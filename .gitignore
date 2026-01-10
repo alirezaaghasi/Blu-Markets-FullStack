@@ -1,3 +1,20 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Zip archives
+*.zip
+
+# Environment files
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+
 ### AL ###
 #Template for AL projects for Dynamics 365 Business Central
 #launch.json folder
