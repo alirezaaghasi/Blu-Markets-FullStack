@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useReducer, useState, useRef } from 'react';
 
-// ====== BLU MARKETS v9.1 ======
+// ====== BLU MARKETS v9.3 ======
+// Visual refresh with Blu Bank design system
 // Fixes from v9:
 // 1. Allocation display: cash separate from Foundation % (assets-only calculation)
 // 2. Hide boundary transition when before === after
@@ -720,7 +721,7 @@ function LayerMini({ layer, pct, target }) {
   const info = LAYER_EXPLANATIONS[layer];
   return (
     <div className="mini">
-      <div className="layerHeader"><span className="layerIcon">{info.icon}</span><span className="tag">{info.name}</span></div>
+      <div className="layerHeader"><span className={`layerDot ${layer}`}></span><span className="tag">{info.name}</span></div>
       <div className="big" style={{ fontSize: 20 }}>{Math.round(pct)}%</div>
       <div className="muted">Target {target}%</div>
     </div>
@@ -796,16 +797,16 @@ function OnboardingRightPanel({ stage, questionIndex, targetLayers, investAmount
     const progress = (questionIndex / questionnaire.questions.length) * 100;
     return (
       <div className="onboardingPanel">
-        <div className="progressCard"><h3>Building Your Profile</h3><div className="bigProgress"><svg viewBox="0 0 100 100" className="progressRing"><circle cx="50" cy="50" r="45" fill="none" stroke="var(--border)" strokeWidth="8" /><circle cx="50" cy="50" r="45" fill="none" stroke="var(--accent)" strokeWidth="8" strokeDasharray={`${progress * 2.83} 283`} strokeLinecap="round" transform="rotate(-90 50 50)" /></svg><div className="progressText">{questionIndex}/{questionnaire.questions.length}</div></div></div>
-        <div className="layerPreviewCard"><h4>The Three Layers</h4>{['foundation', 'growth', 'upside'].map(layer => { const info = LAYER_EXPLANATIONS[layer]; return <div key={layer} className="layerPreviewRow"><span className="layerIcon">{info.icon}</span><div><div className="layerPreviewName">{info.name}</div><div className="layerPreviewDesc">{info.description}</div></div></div>; })}</div>
+        <div className="progressCard"><h3>Building Your Profile</h3><div className="bigProgress"><svg viewBox="0 0 100 100" className="progressRing"><circle cx="50" cy="50" r="45" fill="none" stroke="var(--border-subtle)" strokeWidth="8" /><circle cx="50" cy="50" r="45" fill="none" stroke="#8b5cf6" strokeWidth="8" strokeDasharray={`${progress * 2.83} 283`} strokeLinecap="round" transform="rotate(-90 50 50)" /></svg><div className="progressText">{questionIndex}/{questionnaire.questions.length}</div></div></div>
+        <div className="layerPreviewCard"><h4>The Three Layers</h4>{['foundation', 'growth', 'upside'].map(layer => { const info = LAYER_EXPLANATIONS[layer]; return <div key={layer} className="layerPreviewRow"><span className={`layerDot ${layer}`} style={{ marginTop: 4 }}></span><div><div className="layerPreviewName">{info.name}</div><div className="layerPreviewDesc">{info.description}</div></div></div>; })}</div>
       </div>
     );
   }
   if (stage === STAGES.ALLOCATION_PROPOSED) {
     return (
       <div className="onboardingPanel">
-        <div className="allocationPreviewCard"><h3>Your Allocation</h3><div className="allocationViz">{['foundation', 'growth', 'upside'].map(layer => { const info = LAYER_EXPLANATIONS[layer]; const pct = targetLayers?.[layer] || 0; return <div key={layer} className="allocationBar" style={{ flex: pct }}><span className="barIcon">{info.icon}</span><span className="barPct">{pct}%</span></div>; })}</div>
-        <div className="allocationDetails">{['foundation', 'growth', 'upside'].map(layer => { const info = LAYER_EXPLANATIONS[layer]; const pct = targetLayers?.[layer] || 0; return <div key={layer} className="detailRow"><div className="detailHeader"><span className="layerIcon">{info.icon}</span><span className="detailName">{info.name}</span><span className="detailPct">{pct}%</span></div><div className="detailAssets">{info.assets.join(' · ')}</div></div>; })}</div></div>
+        <div className="allocationPreviewCard"><h3>Your Allocation</h3><div className="allocationViz">{['foundation', 'growth', 'upside'].map(layer => { const info = LAYER_EXPLANATIONS[layer]; const pct = targetLayers?.[layer] || 0; return <div key={layer} className={`allocationBar ${layer}`} style={{ flex: pct }}><span className="barIcon">{info.icon}</span><span className="barPct">{pct}%</span></div>; })}</div>
+        <div className="allocationDetails">{['foundation', 'growth', 'upside'].map(layer => { const info = LAYER_EXPLANATIONS[layer]; const pct = targetLayers?.[layer] || 0; return <div key={layer} className="detailRow"><div className="detailHeader"><span className={`layerDot ${layer}`} style={{ marginRight: 8 }}></span><span className="detailName">{info.name}</span><span className="detailPct">{pct}%</span></div><div className="detailAssets">{info.assets.join(' · ')}</div></div>; })}</div></div>
       </div>
     );
   }
@@ -815,7 +816,7 @@ function OnboardingRightPanel({ stage, questionIndex, targetLayers, investAmount
     return (
       <div className="onboardingPanel">
         <div className="investPreviewCard"><h3>Investment Preview</h3>
-        {isValid ? (<><div className="investTotal"><div className="big">{formatIRR(amount)}</div></div><div className="investBreakdown">{['foundation', 'growth', 'upside'].map(layer => { const info = LAYER_EXPLANATIONS[layer]; const pct = targetLayers?.[layer] || 0; return <div key={layer} className="breakdownRow"><div className="breakdownLeft"><span className="layerIcon">{info.icon}</span><span>{info.name}</span></div><div className="breakdownRight"><span className="breakdownAmount">{formatIRR(Math.floor(amount * pct / 100))}</span></div></div>; })}</div></>) : (<div className="investPlaceholder"><div className="muted">{`Minimum: ${formatIRR(THRESHOLDS.MIN_AMOUNT_IRR)}`}</div></div>)}</div>
+        {isValid ? (<><div className="investTotal"><div className="portfolioValue">{formatIRR(amount)}</div></div><div className="investBreakdown">{['foundation', 'growth', 'upside'].map(layer => { const info = LAYER_EXPLANATIONS[layer]; const pct = targetLayers?.[layer] || 0; return <div key={layer} className="breakdownRow"><div className="breakdownLeft"><span className={`layerDot ${layer}`} style={{ marginRight: 8 }}></span><span>{info.name}</span></div><div className="breakdownRight"><span className="breakdownAmount">{formatIRR(Math.floor(amount * pct / 100))}</span></div></div>; })}</div></>) : (<div className="investPlaceholder"><div className="muted">{`Minimum: ${formatIRR(THRESHOLDS.MIN_AMOUNT_IRR)}`}</div></div>)}</div>
       </div>
     );
   }
@@ -858,7 +859,7 @@ function PortfolioHome({ portfolio, cashIRR, targetLayers, onStartTrade, onStart
   const total = exposure.totalIRR + (cashIRR || 0);
   return (
     <div className="stack">
-      <div className="card"><div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}><div><div className="muted">Total Value</div><div className="big">{formatIRR(total)}</div></div><div style={{ textAlign: 'right' }}><div className="muted">Cash</div><div className="big" style={{ fontSize: 22 }}>{formatIRR(cashIRR || 0)}</div></div></div></div>
+      <div className="card"><div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}><div><div className="muted">Total Value</div><div className="portfolioValue">{formatIRR(total)}</div></div><div style={{ textAlign: 'right' }}><div className="muted">Cash</div><div className="big" style={{ fontSize: 22 }}>{formatIRR(cashIRR || 0)}</div></div></div></div>
       <div className="card"><h3>Asset Allocation</h3><div className="grid3">{['foundation', 'growth', 'upside'].map(layer => <LayerMini key={layer} layer={layer} pct={exposure.pct[layer]} target={targetLayers?.[layer] ?? '-'} />)}</div></div>
       <div className="card"><h3>Holdings</h3><div className="list">{portfolio.holdings.map((h) => { const info = LAYER_EXPLANATIONS[h.layer]; return (
         <div key={h.asset} className="item" style={{ alignItems: 'center' }}><div style={{ flex: 1 }}><div className="asset">{h.asset}</div><div className="muted">{info.icon} {info.name}{h.frozen ? ' · 🔒' : ''}</div></div>
@@ -872,7 +873,7 @@ function Protection({ protections }) {
   const list = protections || [];
   return (
     <div className="card"><h3>Active Protections</h3>
-    {list.length === 0 ? <div className="muted">No assets protected.</div> : <div className="list">{list.map((p, idx) => { const info = LAYER_EXPLANATIONS[p.layer]; return <div key={p.assetId + '|' + idx} className="item"><div style={{ flex: 1 }}><div className="asset">☂️ {p.assetId}</div><div className="muted">{info?.icon} {info?.name} · Until {p.protectedUntil}</div></div><div style={{ textAlign: 'right' }}><div className="asset">{formatIRR(p.premiumIRR)}</div><div className="muted">Premium paid</div></div></div>; })}</div>}</div>
+    {list.length === 0 ? <div className="muted">No assets protected.</div> : <div className="list">{list.map((p, idx) => { const info = LAYER_EXPLANATIONS[p.layer]; return <div key={p.assetId + '|' + idx} className="item protectionItem"><div style={{ flex: 1 }}><div className="asset">☂️ {p.assetId}</div><div className="muted"><span className={`layerDot ${p.layer}`} style={{ marginRight: 6 }}></span>{info?.name} · Until {p.protectedUntil}</div></div><div style={{ textAlign: 'right' }}><div className="asset">{formatIRR(p.premiumIRR)}</div><div className="muted">Premium paid</div></div></div>; })}</div>}</div>
   );
 }
 
@@ -982,42 +983,302 @@ export default function App() {
   return (
     <>
       <style>{`
-        :root{--bg:#0b1220;--panel:#0f1a2e;--card:#101f3a;--border:rgba(255,255,255,.08);--text:#e8eefc;--muted:rgba(232,238,252,.72);--accent:#4f7cff;--accent2:rgba(79,124,255,.18)}
-        *{box-sizing:border-box}html,body{height:100%;margin:0}body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px}
-        .container{height:100vh;display:grid;grid-template-columns:420px 1fr;gap:12px;padding:12px}.panel{background:var(--panel);border:1px solid var(--border);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;min-height:0}
-        .header{padding:14px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:10px}.logo{width:28px;height:28px;border-radius:8px;background:var(--accent2);display:grid;place-items:center;font-weight:700}.h-title{font-weight:700}.h-sub{font-size:12px;color:var(--muted);margin-top:2px}
-        .rightMeta{display:flex;flex-direction:column;align-items:flex-end;gap:6px}.pill{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:rgba(255,255,255,.03);font-weight:600;font-size:11px}
-        .body{padding:14px;overflow:auto;flex:1;min-height:0}.footer{padding:12px;border-top:1px solid var(--border);background:rgba(255,255,255,.02)}.row{display:flex;gap:8px;flex-wrap:wrap}
-        .btn{appearance:none;border:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--text);padding:10px 14px;border-radius:12px;font-weight:600;cursor:pointer;font-size:13px}.btn.primary{background:var(--accent2);border-color:rgba(79,124,255,.35)}.btn.danger{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.4);color:#f87171}.btn:disabled{opacity:.45;cursor:not-allowed}.btn.tiny{padding:6px 10px;font-size:11px;border-radius:10px}.btn.tiny.disabled{opacity:.5;cursor:not-allowed}
-        .input{width:100%;padding:11px 12px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--text);font-weight:500;outline:none;font-size:14px}
-        .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px}.card h3{margin:0 0 10px 0;font-size:14px;font-weight:600}.big{font-size:24px;font-weight:700}.muted{color:var(--muted);font-size:12px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-        .mini{border:1px solid var(--border);border-radius:14px;padding:10px;background:rgba(255,255,255,.02)}.tag{font-size:11px;color:var(--muted);text-transform:uppercase}.list{display:flex;flex-direction:column;gap:10px}.item{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:12px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,.02)}.asset{font-weight:600}
-        .tabs{display:flex;gap:8px;flex-wrap:wrap}.tab{padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,.02);font-weight:600;cursor:pointer;font-size:13px}.tab.active{background:var(--accent2);border-color:rgba(79,124,255,.35)}
-        .chip{padding:8px 12px;border-radius:999px;border:1px solid var(--border);background:rgba(255,255,255,.03);font-weight:600;font-size:12px;cursor:pointer}.chip.primary{background:var(--accent2);border-color:rgba(79,124,255,.35)}
-        @media(max-width:980px){.container{grid-template-columns:1fr;}.panel{min-height:48vh}}
-        .healthBadge{display:inline-flex;align-items:center;padding:6px 12px;border-radius:999px;border:1px solid;font-size:12px;font-weight:600}
-        .healthPill{padding:3px 8px;border-radius:6px;font-size:10px;font-weight:600}.healthPill.small{padding:2px 6px;font-size:9px}.healthPill.safe{background:rgba(34,197,94,.15);color:#4ade80}.healthPill.drift{background:rgba(250,204,21,.15);color:#fde047}.healthPill.structural{background:rgba(249,115,22,.15);color:#fb923c}.healthPill.stress{background:rgba(239,68,68,.15);color:#f87171}
-        .layerIcon{font-size:14px;margin-right:4px}.layerHeader{display:flex;align-items:center;gap:4px;margin-bottom:4px}
-        .actionLog{display:flex;flex-direction:column;gap:4px;font-family:ui-monospace,monospace;font-size:12px}.actionLogEmpty{padding:20px;text-align:center}.logEntry{padding:6px 0;color:var(--muted);border-bottom:1px solid var(--border)}.logEntry:last-child{border-bottom:none}
-        .executionSummary{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:12px;padding:10px;margin-bottom:12px}.summaryHeader{display:flex;align-items:center;gap:8px}.summaryIcon{color:#4ade80}.summaryText{flex:1;font-weight:600;font-size:13px}.summaryDismiss{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0}.summaryBoundary{display:flex;align-items:center;gap:6px;margin-top:6px}.arrow{color:var(--muted);font-size:11px}
-        .questionnaireHeader{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.q-card{border:1px solid var(--border);border-radius:16px;padding:12px;background:rgba(255,255,255,.02)}.q-title{font-weight:600;margin-bottom:6px;line-height:1.4}.q-english{font-size:12px;color:var(--muted);margin-bottom:10px;font-style:italic}.q-options{display:flex;flex-direction:column;gap:8px}.opt{appearance:none;border:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--text);padding:10px 12px;border-radius:12px;font-weight:500;cursor:pointer;text-align:left}.opt:hover{border-color:rgba(79,124,255,.35)}.opt-english{font-size:11px;color:var(--muted);margin-top:4px;font-weight:400}
-        .consentCard{border:1px solid var(--border);border-radius:14px;padding:12px;background:rgba(255,255,255,.02)}.consentHeader{font-weight:600;margin-bottom:8px}.consentInstruction{font-size:12px;color:var(--muted);margin-bottom:10px}.consentSentence{background:rgba(0,0,0,.2);border-radius:10px;padding:10px;margin-bottom:10px}.sentenceFa{font-weight:600;font-size:13px;line-height:1.5}.sentenceEn{font-size:11px;color:var(--muted);margin-top:6px;font-style:italic}
-        .actionCard{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px}.actionTitle{font-weight:600;font-size:13px;margin-bottom:10px;color:var(--muted)}
-        .previewPanel{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px}.previewTitle{font-weight:600;font-size:13px;margin-bottom:10px;color:var(--muted)}.previewCard{border:1px solid var(--border);border-radius:12px;padding:12px;background:rgba(255,255,255,.02)}.previewGrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.previewLabel{font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:4px}.previewLayers{font-size:13px;font-weight:600}.previewTotal{font-size:12px;color:var(--muted);margin-top:4px}.projectedBoundary{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}.projectedLabel{font-size:11px;color:var(--muted)}
-        .validationDisplay{margin-top:10px}.validationError{padding:8px 12px;border-radius:8px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#f87171;font-size:12px;margin-bottom:6px}.validationWarning{padding:8px 12px;border-radius:8px;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.25);color:#fb923c;font-size:12px;margin-bottom:6px}
-        .acknowledgment{margin-top:12px;padding:10px;border:1px solid rgba(249,115,22,.3);border-radius:10px;background:rgba(249,115,22,.08)}.ackLabel{display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12px;color:#fb923c}.ackLabel input{margin-top:2px}
-        .ledgerList{display:flex;flex-direction:column;gap:8px}.ledgerEntry{border:1px solid var(--border);border-radius:12px;padding:10px;background:rgba(255,255,255,.02)}.ledgerHeader{display:flex;align-items:center;gap:8px}.ledgerIcon{font-size:12px;width:20px}.ledgerAction{font-weight:600;font-size:13px;flex:1}.ledgerTime{color:var(--muted);font-size:11px}.ledgerExpand{color:var(--muted);font-size:14px;width:20px;text-align:center}.ledgerBoundary{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}.ledgerDetails{margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}.ledgerSnapshot{display:grid;grid-template-columns:1fr 1fr;gap:12px}.snapshotLabel{font-size:10px;color:var(--muted);text-transform:uppercase}.snapshotValue{font-weight:600;font-size:13px;margin-top:2px}
-        .ltvLimits{margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}.limitsTitle{font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:8px}.limitsRow{display:flex;justify-content:space-between;font-size:12px;padding:3px 0}
-        .borrowHint,.premiumHint{font-size:11px;color:var(--muted);margin-top:6px;padding:6px 8px;background:rgba(0,0,0,.2);border-radius:6px}.loanItem{background:rgba(79,124,255,.08)}.loanAmount{font-size:18px;font-weight:700}.loanDetails{font-size:12px;color:var(--muted);margin-top:4px}.liquidationValue{font-size:16px;font-weight:600;color:#fb923c}
-        .repayDetails{background:rgba(0,0,0,.2);border-radius:10px;padding:10px}.repayRow{display:flex;justify-content:space-between;font-size:12px;padding:4px 0}
-        .fundingDetails{background:rgba(0,0,0,.2);border-radius:10px;padding:12px;margin-bottom:8px}.fundingRow{display:flex;justify-content:space-between;font-size:13px;padding:4px 0}
-        .modalOverlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:100}.modal{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:20px;max-width:400px;width:90%}.modalHeader{font-weight:700;font-size:16px;margin-bottom:12px}.modalBody{margin-bottom:16px}.modalBody p{margin:0 0 10px 0;font-size:13px;color:var(--muted)}.modalInput{margin-top:12px}.modalInput label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}.modalFooter{display:flex;gap:8px}
-        .onboardingPanel{height:100%;display:flex;flex-direction:column;gap:12px}.welcomeCard{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;text-align:center}.welcomeIcon{font-size:48px;margin-bottom:12px}.welcomeCard h2{margin:0 0 8px 0;font-weight:700}.welcomeCard p{color:var(--muted);margin:0 0 16px 0}.welcomeFeatures{text-align:left}.featureItem{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}.featureItem:last-child{border-bottom:none}.featureIcon{font-size:18px}
-        .progressCard{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;text-align:center}.progressCard h3{margin:0 0 16px 0}.bigProgress{position:relative;width:100px;height:100px;margin:0 auto 16px}.progressRing{width:100%;height:100%}.progressText{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-weight:700;font-size:18px}
-        .layerPreviewCard{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}.layerPreviewCard h4{margin:0 0 12px 0;font-size:13px}.layerPreviewRow{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px}.layerPreviewRow:last-child{margin-bottom:0}.layerPreviewName{font-weight:600;font-size:12px}.layerPreviewDesc{font-size:11px;color:var(--muted)}
-        .allocationPreviewCard{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}.allocationPreviewCard h3{margin:0 0 14px 0}.allocationViz{display:flex;gap:2px;height:50px;margin-bottom:16px;border-radius:8px;overflow:hidden}.allocationBar{display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--accent2)}.barIcon{font-size:16px}.barPct{font-size:12px;font-weight:600}.allocationDetails{display:flex;flex-direction:column;gap:10px}.detailHeader{display:flex;align-items:center;gap:8px}.detailName{font-weight:600;font-size:12px;flex:1}.detailPct{font-weight:600}.detailAssets{font-size:11px;color:var(--muted);margin-left:24px;margin-top:2px}
-        .investPreviewCard{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}.investPreviewCard h3{margin:0 0 14px 0}.investTotal{text-align:center;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)}.investBreakdown{display:flex;flex-direction:column;gap:8px}.breakdownRow{display:flex;justify-content:space-between;align-items:center}.breakdownLeft{display:flex;align-items:center;gap:8px}.breakdownAmount{font-weight:600;font-size:13px}.investPlaceholder{padding:30px;text-align:center}
+        /* ===== BLU BANK DESIGN SYSTEM ===== */
+        :root {
+          /* Backgrounds */
+          --bg-primary: #0a0e17;
+          --bg-secondary: #111827;
+          --bg-tertiary: #1a2234;
+
+          /* Gradient Accents */
+          --gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+          --gradient-secondary: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+          --gradient-success: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+          --gradient-warning: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+          --gradient-danger: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+
+          /* Text Colors */
+          --text-primary: #f9fafb;
+          --text-secondary: #9ca3af;
+          --text-muted: #6b7280;
+
+          /* Borders */
+          --border-subtle: rgba(255, 255, 255, 0.06);
+          --border-accent: rgba(139, 92, 246, 0.3);
+
+          /* Shadows */
+          --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
+          --shadow-glow: 0 0 20px rgba(139, 92, 246, 0.15);
+
+          /* Legacy mappings */
+          --bg: var(--bg-primary);
+          --panel: var(--bg-secondary);
+          --card: var(--bg-secondary);
+          --border: var(--border-subtle);
+          --text: var(--text-primary);
+          --muted: var(--text-secondary);
+        }
+
+        *{box-sizing:border-box;transition-property:background-color,border-color,color,box-shadow,transform;transition-duration:0.15s;transition-timing-function:ease}
+        html,body{height:100%;margin:0}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg-primary);color:var(--text-primary);font-size:14px}
+
+        /* Scrollbar */
+        ::-webkit-scrollbar{width:6px}
+        ::-webkit-scrollbar-track{background:var(--bg-primary)}
+        ::-webkit-scrollbar-thumb{background:var(--bg-tertiary);border-radius:3px}
+        ::-webkit-scrollbar-thumb:hover{background:rgba(139,92,246,0.5)}
+
+        /* Layout */
+        .container{height:100vh;display:grid;grid-template-columns:420px 1fr;gap:12px;padding:12px}
+        .panel{background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;min-height:0;box-shadow:var(--shadow-card)}
+
+        /* Header */
+        .header{padding:20px;border-bottom:1px solid var(--border-subtle);display:flex;align-items:flex-start;gap:12px}
+        .logo{width:32px;height:32px;border-radius:10px;background:var(--gradient-primary);display:grid;place-items:center;font-weight:700;color:white;font-size:14px;box-shadow:0 4px 12px rgba(139,92,246,0.3)}
+        .h-title{font-weight:700;font-size:18px;background:var(--gradient-primary);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+        .h-sub{font-size:12px;color:var(--text-secondary);margin-top:4px}
+        .rightMeta{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+        .pill{display:inline-flex;gap:8px;align-items:center;padding:8px 14px;border:1px solid var(--border-subtle);border-radius:999px;background:var(--bg-tertiary);font-weight:600;font-size:12px;color:var(--text-secondary)}
+
+        /* Body & Footer */
+        .body{padding:16px;overflow:auto;flex:1;min-height:0}
+        .footer{padding:16px;border-top:1px solid var(--border-subtle);background:var(--bg-tertiary)}
+        .row{display:flex;gap:10px;flex-wrap:wrap}
+
+        /* Buttons - Primary (Gradient) */
+        .btn{appearance:none;border:1px solid var(--border-subtle);background:var(--bg-tertiary);color:var(--text-primary);padding:12px 20px;border-radius:12px;font-weight:600;cursor:pointer;font-size:14px;transition:all 0.2s ease}
+        .btn:hover{background:var(--bg-secondary);border-color:var(--border-accent);transform:translateY(-1px)}
+        .btn:active{transform:translateY(0) scale(0.98)}
+        .btn.primary{background:var(--gradient-primary);border:none;color:white;box-shadow:0 4px 12px rgba(139,92,246,0.3)}
+        .btn.primary:hover{box-shadow:0 6px 20px rgba(139,92,246,0.4);transform:translateY(-1px)}
+        .btn.danger{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.4);color:#f87171}
+        .btn.danger:hover{background:var(--gradient-danger);color:white;border-color:transparent}
+        .btn:disabled{background:var(--bg-tertiary);color:var(--text-muted);box-shadow:none;cursor:not-allowed;transform:none;opacity:0.5}
+        .btn.tiny{padding:8px 14px;font-size:12px;border-radius:8px;font-weight:500}
+        .btn.tiny:hover{background:var(--gradient-secondary);border-color:transparent;color:white}
+        .btn.tiny.disabled{opacity:.5;cursor:not-allowed}
+
+        /* Inputs */
+        .input{width:100%;padding:14px 16px;border-radius:12px;border:1px solid var(--border-subtle);background:var(--bg-primary);color:var(--text-primary);font-weight:500;outline:none;font-size:15px;transition:all 0.2s ease}
+        .input:focus{border-color:rgba(139,92,246,0.5);box-shadow:0 0 0 3px rgba(139,92,246,0.1)}
+        .input::placeholder{color:var(--text-muted)}
+
+        /* Cards */
+        .card{background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:16px;padding:20px;margin-bottom:12px;box-shadow:var(--shadow-card);transition:all 0.2s ease}
+        .card:hover{border-color:var(--border-accent);box-shadow:var(--shadow-card),var(--shadow-glow)}
+        .card h3{margin:0 0 14px 0;font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary)}
+        .big{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums}
+        .muted{color:var(--text-secondary);font-size:13px}
+        .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+
+        /* Layer Mini Cards */
+        .mini{border:1px solid var(--border-subtle);border-radius:14px;padding:14px;background:var(--bg-tertiary);transition:all 0.2s ease}
+        .mini:hover{border-color:var(--border-accent);box-shadow:var(--shadow-glow)}
+        .tag{font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em}
+        .list{display:flex;flex-direction:column;gap:10px}
+
+        /* Asset Items */
+        .item{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:16px 20px;border:1px solid var(--border-subtle);border-radius:14px;background:var(--bg-tertiary);transition:all 0.2s ease}
+        .item:hover{background:var(--bg-secondary);transform:translateY(-1px);border-color:var(--border-accent)}
+        .asset{font-weight:600;font-size:15px}
+
+        /* Tabs */
+        .tabs{display:flex;gap:4px;background:var(--bg-primary);padding:4px;border-radius:12px}
+        .tab{flex:1;padding:12px 16px;border-radius:8px;border:none;background:transparent;font-weight:500;cursor:pointer;font-size:14px;color:var(--text-secondary);transition:all 0.2s ease}
+        .tab:hover{color:var(--text-primary);background:var(--bg-tertiary)}
+        .tab.active{color:white;background:var(--gradient-primary);box-shadow:0 2px 8px rgba(139,92,246,0.3)}
+
+        /* Chips */
+        .chip{padding:10px 16px;border-radius:999px;border:1px solid var(--border-subtle);background:var(--bg-tertiary);font-weight:600;font-size:13px;cursor:pointer;transition:all 0.2s ease}
+        .chip:hover{border-color:var(--border-accent)}
+        .chip.primary{background:var(--gradient-primary);border:none;color:white}
+
+        @media(max-width:980px){.container{grid-template-columns:1fr}.panel{min-height:48vh}}
+
+        /* Health Badges */
+        .healthBadge{display:inline-flex;align-items:center;padding:8px 14px;border-radius:999px;border:1px solid;font-size:12px;font-weight:600;letter-spacing:0.03em}
+        .healthPill{padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em}
+        .healthPill.small{padding:3px 8px;font-size:10px}
+        .healthPill.safe{background:rgba(16,185,129,.15);color:#34d399}
+        .healthPill.drift{background:rgba(250,204,21,.15);color:#fbbf24}
+        .healthPill.structural{background:var(--gradient-warning);color:#0a0e17}
+        .healthPill.stress{background:rgba(239,68,68,.15);color:#f87171}
+
+        /* Layer Indicators */
+        .layerIcon{font-size:14px;margin-right:6px}
+        .layerHeader{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+        .layerDot{width:8px;height:8px;border-radius:50%;display:inline-block}
+        .layerDot.foundation{background:#10b981;box-shadow:0 0 6px rgba(16,185,129,0.5)}
+        .layerDot.growth{background:#8b5cf6;box-shadow:0 0 6px rgba(139,92,246,0.5)}
+        .layerDot.upside{background:#f59e0b;box-shadow:0 0 6px rgba(245,158,11,0.5)}
+
+        /* Action Log */
+        .actionLog{display:flex;flex-direction:column;gap:6px;font-family:'SF Mono','Fira Code',ui-monospace,monospace;font-size:12px;line-height:1.8}
+        .actionLogEmpty{padding:24px;text-align:center}
+        .logEntry{padding:8px 0;color:var(--text-secondary);border-bottom:1px solid var(--border-subtle)}
+        .logEntry:last-child{border-bottom:none}
+
+        /* Execution Summary */
+        .executionSummary{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25);border-radius:14px;padding:14px;margin-bottom:14px}
+        .summaryHeader{display:flex;align-items:center;gap:10px}
+        .summaryIcon{color:#34d399;font-size:16px}
+        .summaryText{flex:1;font-weight:600;font-size:14px}
+        .summaryDismiss{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;padding:0}
+        .summaryBoundary{display:flex;align-items:center;gap:8px;margin-top:8px}
+        .arrow{color:var(--text-muted);font-size:12px}
+
+        /* Questionnaire */
+        .questionnaireHeader{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+        .q-card{border:1px solid var(--border-subtle);border-radius:16px;padding:16px;background:var(--bg-tertiary)}
+        .q-title{font-weight:600;margin-bottom:8px;line-height:1.5;font-size:15px}
+        .q-english{font-size:12px;color:var(--text-secondary);margin-bottom:12px;font-style:italic}
+        .q-options{display:flex;flex-direction:column;gap:10px}
+        .opt{appearance:none;border:1px solid var(--border-subtle);background:var(--bg-secondary);color:var(--text-primary);padding:14px 16px;border-radius:12px;font-weight:500;cursor:pointer;text-align:left;transition:all 0.2s ease}
+        .opt:hover{border-color:var(--border-accent);background:var(--bg-tertiary);transform:translateY(-1px)}
+        .opt-english{font-size:11px;color:var(--text-muted);margin-top:6px;font-weight:400}
+
+        /* Consent Card */
+        .consentCard{border:1px solid var(--border-subtle);border-radius:16px;padding:20px;background:var(--bg-tertiary)}
+        .consentHeader{font-weight:700;margin-bottom:10px;font-size:16px}
+        .consentInstruction{font-size:13px;color:var(--text-secondary);margin-bottom:12px}
+        .consentSentence{background:var(--bg-primary);border-radius:12px;padding:14px;margin-bottom:14px;border:1px solid var(--border-subtle)}
+        .sentenceFa{font-weight:600;font-size:14px;line-height:1.6}
+        .sentenceEn{font-size:12px;color:var(--text-secondary);margin-top:8px;font-style:italic}
+
+        /* Action Card */
+        .actionCard{background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:16px;padding:16px;box-shadow:var(--shadow-card)}
+        .actionTitle{font-weight:600;font-size:14px;margin-bottom:12px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.03em}
+
+        /* Preview Panel */
+        .previewPanel{background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:16px;padding:16px;box-shadow:var(--shadow-card)}
+        .previewTitle{font-weight:600;font-size:14px;margin-bottom:12px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.03em}
+        .previewCard{border:1px solid var(--border-subtle);border-radius:14px;padding:16px;background:var(--bg-tertiary)}
+        .previewGrid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+        .previewLabel{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px}
+        .previewLayers{font-size:14px;font-weight:600}
+        .previewTotal{font-size:13px;color:var(--text-secondary);margin-top:6px}
+        .projectedBoundary{display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border-subtle)}
+        .projectedLabel{font-size:12px;color:var(--text-muted)}
+
+        /* Validation */
+        .validationDisplay{margin-top:12px}
+        .validationError{padding:12px 16px;border-radius:10px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#f87171;font-size:13px;margin-bottom:8px}
+        .validationWarning{padding:12px 16px;border-radius:10px;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.25);color:#fbbf24;font-size:13px;margin-bottom:8px}
+
+        /* Acknowledgment */
+        .acknowledgment{margin-top:14px;padding:14px;border:1px solid rgba(249,115,22,.3);border-radius:12px;background:rgba(249,115,22,.08)}
+        .ackLabel{display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:#fbbf24}
+        .ackLabel input{margin-top:3px}
+
+        /* Ledger/History */
+        .ledgerList{display:flex;flex-direction:column;gap:10px}
+        .ledgerEntry{border:1px solid var(--border-subtle);border-radius:14px;padding:14px;background:var(--bg-tertiary);transition:all 0.2s ease}
+        .ledgerEntry:hover{border-color:var(--border-accent)}
+        .ledgerHeader{display:flex;align-items:center;gap:10px}
+        .ledgerIcon{font-size:14px;width:24px}
+        .ledgerAction{font-weight:600;font-size:14px;flex:1}
+        .ledgerTime{color:var(--text-muted);font-size:12px}
+        .ledgerExpand{color:var(--text-muted);font-size:16px;width:24px;text-align:center}
+        .ledgerBoundary{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+        .ledgerDetails{margin-top:12px;padding-top:12px;border-top:1px solid var(--border-subtle)}
+        .ledgerSnapshot{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+        .snapshotLabel{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em}
+        .snapshotValue{font-weight:600;font-size:14px;margin-top:4px}
+
+        /* LTV Limits */
+        .ltvLimits{margin-top:14px;padding-top:14px;border-top:1px solid var(--border-subtle)}
+        .limitsTitle{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px}
+        .limitsRow{display:flex;justify-content:space-between;font-size:13px;padding:4px 0}
+
+        /* Loan Styling */
+        .borrowHint,.premiumHint{font-size:12px;color:var(--text-secondary);margin-top:8px;padding:10px 12px;background:var(--bg-primary);border-radius:8px;border:1px solid var(--border-subtle)}
+        .loanItem{background:linear-gradient(135deg,var(--bg-tertiary) 0%,var(--bg-secondary) 100%);border:1px solid var(--border-accent);position:relative;overflow:hidden}
+        .loanItem::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--gradient-warning)}
+        .loanAmount{font-size:24px;font-weight:700}
+        .loanDetails{font-size:13px;color:var(--text-secondary);margin-top:6px}
+        .liquidationValue{font-size:18px;font-weight:600;color:#fbbf24}
+
+        /* Repay Details */
+        .repayDetails{background:var(--bg-primary);border-radius:12px;padding:14px;border:1px solid var(--border-subtle)}
+        .repayRow{display:flex;justify-content:space-between;font-size:13px;padding:6px 0}
+
+        /* Funding Details */
+        .fundingDetails{background:var(--bg-primary);border-radius:12px;padding:16px;margin-bottom:12px;border:1px solid var(--border-subtle)}
+        .fundingRow{display:flex;justify-content:space-between;font-size:14px;padding:6px 0}
+
+        /* Modal */
+        .modalOverlay{position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(4px)}
+        .modal{background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:20px;padding:24px;max-width:420px;width:90%;box-shadow:var(--shadow-card),var(--shadow-glow)}
+        .modalHeader{font-weight:700;font-size:18px;margin-bottom:16px}
+        .modalBody{margin-bottom:20px}
+        .modalBody p{margin:0 0 12px 0;font-size:14px;color:var(--text-secondary)}
+        .modalInput{margin-top:14px}
+        .modalInput label{display:block;font-size:12px;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em}
+        .modalFooter{display:flex;gap:10px}
+
+        /* Onboarding */
+        .onboardingPanel{height:100%;display:flex;flex-direction:column;gap:14px}
+        .welcomeCard{background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:20px;padding:28px;text-align:center;box-shadow:var(--shadow-card)}
+        .welcomeIcon{font-size:56px;margin-bottom:16px}
+        .welcomeCard h2{margin:0 0 10px 0;font-weight:700;font-size:22px;background:var(--gradient-primary);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+        .welcomeCard p{color:var(--text-secondary);margin:0 0 20px 0;font-size:15px}
+        .welcomeFeatures{text-align:left}
+        .featureItem{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border-subtle)}
+        .featureItem:last-child{border-bottom:none}
+        .featureIcon{font-size:20px}
+
+        /* Progress Card */
+        .progressCard{background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:20px;padding:24px;text-align:center;box-shadow:var(--shadow-card)}
+        .progressCard h3{margin:0 0 20px 0;font-size:16px}
+        .bigProgress{position:relative;width:110px;height:110px;margin:0 auto 20px}
+        .progressRing{width:100%;height:100%}
+        .progressText{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-weight:700;font-size:20px}
+
+        /* Layer Preview Card */
+        .layerPreviewCard{background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:16px;padding:18px;box-shadow:var(--shadow-card)}
+        .layerPreviewCard h4{margin:0 0 14px 0;font-size:14px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary)}
+        .layerPreviewRow{display:flex;align-items:flex-start;gap:12px;margin-bottom:12px}
+        .layerPreviewRow:last-child{margin-bottom:0}
+        .layerPreviewName{font-weight:600;font-size:13px}
+        .layerPreviewDesc{font-size:12px;color:var(--text-secondary)}
+
+        /* Allocation Preview */
+        .allocationPreviewCard{background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:16px;padding:18px;box-shadow:var(--shadow-card)}
+        .allocationPreviewCard h3{margin:0 0 16px 0;font-size:14px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary)}
+        .allocationViz{display:flex;gap:2px;height:56px;margin-bottom:20px;border-radius:10px;overflow:hidden}
+        .allocationBar{display:flex;flex-direction:column;align-items:center;justify-content:center}
+        .allocationBar.foundation{background:linear-gradient(180deg,#10b981,#34d399)}
+        .allocationBar.growth{background:linear-gradient(180deg,#6366f1,#8b5cf6)}
+        .allocationBar.upside{background:linear-gradient(180deg,#f59e0b,#fbbf24)}
+        .allocationBar.cash{background:linear-gradient(180deg,#6b7280,#9ca3af)}
+        .barIcon{font-size:18px}
+        .barPct{font-size:13px;font-weight:600}
+        .allocationDetails{display:flex;flex-direction:column;gap:12px}
+        .detailHeader{display:flex;align-items:center;gap:10px}
+        .detailName{font-weight:600;font-size:13px;flex:1}
+        .detailPct{font-weight:600}
+        .detailAssets{font-size:12px;color:var(--text-secondary);margin-left:28px;margin-top:4px}
+
+        /* Invest Preview */
+        .investPreviewCard{background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:16px;padding:18px;box-shadow:var(--shadow-card)}
+        .investPreviewCard h3{margin:0 0 16px 0;font-size:14px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary)}
+        .investTotal{text-align:center;margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--border-subtle)}
+        .investBreakdown{display:flex;flex-direction:column;gap:10px}
+        .breakdownRow{display:flex;justify-content:space-between;align-items:center}
+        .breakdownLeft{display:flex;align-items:center;gap:10px}
+        .breakdownAmount{font-weight:600;font-size:14px}
+        .investPlaceholder{padding:36px;text-align:center}
+
+        /* Protection Card Styling */
+        .protectionItem{background:linear-gradient(135deg,var(--bg-tertiary) 0%,var(--bg-secondary) 100%);border:1px solid rgba(139,92,246,0.3);position:relative;overflow:hidden}
+        .protectionItem::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--gradient-primary)}
+        .protectionBadge{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:rgba(139,92,246,0.15);color:#a78bfa;font-size:11px;font-weight:600;border-radius:6px}
+
         .stack{display:flex;flex-direction:column;gap:0}
+
+        /* Portfolio Value Gradient */
+        .portfolioValue{font-size:32px;font-weight:700;background:var(--gradient-primary);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
       `}</style>
       <div className="container">
         <div className="panel">
