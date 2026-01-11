@@ -1,112 +1,132 @@
 import React, { useEffect, useMemo, useReducer, useState, useRef } from 'react';
 
 // ====== QUESTIONNAIRE DATA ======
+// Designed per Blu Markets Questionnaire Guidelines v8
+// Measures: income stability, cash-flow resilience, loss tolerance, time horizon, reaction to volatility
+// Behavioral framing: "what do you actually do" not "what should you do"
+// No visible scoring, no labels shown to user
 const questionnaire = {
-  "version": "v7.3",
+  "version": "v8.1",
   "consent_exact": "متوجه ریسک این سبد دارایی شدم و باهاش موافق هستم.",
   "consent_english": "I understand the risk of this portfolio and I agree with it.",
   "questions": [
     {
       "id": "q_income",
-      "text": "درآمد ماهانه‌ات چقدر قابل‌پیش‌بینیه؟",
-      "english": "How predictable is your monthly income?",
+      // Income stability - behavioral
+      "text": "هر ماه می‌دونی چقدر پول قراره بیاد؟",
+      "english": "Do you know how much money is coming in each month?",
       "options": [
-        { "id": "inc_stable", "text": "کاملاً ثابت", "english": "Completely stable", "risk": 0 },
-        { "id": "inc_some", "text": "تا حدی ثابت", "english": "Somewhat stable", "risk": 1 },
-        { "id": "inc_var", "text": "متغیره (فریلنس/کسب‌وکار)", "english": "Variable (freelance/business)", "risk": 2 }
+        { "id": "inc_fixed", "text": "آره، حقوقم ثابته", "english": "Yes, my salary is fixed", "risk": 0 },
+        { "id": "inc_mostly", "text": "تقریباً، ولی یه کم بالا پایین داره", "english": "Roughly, but it varies a bit", "risk": 1 },
+        { "id": "inc_variable", "text": "نه، هر ماه فرق می‌کنه", "english": "No, it's different every month", "risk": 2 }
       ]
     },
     {
       "id": "q_buffer",
-      "text": "بدون فروش سرمایه‌گذاری‌هات تا چند ماه می‌تونی خرج غیرمنتظره رو مدیریت کنی؟",
-      "english": "How many months can you handle unexpected expenses without selling investments?",
+      // Cash-flow resilience - real situation
+      "text": "اگه یه خرج بزرگ غیرمنتظره پیش بیاد، بدون دست زدن به این پول چقدر دووم میاری؟",
+      "english": "If a big unexpected expense came up, how long could you last without touching this money?",
       "options": [
-        { "id": "buf_1", "text": "کمتر از ۱ ماه", "english": "Less than 1 month", "risk": 0 },
-        { "id": "buf_3", "text": "۱ تا ۳ ماه", "english": "1 to 3 months", "risk": 1 },
-        { "id": "buf_6", "text": "بیش از ۶ ماه", "english": "More than 6 months", "risk": 2 }
+        { "id": "buf_none", "text": "نمی‌تونم، باید از همین بردارم", "english": "I can't, I'd have to use this", "risk": 0 },
+        { "id": "buf_short", "text": "یکی دو ماه، بیشتر نه", "english": "A month or two, no more", "risk": 1 },
+        { "id": "buf_long", "text": "چند ماه راحت، جدا پس‌انداز دارم", "english": "Several months easily, I have separate savings", "risk": 2 }
       ]
     },
     {
-      "id": "q_drawdown",
-      "text": "اگر ارزش سبدت ۲۰٪ افت کنه، احتمالاً چیکار می‌کنی؟",
-      "english": "If your portfolio drops 20%, what would you likely do?",
+      "id": "q_dependency",
+      // Cash-flow resilience - dependency check
+      "text": "این پول قراره خرج چیزی بشه؟ مثلاً قسط، اجاره، خرج خونه؟",
+      "english": "Is this money meant to cover something? Like installments, rent, household expenses?",
       "options": [
-        { "id": "dd_sell", "text": "می‌فروشم", "english": "Sell", "risk": 0 },
-        { "id": "dd_hold_scared", "text": "استرس می‌گیرم ولی صبر می‌کنم", "english": "Stress but hold", "risk": 1 },
-        { "id": "dd_hold_check", "text": "صبر می‌کنم و منطقی بررسی می‌کنم", "english": "Hold and evaluate rationally", "risk": 2 }
+        { "id": "dep_yes", "text": "آره، باهاش خرج ثابت دارم", "english": "Yes, I have fixed expenses with it", "risk": 0 },
+        { "id": "dep_partial", "text": "شاید یه بخشیش رو لازم داشته باشم", "english": "I might need part of it", "risk": 1 },
+        { "id": "dep_no", "text": "نه، این پول اضافه‌ست", "english": "No, this is extra money", "risk": 2 }
       ]
     },
     {
       "id": "q_horizon",
-      "text": "افق زمانی این پول چقدره؟",
-      "english": "What is your time horizon for this money?",
+      // Time horizon - real situation
+      "text": "کِی ممکنه این پول رو لازم داشته باشی؟",
+      "english": "When might you need this money?",
       "options": [
-        { "id": "hz_short", "text": "کمتر از ۶ ماه", "english": "Less than 6 months", "risk": 0 },
-        { "id": "hz_mid", "text": "۶ ماه تا ۲ سال", "english": "6 months to 2 years", "risk": 1 },
-        { "id": "hz_long", "text": "بیش از ۳ سال", "english": "More than 3 years", "risk": 2 }
+        { "id": "hz_soon", "text": "شاید چند ماه دیگه", "english": "Maybe in a few months", "risk": 0 },
+        { "id": "hz_mid", "text": "یکی دو سال دیگه احتمالاً", "english": "Probably in a year or two", "risk": 1 },
+        { "id": "hz_long", "text": "فعلاً خبری نیست، بلندمدته", "english": "Nothing soon, it's long-term", "risk": 2 }
       ]
     },
     {
-      "id": "q_experience",
-      "text": "تجربه‌ات از دارایی‌های نوسانی چقدره؟",
-      "english": "How much experience do you have with volatile assets?",
+      "id": "q_past_behavior",
+      // Loss tolerance - past behavior (not hypothetical)
+      "text": "قبلاً شده چیزی بخری و قیمتش بیفته؟ چیکار کردی؟",
+      "english": "Have you ever bought something and its price dropped? What did you do?",
       "options": [
-        { "id": "ex_none", "text": "تقریباً هیچ", "english": "Almost none", "risk": 0 },
-        { "id": "ex_some", "text": "متوسط", "english": "Moderate", "risk": 1 },
-        { "id": "ex_high", "text": "زیاد", "english": "Extensive", "risk": 2 }
+        { "id": "past_sold", "text": "فروختم که بیشتر ضرر نکنم", "english": "Sold it to avoid more loss", "risk": 0 },
+        { "id": "past_stressed", "text": "نگهش داشتم ولی کلی استرس داشتم", "english": "Kept it but was very stressed", "risk": 1 },
+        { "id": "past_fine", "text": "نگهش داشتم، زیاد فکرم رو درگیر نکرد", "english": "Kept it, didn't think about it much", "risk": 2 },
+        { "id": "past_never", "text": "نه، تاحالا برام پیش نیومده", "english": "No, this hasn't happened to me", "risk": 1 }
       ]
     },
     {
-      "id": "q_sleep",
-      "text": "با کدوم جمله بیشتر موافقی؟",
-      "english": "Which statement do you agree with more?",
+      "id": "q_check_freq",
+      // Reaction to volatility - behavioral indicator
+      "text": "وقتی پولت جایی گذاشتی، هر چند وقت یه بار سر می‌زنی ببینی چی شده؟",
+      "english": "When you've put money somewhere, how often do you check on it?",
       "options": [
-        { "id": "sl_calm", "text": "آرامش مهم‌تر از سود بالاست", "english": "Peace of mind > high returns", "risk": 0 },
-        { "id": "sl_mix", "text": "تعادل بین آرامش و رشد", "english": "Balance between calm and growth", "risk": 1 },
-        { "id": "sl_up", "text": "رشد مهم‌تره حتی با نوسان", "english": "Growth > volatility concerns", "risk": 2 }
+        { "id": "check_daily", "text": "هر روز، بعضی وقتا چند بار", "english": "Every day, sometimes multiple times", "risk": 0 },
+        { "id": "check_weekly", "text": "هفته‌ای یه بار، دو بار", "english": "Once or twice a week", "risk": 1 },
+        { "id": "check_rarely", "text": "خیلی کم، وقتی یادم بیفته", "english": "Rarely, when I remember", "risk": 2 }
       ]
     },
     {
-      "id": "q_goal",
-      "text": "هدف اصلی‌ات از سرمایه‌گذاری چیه؟",
-      "english": "What is your main investment goal?",
+      "id": "q_regret",
+      // Loss tolerance - emotional framing
+      "text": "کدوم بیشتر ناراحتت می‌کنه؟",
+      "english": "Which bothers you more?",
       "options": [
-        { "id": "g_preserve", "text": "حفظ ارزش پول", "english": "Preserve value", "risk": 0 },
-        { "id": "g_grow", "text": "رشد متعادل", "english": "Balanced growth", "risk": 1 },
-        { "id": "g_moon", "text": "رشد بالاتر با ریسک بیشتر", "english": "Higher growth with more risk", "risk": 2 }
+        { "id": "regret_loss", "text": "پولم کم شد، ضرر کردم", "english": "My money went down, I lost", "risk": 0 },
+        { "id": "regret_both", "text": "هر دو بد هستن، ولی ضرر بدتره", "english": "Both are bad, but losing is worse", "risk": 1 },
+        { "id": "regret_miss", "text": "نخریدم و سودش رو از دست دادم", "english": "I didn't buy and missed the gains", "risk": 2 }
+      ]
+    },
+    {
+      "id": "q_forced_exit",
+      // Cash-flow resilience + loss tolerance combined
+      "text": "اگه مجبور بشی همین الان همه‌ی این پول رو نقد کنی، چقدر به‌هم می‌ریزی؟",
+      "english": "If you had to cash out all this money right now, how much would it mess things up?",
+      "options": [
+        { "id": "exit_bad", "text": "خیلی، روش حساب باز کردم", "english": "A lot, I'm counting on it", "risk": 0 },
+        { "id": "exit_ok", "text": "یه کم اذیت میشم ولی نه خیلی", "english": "A bit annoying but not too much", "risk": 1 },
+        { "id": "exit_fine", "text": "هیچی، فقط می‌خوام رشد کنه", "english": "Nothing, I just want it to grow", "risk": 2 }
       ]
     }
   ]
 };
 
-// Layer explanations for onboarding
+// Layer explanations for onboarding - plain language, no jargon
 const LAYER_EXPLANATIONS = {
   foundation: {
     name: 'Foundation',
     nameFa: 'پایه',
     assets: ['USDT', 'Fixed Income'],
-    description: 'Stable assets that preserve value. Low volatility, steady returns.',
-    descriptionFa: 'دارایی‌های پایدار برای حفظ ارزش. نوسان کم، بازده ثابت.',
+    description: 'Stable assets. Your safety net.',
+    descriptionFa: 'دارایی‌های پایدار. پشتوانه‌ی امنت.',
     color: '#4ade80',
-    risk: 'Low',
   },
   growth: {
     name: 'Growth',
     nameFa: 'رشد',
     assets: ['Gold', 'BTC', 'ETH', 'QQQ'],
-    description: 'Balanced assets for steady growth. Moderate volatility.',
-    descriptionFa: 'دارایی‌های متعادل برای رشد پایدار. نوسان متوسط.',
+    description: 'Balanced assets for steady growth over time.',
+    descriptionFa: 'دارایی‌های متعادل برای رشد تدریجی.',
     color: '#60a5fa',
-    risk: 'Medium',
   },
   upside: {
     name: 'Upside',
     nameFa: 'رشد بالا',
     assets: ['SOL', 'TON'],
-    description: 'High-potential assets. Higher volatility, potential for significant returns.',
-    descriptionFa: 'دارایی‌های با پتانسیل بالا. نوسان زیاد، امکان بازده بالا.',
+    description: 'Higher potential, more ups and downs.',
+    descriptionFa: 'پتانسیل بالاتر، بالا و پایین بیشتر.',
     color: '#f472b6',
-    risk: 'High',
   },
 };
 
@@ -706,8 +726,8 @@ function initialState() {
     validation: null,
     fundingOptions: null,
     lastAction: null,
-    rebalanceSuggestion: null, // NEW: Post-trade rebalance suggestion
-    showTranslations: true, // NEW: Toggle for English translations
+    rebalanceSuggestion: null, // Post-trade rebalance suggestion
+    showTranslations: false, // Default to Farsi per guidelines - toggle for English
     messages: [{ from: 'system', text: 'Enter your phone number.' }],
     ledger: [],
   };
@@ -724,11 +744,15 @@ function computeTargetLayersFromAnswers(answers) {
     const opt = q.options.find(o => o.id === optId);
     risk += (opt?.risk ?? 0);
   }
-  if (risk <= 4) return { foundation: 65, growth: 30, upside: 5 };
-  if (risk <= 9) return { foundation: 50, growth: 35, upside: 15 };
+  // 8 questions × max 2 = 16 max score
+  // Thresholds: 0-5 conservative, 6-10 moderate, 11+ growth
+  // Output is structural, not judgmental - no labels shown to user
+  if (risk <= 5) return { foundation: 65, growth: 30, upside: 5 };
+  if (risk <= 10) return { foundation: 50, growth: 35, upside: 15 };
   return { foundation: 40, growth: 40, upside: 20 };
 }
 
+// Internal only - not shown to user per guidelines
 function getRiskProfile(answers) {
   let risk = 0;
   for (const q of questionnaire.questions) {
@@ -736,9 +760,8 @@ function getRiskProfile(answers) {
     const opt = q.options.find(o => o.id === optId);
     risk += (opt?.risk ?? 0);
   }
-  if (risk <= 4) return { level: 'Conservative', levelFa: 'محافظه‌کار', score: risk };
-  if (risk <= 9) return { level: 'Moderate', levelFa: 'متعادل', score: risk };
-  return { level: 'Growth-Oriented', levelFa: 'رشد‌محور', score: risk };
+  // Used internally for analytics only, never displayed
+  return { score: risk, maxScore: 16 };
 }
 
 function exposureSnapshot(portfolio, cashIRR) {
@@ -815,10 +838,9 @@ function reduce(state, event) {
 
       if (idx >= questionnaire.questions.length) {
         const targetLayers = computeTargetLayersFromAnswers(answers);
-        const riskProfile = getRiskProfile(answers);
-        s = { ...s, targetLayers, riskProfile, user: { ...s.user, stage: STAGES.ALLOCATION_PROPOSED } };
-        s = addMessage(s, 'system', `Risk Profile: ${riskProfile.level} (${riskProfile.levelFa})`);
-        s = addMessage(s, 'system', `Target: Foundation ${targetLayers.foundation}% · Growth ${targetLayers.growth}% · Upside ${targetLayers.upside}%`);
+        s = { ...s, targetLayers, user: { ...s.user, stage: STAGES.ALLOCATION_PROPOSED } };
+        // Per guidelines: no labels, just show allocation
+        s = addMessage(s, 'system', `تخصیص پیشنهادی: پایه ${targetLayers.foundation}% · رشد ${targetLayers.growth}% · رشد بالا ${targetLayers.upside}%`);
       }
       return s;
     }
@@ -1967,20 +1989,16 @@ function PhoneForm({ state, dispatch }) {
   );
 }
 
-// NEW: Allocation Explanation Component
-function AllocationExplanation({ targetLayers, riskProfile, showTranslations, onToggleTranslations }) {
+// Allocation Explanation Component - no labels/scores per guidelines
+function AllocationExplanation({ targetLayers, showTranslations, onToggleTranslations }) {
   return (
     <div className="allocationExplanation">
       <div className="explanationHeader">
-        <div>
-          <div className="profileBadge">
-            <span className="profileLevel">{riskProfile?.level}</span>
-            {showTranslations && <span className="profileLevelFa">{riskProfile?.levelFa}</span>}
-          </div>
-          <div className="muted" style={{ marginTop: 4 }}>Risk Score: {riskProfile?.score}/14</div>
+        <div className="explanationTitle">
+          {showTranslations ? 'Your suggested allocation' : 'تخصیص پیشنهادی شما'}
         </div>
         <button className="btn tiny" onClick={onToggleTranslations}>
-          {showTranslations ? 'Hide EN' : 'Show EN'}
+          {showTranslations ? 'فارسی' : 'English'}
         </button>
       </div>
       
@@ -1992,18 +2010,15 @@ function AllocationExplanation({ targetLayers, riskProfile, showTranslations, on
           return (
             <div key={layer} className="layerExplain" style={{ borderLeftColor: info.color }}>
               <div className="layerHeader">
-                <span className="layerName" style={{ color: info.color }}>{info.name}</span>
+                <span className="layerName" style={{ color: info.color }}>
+                  {showTranslations ? info.name : info.nameFa}
+                </span>
                 <span className="layerPct">{pct}%</span>
               </div>
-              {showTranslations && (
-                <div className="layerNameFa">{info.nameFa}</div>
-              )}
               <div className="layerAssets">{info.assets.join(' · ')}</div>
-              <div className="layerDesc">{info.description}</div>
-              {showTranslations && (
-                <div className="layerDescFa">{info.descriptionFa}</div>
-              )}
-              <div className="layerRisk">Risk: {info.risk}</div>
+              <div className="layerDesc">
+                {showTranslations ? info.description : info.descriptionFa}
+              </div>
             </div>
           );
         })}
@@ -2174,27 +2189,29 @@ function OnboardingControls({ state, dispatch, onReset }) {
   }
 
   if (stage === STAGES.ALLOCATION_PROPOSED) {
+    const showTranslations = state.showTranslations;
     return (
       <div>
         <AllocationExplanation 
           targetLayers={state.targetLayers}
-          riskProfile={state.riskProfile}
-          showTranslations={state.showTranslations}
+          showTranslations={showTranslations}
           onToggleTranslations={() => dispatch({ type: 'TOGGLE_TRANSLATIONS' })}
         />
         
         <div className="consentCard">
-          <div className="consentHeader">Confirm Your Allocation</div>
+          <div className="consentHeader">
+            {showTranslations ? 'Confirm Your Allocation' : 'تأیید تخصیص'}
+          </div>
           <div className="consentInstruction">
-            {state.showTranslations 
-              ? 'Paste the exact Persian sentence below to confirm you understand and accept:'
-              : 'برای تأیید، جمله دقیق زیر را کپی و پیست کنید:'
+            {showTranslations 
+              ? 'Copy and paste the exact sentence below to confirm:'
+              : 'برای تأیید، جمله زیر رو عیناً کپی و پیست کن:'
             }
           </div>
           
           <div className="consentSentence">
             <div className="sentenceFa">{questionnaire.consent_exact}</div>
-            {state.showTranslations && (
+            {showTranslations && (
               <div className="sentenceEn">{questionnaire.consent_english}</div>
             )}
           </div>
@@ -2202,13 +2219,13 @@ function OnboardingControls({ state, dispatch, onReset }) {
           <input
             className="input"
             type="text"
-            placeholder="Paste the exact sentence here"
+            placeholder={showTranslations ? "Paste the exact sentence here" : "جمله رو اینجا پیست کن"}
             value={consentText}
             onChange={(e) => setConsentText(e.target.value)}
           />
           <div className="row" style={{ marginTop: 10 }}>
             <button className="btn primary" onClick={() => dispatch({ type: 'SUBMIT_CONSENT', text: consentText })}>
-              Confirm
+              {showTranslations ? 'Confirm' : 'تأیید'}
             </button>
           </div>
         </div>
@@ -2605,20 +2622,15 @@ export default function App() {
         
         /* Allocation Explanation */
         .allocationExplanation{margin-bottom:12px}
-        .explanationHeader{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
-        .profileBadge{display:flex;flex-direction:column}
-        .profileLevel{font-weight:900;font-size:16px;color:var(--accent)}
-        .profileLevelFa{font-size:12px;color:var(--muted)}
+        .explanationHeader{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+        .explanationTitle{font-weight:900;font-size:14px}
         .layerExplanations{display:flex;flex-direction:column;gap:10px}
         .layerExplain{border-left:3px solid;padding-left:12px;padding:8px 0 8px 12px;background:rgba(255,255,255,.02);border-radius:0 10px 10px 0}
         .layerHeader{display:flex;justify-content:space-between;align-items:center}
         .layerName{font-weight:900;font-size:14px}
         .layerPct{font-weight:900;font-size:16px}
-        .layerNameFa{font-size:11px;color:var(--muted)}
         .layerAssets{font-size:11px;color:var(--muted);margin-top:4px}
-        .layerDesc{font-size:12px;margin-top:4px}
-        .layerDescFa{font-size:11px;color:var(--muted);font-style:italic}
-        .layerRisk{font-size:10px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.05em}
+        .layerDesc{font-size:12px;margin-top:4px;line-height:1.4}
         
         /* Consent */
         .consentCard{border:1px solid var(--border);border-radius:14px;padding:12px;background:rgba(255,255,255,.02)}
