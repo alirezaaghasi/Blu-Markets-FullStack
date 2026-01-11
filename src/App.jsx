@@ -825,14 +825,25 @@ function OnboardingRightPanel({ stage, questionIndex, targetLayers, investAmount
 function HistoryPane({ ledger }) {
   const [expanded, setExpanded] = useState({});
   if (!ledger || ledger.length === 0) return <div className="card"><h3>Action History</h3><div className="muted">No actions yet.</div></div>;
-  const actionLabels = { 'PORTFOLIO_CREATED': 'Portfolio Created', 'ADD_FUNDS': 'Funds Added', 'TRADE': 'Trade', 'REBALANCE': 'Rebalanced', 'PROTECT': 'Protection', 'BORROW': 'Borrowed', 'REPAY_LOAN': 'Loan Repaid' };
   const actionIcons = { 'PORTFOLIO_CREATED': '✓', 'ADD_FUNDS': '+', 'TRADE': '↔', 'REBALANCE': '⟲', 'PROTECT': '☂️', 'BORROW': '💰', 'REPAY_LOAN': '✓' };
+  const formatLedgerAction = (entry) => {
+    switch (entry.actionType) {
+      case 'PORTFOLIO_CREATED': return 'Portfolio Created';
+      case 'ADD_FUNDS': return 'Funds Added';
+      case 'TRADE': return `${entry.params?.side === 'BUY' ? 'Bought' : 'Sold'} ${entry.params?.assetId || ''}`;
+      case 'REBALANCE': return 'Rebalanced';
+      case 'PROTECT': return `Protected ${entry.params?.assetId || ''} (${entry.params?.months || 3}mo)`;
+      case 'BORROW': return `Borrowed (${entry.params?.collateralAssetId || ''})`;
+      case 'REPAY_LOAN': return 'Loan Repaid';
+      default: return entry.actionType;
+    }
+  };
   return (
     <div className="card"><h3>Action History</h3><div className="ledgerList">{[...ledger].reverse().map((entry) => {
       const showTransition = entry.boundary.before !== entry.boundary.after;
       return (
         <div key={entry.id} className="ledgerEntry">
-          <div className="ledgerHeader" onClick={() => setExpanded(prev => ({ ...prev, [entry.id]: !prev[entry.id] }))} style={{ cursor: 'pointer' }}><span className="ledgerIcon">{actionIcons[entry.actionType] || '•'}</span><span className="ledgerAction">{actionLabels[entry.actionType] || entry.actionType}</span><span className="ledgerTime">{formatTimestamp(entry.timestamp)}</span><span className="ledgerExpand">{expanded[entry.id] ? '−' : '+'}</span></div>
+          <div className="ledgerHeader" onClick={() => setExpanded(prev => ({ ...prev, [entry.id]: !prev[entry.id] }))} style={{ cursor: 'pointer' }}><span className="ledgerIcon">{actionIcons[entry.actionType] || '•'}</span><span className="ledgerAction">{formatLedgerAction(entry)}</span><span className="ledgerTime">{formatTimestamp(entry.timestamp)}</span><span className="ledgerExpand">{expanded[entry.id] ? '−' : '+'}</span></div>
           {showTransition && <div className="ledgerBoundary"><span className={`healthPill small ${entry.boundary.before.toLowerCase()}`}>{PORTFOLIO_HEALTH_LABELS[entry.boundary.before]}</span><span className="arrow">→</span><span className={`healthPill small ${entry.boundary.after.toLowerCase()}`}>{PORTFOLIO_HEALTH_LABELS[entry.boundary.after]}</span></div>}
           {expanded[entry.id] && entry.snapshot.before && entry.snapshot.after && <div className="ledgerDetails"><div className="ledgerSnapshot"><div className="snapshotColumn"><div className="snapshotLabel">Before</div><div className="snapshotValue">{formatIRR(entry.snapshot.before.totalIRR)}</div></div><div className="snapshotColumn"><div className="snapshotLabel">After</div><div className="snapshotValue">{formatIRR(entry.snapshot.after.totalIRR)}</div></div></div></div>}
         </div>
@@ -868,8 +879,7 @@ function Protection({ protections }) {
 function Loans({ loan, dispatch }) {
   return (
     <div className="card"><h3>Active Loan</h3>
-    {!loan ? <div className="muted">No active loans.</div> : <div className="list"><div className="item loanItem"><div style={{ flex: 1 }}><div className="loanAmount">{formatIRR(loan.amountIRR)}</div><div className="loanDetails">Collateral: {loan.collateralAssetId} · LTV {Math.round(loan.ltv * 100)}%</div></div><div style={{ textAlign: 'right' }}><div className="liquidationValue">{formatIRR(loan.liquidationIRR)}</div><div className="muted">Liquidation</div></div></div><button className="btn primary" style={{ width: '100%', marginTop: 10 }} onClick={() => dispatch({ type: 'START_REPAY_LOAN' })}>Repay Loan</button></div>}
-    <div className="ltvLimits"><div className="limitsTitle">LTV Limits</div><div className="limitsRow"><span>🛡️ Foundation</span><span>Max 70%</span></div><div className="limitsRow"><span>📈 Growth</span><span>Max 60%</span></div><div className="limitsRow"><span>🚀 Upside</span><span>Max 50%</span></div></div></div>
+    {!loan ? <div className="muted">No active loans.</div> : <div className="list"><div className="item loanItem"><div style={{ flex: 1 }}><div className="loanAmount">{formatIRR(loan.amountIRR)}</div><div className="loanDetails">Collateral: {loan.collateralAssetId} · LTV {Math.round(loan.ltv * 100)}%</div></div><div style={{ textAlign: 'right' }}><div className="liquidationValue">{formatIRR(loan.liquidationIRR)}</div><div className="muted">Liquidation</div></div></div><button className="btn primary" style={{ width: '100%', marginTop: 10 }} onClick={() => dispatch({ type: 'START_REPAY_LOAN' })}>Repay Loan</button></div>}</div>
   );
 }
 
@@ -905,6 +915,9 @@ function PreviewPanel({ title, preview, validation, acknowledged, onAcknowledge,
 }
 
 function OnboardingControls({ state, dispatch }) {
+  const [consentText, setConsentText] = useState('');
+  const isConsentMatch = consentText === CONSENT_EXACT;
+
   if (state.user.stage === STAGES.PHONE_REQUIRED) return <PhoneForm state={state} dispatch={dispatch} />;
   if (state.user.stage === STAGES.QUESTIONNAIRE) {
     const idx = state.questionnaire.index;
@@ -917,7 +930,7 @@ function OnboardingControls({ state, dispatch }) {
   }
   if (state.user.stage === STAGES.ALLOCATION_PROPOSED) {
     return (
-      <div><div className="consentCard"><div className="consentHeader">Confirm allocation</div><div className="consentInstruction">Type the following sentence exactly:</div><div className="consentSentence"><div className="sentenceFa">{questionnaire.consent_exact}</div><div className="sentenceEn">{questionnaire.consent_english}</div></div><input className="input" type="text" dir="rtl" placeholder="Type consent here..." onKeyDown={(e) => { if (e.key === 'Enter') dispatch({ type: 'SUBMIT_CONSENT', text: e.target.value }); }} /></div></div>
+      <div><div className="consentCard"><div className="consentHeader">Confirm allocation</div><div className="consentInstruction">Type the following sentence exactly:</div><div className="consentSentence"><div className="sentenceFa">{questionnaire.consent_exact}</div><div className="sentenceEn">{questionnaire.consent_english}</div></div><input className="input" type="text" dir="rtl" placeholder="Type consent here..." value={consentText} onChange={(e) => setConsentText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && isConsentMatch) dispatch({ type: 'SUBMIT_CONSENT', text: consentText }); }} /><button className="btn primary" style={{ marginTop: 10, width: '100%' }} disabled={!isConsentMatch} onClick={() => dispatch({ type: 'SUBMIT_CONSENT', text: consentText })}>Confirm</button></div></div>
     );
   }
   if (state.user.stage === STAGES.AMOUNT_REQUIRED) {
