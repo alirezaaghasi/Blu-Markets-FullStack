@@ -952,7 +952,7 @@ function reduce(state, event) {
         return state; // v9: No message, form shows validation
       }
 
-      let s = { ...s, user: { ...state.user, stage: STAGES.AMOUNT_REQUIRED } };
+      let s = { ...state, user: { ...state.user, stage: STAGES.AMOUNT_REQUIRED } };
       s = addLogEntry(s, 'CONSENT_GIVEN');
       return s;
     }
