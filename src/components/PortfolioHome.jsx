@@ -11,7 +11,7 @@ function LayerMini({ name, pct, target }) {
   );
 }
 
-export default function PortfolioHome({ portfolio, cashIRR, targetLayers, onStartTrade, onStartProtect, onStartBorrow, onAddFunds }) {
+export default function PortfolioHome({ portfolio, cashIRR, targetLayers, onStartTrade, onStartProtect, onStartBorrow }) {
   if (!portfolio) {
     return (
       <div className="card">
@@ -36,10 +36,7 @@ export default function PortfolioHome({ portfolio, cashIRR, targetLayers, onStar
           <div style={{ textAlign: 'right' }}>
             <div className="muted">Cash</div>
             <div className="big" style={{ fontSize: 22 }}>{formatIRR(cashIRR || 0)}</div>
-                        <div className="muted">Available for Buy / Protect</div>
-            <div style={{ marginTop: 10 }}>
-              <button className="btn" onClick={onAddFunds}>Add funds</button>
-            </div>
+            <div className="muted">Available for Buy / Protect</div>
           </div>
         </div>
       </div>

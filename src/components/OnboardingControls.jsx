@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import questionnaire from '../data/questionnaire.fa.json'
 import { STAGES, POST_ACTIONS } from '../stateMachine.js'
+import { formatIRR } from '../helpers.js'
 
 export default function OnboardingControls({ state, dispatch, onReset }) {
   const stage = state.user.stage;
@@ -218,6 +219,15 @@ export default function OnboardingControls({ state, dispatch, onReset }) {
               />
             </div>
             <div className="muted" style={{ marginTop: 6 }}>Months (1–6). Premium will be paid from cash.</div>
+            {state.protectError ? (
+              <div className="softWarn" style={{ marginTop: 10 }}>
+                Need at least {formatIRR(state.protectError.neededIRR)} cash to pay the premium.
+                <div style={{ marginTop: 8 }}>
+                  <button className="btn" onClick={() => dispatch({ type: 'START_FUNDING' })}>Add funds</button>
+                </div>
+              </div>
+            ) : null}
+
             <div className="row" style={{ marginTop: 10 }}>
               <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_PROTECT' })}>Preview</button>
               <button className="btn" onClick={() => dispatch({ type: 'CANCEL_POST_ACTION' })}>Cancel</button>
@@ -321,45 +331,48 @@ function ActionCard({ title, children }) {
 }
 
 function PreviewPanel({ title, preview, softWarning, onConfirm, onBack }) {
-  if (!preview) return null;
+  const after = preview?.after || preview;
+  const deltas = preview?.deltas;
+
   return (
-    <div className="card" style={{ padding: 12 }}>
-      <div className="muted" style={{ marginBottom: 6 }}>{title}</div>
+    <div className="panel">
+      <div className="muted" style={{ marginBottom: 8 }}>{title}</div>
 
-      {softWarning && (
-        <div className="warn">
-          {softWarning}
-        </div>
-      )}
+      <div className="previewCard">
+        <div className="row" style={{ gap: 16, flexWrap: "wrap" }}>
+          <div style={{ minWidth: 220 }}>
+            <div className="muted">After</div>
+            <div className="big">
+              Foundation {Math.round(after.layers.foundation)}% • Growth {Math.round(after.layers.growth)}% • Upside {Math.round(after.layers.upside)}%
+            </div>
+            <div className="muted" style={{ marginTop: 8 }}>
+              Total {formatIRR(after.totalIRR)}
+            </div>
+          </div>
 
-      <div className="preview">
-        <div className="previewRow">
-          <div className="muted">Before</div>
-          <div className="muted">After</div>
+          {deltas ? (
+            <div style={{ minWidth: 220 }}>
+              <div className="muted">Change</div>
+              <div className="big">
+                Upside {deltas.layers.upside >= 0 ? "+" : ""}{Math.round(deltas.layers.upside)}%
+              </div>
+              <div className="muted" style={{ marginTop: 8 }}>
+                Δ Total {formatIRR(deltas.totalIRR)}
+              </div>
+            </div>
+          ) : null}
         </div>
 
-        <div className="previewRow">
-          <div>Foundation {preview.before.layers.foundation}%</div>
-          <div>Foundation {preview.after.layers.foundation}%</div>
-        </div>
-        <div className="previewRow">
-          <div>Growth {preview.before.layers.growth}%</div>
-          <div>Growth {preview.after.layers.growth}%</div>
-        </div>
-        <div className="previewRow">
-          <div>Upside {preview.before.layers.upside}%</div>
-          <div>Upside {preview.after.layers.upside}%</div>
-        </div>
-
-        <div className="previewRow" style={{ marginTop: 6 }}>
-          <div className="muted">Total {preview.before.totalIRR.toLocaleString('en-US')} IRR</div>
-          <div className="muted">Total {preview.after.totalIRR.toLocaleString('en-US')} IRR</div>
-        </div>
+        {softWarning ? (
+          <div className="softWarn" style={{ marginTop: 12 }}>
+            {softWarning.text}
+          </div>
+        ) : null}
       </div>
 
-      <div className="row" style={{ marginTop: 10 }}>
+      <div className="row" style={{ marginTop: 12, gap: 10 }}>
         <button className="btn primary" onClick={onConfirm}>
-          {softWarning ? 'Continue anyway' : 'Confirm'}
+          {softWarning ? "Confirm anyway" : "Confirm"}
         </button>
         <button className="btn" onClick={onBack}>Back</button>
       </div>

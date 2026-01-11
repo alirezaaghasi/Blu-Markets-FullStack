@@ -1,5 +1,6 @@
 import questionnaire from './data/questionnaire.fa.json'
 import { buildPortfolio, calcLayerPercents, tradeAsset, rebalanceToTarget } from './engine.js'
+import { formatIRR } from './helpers.js'
 
 export const STAGES = {
   PHONE_REQUIRED: 'PHONE_REQUIRED',
@@ -32,6 +33,7 @@ const CONSENT_EXACT = questionnaire.consent_exact;
 
 export function initialState() {
   return {
+    protectError: null,
     user: {
       stage: STAGES.PHONE_REQUIRED,
       phone: '',
@@ -363,7 +365,7 @@ export function reduce(state, event) {
         return s;
       }
 
-      s = { ...s, postAction: POST_ACTIONS.PROTECT, protectDraft: { assetId: preferred, months: 3 }, preview: null, softWarning: null };
+      s = { ...s, postAction: POST_ACTIONS.PROTECT, protectDraft: { assetId: preferred, months: 3 }, preview: null, softWarning: null, protectError: null };
       s = addMessage(s, 'system', 'Select an asset and protection duration (1–6 months).');
       return s;
     }
@@ -390,7 +392,10 @@ export function reduce(state, event) {
       if (!h) return addMessage(state, 'system', 'Asset not found.');
       const premium = Math.floor((h.amountIRR * 0.02 * (months / 3))); // deterministic prototype pricing
       if ((state.cashIRR || 0) < premium) {
-        return addMessage(state, 'system', 'Not enough cash to pay premium. Add funds first.');
+        const cash = state.cashIRR || 0;
+        const needed = premium - cash;
+        const next = addMessage(state, 'system', `Not enough cash to pay premium. Add at least ${formatIRR(needed)} first.`);
+        return { ...next, protectError: { neededIRR: needed, premiumIRR: premium, cashIRR: cash } };
       }
 
       // protection doesn't change allocation; preview is informational only
@@ -413,7 +418,12 @@ export function reduce(state, event) {
       const h = state.portfolio.holdings.find(x => x.asset === d.assetId);
       if (!h) return addMessage(state, 'system', 'Asset not found.');
       const premium = Math.floor((h.amountIRR * 0.02 * (months / 3)));
-      if ((state.cashIRR || 0) < premium) return addMessage(state, 'system', 'Not enough cash to pay premium. Add funds first.');
+      if ((state.cashIRR || 0) < premium) {
+        const cash = state.cashIRR || 0;
+        const needed = premium - cash;
+        const next = addMessage(state, 'system', `Not enough cash to pay premium. Add at least ${formatIRR(needed)} first.`);
+        return { ...next, protectError: { neededIRR: needed, premiumIRR: premium, cashIRR: cash } };
+      }
 
       const until = new Date();
       until.setMonth(until.getMonth() + months);
