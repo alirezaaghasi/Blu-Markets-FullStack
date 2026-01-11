@@ -142,6 +142,8 @@ const PORTFOLIO_HEALTH_LABELS = {
   DRIFT: 'Slightly Off',
   STRUCTURAL: 'Rebalance Needed',
   STRESS: 'Attention Required',
+  undefined: 'Unknown',
+  null: 'Unknown',
 };
 
 const PORTFOLIO_HEALTH_LABELS_FA = {
@@ -228,16 +230,18 @@ function buildPortfolio(totalIRR, layers) {
 }
 
 function calcLayerPercents(holdings, cashIRR) {
-  const sums = { foundation: Math.max(0, cashIRR || 0), growth: 0, upside: 0 };
+  // v9 FIX: Cash is separate from layer allocation. Only holdings determine layer percentages.
+  const sums = { foundation: 0, growth: 0, upside: 0 };
   for (const h of holdings || []) sums[h.layer] = (sums[h.layer] || 0) + (h.amountIRR || 0);
 
-  const total = sums.foundation + sums.growth + sums.upside;
+  const holdingsTotal = sums.foundation + sums.growth + sums.upside;
   const pct = {
-    foundation: total ? (sums.foundation / total) * 100 : 0,
-    growth: total ? (sums.growth / total) * 100 : 0,
-    upside: total ? (sums.upside / total) * 100 : 0,
+    foundation: holdingsTotal ? (sums.foundation / holdingsTotal) * 100 : 0,
+    growth: holdingsTotal ? (sums.growth / holdingsTotal) * 100 : 0,
+    upside: holdingsTotal ? (sums.upside / holdingsTotal) * 100 : 0,
   };
-  return { sums, pct, totalIRR: total };
+  // totalIRR includes holdings + cash for display purposes
+  return { sums, pct, totalIRR: holdingsTotal + Math.max(0, cashIRR || 0), holdingsTotal };
 }
 
 function tradeAsset(portfolio, cashIRR, assetId, side, amountIRR) {
@@ -1676,38 +1680,42 @@ function ActionLogPane({ actionLog }) {
     }
   }, [actionLog]);
 
-  const actionLabels = {
-    'STAGE_CHANGE': 'Stage',
-    'ALLOCATION_COMPUTED': 'Allocation',
-    'CONSENT_GIVEN': 'Consent',
-    'PORTFOLIO_CREATED': 'Portfolio Created',
-    'ADD_FUNDS': 'Funds Added',
-    'TRADE': 'Trade',
-    'REBALANCE': 'Rebalanced',
-    'PROTECT': 'Protection',
-    'BORROW': 'Borrowed',
-    'REPAY_LOAN': 'Loan Repaid',
+  const actionConfig = {
+    'STAGE_CHANGE': { icon: '📋', label: 'Progress' },
+    'ALLOCATION_COMPUTED': { icon: '🎯', label: 'Target Set' },
+    'CONSENT_GIVEN': { icon: '✅', label: 'Confirmed' },
+    'PORTFOLIO_CREATED': { icon: '🏦', label: 'Portfolio Created' },
+    'ADD_FUNDS': { icon: '💰', label: 'Funds Added' },
+    'TRADE': { icon: '📊', label: 'Trade Executed' },
+    'REBALANCE': { icon: '⚖️', label: 'Rebalanced' },
+    'PROTECT': { icon: '🛡️', label: 'Protection Added' },
+    'BORROW': { icon: '💳', label: 'Loan Taken' },
+    'REPAY_LOAN': { icon: '✓', label: 'Loan Repaid' },
   };
 
   if (!actionLog || actionLog.length === 0) {
     return (
       <div className="actionLogEmpty">
-        <div className="muted">No actions yet</div>
+        <div className="muted">Your activity will appear here</div>
       </div>
     );
   }
 
   return (
     <div className="actionLog" ref={logRef}>
-      {actionLog.map((entry) => (
-        <div key={entry.id} className="logEntry">
-          <div className="logTime">{formatTimestamp(entry.timestamp)}</div>
-          <div className="logAction">{actionLabels[entry.type] || entry.type}</div>
-          {entry.amountIRR && (
-            <div className="logAmount">{formatIRR(entry.amountIRR)}</div>
-          )}
-        </div>
-      ))}
+      {actionLog.map((entry) => {
+        const config = actionConfig[entry.type] || { icon: '•', label: entry.type };
+        return (
+          <div key={entry.id} className="logEntry">
+            <div className="logIcon">{config.icon}</div>
+            <div className="logAction">{config.label}</div>
+            {entry.amountIRR && (
+              <div className="logAmount">{formatIRR(entry.amountIRR)}</div>
+            )}
+            <div className="logTime">{formatTimestamp(entry.timestamp)}</div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1716,6 +1724,9 @@ function ActionLogPane({ actionLog }) {
 function ExecutionSummary({ lastAction, dispatch }) {
   if (!lastAction) return null;
 
+  const beforeState = lastAction.boundary?.before || 'SAFE';
+  const afterState = lastAction.boundary?.after || 'SAFE';
+
   return (
     <div className="executionSummary">
       <div className="summaryHeader">
@@ -1723,14 +1734,14 @@ function ExecutionSummary({ lastAction, dispatch }) {
         <span className="summaryText">{lastAction.summary}</span>
         <button className="summaryDismiss" onClick={() => dispatch({ type: 'DISMISS_LAST_ACTION' })}>×</button>
       </div>
-      {lastAction.boundary && (
+      {lastAction.boundary && beforeState !== afterState && (
         <div className="summaryBoundary">
-          <span className={`healthPill ${lastAction.boundary.before.toLowerCase()}`}>
-            {PORTFOLIO_HEALTH_LABELS[lastAction.boundary.before]}
+          <span className={`healthPill ${beforeState.toLowerCase()}`}>
+            {PORTFOLIO_HEALTH_LABELS[beforeState] || beforeState}
           </span>
           <span className="arrow">→</span>
-          <span className={`healthPill ${lastAction.boundary.after.toLowerCase()}`}>
-            {PORTFOLIO_HEALTH_LABELS[lastAction.boundary.after]}
+          <span className={`healthPill ${afterState.toLowerCase()}`}>
+            {PORTFOLIO_HEALTH_LABELS[afterState] || afterState}
           </span>
         </div>
       )}
@@ -1980,15 +1991,17 @@ function HistoryPane({ ledger }) {
               <span className="ledgerExpand">{expanded[entry.id] ? '−' : '+'}</span>
             </div>
             
-            <div className="ledgerBoundary">
-              <span className={`healthPill small ${entry.boundary.before.toLowerCase()}`}>
-                {PORTFOLIO_HEALTH_LABELS[entry.boundary.before]}
-              </span>
-              <span className="arrow">→</span>
-              <span className={`healthPill small ${entry.boundary.after.toLowerCase()}`}>
-                {PORTFOLIO_HEALTH_LABELS[entry.boundary.after]}
-              </span>
-            </div>
+            {entry.boundary && entry.boundary.before !== entry.boundary.after && (
+              <div className="ledgerBoundary">
+                <span className={`healthPill small ${(entry.boundary.before || 'safe').toLowerCase()}`}>
+                  {PORTFOLIO_HEALTH_LABELS[entry.boundary.before] || 'Unknown'}
+                </span>
+                <span className="arrow">→</span>
+                <span className={`healthPill small ${(entry.boundary.after || 'safe').toLowerCase()}`}>
+                  {PORTFOLIO_HEALTH_LABELS[entry.boundary.after] || 'Unknown'}
+                </span>
+              </div>
+            )}
             
             {expanded[entry.id] && entry.snapshot.before && entry.snapshot.after && (
               <div className="ledgerDetails">
@@ -2442,6 +2455,12 @@ function OnboardingControls({ state, dispatch }) {
           <button className="btn" onClick={() => dispatch({ type: 'START_REBALANCE' })}>
             Rebalance
           </button>
+          <button className="btn" onClick={() => dispatch({ type: 'START_PROTECT', assetId: state.portfolio?.holdings?.[0]?.asset })}>
+            Protect
+          </button>
+          <button className="btn" onClick={() => dispatch({ type: 'START_BORROW', assetId: state.portfolio?.holdings?.find(h => !h.frozen)?.asset })}>
+            Borrow
+          </button>
           <button className="btn tiny danger" onClick={() => dispatch({ type: 'SHOW_RESET_CONFIRM' })}>
             Reset
           </button>
@@ -2875,7 +2894,8 @@ export default function App() {
         .actionLog{display:flex;flex-direction:column;gap:6px}
         .actionLogEmpty{padding:20px;text-align:center}
         .logEntry{padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.02);display:flex;align-items:center;gap:10px}
-        .logTime{font-size:10px;color:var(--muted);min-width:80px}
+        .logIcon{font-size:14px;min-width:20px}
+        .logTime{font-size:10px;color:var(--muted);min-width:70px;text-align:right}
         .logAction{flex:1;font-weight:600;font-size:12px}
         .logAmount{font-weight:600;font-size:12px;color:var(--accent)}
         
