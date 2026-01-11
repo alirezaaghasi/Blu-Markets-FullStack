@@ -4,71 +4,110 @@ import React, { useEffect, useMemo, useReducer, useState, useRef } from 'react';
 const questionnaire = {
   "version": "v7.3",
   "consent_exact": "متوجه ریسک این سبد دارایی شدم و باهاش موافق هستم.",
+  "consent_english": "I understand the risk of this portfolio and I agree with it.",
   "questions": [
     {
       "id": "q_income",
       "text": "درآمد ماهانه‌ات چقدر قابل‌پیش‌بینیه؟",
+      "english": "How predictable is your monthly income?",
       "options": [
-        { "id": "inc_stable", "text": "کاملاً ثابت", "risk": 0 },
-        { "id": "inc_some", "text": "تا حدی ثابت", "risk": 1 },
-        { "id": "inc_var", "text": "متغیره (فریلنس/کسب‌وکار)", "risk": 2 }
+        { "id": "inc_stable", "text": "کاملاً ثابت", "english": "Completely stable", "risk": 0 },
+        { "id": "inc_some", "text": "تا حدی ثابت", "english": "Somewhat stable", "risk": 1 },
+        { "id": "inc_var", "text": "متغیره (فریلنس/کسب‌وکار)", "english": "Variable (freelance/business)", "risk": 2 }
       ]
     },
     {
       "id": "q_buffer",
       "text": "بدون فروش سرمایه‌گذاری‌هات تا چند ماه می‌تونی خرج غیرمنتظره رو مدیریت کنی؟",
+      "english": "How many months can you handle unexpected expenses without selling investments?",
       "options": [
-        { "id": "buf_1", "text": "کمتر از ۱ ماه", "risk": 0 },
-        { "id": "buf_3", "text": "۱ تا ۳ ماه", "risk": 1 },
-        { "id": "buf_6", "text": "بیش از ۶ ماه", "risk": 2 }
+        { "id": "buf_1", "text": "کمتر از ۱ ماه", "english": "Less than 1 month", "risk": 0 },
+        { "id": "buf_3", "text": "۱ تا ۳ ماه", "english": "1 to 3 months", "risk": 1 },
+        { "id": "buf_6", "text": "بیش از ۶ ماه", "english": "More than 6 months", "risk": 2 }
       ]
     },
     {
       "id": "q_drawdown",
       "text": "اگر ارزش سبدت ۲۰٪ افت کنه، احتمالاً چیکار می‌کنی؟",
+      "english": "If your portfolio drops 20%, what would you likely do?",
       "options": [
-        { "id": "dd_sell", "text": "می‌فروشم", "risk": 0 },
-        { "id": "dd_hold_scared", "text": "استرس می‌گیرم ولی صبر می‌کنم", "risk": 1 },
-        { "id": "dd_hold_check", "text": "صبر می‌کنم و منطقی بررسی می‌کنم", "risk": 2 }
+        { "id": "dd_sell", "text": "می‌فروشم", "english": "Sell", "risk": 0 },
+        { "id": "dd_hold_scared", "text": "استرس می‌گیرم ولی صبر می‌کنم", "english": "Stress but hold", "risk": 1 },
+        { "id": "dd_hold_check", "text": "صبر می‌کنم و منطقی بررسی می‌کنم", "english": "Hold and evaluate rationally", "risk": 2 }
       ]
     },
     {
       "id": "q_horizon",
       "text": "افق زمانی این پول چقدره؟",
+      "english": "What is your time horizon for this money?",
       "options": [
-        { "id": "hz_short", "text": "کمتر از ۶ ماه", "risk": 0 },
-        { "id": "hz_mid", "text": "۶ ماه تا ۲ سال", "risk": 1 },
-        { "id": "hz_long", "text": "بیش از ۳ سال", "risk": 2 }
+        { "id": "hz_short", "text": "کمتر از ۶ ماه", "english": "Less than 6 months", "risk": 0 },
+        { "id": "hz_mid", "text": "۶ ماه تا ۲ سال", "english": "6 months to 2 years", "risk": 1 },
+        { "id": "hz_long", "text": "بیش از ۳ سال", "english": "More than 3 years", "risk": 2 }
       ]
     },
     {
       "id": "q_experience",
       "text": "تجربه‌ات از دارایی‌های نوسانی چقدره؟",
+      "english": "How much experience do you have with volatile assets?",
       "options": [
-        { "id": "ex_none", "text": "تقریباً هیچ", "risk": 0 },
-        { "id": "ex_some", "text": "متوسط", "risk": 1 },
-        { "id": "ex_high", "text": "زیاد", "risk": 2 }
+        { "id": "ex_none", "text": "تقریباً هیچ", "english": "Almost none", "risk": 0 },
+        { "id": "ex_some", "text": "متوسط", "english": "Moderate", "risk": 1 },
+        { "id": "ex_high", "text": "زیاد", "english": "Extensive", "risk": 2 }
       ]
     },
     {
       "id": "q_sleep",
       "text": "با کدوم جمله بیشتر موافقی؟",
+      "english": "Which statement do you agree with more?",
       "options": [
-        { "id": "sl_calm", "text": "آرامش مهم‌تر از سود بالاست", "risk": 0 },
-        { "id": "sl_mix", "text": "تعادل بین آرامش و رشد", "risk": 1 },
-        { "id": "sl_up", "text": "رشد مهم‌تره حتی با نوسان", "risk": 2 }
+        { "id": "sl_calm", "text": "آرامش مهم‌تر از سود بالاست", "english": "Peace of mind > high returns", "risk": 0 },
+        { "id": "sl_mix", "text": "تعادل بین آرامش و رشد", "english": "Balance between calm and growth", "risk": 1 },
+        { "id": "sl_up", "text": "رشد مهم‌تره حتی با نوسان", "english": "Growth > volatility concerns", "risk": 2 }
       ]
     },
     {
       "id": "q_goal",
       "text": "هدف اصلی‌ات از سرمایه‌گذاری چیه؟",
+      "english": "What is your main investment goal?",
       "options": [
-        { "id": "g_preserve", "text": "حفظ ارزش پول", "risk": 0 },
-        { "id": "g_grow", "text": "رشد متعادل", "risk": 1 },
-        { "id": "g_moon", "text": "رشد بالاتر با ریسک بیشتر", "risk": 2 }
+        { "id": "g_preserve", "text": "حفظ ارزش پول", "english": "Preserve value", "risk": 0 },
+        { "id": "g_grow", "text": "رشد متعادل", "english": "Balanced growth", "risk": 1 },
+        { "id": "g_moon", "text": "رشد بالاتر با ریسک بیشتر", "english": "Higher growth with more risk", "risk": 2 }
       ]
     }
   ]
+};
+
+// Layer explanations for onboarding
+const LAYER_EXPLANATIONS = {
+  foundation: {
+    name: 'Foundation',
+    nameFa: 'پایه',
+    assets: ['USDT', 'Fixed Income'],
+    description: 'Stable assets that preserve value. Low volatility, steady returns.',
+    descriptionFa: 'دارایی‌های پایدار برای حفظ ارزش. نوسان کم، بازده ثابت.',
+    color: '#4ade80',
+    risk: 'Low',
+  },
+  growth: {
+    name: 'Growth',
+    nameFa: 'رشد',
+    assets: ['Gold', 'BTC', 'ETH', 'QQQ'],
+    description: 'Balanced assets for steady growth. Moderate volatility.',
+    descriptionFa: 'دارایی‌های متعادل برای رشد پایدار. نوسان متوسط.',
+    color: '#60a5fa',
+    risk: 'Medium',
+  },
+  upside: {
+    name: 'Upside',
+    nameFa: 'رشد بالا',
+    assets: ['SOL', 'TON'],
+    description: 'High-potential assets. Higher volatility, potential for significant returns.',
+    descriptionFa: 'دارایی‌های با پتانسیل بالا. نوسان زیاد، امکان بازده بالا.',
+    color: '#f472b6',
+    risk: 'High',
+  },
 };
 
 // ====== HELPERS ======
@@ -93,25 +132,24 @@ const WEIGHTS = {
   upside: { SOL: 0.55, TON: 0.45 },
 };
 
-// Premium rates by layer
 const PREMIUM_RATES = {
   foundation: 0.01,
   growth: 0.02,
   upside: 0.03,
 };
 
-// LTV limits by layer
 const LTV_LIMITS = {
   foundation: { max: 0.7, recommended: 0.5 },
   growth: { max: 0.6, recommended: 0.5 },
   upside: { max: 0.5, recommended: 0.4 },
 };
 
-// Minimum thresholds
 const THRESHOLDS = {
   FOUNDATION_MIN_PCT: 40,
   UPSIDE_MAX_PCT: 25,
   MIN_AMOUNT_IRR: 1_000_000,
+  DRIFT_SUGGEST_REBALANCE: 5,
+  DRIFT_WARN: 10,
 };
 
 function buildPortfolio(totalIRR, layers) {
@@ -197,7 +235,6 @@ function rebalanceToTarget(totalIRR, targetLayers) {
   return buildPortfolio(t, targetLayers);
 }
 
-// Calculate borrow capacity for each asset
 function calcBorrowCapacity(holdings, loan) {
   return (holdings || []).map(h => {
     const limits = LTV_LIMITS[h.layer] || LTV_LIMITS.growth;
@@ -265,7 +302,6 @@ function computeBoundary(state) {
   const warnings = [];
   const constraints = [];
   
-  // Check constraint violations
   if (exposure.pct.foundation < THRESHOLDS.FOUNDATION_MIN_PCT) {
     constraints.push(`Foundation below minimum (${THRESHOLDS.FOUNDATION_MIN_PCT}%)`);
   }
@@ -308,7 +344,6 @@ function computeBoundary(state) {
   };
 }
 
-// Calculate what would be needed to fund a shortfall
 function calcFundingOptions(state, shortfallIRR) {
   const options = {
     shortfall: shortfallIRR,
@@ -318,7 +353,6 @@ function calcFundingOptions(state, shortfallIRR) {
   
   if (!state.portfolio) return options;
   
-  // Find Foundation assets that could be sold
   const foundationHoldings = state.portfolio.holdings
     .filter(h => h.layer === 'foundation' && !h.frozen && h.amountIRR > 0)
     .sort((a, b) => b.amountIRR - a.amountIRR);
@@ -326,7 +360,6 @@ function calcFundingOptions(state, shortfallIRR) {
   for (const h of foundationHoldings) {
     const sellAmount = Math.min(h.amountIRR, shortfallIRR);
     
-    // Simulate the sell to check resulting boundary
     const afterTrade = tradeAsset(state.portfolio, state.cashIRR, h.asset, 'SELL', sellAmount);
     const afterState = { ...state, portfolio: afterTrade.portfolio, cashIRR: afterTrade.cashIRR };
     const afterBoundary = computeBoundary(afterState);
@@ -349,16 +382,42 @@ function calcFundingOptions(state, shortfallIRR) {
   return options;
 }
 
-// Unified action validation
+// Calculate rebalance impact for post-trade suggestion
+function calcRebalanceImpact(state) {
+  if (!state.portfolio || !state.targetLayers) return null;
+  
+  const currentExposure = calcLayerPercents(state.portfolio.holdings, state.cashIRR || 0);
+  const currentDrift = computeDrift(currentExposure.pct, state.targetLayers);
+  
+  const total = (state.cashIRR || 0) + (state.portfolio?.totalIRR || 0);
+  const afterPortfolio = rebalanceToTarget(total, state.targetLayers);
+  const afterExposure = calcLayerPercents(afterPortfolio.holdings, 0);
+  const afterDrift = computeDrift(afterExposure.pct, state.targetLayers);
+  
+  return {
+    before: {
+      drift: currentDrift,
+      exposure: currentExposure.pct,
+    },
+    after: {
+      drift: afterDrift,
+      exposure: afterExposure.pct,
+    },
+    improvement: currentDrift.total - afterDrift.total,
+    worthIt: currentDrift.total > THRESHOLDS.DRIFT_SUGGEST_REBALANCE,
+  };
+}
+
 function validateAction(state, actionType, params = {}) {
   const result = {
     allowed: true,
     boundary: computeBoundary(state),
     warnings: [],
     errors: [],
-    blockers: [], // Hard blocks that cannot be overridden
+    blockers: [],
     projectedBoundary: null,
     fundingOptions: null,
+    rebalanceImpact: null,
   };
   
   if (state.user.stage !== STAGES.EXECUTED) {
@@ -407,6 +466,9 @@ function validateAction(state, actionType, params = {}) {
       if (result.allowed) {
         const after = tradeAsset(state.portfolio, state.cashIRR, assetId, side, amount);
         projectedState = { ...state, portfolio: after.portfolio, cashIRR: after.cashIRR };
+        
+        // Calculate rebalance impact for post-trade suggestion
+        result.rebalanceImpact = calcRebalanceImpact(projectedState);
       }
       break;
     }
@@ -415,7 +477,6 @@ function validateAction(state, actionType, params = {}) {
       const total = (state.cashIRR || 0) + (state.portfolio?.totalIRR || 0);
       const afterPortfolio = rebalanceToTarget(total, state.targetLayers);
       
-      // Check if any frozen assets would be affected
       const frozenAssets = state.portfolio?.holdings?.filter(h => h.frozen) || [];
       if (frozenAssets.length > 0) {
         result.warnings.push('Rebalance will not affect frozen collateral assets');
@@ -482,7 +543,6 @@ function validateAction(state, actionType, params = {}) {
         break;
       }
       
-      // Check LTV limits by layer
       const limits = LTV_LIMITS[holding.layer] || LTV_LIMITS.growth;
       if (ltv > limits.max) {
         result.blockers.push(`Maximum LTV for ${holding.layer} assets is ${Math.round(limits.max * 100)}%`);
@@ -504,14 +564,9 @@ function validateAction(state, actionType, params = {}) {
         result.allowed = false;
       }
       
-      // Check if borrowing would drop Foundation below minimum
       if (result.allowed) {
         const afterCash = (state.cashIRR || 0) + amount;
-        const afterExposure = calcLayerPercents(state.portfolio.holdings, afterCash);
         
-        // Freezing the collateral effectively removes it from available assets
-        // But cash increases, which goes to Foundation
-        // Let's simulate the full state
         const holdings = state.portfolio.holdings.map(h => ({ ...h }));
         const collateral = holdings.find(x => x.asset === assetId);
         if (collateral) collateral.frozen = true;
@@ -523,7 +578,6 @@ function validateAction(state, actionType, params = {}) {
           result.allowed = false;
         }
         
-        // Warn for Upside collateral at high LTV
         if (holding.layer === 'upside' && ltv >= 0.5) {
           result.warnings.push('High LTV on Upside collateral increases liquidation risk significantly');
         }
@@ -536,7 +590,6 @@ function validateAction(state, actionType, params = {}) {
     }
   }
   
-  // Compute projected boundary
   if (result.allowed) {
     result.projectedBoundary = computeBoundary(projectedState);
     
@@ -550,7 +603,6 @@ function validateAction(state, actionType, params = {}) {
     result.warnings = [...result.warnings, ...result.projectedBoundary.warnings];
   }
   
-  // Blockers always prevent action
   if (result.blockers.length > 0) {
     result.allowed = false;
   }
@@ -558,7 +610,6 @@ function validateAction(state, actionType, params = {}) {
   return result;
 }
 
-// Create ledger entry with enhanced details
 function createLedgerEntry(actionType, params, stateBefore, stateAfter) {
   const boundaryBefore = computeBoundary(stateBefore);
   const boundaryAfter = computeBoundary(stateAfter);
@@ -620,7 +671,7 @@ const POST_ACTIONS = {
   REBALANCE_PREVIEW: 'REBALANCE_PREVIEW',
   PROTECT: 'PROTECT',
   PROTECT_PREVIEW: 'PROTECT_PREVIEW',
-  PROTECT_FUNDING: 'PROTECT_FUNDING', // NEW: Funding options for protection
+  PROTECT_FUNDING: 'PROTECT_FUNDING',
   BORROW: 'BORROW',
   BORROW_PREVIEW: 'BORROW_PREVIEW',
 };
@@ -653,8 +704,10 @@ function initialState() {
     preview: null,
     softWarning: null,
     validation: null,
-    fundingOptions: null, // NEW: For insufficient cash scenarios
-    lastAction: null, // NEW: For execution summary
+    fundingOptions: null,
+    lastAction: null,
+    rebalanceSuggestion: null, // NEW: Post-trade rebalance suggestion
+    showTranslations: true, // NEW: Toggle for English translations
     messages: [{ from: 'system', text: 'Enter your phone number.' }],
     ledger: [],
   };
@@ -676,14 +729,30 @@ function computeTargetLayersFromAnswers(answers) {
   return { foundation: 40, growth: 40, upside: 20 };
 }
 
+function getRiskProfile(answers) {
+  let risk = 0;
+  for (const q of questionnaire.questions) {
+    const optId = answers[q.id];
+    const opt = q.options.find(o => o.id === optId);
+    risk += (opt?.risk ?? 0);
+  }
+  if (risk <= 4) return { level: 'Conservative', levelFa: 'محافظه‌کار', score: risk };
+  if (risk <= 9) return { level: 'Moderate', levelFa: 'متعادل', score: risk };
+  return { level: 'Growth-Oriented', levelFa: 'رشد‌محور', score: risk };
+}
+
 function exposureSnapshot(portfolio, cashIRR) {
   const { pct, totalIRR } = calcLayerPercents(portfolio?.holdings || [], cashIRR || 0);
   return { totalIRR, layers: pct };
 }
 
-function buildPreview(beforePortfolio, beforeCash, afterPortfolio, afterCash) {
+function buildPreview(beforePortfolio, beforeCash, afterPortfolio, afterCash, targetLayers) {
   const before = exposureSnapshot(beforePortfolio, beforeCash);
   const after = exposureSnapshot(afterPortfolio, afterCash);
+  
+  const beforeDrift = targetLayers ? computeDrift(before.layers, targetLayers) : null;
+  const afterDrift = targetLayers ? computeDrift(after.layers, targetLayers) : null;
+  
   const deltas = {
     totalIRR: after.totalIRR - before.totalIRR,
     layers: {
@@ -692,7 +761,15 @@ function buildPreview(beforePortfolio, beforeCash, afterPortfolio, afterCash) {
       upside: after.layers.upside - before.layers.upside,
     },
   };
-  return { before, after, deltas };
+  
+  return { 
+    before, 
+    after, 
+    deltas, 
+    beforeDrift, 
+    afterDrift,
+    driftChange: afterDrift && beforeDrift ? afterDrift.total - beforeDrift.total : 0,
+  };
 }
 
 function requireExecuted(state) {
@@ -706,6 +783,10 @@ function reduce(state, event) {
 
     case 'SET_TAB': {
       return { ...state, tab: event.tab };
+    }
+
+    case 'TOGGLE_TRANSLATIONS': {
+      return { ...state, showTranslations: !state.showTranslations };
     }
 
     case 'SET_PHONE': {
@@ -734,9 +815,10 @@ function reduce(state, event) {
 
       if (idx >= questionnaire.questions.length) {
         const targetLayers = computeTargetLayersFromAnswers(answers);
-        s = { ...s, targetLayers, user: { ...s.user, stage: STAGES.ALLOCATION_PROPOSED } };
-        s = addMessage(s, 'system', `Suggested target allocation: Foundation ${targetLayers.foundation}% · Growth ${targetLayers.growth}% · Upside ${targetLayers.upside}%.`);
-        s = addMessage(s, 'system', 'If you agree, paste the exact consent sentence.');
+        const riskProfile = getRiskProfile(answers);
+        s = { ...s, targetLayers, riskProfile, user: { ...s.user, stage: STAGES.ALLOCATION_PROPOSED } };
+        s = addMessage(s, 'system', `Risk Profile: ${riskProfile.level} (${riskProfile.levelFa})`);
+        s = addMessage(s, 'system', `Target: Foundation ${targetLayers.foundation}% · Growth ${targetLayers.growth}% · Upside ${targetLayers.upside}%`);
       }
       return s;
     }
@@ -748,7 +830,6 @@ function reduce(state, event) {
 
       if (text !== CONSENT_EXACT) {
         s = addMessage(s, 'system', 'Consent sentence must match exactly.');
-        s = addMessage(s, 'system', CONSENT_EXACT);
         return s;
       }
 
@@ -771,9 +852,8 @@ function reduce(state, event) {
       }
 
       const portfolio = buildPortfolio(n, state.targetLayers);
-      let s = addMessage(state, 'system', 'Execution complete.');
+      let s = addMessage(state, 'system', 'Portfolio created successfully.');
       s = { ...s, portfolio, cashIRR: 0, user: { ...s.user, stage: STAGES.EXECUTED } };
-      s = addMessage(s, 'system', `${n.toLocaleString('en-US')} IRR invested across assets.`);
       
       const entry = createLedgerEntry('PORTFOLIO_CREATED', { amountIRR: n }, state, s);
       s = { 
@@ -802,6 +882,7 @@ function reduce(state, event) {
         softWarning: null,
         validation: null,
         fundingOptions: null,
+        rebalanceSuggestion: null,
       };
     }
 
@@ -809,11 +890,15 @@ function reduce(state, event) {
       return { ...state, lastAction: null };
     }
 
+    case 'DISMISS_REBALANCE_SUGGESTION': {
+      return { ...state, rebalanceSuggestion: null };
+    }
+
     // ===== ADD FUNDS =====
     case 'START_ADD_FUNDS': {
       if (!requireExecuted(state)) return state;
       let s = addMessage(state, 'user', 'Add funds');
-      s = { ...s, postAction: POST_ACTIONS.ADD_FUNDS, pendingAmountIRR: event.prefillAmount || null, preview: null, softWarning: null, validation: null, lastAction: null };
+      s = { ...s, postAction: POST_ACTIONS.ADD_FUNDS, pendingAmountIRR: event.prefillAmount || null, preview: null, softWarning: null, validation: null, lastAction: null, rebalanceSuggestion: null };
       s = addMessage(s, 'system', 'Enter top-up amount (IRR). Funds will go to cash.');
       return s;
     }
@@ -838,10 +923,10 @@ function reduce(state, event) {
       }
 
       const afterCash = (state.cashIRR || 0) + Math.floor(n);
-      const preview = buildPreview(state.portfolio, state.cashIRR, state.portfolio, afterCash);
+      const preview = buildPreview(state.portfolio, state.cashIRR, state.portfolio, afterCash, state.targetLayers);
 
       let s = { ...state, preview, validation, postAction: POST_ACTIONS.ADD_FUNDS_PREVIEW };
-      s = addMessage(s, 'system', 'Preview ready. Confirm to add to cash or go back.');
+      s = addMessage(s, 'system', 'Preview ready. Confirm to add to cash.');
       return s;
     }
 
@@ -859,6 +944,10 @@ function reduce(state, event) {
       let s = { ...state, cashIRR: (state.cashIRR || 0) + delta, postAction: POST_ACTIONS.NONE, pendingAmountIRR: null, preview: null, softWarning: null, validation: null };
       
       const entry = createLedgerEntry('ADD_FUNDS', { amountIRR: delta }, stateBefore, s);
+      
+      // Check if rebalance would help
+      const rebalanceImpact = calcRebalanceImpact(s);
+      
       s = { 
         ...s, 
         ledger: [...state.ledger, entry],
@@ -868,7 +957,8 @@ function reduce(state, event) {
           details: { amount: delta, newCash: s.cashIRR },
           boundary: entry.boundary,
           timestamp: Date.now(),
-        }
+        },
+        rebalanceSuggestion: rebalanceImpact?.worthIt ? rebalanceImpact : null,
       };
       
       return s;
@@ -880,7 +970,7 @@ function reduce(state, event) {
       const assetId = String(event.assetId || '');
       const side = event.side === 'SELL' ? 'SELL' : 'BUY';
       let s = addMessage(state, 'user', side === 'BUY' ? `Buy ${assetId}` : `Sell ${assetId}`);
-      s = { ...s, postAction: POST_ACTIONS.TRADE, tradeDraft: { assetId, side, amountIRR: null }, preview: null, softWarning: null, validation: null, lastAction: null };
+      s = { ...s, postAction: POST_ACTIONS.TRADE, tradeDraft: { assetId, side, amountIRR: null }, preview: null, softWarning: null, validation: null, lastAction: null, rebalanceSuggestion: null };
       s = addMessage(s, 'system', 'Enter amount (IRR).');
       return s;
     }
@@ -918,15 +1008,21 @@ function reduce(state, event) {
       }
 
       const after = tradeAsset(state.portfolio, state.cashIRR, d.assetId, d.side, Math.floor(Number(d.amountIRR)));
-      const preview = buildPreview(state.portfolio, state.cashIRR, after.portfolio, after.cashIRR);
+      const preview = buildPreview(state.portfolio, state.cashIRR, after.portfolio, after.cashIRR, state.targetLayers);
 
       let s = { ...state, preview, validation, postAction: POST_ACTIONS.TRADE_PREVIEW };
       
-      if (validation.warnings.length > 0) {
-        s = { ...s, softWarning: validation.warnings.join(' ') };
+      // Add drift change warning
+      if (preview.driftChange > 0) {
+        const msg = `This trade will increase portfolio drift by ${preview.driftChange.toFixed(1)}%`;
+        s = { ...s, softWarning: msg };
       }
       
-      s = addMessage(s, 'system', 'Preview ready. Confirm to execute or go back.');
+      if (validation.warnings.length > 0) {
+        s = { ...s, softWarning: (s.softWarning ? s.softWarning + ' ' : '') + validation.warnings.join(' ') };
+      }
+      
+      s = addMessage(s, 'system', 'Preview ready. Confirm to execute.');
       return s;
     }
 
@@ -950,6 +1046,10 @@ function reduce(state, event) {
       let s = { ...state, portfolio: after.portfolio, cashIRR: after.cashIRR, postAction: POST_ACTIONS.NONE, tradeDraft: null, preview: null, softWarning: null, validation: null };
       
       const entry = createLedgerEntry('TRADE', { assetId: d.assetId, side: d.side, amountIRR: Number(d.amountIRR) }, stateBefore, s);
+      
+      // Calculate rebalance suggestion
+      const rebalanceImpact = calcRebalanceImpact(s);
+      
       s = { 
         ...s, 
         ledger: [...state.ledger, entry],
@@ -959,13 +1059,9 @@ function reduce(state, event) {
           details: { asset: d.assetId, side: d.side, amount: Number(d.amountIRR) },
           boundary: entry.boundary,
           timestamp: Date.now(),
-        }
+        },
+        rebalanceSuggestion: rebalanceImpact?.worthIt ? rebalanceImpact : null,
       };
-      
-      const newBoundary = computeBoundary(s);
-      if (newBoundary.state !== BOUNDARY_STATES.SAFE && newBoundary.drift?.total > 5) {
-        s = addMessage(s, 'system', `Portfolio drift: ${newBoundary.drift.total.toFixed(1)}%. Consider rebalancing.`);
-      }
       
       return s;
     }
@@ -976,7 +1072,7 @@ function reduce(state, event) {
       let s = addMessage(state, 'user', 'Rebalance');
       
       const validation = validateAction(state, 'REBALANCE', {});
-      s = { ...s, postAction: POST_ACTIONS.REBALANCE, preview: null, softWarning: null, validation, lastAction: null };
+      s = { ...s, postAction: POST_ACTIONS.REBALANCE, preview: null, softWarning: null, validation, lastAction: null, rebalanceSuggestion: null };
       s = addMessage(s, 'system', 'Preview rebalance to restore your target allocation?');
       return s;
     }
@@ -985,7 +1081,7 @@ function reduce(state, event) {
       if (!requireExecuted(state)) return state;
       const total = (state.cashIRR || 0) + (state.portfolio?.totalIRR || 0);
       const afterPortfolio = rebalanceToTarget(total, state.targetLayers);
-      const preview = buildPreview(state.portfolio, state.cashIRR, afterPortfolio, 0);
+      const preview = buildPreview(state.portfolio, state.cashIRR, afterPortfolio, 0, state.targetLayers);
       
       const validation = validateAction(state, 'REBALANCE', {});
 
@@ -995,7 +1091,7 @@ function reduce(state, event) {
         s = { ...s, softWarning: validation.warnings.join(' ') };
       }
       
-      s = addMessage(s, 'system', 'Preview ready. Confirm to rebalance or go back.');
+      s = addMessage(s, 'system', `Rebalance will restore target allocation. Drift: ${preview.beforeDrift?.total.toFixed(1)}% → ${preview.afterDrift?.total.toFixed(1)}%`);
       return s;
     }
 
@@ -1004,7 +1100,7 @@ function reduce(state, event) {
       const stateBefore = state;
       const total = (state.cashIRR || 0) + (state.portfolio?.totalIRR || 0);
       const nextPortfolio = rebalanceToTarget(total, state.targetLayers);
-      let s = { ...state, portfolio: nextPortfolio, cashIRR: 0, postAction: POST_ACTIONS.NONE, preview: null, softWarning: null, validation: null };
+      let s = { ...state, portfolio: nextPortfolio, cashIRR: 0, postAction: POST_ACTIONS.NONE, preview: null, softWarning: null, validation: null, rebalanceSuggestion: null };
       
       const entry = createLedgerEntry('REBALANCE', { totalIRR: total }, stateBefore, s);
       s = { 
@@ -1012,7 +1108,7 @@ function reduce(state, event) {
         ledger: [...state.ledger, entry],
         lastAction: {
           type: 'REBALANCE',
-          summary: `Rebalanced ${formatIRR(total)} to target allocation`,
+          summary: `Rebalanced to target allocation`,
           details: { total },
           boundary: entry.boundary,
           timestamp: Date.now(),
@@ -1037,7 +1133,7 @@ function reduce(state, event) {
         return s;
       }
 
-      s = { ...s, postAction: POST_ACTIONS.PROTECT, protectDraft: { assetId: preferred, months: 3 }, preview: null, softWarning: null, protectError: null, validation: null, fundingOptions: null, lastAction: null };
+      s = { ...s, postAction: POST_ACTIONS.PROTECT, protectDraft: { assetId: preferred, months: 3 }, preview: null, softWarning: null, protectError: null, validation: null, fundingOptions: null, lastAction: null, rebalanceSuggestion: null };
       s = addMessage(s, 'system', 'Select an asset and protection duration (1–6 months).');
       return s;
     }
@@ -1068,7 +1164,6 @@ function reduce(state, event) {
       
       const validation = validateAction(state, 'PROTECT', { assetId: d.assetId, months });
       
-      // If insufficient cash, show funding options
       if (!validation.allowed && validation.fundingOptions) {
         let s = { 
           ...state, 
@@ -1141,12 +1236,10 @@ function reduce(state, event) {
       return s;
     }
 
-    // NEW: Quick sell from funding options
     case 'QUICK_SELL_FOR_FUNDING': {
       if (!requireExecuted(state)) return state;
       const { assetId, amount, returnTo } = event;
       
-      // Validate the sell
       const validation = validateAction(state, 'TRADE', {
         assetId,
         side: 'SELL',
@@ -1157,7 +1250,6 @@ function reduce(state, event) {
         return addMessage(state, 'system', validation.errors[0] || validation.blockers[0] || 'Cannot execute sell');
       }
       
-      // Execute the sell
       const stateBefore = state;
       const after = tradeAsset(state.portfolio, state.cashIRR, assetId, 'SELL', amount);
       let s = { ...state, portfolio: after.portfolio, cashIRR: after.cashIRR };
@@ -1165,7 +1257,6 @@ function reduce(state, event) {
       const entry = createLedgerEntry('TRADE', { assetId, side: 'SELL', amountIRR: amount, reason: 'funding_protection' }, stateBefore, s);
       s = { ...s, ledger: [...state.ledger, entry] };
       
-      // Return to the original flow
       if (returnTo === 'PROTECT') {
         s = { ...s, postAction: POST_ACTIONS.PROTECT, fundingOptions: null, protectError: null };
         s = addMessage(s, 'system', `Sold ${formatIRR(amount)} of ${assetId}. Cash available: ${formatIRR(s.cashIRR)}. Continue with protection.`);
@@ -1187,7 +1278,6 @@ function reduce(state, event) {
         return s;
       }
 
-      // Find best collateral (prefer Foundation/Growth over Upside)
       const availableCollateral = state.portfolio.holdings
         .filter(h => !h.frozen && h.amountIRR > 0)
         .sort((a, b) => {
@@ -1199,7 +1289,7 @@ function reduce(state, event) {
       if (!preferred) return addMessage(state, 'system', 'No assets available for collateral.');
 
       let s = addMessage(state, 'user', 'Borrow');
-      s = { ...s, postAction: POST_ACTIONS.BORROW, borrowDraft: { assetId: preferred, ltv: 0.5, amountIRR: null }, preview: null, softWarning: null, validation: null, lastAction: null };
+      s = { ...s, postAction: POST_ACTIONS.BORROW, borrowDraft: { assetId: preferred, ltv: 0.5, amountIRR: null }, preview: null, softWarning: null, validation: null, lastAction: null, rebalanceSuggestion: null };
       s = addMessage(s, 'system', 'Select collateral asset, LTV, and loan amount.');
       return s;
     }
@@ -1208,7 +1298,6 @@ function reduce(state, event) {
       if (!requireExecuted(state)) return state;
       if (!state.borrowDraft) return state;
       
-      // Reset LTV to recommended for the new asset's layer
       const holding = state.portfolio?.holdings?.find(h => h.asset === event.assetId);
       const limits = holding ? (LTV_LIMITS[holding.layer] || LTV_LIMITS.growth) : LTV_LIMITS.growth;
       
@@ -1387,7 +1476,34 @@ function BoundaryBadge({ boundary }) {
   );
 }
 
-// NEW: Execution Summary Card
+// NEW: Rebalance Suggestion Card
+function RebalanceSuggestion({ suggestion, onRebalance, onDismiss }) {
+  if (!suggestion || !suggestion.worthIt) return null;
+  
+  return (
+    <div className="rebalanceSuggestion">
+      <div className="suggestionHeader">
+        <span className="suggestionIcon">⟲</span>
+        <span className="suggestionTitle">Rebalance Recommended</span>
+        <button className="suggestionDismiss" onClick={onDismiss}>×</button>
+      </div>
+      <div className="suggestionDetails">
+        <div className="suggestionRow">
+          <span>Current drift:</span>
+          <span className="driftValue high">{suggestion.before.drift.total.toFixed(1)}%</span>
+        </div>
+        <div className="suggestionRow">
+          <span>After rebalance:</span>
+          <span className="driftValue low">{suggestion.after.drift.total.toFixed(1)}%</span>
+        </div>
+      </div>
+      <button className="btn primary small" onClick={onRebalance}>
+        Rebalance Now
+      </button>
+    </div>
+  );
+}
+
 function ExecutionSummary({ lastAction, onDismiss }) {
   if (!lastAction) return null;
   
@@ -1422,7 +1538,6 @@ function ExecutionSummary({ lastAction, onDismiss }) {
   );
 }
 
-// NEW: Enhanced History Pane with collapsible entries
 function HistoryPane({ ledger }) {
   const [expanded, setExpanded] = useState({});
   
@@ -1461,7 +1576,7 @@ function HistoryPane({ ledger }) {
     <div className="card">
       <h3>Action History</h3>
       <div className="muted" style={{ marginBottom: 12 }}>
-        {ledger.length} actions recorded • Append-only ledger
+        {ledger.length} actions recorded
       </div>
       <div className="ledgerList">
         {[...ledger].reverse().map((entry) => (
@@ -1534,7 +1649,6 @@ function HistoryPane({ ledger }) {
   );
 }
 
-// NEW: Funding Options Panel for insufficient cash
 function FundingOptionsPanel({ fundingOptions, protectDraft, dispatch }) {
   if (!fundingOptions) return null;
   
@@ -1610,7 +1724,6 @@ function FundingOptionsPanel({ fundingOptions, protectDraft, dispatch }) {
   );
 }
 
-// NEW: Borrow Capacity Display
 function BorrowCapacityCard({ holdings, loan }) {
   const capacity = calcBorrowCapacity(holdings, loan);
   const available = capacity.filter(c => !c.frozen && c.maxBorrow > 0);
@@ -1854,6 +1967,51 @@ function PhoneForm({ state, dispatch }) {
   );
 }
 
+// NEW: Allocation Explanation Component
+function AllocationExplanation({ targetLayers, riskProfile, showTranslations, onToggleTranslations }) {
+  return (
+    <div className="allocationExplanation">
+      <div className="explanationHeader">
+        <div>
+          <div className="profileBadge">
+            <span className="profileLevel">{riskProfile?.level}</span>
+            {showTranslations && <span className="profileLevelFa">{riskProfile?.levelFa}</span>}
+          </div>
+          <div className="muted" style={{ marginTop: 4 }}>Risk Score: {riskProfile?.score}/14</div>
+        </div>
+        <button className="btn tiny" onClick={onToggleTranslations}>
+          {showTranslations ? 'Hide EN' : 'Show EN'}
+        </button>
+      </div>
+      
+      <div className="layerExplanations">
+        {['foundation', 'growth', 'upside'].map(layer => {
+          const info = LAYER_EXPLANATIONS[layer];
+          const pct = targetLayers?.[layer] || 0;
+          
+          return (
+            <div key={layer} className="layerExplain" style={{ borderLeftColor: info.color }}>
+              <div className="layerHeader">
+                <span className="layerName" style={{ color: info.color }}>{info.name}</span>
+                <span className="layerPct">{pct}%</span>
+              </div>
+              {showTranslations && (
+                <div className="layerNameFa">{info.nameFa}</div>
+              )}
+              <div className="layerAssets">{info.assets.join(' · ')}</div>
+              <div className="layerDesc">{info.description}</div>
+              {showTranslations && (
+                <div className="layerDescFa">{info.descriptionFa}</div>
+              )}
+              <div className="layerRisk">Risk: {info.risk}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ActionCard({ title, children }) {
   return (
     <div className="actionCard">
@@ -1881,6 +2039,7 @@ function ValidationDisplay({ validation }) {
   );
 }
 
+// Enhanced preview panel with drift change display
 function PreviewPanel({ title, preview, softWarning, validation, onConfirm, onBack }) {
   const after = preview?.after || preview;
   const deltas = preview?.deltas;
@@ -1920,6 +2079,25 @@ function PreviewPanel({ title, preview, softWarning, validation, onConfirm, onBa
           )}
         </div>
         
+        {/* Drift change indicator */}
+        {preview?.beforeDrift && preview?.afterDrift && (
+          <div className="driftChangeRow">
+            <span className="driftChangeLabel">Drift:</span>
+            <span className="driftChangeValue" style={{ color: preview.beforeDrift.total > 5 ? '#fb923c' : 'var(--muted)' }}>
+              {preview.beforeDrift.total.toFixed(1)}%
+            </span>
+            <span className="driftArrow">→</span>
+            <span className="driftChangeValue" style={{ color: preview.afterDrift.total > 5 ? '#fb923c' : '#4ade80' }}>
+              {preview.afterDrift.total.toFixed(1)}%
+            </span>
+            {preview.driftChange !== 0 && (
+              <span className={`driftDelta ${preview.driftChange > 0 ? 'negative' : 'positive'}`}>
+                ({preview.driftChange > 0 ? '+' : ''}{preview.driftChange.toFixed(1)}%)
+              </span>
+            )}
+          </div>
+        )}
+        
         {validation?.projectedBoundary && (
           <div className="projectedBoundary">
             <span className="projectedLabel">Projected:</span>
@@ -1957,12 +2135,21 @@ function OnboardingControls({ state, dispatch, onReset }) {
 
     return (
       <div>
-        <div className="muted" style={{ marginBottom: 10 }}>
-          Questionnaire ({idx + 1}/{questionnaire.questions.length})
+        <div className="questionnaireHeader">
+          <div className="muted">Question {idx + 1} of {questionnaire.questions.length}</div>
+          <button 
+            className="btn tiny" 
+            onClick={() => dispatch({ type: 'TOGGLE_TRANSLATIONS' })}
+          >
+            {state.showTranslations ? 'Hide EN' : 'Show EN'}
+          </button>
         </div>
 
         <div className="q-card">
           <div className="q-title">{q.text}</div>
+          {state.showTranslations && q.english && (
+            <div className="q-english">{q.english}</div>
+          )}
           <div className="q-options">
             {q.options.map((opt) => (
               <button
@@ -1970,10 +2157,17 @@ function OnboardingControls({ state, dispatch, onReset }) {
                 className="opt"
                 onClick={() => dispatch({ type: 'ANSWER_QUESTION', qId: q.id, optionId: opt.id })}
               >
-                {opt.text}
+                <div>{opt.text}</div>
+                {state.showTranslations && opt.english && (
+                  <div className="opt-english">{opt.english}</div>
+                )}
               </button>
             ))}
           </div>
+        </div>
+        
+        <div className="progressBar">
+          <div className="progressFill" style={{ width: `${((idx) / questionnaire.questions.length) * 100}%` }} />
         </div>
       </div>
     );
@@ -1982,27 +2176,40 @@ function OnboardingControls({ state, dispatch, onReset }) {
   if (stage === STAGES.ALLOCATION_PROPOSED) {
     return (
       <div>
-        <div className="muted" style={{ marginBottom: 10 }}>
-          Target allocation proposed
-        </div>
+        <AllocationExplanation 
+          targetLayers={state.targetLayers}
+          riskProfile={state.riskProfile}
+          showTranslations={state.showTranslations}
+          onToggleTranslations={() => dispatch({ type: 'TOGGLE_TRANSLATIONS' })}
+        />
+        
+        <div className="consentCard">
+          <div className="consentHeader">Confirm Your Allocation</div>
+          <div className="consentInstruction">
+            {state.showTranslations 
+              ? 'Paste the exact Persian sentence below to confirm you understand and accept:'
+              : 'برای تأیید، جمله دقیق زیر را کپی و پیست کنید:'
+            }
+          </div>
+          
+          <div className="consentSentence">
+            <div className="sentenceFa">{questionnaire.consent_exact}</div>
+            {state.showTranslations && (
+              <div className="sentenceEn">{questionnaire.consent_english}</div>
+            )}
+          </div>
 
-        <div className="card" style={{ padding: 12 }}>
-          <div className="muted" style={{ marginBottom: 6 }}>Paste this exact sentence to confirm:</div>
-          <div className="code">{questionnaire.consent_exact}</div>
-
-          <div style={{ marginTop: 10 }}>
-            <input
-              className="input"
-              type="text"
-              placeholder="Paste the exact sentence"
-              value={consentText}
-              onChange={(e) => setConsentText(e.target.value)}
-            />
-            <div className="row" style={{ marginTop: 10 }}>
-              <button className="btn primary" onClick={() => dispatch({ type: 'SUBMIT_CONSENT', text: consentText })}>
-                Confirm
-              </button>
-            </div>
+          <input
+            className="input"
+            type="text"
+            placeholder="Paste the exact sentence here"
+            value={consentText}
+            onChange={(e) => setConsentText(e.target.value)}
+          />
+          <div className="row" style={{ marginTop: 10 }}>
+            <button className="btn primary" onClick={() => dispatch({ type: 'SUBMIT_CONSENT', text: consentText })}>
+              Confirm
+            </button>
           </div>
         </div>
       </div>
@@ -2027,6 +2234,23 @@ function OnboardingControls({ state, dispatch, onReset }) {
             Execute
           </button>
         </div>
+        
+        {state.targetLayers && (
+          <div className="allocationPreview">
+            <div className="previewTitle2">Your allocation:</div>
+            <div className="allocationBars">
+              <div className="allocBar foundation" style={{ width: `${state.targetLayers.foundation}%` }}>
+                F {state.targetLayers.foundation}%
+              </div>
+              <div className="allocBar growth" style={{ width: `${state.targetLayers.growth}%` }}>
+                G {state.targetLayers.growth}%
+              </div>
+              <div className="allocBar upside" style={{ width: `${state.targetLayers.upside}%` }}>
+                U {state.targetLayers.upside}%
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -2034,10 +2258,15 @@ function OnboardingControls({ state, dispatch, onReset }) {
   if (stage === STAGES.EXECUTED) {
     return (
       <div>
-        {/* Execution Summary */}
         <ExecutionSummary 
           lastAction={state.lastAction} 
           onDismiss={() => dispatch({ type: 'DISMISS_LAST_ACTION' })} 
+        />
+        
+        <RebalanceSuggestion
+          suggestion={state.rebalanceSuggestion}
+          onRebalance={() => dispatch({ type: 'START_REBALANCE' })}
+          onDismiss={() => dispatch({ type: 'DISMISS_REBALANCE_SUGGESTION' })}
         />
         
         {state.postAction === POST_ACTIONS.NONE && (
@@ -2270,8 +2499,8 @@ export default function App() {
     const map = {
       [STAGES.PHONE_REQUIRED]: { idx: 1, name: 'Phone' },
       [STAGES.QUESTIONNAIRE]: { idx: 2, name: 'Questionnaire' },
-      [STAGES.ALLOCATION_PROPOSED]: { idx: 3, name: 'Allocation' },
-      [STAGES.AMOUNT_REQUIRED]: { idx: 4, name: 'Amount' },
+      [STAGES.ALLOCATION_PROPOSED]: { idx: 3, name: 'Review' },
+      [STAGES.AMOUNT_REQUIRED]: { idx: 4, name: 'Fund' },
       [STAGES.EXECUTED]: { idx: 5, name: 'Active' },
     };
     const x = map[stage] || { idx: 0, name: stage };
@@ -2361,11 +2590,53 @@ export default function App() {
         
         .btn.tiny{padding:6px 10px;font-size:11px;border-radius:10px}
         .btn.tiny.disabled{opacity:.5;cursor:not-allowed}
+        
+        /* Questionnaire */
+        .questionnaireHeader{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
         .q-card{border:1px solid var(--border);border-radius:16px;padding:12px;background:rgba(255,255,255,.02)}
-        .q-title{font-weight:900;margin-bottom:10px;line-height:1.4}
+        .q-title{font-weight:900;margin-bottom:6px;line-height:1.4;font-size:15px}
+        .q-english{font-size:12px;color:var(--muted);margin-bottom:10px;font-style:italic}
         .q-options{display:flex;flex-direction:column;gap:8px}
         .opt{appearance:none;border:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--text);padding:10px 12px;border-radius:12px;font-weight:900;cursor:pointer;text-align:left}
         .opt:hover{border-color:rgba(79,124,255,.35)}
+        .opt-english{font-size:11px;color:var(--muted);margin-top:4px;font-weight:500}
+        .progressBar{height:4px;background:var(--border);border-radius:2px;margin-top:12px;overflow:hidden}
+        .progressFill{height:100%;background:var(--accent);transition:width .3s}
+        
+        /* Allocation Explanation */
+        .allocationExplanation{margin-bottom:12px}
+        .explanationHeader{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+        .profileBadge{display:flex;flex-direction:column}
+        .profileLevel{font-weight:900;font-size:16px;color:var(--accent)}
+        .profileLevelFa{font-size:12px;color:var(--muted)}
+        .layerExplanations{display:flex;flex-direction:column;gap:10px}
+        .layerExplain{border-left:3px solid;padding-left:12px;padding:8px 0 8px 12px;background:rgba(255,255,255,.02);border-radius:0 10px 10px 0}
+        .layerHeader{display:flex;justify-content:space-between;align-items:center}
+        .layerName{font-weight:900;font-size:14px}
+        .layerPct{font-weight:900;font-size:16px}
+        .layerNameFa{font-size:11px;color:var(--muted)}
+        .layerAssets{font-size:11px;color:var(--muted);margin-top:4px}
+        .layerDesc{font-size:12px;margin-top:4px}
+        .layerDescFa{font-size:11px;color:var(--muted);font-style:italic}
+        .layerRisk{font-size:10px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.05em}
+        
+        /* Consent */
+        .consentCard{border:1px solid var(--border);border-radius:14px;padding:12px;background:rgba(255,255,255,.02)}
+        .consentHeader{font-weight:900;margin-bottom:8px}
+        .consentInstruction{font-size:12px;color:var(--muted);margin-bottom:10px}
+        .consentSentence{background:rgba(0,0,0,.2);border-radius:10px;padding:10px;margin-bottom:10px}
+        .sentenceFa{font-weight:900;font-size:13px;line-height:1.5}
+        .sentenceEn{font-size:11px;color:var(--muted);margin-top:6px;font-style:italic}
+        
+        /* Amount Preview */
+        .allocationPreview{margin-top:12px;padding:10px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.02)}
+        .previewTitle2{font-size:11px;color:var(--muted);margin-bottom:8px}
+        .allocationBars{display:flex;height:24px;border-radius:6px;overflow:hidden}
+        .allocBar{display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:#fff}
+        .allocBar.foundation{background:#4ade80}
+        .allocBar.growth{background:#60a5fa}
+        .allocBar.upside{background:#f472b6}
+        
         .code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;line-height:1.5;border:1px solid var(--border);background:rgba(0,0,0,.2);padding:10px 12px;border-radius:12px;white-space:pre-wrap}
         .stack{display:flex;flex-direction:column;gap:0}
         
@@ -2374,6 +2645,18 @@ export default function App() {
         
         /* Drift Warning */
         .driftWarning{padding:8px 12px;border-radius:10px;background:rgba(250,204,21,.1);border:1px solid rgba(250,204,21,.25);color:#fde047;font-size:12px;font-weight:700}
+        
+        /* Rebalance Suggestion */
+        .rebalanceSuggestion{background:rgba(79,124,255,.1);border:1px solid rgba(79,124,255,.25);border-radius:12px;padding:10px 12px;margin-bottom:12px}
+        .suggestionHeader{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+        .suggestionIcon{font-size:14px}
+        .suggestionTitle{flex:1;font-weight:900;font-size:13px;color:var(--accent)}
+        .suggestionDismiss{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0}
+        .suggestionDetails{display:flex;gap:16px;margin-bottom:10px}
+        .suggestionRow{display:flex;align-items:center;gap:6px;font-size:12px}
+        .driftValue{font-weight:900}
+        .driftValue.high{color:#fb923c}
+        .driftValue.low{color:#4ade80}
         
         /* Action Card */
         .actionCard{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px}
@@ -2392,6 +2675,15 @@ export default function App() {
         .previewDelta{font-size:12px;color:var(--muted);margin-top:4px}
         .projectedBoundary{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
         .projectedLabel{font-size:11px;color:var(--muted)}
+        
+        /* Drift Change Row */
+        .driftChangeRow{display:flex;align-items:center;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px}
+        .driftChangeLabel{color:var(--muted)}
+        .driftChangeValue{font-weight:900}
+        .driftArrow{color:var(--muted)}
+        .driftDelta{font-weight:700}
+        .driftDelta.negative{color:#f87171}
+        .driftDelta.positive{color:#4ade80}
         
         /* Validation */
         .validationDisplay{margin-top:10px}
