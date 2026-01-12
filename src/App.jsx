@@ -1,24 +1,20 @@
 import React, { useEffect, useMemo, useReducer, useState, useRef } from 'react';
 
-// ====== BLU MARKETS v9.5 ======
-// UI Enhancement: 12 Visual & Layout Improvements
-// - Asset display names (IRR_FIXED_INCOME → Fixed Income)
-// - Horizontal allocation bar with gradients
-// - Portfolio value card redesign
-// - Footer buttons with labels (☂️ Protect, 💰 Borrow, ↺ Reset)
-// - Active tab gradient styling with glow
-// - Multi-line rebalance log format
-// - Protection status inline on holdings
-// - Locked amount display on collateralized assets
-// - Toast notifications with auto-dismiss
-// - Simplified reset confirmation modal
-// Fixes from v9:
-// 1. Allocation display: cash separate from Foundation % (assets-only calculation)
-// 2. Hide boundary transition when before === after
-// 3. Add Protect/Borrow buttons to footer
-// 4. New action log format (minimal event markers)
-// 5. Boundary calculation based on assets only
-// 6. Remove premium rates table, show rate contextually when protecting
+// ====== BLU MARKETS v9.6 ======
+// UI Refinement: 13 Visual & Layout Improvements
+// 1. Lock icon shows "IRR" unit (🔒 7.0M IRR locked)
+// 2. Portfolio value breakdown: two mini-cards (Invested/Cash)
+// 3. Protection status inline in Holdings (☂️ Protected Xd)
+// 4. Zero-value assets grayed out, only Buy enabled
+// 5. Trade amounts shown in History with colored +/- icons
+// 6. Protection tab shows "X days left" format
+// 7. Premium storage verified correct
+// 8. All tabs use purple gradient consistently
+// 9. Footer reorganized: 4 actions row 1, Reset alone row 2
+// 10. Disabled buttons at 35% opacity
+// 11. Buy trades: green +, Sell trades: red -
+// 12. Loan card: collateral value, % used, risk alerts
+// 13. Allocation bar removed, cards only remain
 
 const questionnaire = {
   "version": "v9.1",
@@ -877,15 +873,25 @@ function OnboardingRightPanel({ stage, questionIndex, targetLayers, investAmount
 function HistoryPane({ ledger }) {
   const [expanded, setExpanded] = useState({});
   if (!ledger || ledger.length === 0) return <div className="card"><h3>Action History</h3><div className="muted">No actions yet.</div></div>;
-  const actionIcons = { 'PORTFOLIO_CREATED': '✓', 'ADD_FUNDS': '+', 'TRADE': '↔', 'REBALANCE': '⟲', 'PROTECT': '☂️', 'BORROW': '💰', 'REPAY_LOAN': '✓' };
+  const getActionIcon = (entry) => {
+    if (entry.actionType === 'TRADE') {
+      return entry.params?.side === 'BUY' ? '+' : '-';
+    }
+    const icons = { 'PORTFOLIO_CREATED': '✓', 'ADD_FUNDS': '+', 'REBALANCE': '⟲', 'PROTECT': '☂️', 'BORROW': '💰', 'REPAY_LOAN': '✓' };
+    return icons[entry.actionType] || '•';
+  };
+  const getTradeClass = (entry) => {
+    if (entry.actionType !== 'TRADE') return '';
+    return entry.params?.side === 'BUY' ? 'tradeBuy' : 'tradeSell';
+  };
   const formatLedgerAction = (entry) => {
     switch (entry.actionType) {
       case 'PORTFOLIO_CREATED': return 'Portfolio Created';
       case 'ADD_FUNDS': return 'Funds Added';
-      case 'TRADE': return `${entry.params?.side === 'BUY' ? 'Bought' : 'Sold'} ${entry.params?.assetId || ''}`;
+      case 'TRADE': return `${entry.params?.side === 'BUY' ? 'Bought' : 'Sold'} ${getAssetDisplayName(entry.params?.assetId) || ''}`;
       case 'REBALANCE': return 'Rebalanced';
-      case 'PROTECT': return `Protected ${entry.params?.assetId || ''} (${entry.params?.months || 3}mo)`;
-      case 'BORROW': return `Borrowed (${entry.params?.collateralAssetId || ''})`;
+      case 'PROTECT': return `Protected ${getAssetDisplayName(entry.params?.assetId) || ''} (${entry.params?.months || 3}mo)`;
+      case 'BORROW': return `Borrowed (${getAssetDisplayName(entry.params?.collateralAssetId) || ''})`;
       case 'REPAY_LOAN': return 'Loan Repaid';
       default: return entry.actionType;
     }
@@ -893,9 +899,16 @@ function HistoryPane({ ledger }) {
   return (
     <div className="card"><h3>Action History</h3><div className="ledgerList">{[...ledger].reverse().map((entry) => {
       const showTransition = entry.boundary.before !== entry.boundary.after;
+      const isTrade = entry.actionType === 'TRADE';
       return (
-        <div key={entry.id} className="ledgerEntry">
-          <div className="ledgerHeader" onClick={() => setExpanded(prev => ({ ...prev, [entry.id]: !prev[entry.id] }))} style={{ cursor: 'pointer' }}><span className="ledgerIcon">{actionIcons[entry.actionType] || '•'}</span><span className="ledgerAction">{formatLedgerAction(entry)}</span><span className="ledgerTime">{formatTimestamp(entry.timestamp)}</span><span className="ledgerExpand">{expanded[entry.id] ? '−' : '+'}</span></div>
+        <div key={entry.id} className={`ledgerEntry ${getTradeClass(entry)}`}>
+          <div className="ledgerHeader" onClick={() => setExpanded(prev => ({ ...prev, [entry.id]: !prev[entry.id] }))} style={{ cursor: 'pointer' }}>
+            <span className={`ledgerIcon ${getTradeClass(entry)}`}>{getActionIcon(entry)}</span>
+            <span className="ledgerAction">{formatLedgerAction(entry)}</span>
+            {isTrade && <span className="ledgerAmount">{formatIRR(entry.params?.amountIRR || 0)}</span>}
+            <span className="ledgerTime">{formatTimestamp(entry.timestamp)}</span>
+            <span className="ledgerExpand">{expanded[entry.id] ? '−' : '+'}</span>
+          </div>
           {showTransition && <div className="ledgerBoundary"><span className={`healthPill small ${entry.boundary.before.toLowerCase()}`}>{PORTFOLIO_HEALTH_LABELS[entry.boundary.before]}</span><span className="arrow">→</span><span className={`healthPill small ${entry.boundary.after.toLowerCase()}`}>{PORTFOLIO_HEALTH_LABELS[entry.boundary.after]}</span></div>}
           {expanded[entry.id] && entry.snapshot.before && entry.snapshot.after && <div className="ledgerDetails"><div className="ledgerSnapshot"><div className="snapshotColumn"><div className="snapshotLabel">Before</div><div className="snapshotValue">{formatIRR(entry.snapshot.before.totalIRR)}</div></div><div className="snapshotColumn"><div className="snapshotLabel">After</div><div className="snapshotValue">{formatIRR(entry.snapshot.after.totalIRR)}</div></div></div></div>}
         </div>
@@ -920,29 +933,36 @@ function PortfolioHome({ portfolio, cashIRR, targetLayers, protections, onStartT
       <div className="portfolioValueCard">
         <div className="portfolioValueLabel">PORTFOLIO VALUE</div>
         <div className="portfolioValueAmount">{formatIRR(total)}</div>
-        <div className="portfolioValueBreakdown"><span>Invested: {formatIRR(exposure.totalIRR)}</span><span className="breakdownDivider">·</span><span>Cash: {formatIRR(cashIRR || 0)}</span></div>
+        <div className="portfolioBreakdown">
+          <div className="breakdownCard">
+            <div className="breakdownCardIcon">📊</div>
+            <div className="breakdownCardLabel">Invested</div>
+            <div className="breakdownCardValue">{formatIRR(exposure.totalIRR)}</div>
+          </div>
+          <div className="breakdownCard">
+            <div className="breakdownCardIcon">💵</div>
+            <div className="breakdownCardLabel">Cash</div>
+            <div className="breakdownCardValue">{formatIRR(cashIRR || 0)}</div>
+          </div>
+        </div>
       </div>
       <div className="card">
         <div className="sectionTitle">ASSET ALLOCATION</div>
-        <div className="allocationBar">
-          <div className="allocationSegment foundation" style={{ width: `${exposure.pct.foundation}%` }}></div>
-          <div className="allocationSegment growth" style={{ width: `${exposure.pct.growth}%` }}></div>
-          <div className="allocationSegment upside" style={{ width: `${exposure.pct.upside}%` }}></div>
-        </div>
         <div className="grid3">{['foundation', 'growth', 'upside'].map(layer => <LayerMini key={layer} layer={layer} pct={exposure.pct[layer]} target={targetLayers?.[layer] ?? '-'} />)}</div>
       </div>
       <div className="card"><h3>Holdings</h3><div className="list">{portfolio.holdings.map((h) => {
         const info = LAYER_EXPLANATIONS[h.layer];
         const protDays = getProtectionDays(h.asset);
+        const isEmpty = h.amountIRR === 0;
         return (
-        <div key={h.asset} className="item" style={{ alignItems: 'center' }}>
+        <div key={h.asset} className={`item ${isEmpty ? 'assetEmpty' : ''}`} style={{ alignItems: 'center' }}>
           <div style={{ flex: 1 }}>
             <div className="asset">{getAssetDisplayName(h.asset)}</div>
-            <div className="muted">{info.icon} {info.name}{protDays !== null ? ` · ☂️ Protected (${protDays}d)` : ''}{h.frozen ? ` · 🔒 ${formatIRRShort(h.amountIRR)} locked` : ''}</div>
+            <div className="muted">{info.icon} {info.name}{protDays !== null ? ` · ☂️ Protected (${protDays}d)` : ''}{h.frozen ? ` · 🔒 ${formatIRRShort(h.amountIRR)} IRR locked` : ''}</div>
           </div>
           <div style={{ textAlign: 'right', minWidth: 150 }}>
             <div className="asset">{formatIRR(h.amountIRR)}</div>
-            <div className="assetActions"><button className="btn tiny" onClick={() => onStartTrade(h.asset, 'BUY')}>Buy</button><button className="btn tiny" disabled={h.frozen} onClick={() => onStartTrade(h.asset, 'SELL')}>Sell</button><button className="btn tiny" onClick={() => onStartProtect?.(h.asset)}>Protect</button><button className="btn tiny" disabled={h.frozen} onClick={() => onStartBorrow?.(h.asset)}>Borrow</button></div>
+            <div className="assetActions"><button className="btn tiny" onClick={() => onStartTrade(h.asset, 'BUY')}>Buy</button><button className="btn tiny" disabled={h.frozen || isEmpty} onClick={() => onStartTrade(h.asset, 'SELL')}>Sell</button><button className="btn tiny" disabled={isEmpty} onClick={() => onStartProtect?.(h.asset)}>Protect</button><button className="btn tiny" disabled={h.frozen || isEmpty} onClick={() => onStartBorrow?.(h.asset)}>Borrow</button></div>
           </div>
         </div>
       ); })}</div></div>
@@ -952,16 +972,45 @@ function PortfolioHome({ portfolio, cashIRR, targetLayers, protections, onStartT
 
 function Protection({ protections }) {
   const list = protections || [];
+  const getDaysRemaining = (protectedUntil) => {
+    const now = Date.now();
+    const until = new Date(protectedUntil).getTime();
+    return Math.max(0, Math.ceil((until - now) / (1000 * 60 * 60 * 24)));
+  };
   return (
     <div className="card"><h3>Active Protections</h3>
-    {list.length === 0 ? <div className="muted">No assets protected.</div> : <div className="list">{list.map((p, idx) => { const info = LAYER_EXPLANATIONS[p.layer]; return <div key={p.assetId + '|' + idx} className="item protectionItem"><div style={{ flex: 1 }}><div className="asset">☂️ {p.assetId}</div><div className="muted"><span className={`layerDot ${p.layer}`} style={{ marginRight: 6 }}></span>{info?.name} · Until {p.protectedUntil}</div></div><div style={{ textAlign: 'right' }}><div className="asset">{formatIRR(p.premiumIRR)}</div><div className="muted">Premium paid</div></div></div>; })}</div>}</div>
+    {list.length === 0 ? <div className="muted">No assets protected.</div> : <div className="list">{list.map((p, idx) => { const info = LAYER_EXPLANATIONS[p.layer]; const daysLeft = getDaysRemaining(p.protectedUntil); return <div key={p.assetId + '|' + idx} className="item protectionItem"><div style={{ flex: 1 }}><div className="asset">☂️ {getAssetDisplayName(p.assetId)}</div><div className="muted"><span className={`layerDot ${p.layer}`} style={{ marginRight: 6 }}></span>{info?.name} · {daysLeft} days left</div></div><div style={{ textAlign: 'right' }}><div className="asset">{formatIRR(p.premiumIRR)}</div><div className="muted">Premium paid</div></div></div>; })}</div>}</div>
   );
 }
 
 function Loans({ loan, dispatch }) {
+  const getLoanStatus = (loanAmount, collateralValue) => {
+    const ltvPercent = (loanAmount / collateralValue) * 100;
+    if (ltvPercent > 75) return { level: 'critical', message: '🔴 Liquidation risk — repay or add collateral' };
+    if (ltvPercent > 60) return { level: 'warning', message: '⚠️ Monitor collateral' };
+    return null;
+  };
   return (
     <div className="card"><h3>Active Loan</h3>
-    {!loan ? <div className="muted">No active loans.</div> : <div className="list"><div className="item loanItem"><div style={{ flex: 1 }}><div className="loanAmount">{formatIRR(loan.amountIRR)}</div><div className="loanDetails">Collateral: {loan.collateralAssetId} · LTV {Math.round(loan.ltv * 100)}%</div></div><div style={{ textAlign: 'right' }}><div className="liquidationValue">{formatIRR(loan.liquidationIRR)}</div><div className="muted">Liquidation</div></div></div><button className="btn primary" style={{ width: '100%', marginTop: 10 }} onClick={() => dispatch({ type: 'START_REPAY_LOAN' })}>Repay Loan</button></div>}</div>
+    {!loan ? <div className="muted">No active loans.</div> : <div className="list">
+      <div className="item loanItem">
+        <div style={{ flex: 1 }}>
+          <div className="loanAmount">{formatIRR(loan.amountIRR)}</div>
+          <div className="loanDetails">Collateral: {getAssetDisplayName(loan.collateralAssetId)} ({formatIRR(loan.collateralValueIRR)})</div>
+          <div className="loanUsage">Using {Math.round((loan.amountIRR / loan.collateralValueIRR) * 100)}% of collateral</div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div className="liquidationValue">{formatIRR(loan.liquidationIRR)}</div>
+          <div className="muted">Liquidation</div>
+        </div>
+      </div>
+      {getLoanStatus(loan.amountIRR, loan.collateralValueIRR) && (
+        <div className={`loanStatus loanStatus${getLoanStatus(loan.amountIRR, loan.collateralValueIRR).level.charAt(0).toUpperCase() + getLoanStatus(loan.amountIRR, loan.collateralValueIRR).level.slice(1)}`}>
+          {getLoanStatus(loan.amountIRR, loan.collateralValueIRR).message}
+        </div>
+      )}
+      <button className="btn primary" style={{ width: '100%', marginTop: 10 }} onClick={() => dispatch({ type: 'START_REPAY_LOAN' })}>Repay Loan</button>
+    </div>}</div>
   );
 }
 
@@ -1024,7 +1073,7 @@ function OnboardingControls({ state, dispatch }) {
   // EXECUTED
   return (
     <div>
-      {state.postAction === POST_ACTIONS.NONE && <div className="footerActions"><button className="btn primary" onClick={() => dispatch({ type: 'START_ADD_FUNDS' })}>Add Funds</button><button className="btn" onClick={() => dispatch({ type: 'START_REBALANCE' })}>Rebalance</button><button className="btn" onClick={() => dispatch({ type: 'START_PROTECT' })}>☂️ Protect</button><button className="btn" onClick={() => dispatch({ type: 'START_BORROW' })}>💰 Borrow</button><button className="btn resetBtn" onClick={() => dispatch({ type: 'SHOW_RESET_CONFIRM' })}>↺ Reset</button></div>}
+      {state.postAction === POST_ACTIONS.NONE && <div className="footerActions"><div className="footerRowPrimary"><button className="btn primary" onClick={() => dispatch({ type: 'START_ADD_FUNDS' })}>Add Funds</button><button className="btn" onClick={() => dispatch({ type: 'START_REBALANCE' })}>Rebalance</button><button className="btn" onClick={() => dispatch({ type: 'START_PROTECT' })}>☂️ Protect</button><button className="btn" onClick={() => dispatch({ type: 'START_BORROW' })}>💰 Borrow</button></div><div className="footerRowSecondary"><button className="btn resetBtn" onClick={() => dispatch({ type: 'SHOW_RESET_CONFIRM' })}>↺ Reset</button></div></div>}
       {state.postAction === POST_ACTIONS.ADD_FUNDS && <ActionCard title="Add Funds"><input className="input" type="number" placeholder="Amount (IRR)" value={state.pendingAmountIRR || ''} onChange={(e) => dispatch({ type: 'SET_PENDING_AMOUNT', amountIRR: e.target.value })} />{state.validation?.errors?.length > 0 && <div className="validationDisplay">{state.validation.errors.map((e, i) => <div key={i} className="validationError">{e}</div>)}</div>}<div className="row" style={{ marginTop: 10 }}><button className="btn primary" onClick={() => dispatch({ type: 'CONFIRM_ADD_FUNDS' })} disabled={!state.pendingAmountIRR}>Add to Cash</button><button className="btn" onClick={() => dispatch({ type: 'CANCEL_POST_ACTION' })}>Cancel</button></div></ActionCard>}
       {state.postAction === POST_ACTIONS.TRADE && <ActionCard title={`${state.tradeDraft?.side === 'BUY' ? 'Buy' : 'Sell'} ${state.tradeDraft?.assetId}`}><div className="row" style={{ gap: 8 }}><button className={`chip ${state.tradeDraft?.side === 'BUY' ? 'primary' : ''}`} onClick={() => dispatch({ type: 'SET_TRADE_SIDE', side: 'BUY' })}>Buy</button><button className={`chip ${state.tradeDraft?.side === 'SELL' ? 'primary' : ''}`} onClick={() => dispatch({ type: 'SET_TRADE_SIDE', side: 'SELL' })}>Sell</button></div><input className="input" style={{ marginTop: 8 }} type="number" placeholder="Amount (IRR)" value={state.tradeDraft?.amountIRR ?? ''} onChange={(e) => dispatch({ type: 'SET_TRADE_AMOUNT', amountIRR: e.target.value })} />{state.validation?.errors?.length > 0 && <div className="validationDisplay">{state.validation.errors.map((e, i) => <div key={i} className="validationError">{e}</div>)}</div>}<div className="row" style={{ marginTop: 10 }}><button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_TRADE' })} disabled={!state.tradeDraft?.amountIRR}>Preview</button><button className="btn" onClick={() => dispatch({ type: 'CANCEL_POST_ACTION' })}>Cancel</button></div></ActionCard>}
       {state.postAction === POST_ACTIONS.TRADE_PREVIEW && <PreviewPanel title={`${state.tradeDraft?.side === 'BUY' ? 'Buy' : 'Sell'} ${state.tradeDraft?.assetId}`} preview={state.preview} validation={state.validation} acknowledged={state.acknowledged} onAcknowledge={(v) => dispatch({ type: 'SET_ACKNOWLEDGED', value: v })} onConfirm={() => dispatch({ type: 'CONFIRM_TRADE_FINAL' })} onBack={() => dispatch({ type: 'CANCEL_POST_ACTION' })} />}
@@ -1208,9 +1257,12 @@ export default function App() {
         /* Portfolio Value Card */
         .portfolioValueCard{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:12px}
         .portfolioValueLabel{font-size:12px;font-weight:600;color:var(--text-muted);letter-spacing:0.05em;margin-bottom:8px}
-        .portfolioValueAmount{font-size:32px;font-weight:700;background:linear-gradient(135deg,#6366f1,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:12px}
-        .portfolioValueBreakdown{font-size:13px;color:var(--text-secondary);display:flex;gap:12px}
-        .breakdownDivider{color:var(--text-muted)}
+        .portfolioValueAmount{font-size:32px;font-weight:700;background:linear-gradient(135deg,#6366f1,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:16px}
+        .portfolioBreakdown{display:flex;gap:12px}
+        .breakdownCard{flex:1;background:var(--bg-primary);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+        .breakdownCardIcon{font-size:16px;margin-bottom:4px}
+        .breakdownCardLabel{font-size:12px;color:var(--text-muted);margin-bottom:4px}
+        .breakdownCardValue{font-size:16px;font-weight:600;color:var(--text-primary)}
 
         /* Allocation Bar */
         .sectionTitle{font-size:12px;font-weight:600;color:var(--text-muted);letter-spacing:0.05em;margin-bottom:12px}
@@ -1222,12 +1274,18 @@ export default function App() {
 
         /* Asset Actions */
         .assetActions{display:flex;justify-content:flex-end;gap:6px;margin-top:6px;flex-wrap:wrap}
-        .assetActions .btn.tiny:disabled{opacity:0.3;cursor:not-allowed;background:transparent;border-color:transparent;color:var(--text-muted)}
+        .assetActions .btn.tiny:disabled{opacity:0.35;cursor:not-allowed;background:transparent;border-color:transparent;color:var(--text-muted)}
+
+        /* Empty Asset State */
+        .item.assetEmpty{opacity:0.5}
+        .item.assetEmpty .asset{color:var(--text-muted)}
 
         /* Footer Actions */
-        .footerActions{display:flex;gap:8px;flex-wrap:wrap}
-        .resetBtn{color:var(--text-muted)}
-        .resetBtn:hover{color:var(--danger);border-color:var(--danger);background:rgba(248,81,73,0.08)}
+        .footerActions{display:flex;flex-direction:column;gap:10px}
+        .footerRowPrimary{display:flex;gap:8px;flex-wrap:wrap}
+        .footerRowSecondary{display:flex;gap:8px}
+        .resetBtn{color:var(--text-muted);opacity:0.6}
+        .resetBtn:hover{color:var(--danger);border-color:var(--danger);background:rgba(248,81,73,0.08);opacity:1}
 
         /* Toast Notifications */
         .toastContainer{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:900;pointer-events:none}
@@ -1296,8 +1354,11 @@ export default function App() {
         .ledgerEntry{border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--bg-secondary);transition:border-color 0.15s}
         .ledgerEntry:hover{border-color:var(--border-hover)}
         .ledgerHeader{display:flex;align-items:center;gap:8px}
-        .ledgerIcon{font-size:12px;width:20px}
+        .ledgerIcon{font-size:12px;width:20px;font-weight:700}
+        .ledgerIcon.tradeBuy{color:#34d399}
+        .ledgerIcon.tradeSell{color:#f87171}
         .ledgerAction{font-weight:500;font-size:13px;flex:1}
+        .ledgerAmount{font-weight:500;font-size:12px;margin-right:16px}
         .ledgerTime{color:var(--text-muted);font-size:11px}
         .ledgerExpand{color:var(--text-muted);font-size:14px;width:20px;text-align:center}
         .ledgerBoundary{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
@@ -1316,7 +1377,11 @@ export default function App() {
         .loanItem{background:var(--bg-secondary);border:1px solid rgba(210,153,34,.3);border-left:3px solid var(--warning)}
         .loanAmount{font-size:20px;font-weight:600}
         .loanDetails{font-size:12px;color:var(--text-secondary);margin-top:4px}
+        .loanUsage{font-size:12px;color:var(--text-muted);margin-top:4px}
         .liquidationValue{font-size:16px;font-weight:500;color:var(--warning)}
+        .loanStatus{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:500}
+        .loanStatusWarning{background:rgba(245,158,11,0.15);color:#fbbf24}
+        .loanStatusCritical{background:rgba(239,68,68,0.15);color:#f87171}
 
         /* Repay Details */
         .repayDetails{background:var(--bg-primary);border-radius:10px;padding:12px;border:1px solid var(--border)}
