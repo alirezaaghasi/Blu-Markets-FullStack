@@ -98,6 +98,9 @@ function formatIRRShort(n) {
 }
 function formatTime(ts) { return new Date(ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }); }
 function formatTimestamp(ts) { return new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+function formatTimeOnly(ts) {
+  return new Date(ts).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+}
 
 const ASSET_DISPLAY_NAMES = {
   'IRR_FIXED_INCOME': 'Fixed Income (IRR)',
@@ -227,6 +230,10 @@ function initialState() {
     showResetConfirm: false,
     actionLog: [],
 
+    // Consent flow state
+    consentStep: 0,
+    consentMessages: [],
+
     // Draft state for UI input collection
     tradeDraft: null,
     protectDraft: null,
@@ -285,9 +292,14 @@ function reducer(state, action) {
 
       if (idx >= questionnaire.questions.length) {
         const targetLayerPct = computeTargetLayersFromAnswers(answers);
-        s = { ...s, targetLayerPct, stage: STAGES.ONBOARDING_RESULT };
+        s = { ...s, targetLayerPct, stage: STAGES.ONBOARDING_RESULT, consentStep: 0, consentMessages: [] };
       }
       return s;
+    }
+
+    case 'CONSENT_NEXT_STEP': {
+      if (state.stage !== STAGES.ONBOARDING_RESULT) return state;
+      return { ...state, consentStep: state.consentStep + 1 };
     }
 
     case 'SUBMIT_CONSENT': {
@@ -596,28 +608,33 @@ function LayerMini({ layer, pct, target }) {
   );
 }
 
+// Issue 10: Left panel shows only last 10 actions
 function ActionLogPane({ actionLog }) {
   const logRef = useRef(null);
   useEffect(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [actionLog]);
   if (!actionLog || actionLog.length === 0) return <div className="actionLogEmpty"><div className="muted">No actions yet</div></div>;
 
+  // Only show last 10 actions
+  const recentActions = actionLog.slice(-10);
+
   const renderLogEntry = (entry) => {
     const time = formatTime(entry.timestamp);
     if (entry.type === 'REBALANCE') {
-      return <span>{time}  ⚖️ Rebalanced</span>;
+      return <span>{time}  Rebalanced</span>;
     }
     switch (entry.type) {
       case 'PORTFOLIO_CREATED': return `${time}  Started with ${formatIRRShort(entry.amountIRR)}`;
       case 'ADD_FUNDS': return `${time}  +${formatIRRShort(entry.amountIRR)} cash`;
       case 'TRADE': return `${time}  ${entry.side === 'BUY' ? '+' : '-'}${getAssetDisplayName(entry.assetId)} ${formatIRRShort(entry.amountIRR)}`;
-      case 'BORROW': return `${time}  💰 Borrowed ${formatIRRShort(entry.amountIRR)}`;
-      case 'REPAY': return `${time}  ✓ Repaid ${formatIRRShort(entry.amountIRR)}`;
-      case 'PROTECT': return `${time}  ☂️ ${getAssetDisplayName(entry.assetId)} protected ${entry.months}mo`;
+      // Issue 8: Borrowed format
+      case 'BORROW': return `${time}  Borrowed ${formatIRRShort(entry.amountIRR)} IRR against ${getAssetDisplayName(entry.assetId)}`;
+      case 'REPAY': return `${time}  Repaid ${formatIRRShort(entry.amountIRR)}`;
+      case 'PROTECT': return `${time}  ${getAssetDisplayName(entry.assetId)} protected ${entry.months}mo`;
       default: return `${time}  ${entry.type}`;
     }
   };
 
-  return <div className="actionLog" ref={logRef}>{actionLog.map((entry) => <div key={entry.id} className="logEntry">{renderLogEntry(entry)}</div>)}</div>;
+  return <div className="actionLog" ref={logRef}>{recentActions.map((entry) => <div key={entry.id} className="logEntry">{renderLogEntry(entry)}</div>)}</div>;
 }
 
 function ExecutionSummary({ lastAction, dispatch }) {
@@ -631,14 +648,14 @@ function ExecutionSummary({ lastAction, dispatch }) {
 
   const formatSummary = () => {
     switch (lastAction.type) {
-      case 'PORTFOLIO_CREATED': return '✓ Portfolio created';
-      case 'ADD_FUNDS': return `✓ +${formatIRRShort(lastAction.amountIRR)} cash added`;
-      case 'TRADE': return `✓ ${lastAction.side === 'BUY' ? 'Bought' : 'Sold'} ${getAssetDisplayName(lastAction.assetId)}`;
-      case 'BORROW': return `✓ Borrowed ${formatIRRShort(lastAction.amountIRR)}`;
-      case 'REPAY': return '✓ Loan repaid';
-      case 'PROTECT': return `✓ ${getAssetDisplayName(lastAction.assetId)} protected`;
-      case 'REBALANCE': return '✓ Rebalanced successfully';
-      default: return `✓ ${lastAction.type}`;
+      case 'PORTFOLIO_CREATED': return 'Portfolio created';
+      case 'ADD_FUNDS': return `+${formatIRRShort(lastAction.amountIRR)} cash added`;
+      case 'TRADE': return `${lastAction.side === 'BUY' ? 'Bought' : 'Sold'} ${getAssetDisplayName(lastAction.assetId)}`;
+      case 'BORROW': return `Borrowed ${formatIRRShort(lastAction.amountIRR)}`;
+      case 'REPAY': return 'Loan repaid';
+      case 'PROTECT': return `${getAssetDisplayName(lastAction.assetId)} protected`;
+      case 'REBALANCE': return 'Rebalanced successfully';
+      default: return `${lastAction.type}`;
     }
   };
   return <div className="toast success">{formatSummary()}</div>;
@@ -670,15 +687,61 @@ function PhoneForm({ state, dispatch }) {
   );
 }
 
+// Issue 3: Consent flow steps
+const CONSENT_STEPS = [
+  {
+    id: 'recommendation',
+    getMessage: (targetLayers) => `Based on your answers, here's your recommended allocation:
+
+Foundation (${targetLayers?.FOUNDATION || 0}%) - Stable assets
+Growth (${targetLayers?.GROWTH || 0}%) - Balanced growth
+Upside (${targetLayers?.UPSIDE || 0}%) - Higher potential
+
+This balances protection with growth.`,
+    button: 'Continue'
+  },
+  {
+    id: 'risk',
+    getMessage: () => `With this allocation:
+
+Good year: +15-25%
+Bad quarter: -10-15%
+Recovery: typically 3-6 months
+
+Markets are uncertain. This is not a guarantee.`,
+    button: 'I understand'
+  },
+  {
+    id: 'control',
+    getMessage: () => `You're always in control:
+
+Adjust allocation anytime
+Protect assets against drops
+Borrow without selling
+Exit to cash whenever`,
+    button: 'Continue'
+  },
+  {
+    id: 'consent',
+    getMessage: () => `Ready to start? Type this to confirm:`,
+    consentRequired: true
+  }
+];
+
+// Issue 1 & 2: Welcome screen with prominent motto, no layer explanation
 function OnboardingRightPanel({ stage, questionIndex, targetLayers, investAmount, dispatch }) {
   if (stage === STAGES.WELCOME) {
     return (
       <div className="welcomeScreen">
-        <div className="welcomeLogo">B</div>
-        <h1 className="welcomeTitle">Blu Markets</h1>
-        <p className="welcomeMotto">Markets, but mindful</p>
-        <p className="welcomeTagline">Your wealth, your pace, your future.</p>
-        <button className="btn primary welcomeCta" onClick={() => dispatch({ type: 'START_ONBOARDING' })}>Get Started</button>
+        <div className="welcomeIcon">B</div>
+        <h1 className="welcomeTitle">Welcome</h1>
+        <p className="welcomeMotto">Markets, but mindful.</p>
+        <div className="welcomeValues">
+          <p>Your decisions matter here.</p>
+          <p>Build wealth without losing control.</p>
+          <p>Take risk without risking everything.</p>
+        </div>
+        <button className="btn primary welcomeCta" onClick={() => dispatch({ type: 'START_ONBOARDING' })}>Continue</button>
       </div>
     );
   }
@@ -686,15 +749,9 @@ function OnboardingRightPanel({ stage, questionIndex, targetLayers, investAmount
     return (
       <div className="onboardingPanel">
         <div className="welcomeCard">
-          <div className="welcomeIcon">🏦</div>
+          <div className="welcomeIconSmall">B</div>
           <h2>Welcome</h2>
           <p>A calm approach to building wealth.</p>
-          <div className="welcomeFeatures">
-            {['FOUNDATION', 'GROWTH', 'UPSIDE'].map(layer => {
-              const info = LAYER_EXPLANATIONS[layer];
-              return <div key={layer} className="featureItem"><span className={`layerDot ${layer.toLowerCase()}`}></span><span>{`${info.name} — ${info.description.split('.')[0]}`}</span></div>;
-            })}
-          </div>
         </div>
       </div>
     );
@@ -746,32 +803,53 @@ function OnboardingRightPanel({ stage, questionIndex, targetLayers, investAmount
       </div>
     );
   }
+  // Issue 4: Investment amount screen with presets and live preview
   if (stage === STAGES.AMOUNT_REQUIRED) {
     const amount = Number(investAmount) || 0;
     const isValid = amount >= THRESHOLDS.MIN_AMOUNT_IRR;
     const hasInput = amount > 0;
+
+    const breakdown = hasInput && isValid ? {
+      foundation: Math.round(amount * (targetLayers?.FOUNDATION || 0) / 100),
+      growth: Math.round(amount * (targetLayers?.GROWTH || 0) / 100),
+      upside: Math.round(amount * (targetLayers?.UPSIDE || 0) / 100),
+    } : null;
+
     return (
       <div className="onboardingPanel">
         <div className="investPreviewCard">
-          <h3>Investment Preview</h3>
-          {hasInput ? (
+          <div className="previewHeader">YOUR PORTFOLIO PREVIEW</div>
+          {breakdown ? (
             <>
-              <div className="investTotal">
-                <div className="portfolioValue">{formatIRR(amount)}</div>
-                {!isValid && <div className="investWarning">Minimum: {formatIRR(THRESHOLDS.MIN_AMOUNT_IRR)}</div>}
+              <div className="previewTotal">{formatIRR(amount)}</div>
+              <div className="previewBreakdown">
+                <div className="previewLayer">
+                  <span className="layerDot foundation"></span>
+                  <span className="layerName">Foundation ({targetLayers?.FOUNDATION}%)</span>
+                  <span className="layerAmount">{formatIRR(breakdown.foundation)}</span>
+                </div>
+                <div className="previewLayerAssets">USDT · Fixed Income</div>
+
+                <div className="previewLayer">
+                  <span className="layerDot growth"></span>
+                  <span className="layerName">Growth ({targetLayers?.GROWTH}%)</span>
+                  <span className="layerAmount">{formatIRR(breakdown.growth)}</span>
+                </div>
+                <div className="previewLayerAssets">Gold · BTC · ETH · QQQ</div>
+
+                <div className="previewLayer">
+                  <span className="layerDot upside"></span>
+                  <span className="layerName">Upside ({targetLayers?.UPSIDE}%)</span>
+                  <span className="layerAmount">{formatIRR(breakdown.upside)}</span>
+                </div>
+                <div className="previewLayerAssets">SOL · TON</div>
               </div>
-              {isValid && <div className="investBreakdown">
-                {['FOUNDATION', 'GROWTH', 'UPSIDE'].map(layer => {
-                  const info = LAYER_EXPLANATIONS[layer];
-                  const pct = targetLayers?.[layer] || 0;
-                  return <div key={layer} className="breakdownRow"><div className="breakdownLeft"><span className={`layerDot ${layer.toLowerCase()}`} style={{ marginRight: 8 }}></span><span>{info.name}</span></div><div className="breakdownRight"><span className="breakdownAmount">{formatIRR(Math.floor(amount * pct / 100))}</span></div></div>;
-                })}
-              </div>}
+              <div className="previewReady">Ready when you are.</div>
             </>
           ) : (
-            <div className="investPlaceholder">
-              <div className="muted">Enter an amount to see your allocation</div>
-              <div className="investMinHint">Minimum: {formatIRR(THRESHOLDS.MIN_AMOUNT_IRR)}</div>
+            <div className="previewEmpty">
+              <p>Enter an amount to see your allocation</p>
+              <p className="previewMinimum">Minimum: {formatIRR(THRESHOLDS.MIN_AMOUNT_IRR)}</p>
             </div>
           )}
         </div>
@@ -781,6 +859,7 @@ function OnboardingRightPanel({ stage, questionIndex, targetLayers, investAmount
   return null;
 }
 
+// Issue 5: Fix tab border radius
 function Tabs({ tab, dispatch }) {
   return (
     <div className="tabs" style={{ padding: '0 14px 10px' }}>
@@ -792,6 +871,35 @@ function Tabs({ tab, dispatch }) {
   );
 }
 
+// Issue 12: Group history by date
+function groupByDate(entries) {
+  const groups = {};
+  const today = new Date().toDateString();
+  const yesterday = new Date(Date.now() - 86400000).toDateString();
+
+  entries.forEach(entry => {
+    const date = new Date(entry.tsISO).toDateString();
+    let label;
+
+    if (date === today) {
+      label = 'Today';
+    } else if (date === yesterday) {
+      label = 'Yesterday';
+    } else {
+      label = new Date(entry.tsISO).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
+      });
+    }
+
+    if (!groups[label]) groups[label] = [];
+    groups[label].push(entry);
+  });
+
+  return groups;
+}
+
+// Issues 7, 8, 9, 11, 12: History pane with all improvements
 function HistoryPane({ ledger }) {
   const [expanded, setExpanded] = useState({});
   if (!ledger || ledger.length === 0) return <div className="card"><h3>Action History</h3><div className="muted">No actions yet.</div></div>;
@@ -799,38 +907,102 @@ function HistoryPane({ ledger }) {
   const getActionIcon = (entry) => {
     const type = entry.type.replace('_COMMIT', '');
     if (type === 'TRADE') return entry.details?.payload?.side === 'BUY' ? '+' : '-';
-    const icons = { 'PORTFOLIO_CREATED': '✓', 'ADD_FUNDS': '+', 'REBALANCE': '⟲', 'PROTECT': '☂️', 'BORROW': '💰', 'REPAY': '✓' };
+    const icons = { 'PORTFOLIO_CREATED': '+', 'ADD_FUNDS': '+', 'REBALANCE': '⟲', 'PROTECT': '☂️', 'BORROW': '💰', 'REPAY': '✓' };
     return icons[type] || '•';
   };
 
+  const getIconClass = (entry) => {
+    const type = entry.type.replace('_COMMIT', '');
+    if (type === 'TRADE') return entry.details?.payload?.side === 'BUY' ? 'trade-buy' : 'trade-sell';
+    const classes = { 'PORTFOLIO_CREATED': 'funds-add', 'ADD_FUNDS': 'funds-add', 'REBALANCE': 'action-rebalance', 'PROTECT': 'action-protect', 'BORROW': 'action-loan', 'REPAY': 'action-success' };
+    return classes[type] || '';
+  };
+
+  // Issue 7 & 8: Format ledger action with amounts
   const formatLedgerAction = (entry) => {
     const type = entry.type.replace('_COMMIT', '');
     const payload = entry.details?.payload;
     switch (type) {
-      case 'PORTFOLIO_CREATED': return 'Portfolio Created';
-      case 'ADD_FUNDS': return 'Funds Added';
-      case 'TRADE': return `${payload?.side === 'BUY' ? 'Bought' : 'Sold'} ${getAssetDisplayName(payload?.assetId)}`;
-      case 'REBALANCE': return 'Rebalanced';
-      case 'PROTECT': return `Protected ${getAssetDisplayName(payload?.assetId)} (${payload?.months}mo)`;
-      case 'BORROW': return `Borrowed`;
-      case 'REPAY': return 'Loan Repaid';
-      default: return type;
+      case 'PORTFOLIO_CREATED': return { text: 'Portfolio Created', amount: entry.details?.amountIRR };
+      case 'ADD_FUNDS': return { text: 'Funds Added', amount: payload?.amountIRR };
+      case 'TRADE': return { text: `${payload?.side === 'BUY' ? 'Bought' : 'Sold'} ${getAssetDisplayName(payload?.assetId)}`, amount: payload?.amountIRR };
+      case 'REBALANCE': return { text: 'Rebalanced', amount: null };
+      case 'PROTECT': return { text: `Protected ${getAssetDisplayName(payload?.assetId)} (${payload?.months}mo)`, amount: null, amountLabel: 'Premium' };
+      // Issue 8: Borrowed format
+      case 'BORROW': return { text: `Borrowed ${formatIRRShort(payload?.amountIRR)} IRR against ${getAssetDisplayName(payload?.assetId)}`, amount: payload?.amountIRR };
+      case 'REPAY': return { text: 'Loan Repaid', amount: payload?.amountIRR };
+      default: return { text: type, amount: null };
     }
   };
+
+  // Issue 11: Check if entry has expandable details
+  const hasDetails = (entry) => {
+    return entry.details?.boundary || entry.details?.before || entry.details?.after;
+  };
+
+  // Issue 12: Group by date
+  const grouped = groupByDate([...ledger].reverse());
 
   return (
     <div className="card">
       <h3>Action History</h3>
-      <div className="ledgerList">
-        {[...ledger].reverse().map((entry) => (
-          <div key={entry.id} className="ledgerEntry">
-            <div className="ledgerHeader" onClick={() => setExpanded(prev => ({ ...prev, [entry.id]: !prev[entry.id] }))} style={{ cursor: 'pointer' }}>
-              <span className="ledgerIcon">{getActionIcon(entry)}</span>
-              <span className="ledgerAction">{formatLedgerAction(entry)}</span>
-              <span className="ledgerTime">{formatTimestamp(new Date(entry.tsISO).getTime())}</span>
-              <span className="ledgerExpand">{expanded[entry.id] ? '−' : '+'}</span>
-            </div>
-            {entry.details?.boundary && <div className="ledgerBoundary"><span className={`healthPill small ${entry.details.boundary.toLowerCase()}`}>{BOUNDARY_LABELS[entry.details.boundary]}</span></div>}
+      <div className="historyList">
+        {Object.entries(grouped).map(([date, items]) => (
+          <div key={date} className="historyGroup">
+            <div className="historyDateHeader">{date}</div>
+            {items.map((entry) => {
+              const formatted = formatLedgerAction(entry);
+              const entryHasDetails = hasDetails(entry);
+              const isExpanded = expanded[entry.id];
+
+              return (
+                <div key={entry.id} className="historyEntry">
+                  <div className="historyEntryMain">
+                    <span className={`historyIcon ${getIconClass(entry)}`}>{getActionIcon(entry)}</span>
+                    <span className="historyText">{formatted.text}</span>
+                    {formatted.amount && (
+                      <span className="historyAmount">{formatIRR(formatted.amount)}</span>
+                    )}
+                    <span className="historyTime">{formatTimeOnly(new Date(entry.tsISO).getTime())}</span>
+                    {/* Issue 11: Only show expand button when details exist */}
+                    {entryHasDetails && (
+                      <button
+                        className="historyExpandBtn"
+                        onClick={() => setExpanded(prev => ({ ...prev, [entry.id]: !prev[entry.id] }))}
+                      >
+                        {isExpanded ? '−' : '+'}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Issue 9: Status badges in expandable details */}
+                  {isExpanded && entryHasDetails && (
+                    <div className="historyEntryDetails">
+                      {entry.details?.boundary && (
+                        <div className="statusChange">
+                          <span className="statusLabel">Boundary:</span>
+                          <span className={`statusBadge ${entry.details.boundary.toLowerCase()}`}>
+                            {BOUNDARY_LABELS[entry.details.boundary]}
+                          </span>
+                        </div>
+                      )}
+                      {entry.details?.before && entry.details?.after && (
+                        <div className="snapshotChange">
+                          <div className="snapshotRow">
+                            <span className="snapshotLabel">Before:</span>
+                            <span>{formatIRR(entry.details.before.totalIRR)}</span>
+                          </div>
+                          <div className="snapshotRow">
+                            <span className="snapshotLabel">After:</span>
+                            <span>{formatIRR(entry.details.after.totalIRR)}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ))}
       </div>
@@ -891,8 +1063,8 @@ function PortfolioHome({ state, snapshot, onStartTrade, onStartProtect, onStartB
                   <div className="asset">{getAssetDisplayName(h.assetId)}</div>
                   <div className="muted">
                     {info.icon} {info.name}
-                    {protDays !== null ? ` · ☂️ Protected (${protDays}d)` : ''}
-                    {h.frozen ? ` · 🔒 ${formatIRRShort(h.valueIRR)} IRR locked` : ''}
+                    {protDays !== null ? ` · Protected (${protDays}d)` : ''}
+                    {h.frozen ? ` · ${formatIRRShort(h.valueIRR)} IRR locked` : ''}
                   </div>
                 </div>
                 <div style={{ textAlign: 'right', minWidth: 150 }}>
@@ -935,7 +1107,7 @@ function Protection({ protections }) {
             return (
               <div key={p.id || idx} className="item protectionItem">
                 <div style={{ flex: 1 }}>
-                  <div className="asset">☂️ {getAssetDisplayName(p.assetId)}</div>
+                  <div className="asset">{getAssetDisplayName(p.assetId)}</div>
                   <div className="muted"><span className={`layerDot ${layer.toLowerCase()}`} style={{ marginRight: 6 }}></span>{info?.name} · {daysLeft} days left</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
@@ -958,8 +1130,8 @@ function Loans({ loan, dispatch }) {
 
   const getLoanStatus = () => {
     const ltvPercent = (loan.amountIRR / loan.liquidationIRR) * 100;
-    if (ltvPercent > 75) return { level: 'critical', message: '🔴 Liquidation risk — repay or add collateral' };
-    if (ltvPercent > 60) return { level: 'warning', message: '⚠️ Monitor collateral' };
+    if (ltvPercent > 75) return { level: 'critical', message: 'Liquidation risk - repay or add collateral' };
+    if (ltvPercent > 60) return { level: 'warning', message: 'Monitor collateral' };
     return null;
   };
 
@@ -1030,16 +1202,16 @@ function PendingActionModal({ pendingAction, dispatch }) {
               <div className="previewColumn">
                 <div className="previewLabel">Before</div>
                 <div className="previewLayers">
-                  🛡️{Math.round(before.layerPct.FOUNDATION)}% 📈{Math.round(before.layerPct.GROWTH)}% 🚀{Math.round(before.layerPct.UPSIDE)}%
+                  {Math.round(before.layerPct.FOUNDATION)}% / {Math.round(before.layerPct.GROWTH)}% / {Math.round(before.layerPct.UPSIDE)}%
                 </div>
-                <div className="previewTotal">{formatIRR(before.totalIRR)}</div>
+                <div className="previewTotalSmall">{formatIRR(before.totalIRR)}</div>
               </div>
               <div className="previewColumn">
                 <div className="previewLabel">After</div>
                 <div className="previewLayers">
-                  🛡️{Math.round(after.layerPct.FOUNDATION)}% 📈{Math.round(after.layerPct.GROWTH)}% 🚀{Math.round(after.layerPct.UPSIDE)}%
+                  {Math.round(after.layerPct.FOUNDATION)}% / {Math.round(after.layerPct.GROWTH)}% / {Math.round(after.layerPct.UPSIDE)}%
                 </div>
-                <div className="previewTotal">{formatIRR(after.totalIRR)}</div>
+                <div className="previewTotalSmall">{formatIRR(after.totalIRR)}</div>
               </div>
             </div>
             <div className="projectedBoundary">
@@ -1064,10 +1236,128 @@ function PendingActionModal({ pendingAction, dispatch }) {
   );
 }
 
-function OnboardingControls({ state, dispatch }) {
+// Issue 3: Consent flow as chat conversation
+function ConsentFlow({ state, dispatch }) {
   const [consentText, setConsentText] = useState('');
+  const currentStep = state.consentStep || 0;
+  const targetLayers = state.targetLayerPct;
   const isConsentMatch = consentText === questionnaire.consent_exact;
 
+  const handleContinue = () => {
+    dispatch({ type: 'CONSENT_NEXT_STEP' });
+  };
+
+  const handleConfirm = () => {
+    if (isConsentMatch) {
+      dispatch({ type: 'SUBMIT_CONSENT', text: consentText });
+    }
+  };
+
+  return (
+    <div className="consentFlow">
+      <div className="chatMessages">
+        {CONSENT_STEPS.slice(0, currentStep + 1).map((step, i) => (
+          <div key={step.id} className="chatMessage bot">
+            <div className="messageContent">{step.getMessage(targetLayers)}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="chatInputArea">
+        {CONSENT_STEPS[currentStep]?.consentRequired ? (
+          <>
+            <div className="consentSentence">
+              <div className="sentenceFa">{questionnaire.consent_exact}</div>
+              <div className="sentenceEn">{questionnaire.consent_english}</div>
+            </div>
+            <input
+              type="text"
+              className="input consentInput"
+              dir="rtl"
+              value={consentText}
+              onChange={(e) => setConsentText(e.target.value)}
+              placeholder="Type the sentence above..."
+              onKeyDown={(e) => { if (e.key === 'Enter' && isConsentMatch) handleConfirm(); }}
+            />
+            <button
+              className="btn primary"
+              onClick={handleConfirm}
+              disabled={!isConsentMatch}
+              style={{ width: '100%', marginTop: 10 }}
+            >
+              Confirm
+            </button>
+          </>
+        ) : (
+          <button className="btn primary" onClick={handleContinue} style={{ width: '100%' }}>
+            {CONSENT_STEPS[currentStep]?.button || 'Continue'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Issue 4: Investment amount screen with presets
+function InvestmentAmountForm({ state, dispatch }) {
+  const amount = Number(state.investAmountIRR) || 0;
+  const isValid = amount >= THRESHOLDS.MIN_AMOUNT_IRR;
+  const presetAmounts = [10_000_000, 50_000_000, 100_000_000, 500_000_000];
+
+  const formatPreset = (val) => {
+    if (val >= 1_000_000_000) return `${val / 1_000_000_000}B`;
+    if (val >= 1_000_000) return `${val / 1_000_000}M`;
+    return val.toLocaleString();
+  };
+
+  return (
+    <div className="investmentInputPanel">
+      <div className="investmentHeader">
+        <h2>Let's bring your portfolio to life.</h2>
+        <p>How much would you like to start with?</p>
+      </div>
+
+      <div className="presetAmounts">
+        {presetAmounts.map(preset => (
+          <button
+            key={preset}
+            className={`presetBtn ${amount === preset ? 'active' : ''}`}
+            onClick={() => dispatch({ type: 'SET_INVEST_AMOUNT', amountIRR: preset })}
+          >
+            {formatPreset(preset)}
+          </button>
+        ))}
+      </div>
+
+      <div className="customAmount">
+        <input
+          type="text"
+          className="input"
+          placeholder="Or enter custom amount"
+          value={amount ? amount.toLocaleString() : ''}
+          onChange={(e) => {
+            const val = parseInt(e.target.value.replace(/,/g, ''), 10);
+            if (!isNaN(val)) dispatch({ type: 'SET_INVEST_AMOUNT', amountIRR: val });
+            else if (e.target.value === '') dispatch({ type: 'SET_INVEST_AMOUNT', amountIRR: null });
+          }}
+        />
+        <span className="currencyLabel">IRR</span>
+      </div>
+
+      <p className="investmentReassurance">You can add more anytime. No lock-in.</p>
+
+      <button
+        className="btn primary btnLarge"
+        onClick={() => dispatch({ type: 'EXECUTE_PORTFOLIO' })}
+        disabled={!isValid}
+      >
+        Start Investing
+      </button>
+    </div>
+  );
+}
+
+function OnboardingControls({ state, dispatch }) {
   if (state.stage === STAGES.WELCOME) return <div className="muted" style={{ textAlign: 'center', padding: 8 }}>Begin your mindful journey</div>;
 
   if (state.stage === STAGES.ONBOARDING_PHONE) return <PhoneForm state={state} dispatch={dispatch} />;
@@ -1095,35 +1385,14 @@ function OnboardingControls({ state, dispatch }) {
     );
   }
 
+  // Issue 3: Use chat-based consent flow
   if (state.stage === STAGES.ONBOARDING_RESULT) {
-    return (
-      <div>
-        <div className="consentCard">
-          <div className="consentHeader">Confirm allocation</div>
-          <div className="consentInstruction">Type the following sentence exactly:</div>
-          <div className="consentSentence">
-            <div className="sentenceFa">{questionnaire.consent_exact}</div>
-            <div className="sentenceEn">{questionnaire.consent_english}</div>
-          </div>
-          <input className="input" type="text" dir="rtl" placeholder="Type consent here..." value={consentText} onChange={(e) => setConsentText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && isConsentMatch) dispatch({ type: 'SUBMIT_CONSENT', text: consentText }); }} />
-          <button className="btn primary" style={{ marginTop: 10, width: '100%' }} disabled={!isConsentMatch} onClick={() => dispatch({ type: 'SUBMIT_CONSENT', text: consentText })}>Confirm</button>
-        </div>
-      </div>
-    );
+    return <ConsentFlow state={state} dispatch={dispatch} />;
   }
 
+  // Issue 4: Use improved investment form
   if (state.stage === STAGES.AMOUNT_REQUIRED) {
-    const amount = Number(state.investAmountIRR) || 0;
-    const isValid = amount >= THRESHOLDS.MIN_AMOUNT_IRR;
-    return (
-      <div>
-        <div className="muted" style={{ marginBottom: 10 }}>Investment amount (IRR)</div>
-        <div className="row">
-          <input className="input" type="number" placeholder={formatIRR(THRESHOLDS.MIN_AMOUNT_IRR)} value={state.investAmountIRR || ''} onChange={(e) => dispatch({ type: 'SET_INVEST_AMOUNT', amountIRR: e.target.value })} />
-          <button className="btn primary" onClick={() => dispatch({ type: 'EXECUTE_PORTFOLIO' })} disabled={!isValid}>Create Portfolio</button>
-        </div>
-      </div>
-    );
+    return <InvestmentAmountForm state={state} dispatch={dispatch} />;
   }
 
   // ACTIVE stage - show drafts or pendingAction
@@ -1164,7 +1433,7 @@ function OnboardingControls({ state, dispatch }) {
     const h = state.holdings.find(x => x.assetId === state.protectDraft.assetId);
     const premium = h ? calcPremiumIRR({ assetId: h.assetId, notionalIRR: h.valueIRR, months: state.protectDraft.months }) : 0;
     return (
-      <ActionCard title="☂️ Protect Asset">
+      <ActionCard title="Protect Asset">
         <div className="row" style={{ gap: 8 }}>
           <select className="input" value={state.protectDraft.assetId || ''} onChange={(e) => dispatch({ type: 'SET_PROTECT_ASSET', assetId: e.target.value })}>
             {state.holdings.filter(h => h.valueIRR > 0).map((h) => {
@@ -1190,7 +1459,7 @@ function OnboardingControls({ state, dispatch }) {
     const h = state.holdings.find(x => x.assetId === state.borrowDraft.assetId);
     const maxBorrow = h ? Math.floor(h.valueIRR * state.borrowDraft.ltv) : 0;
     return (
-      <ActionCard title="💰 Borrow">
+      <ActionCard title="Borrow">
         <div className="row" style={{ gap: 8 }}>
           <select className="input" value={state.borrowDraft.assetId || ''} onChange={(e) => dispatch({ type: 'SET_BORROW_ASSET', assetId: e.target.value })}>
             {state.holdings.filter(h => !h.frozen && h.valueIRR > 0).map((h) => {
@@ -1251,15 +1520,55 @@ function OnboardingControls({ state, dispatch }) {
         <div className="footerRowPrimary">
           <button className="btn primary" onClick={() => dispatch({ type: 'START_ADD_FUNDS' })}>Add Funds</button>
           <button className="btn" onClick={() => dispatch({ type: 'START_REBALANCE' })}>Rebalance</button>
-          <button className="btn" onClick={() => dispatch({ type: 'START_PROTECT' })}>☂️ Protect</button>
-          <button className="btn" onClick={() => dispatch({ type: 'START_BORROW' })}>💰 Borrow</button>
+          <button className="btn" onClick={() => dispatch({ type: 'START_PROTECT' })}>Protect</button>
+          <button className="btn" onClick={() => dispatch({ type: 'START_BORROW' })}>Borrow</button>
         </div>
         <div className="footerRowSecondary">
-          <button className="btn resetBtn" onClick={() => dispatch({ type: 'SHOW_RESET_CONFIRM' })}>↺ Reset</button>
+          <button className="btn resetBtn" onClick={() => dispatch({ type: 'SHOW_RESET_CONFIRM' })}>Reset</button>
         </div>
       </div>
     </div>
   );
+}
+
+// Issue 6: Contextual header based on tab
+function getHeaderContent(activeTab, portfolioData, snapshot) {
+  const { status } = computePortfolioStatus(snapshot?.layerPct || {});
+
+  switch (activeTab) {
+    case 'PORTFOLIO':
+      return {
+        title: 'Your Portfolio',
+        badge: status === 'ATTENTION_REQUIRED'
+          ? { text: 'Rebalance', variant: 'warning' }
+          : status === 'SLIGHTLY_OFF'
+          ? { text: 'Slightly Off', variant: 'warning' }
+          : { text: 'Balanced', variant: 'success' }
+      };
+    case 'PROTECTION':
+      const protectedCount = portfolioData.protections?.length || 0;
+      return {
+        title: 'Your Protections',
+        badge: protectedCount > 0
+          ? { text: `${protectedCount} asset${protectedCount > 1 ? 's' : ''} covered`, variant: 'info' }
+          : null
+      };
+    case 'LOANS':
+      const totalLoan = portfolioData.loan?.amountIRR || 0;
+      return {
+        title: 'Your Loans',
+        badge: totalLoan > 0
+          ? { text: `Active: ${formatIRRShort(totalLoan)}`, variant: 'info' }
+          : null
+      };
+    case 'HISTORY':
+      return {
+        title: 'Your History',
+        badge: null
+      };
+    default:
+      return { title: 'Portfolio', badge: null };
+  }
 }
 
 // ====== MAIN APP ======
@@ -1281,6 +1590,11 @@ export default function App() {
     if (state.tab === 'HISTORY') return <HistoryPane ledger={state.ledger} />;
     return <PortfolioHome state={state} snapshot={snapshot} onStartTrade={onStartTrade} onStartProtect={onStartProtect} onStartBorrow={onStartBorrow} />;
   }, [state, snapshot]);
+
+  // Issue 6: Get contextual header content
+  const headerContent = state.stage === STAGES.ACTIVE
+    ? getHeaderContent(state.tab, state, snapshot)
+    : { title: 'Getting Started', badge: null };
 
   return (
     <>
@@ -1307,6 +1621,7 @@ export default function App() {
           --font-farsi: 'Vazirmatn', system-ui, sans-serif;
           --farsi-line-height: 1.8;
           --farsi-letter-spacing: 0.01em;
+          --gradient-primary: linear-gradient(135deg,#6366f1,#8b5cf6);
         }
         *{box-sizing:border-box}
         html,body{height:100%;margin:0}
@@ -1317,12 +1632,12 @@ export default function App() {
         ::-webkit-scrollbar-thumb:hover{background:var(--text-muted)}
         .container{height:100vh;display:grid;grid-template-columns:400px 1fr;gap:1px;background:var(--border)}
         .panel{background:var(--bg-secondary);overflow:hidden;display:flex;flex-direction:column;min-height:0}
-        .header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:12px}
+        .header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
         .logo{width:28px;height:28px;border-radius:6px;background:var(--accent);display:grid;place-items:center;font-weight:600;color:white;font-size:12px}
         .h-title{font-weight:600;font-size:15px;color:var(--text-primary)}
         .h-sub{font-size:12px;color:var(--text-muted);margin-top:2px}
         .h-motto{font-size:11px;color:var(--text-muted);margin-top:2px;font-weight:400;letter-spacing:0.01em}
-        .rightMeta{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+        .rightMeta{display:flex;flex-direction:row;align-items:center;gap:8px}
         .pill{display:inline-flex;gap:6px;align-items:center;padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-tertiary);font-weight:500;font-size:11px;color:var(--text-secondary)}
         .body{padding:16px;overflow:auto;flex:1;min-height:0}
         .footer{padding:14px 16px;border-top:1px solid var(--border);background:var(--bg-tertiary)}
@@ -1337,6 +1652,7 @@ export default function App() {
         .btn.tiny{padding:6px 12px;font-size:12px;border-radius:6px}
         .btn.tiny:hover{background:var(--accent-muted);border-color:var(--accent-border);color:var(--accent)}
         .btn.tiny:disabled{opacity:.35;cursor:not-allowed;background:transparent;border-color:transparent;color:var(--text-muted)}
+        .btnLarge{width:100%;padding:16px;font-size:16px}
         .input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);font-weight:400;outline:none;font-size:14px;transition:border-color 0.15s}
         .input:focus{border-color:var(--accent)}
         .input::placeholder{color:var(--text-muted)}
@@ -1354,10 +1670,11 @@ export default function App() {
         .item.assetEmpty .asset{color:var(--text-muted)}
         .asset{font-weight:500;font-size:14px}
         .assetActions{display:flex;justify-content:flex-end;gap:6px;margin-top:6px;flex-wrap:wrap}
+        /* Issue 5: Fix tab border radius - all corners equal */
         .tabs{display:flex;gap:4px;background:var(--bg-primary);padding:4px;border-radius:12px;border:1px solid var(--border)}
         .tab{flex:1;padding:10px 14px;border-radius:8px;border:none;background:transparent;font-weight:500;cursor:pointer;font-size:13px;color:var(--text-muted);transition:all 0.2s}
         .tab:hover:not(.active){color:var(--text-primary);background:var(--bg-tertiary)}
-        .tab.active{color:white;background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 4px 12px rgba(139,92,246,0.3);font-weight:600}
+        .tab.active{color:white;background:var(--gradient-primary);box-shadow:0 4px 12px rgba(139,92,246,0.3);font-weight:600;border-radius:8px}
         .chip{padding:8px 14px;border-radius:6px;border:1px solid var(--border);background:var(--bg-tertiary);font-weight:500;font-size:12px;cursor:pointer;transition:border-color 0.15s}
         .chip:hover{border-color:var(--border-hover)}
         .chip.primary{background:var(--accent);border-color:var(--accent);color:white}
@@ -1380,7 +1697,7 @@ export default function App() {
         .logEntry:last-child{border-bottom:none}
         .portfolioValueCard{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:12px}
         .portfolioValueLabel{font-size:12px;font-weight:600;color:var(--text-muted);letter-spacing:0.05em;margin-bottom:8px}
-        .portfolioValueAmount{font-size:32px;font-weight:700;background:linear-gradient(135deg,#6366f1,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:16px}
+        .portfolioValueAmount{font-size:32px;font-weight:700;background:var(--gradient-primary);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:16px}
         .portfolioBreakdown{display:flex;gap:12px}
         .breakdownCard{flex:1;background:var(--bg-primary);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
         .breakdownCardIcon{font-size:16px;margin-bottom:4px}
@@ -1405,13 +1722,19 @@ export default function App() {
         .opt{appearance:none;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-primary);padding:12px 14px;border-radius:8px;font-weight:400;cursor:pointer;text-align:right;direction:rtl;font-family:var(--font-farsi);line-height:var(--farsi-line-height);letter-spacing:var(--farsi-letter-spacing);transition:border-color 0.15s,background 0.15s}
         .opt:hover{border-color:var(--accent-border);background:var(--bg-tertiary)}
         .opt-english{font-size:10px;color:var(--text-muted);margin-top:4px;text-align:left;direction:ltr;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+        /* Issue 3: Chat-based consent flow styles */
+        .consentFlow{display:flex;flex-direction:column;height:100%}
+        .chatMessages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:12px;margin-bottom:16px}
+        .chatMessage.bot{background:var(--bg-secondary);border-radius:12px;padding:16px;white-space:pre-line;line-height:1.6;border:1px solid var(--border)}
+        .messageContent{font-size:13px;color:var(--text-primary)}
+        .chatInputArea{border-top:1px solid var(--border);padding-top:16px}
         .consentCard{border:1px solid var(--border);border-radius:12px;padding:16px;background:var(--bg-tertiary)}
         .consentHeader{font-weight:600;margin-bottom:8px;font-size:14px}
         .consentInstruction{font-size:12px;color:var(--text-secondary);margin-bottom:10px}
         .consentSentence{background:var(--bg-primary);border-radius:8px;padding:12px;margin-bottom:12px;border:1px solid var(--border)}
         .sentenceFa{font-family:var(--font-farsi);font-weight:500;font-size:14px;line-height:var(--farsi-line-height);direction:rtl;text-align:right;letter-spacing:var(--farsi-letter-spacing)}
         .sentenceEn{font-size:11px;color:var(--text-muted);margin-top:6px;font-style:italic;text-align:left;direction:ltr}
-        .consentCard input[dir="rtl"]{font-family:var(--font-farsi);text-align:right;line-height:var(--farsi-line-height);letter-spacing:var(--farsi-letter-spacing)}
+        .consentInput{font-family:var(--font-farsi);text-align:right;line-height:var(--farsi-line-height);letter-spacing:var(--farsi-letter-spacing)}
         .actionCard{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:12px;padding:14px}
         .actionTitle{font-weight:500;font-size:12px;margin-bottom:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.03em}
         .previewPanel{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:12px;padding:14px}
@@ -1420,21 +1743,42 @@ export default function App() {
         .previewGrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
         .previewLabel{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px}
         .previewLayers{font-size:13px;font-weight:500}
-        .previewTotal{font-size:12px;color:var(--text-secondary);margin-top:4px}
+        .previewTotalSmall{font-size:12px;color:var(--text-secondary);margin-top:4px}
         .projectedBoundary{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
         .projectedLabel{font-size:11px;color:var(--text-muted)}
         .validationDisplay{margin-top:10px}
         .validationError{padding:10px 12px;border-radius:8px;background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.2);color:var(--danger);font-size:12px;margin-bottom:6px}
         .validationWarning{padding:10px 12px;border-radius:8px;background:rgba(210,153,34,.08);border:1px solid rgba(210,153,34,.2);color:var(--warning);font-size:12px;margin-bottom:6px}
-        .ledgerList{display:flex;flex-direction:column;gap:8px}
-        .ledgerEntry{border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--bg-secondary);transition:border-color 0.15s}
-        .ledgerEntry:hover{border-color:var(--border-hover)}
-        .ledgerHeader{display:flex;align-items:center;gap:8px}
-        .ledgerIcon{font-size:12px;width:20px;font-weight:700}
-        .ledgerAction{font-weight:500;font-size:13px;flex:1}
-        .ledgerTime{color:var(--text-muted);font-size:11px}
-        .ledgerExpand{color:var(--text-muted);font-size:14px;width:20px;text-align:center}
-        .ledgerBoundary{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+        /* Issue 9, 11, 12: History styles */
+        .historyList{display:flex;flex-direction:column;gap:0}
+        .historyGroup{margin-bottom:20px}
+        .historyDateHeader{font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;padding:8px 0;border-bottom:1px solid var(--border);margin-bottom:8px}
+        .historyEntry{border:1px solid var(--border);border-radius:10px;margin-bottom:8px;background:var(--bg-secondary);overflow:hidden}
+        .historyEntryMain{display:flex;align-items:center;gap:8px;padding:12px}
+        .historyIcon{font-size:12px;width:20px;font-weight:700;text-align:center}
+        .historyIcon.trade-buy{color:var(--success)}
+        .historyIcon.trade-sell{color:var(--danger)}
+        .historyIcon.funds-add{color:var(--success)}
+        .historyIcon.action-success{color:var(--success)}
+        .historyIcon.action-loan{color:var(--warning)}
+        .historyIcon.action-protect{color:var(--accent)}
+        .historyIcon.action-rebalance{color:var(--text-secondary)}
+        .historyText{font-weight:500;font-size:13px;flex:1}
+        .historyAmount{font-weight:500;font-size:12px;color:var(--text-secondary)}
+        .historyTime{color:var(--text-muted);font-size:11px;min-width:70px;text-align:right}
+        .historyExpandBtn{width:24px;height:24px;border-radius:4px;border:none;background:var(--bg-tertiary);color:var(--text-muted);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
+        .historyExpandBtn:hover{background:var(--bg-elevated)}
+        .historyEntryDetails{padding:12px 16px 12px 40px;background:var(--bg-tertiary);border-top:1px solid var(--border)}
+        .statusChange{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+        .statusLabel{font-size:11px;color:var(--text-muted)}
+        .statusBadge{padding:4px 8px;border-radius:4px;font-size:10px;font-weight:600;text-transform:uppercase}
+        .statusBadge.safe{background:rgba(52,211,153,0.15);color:#34d399}
+        .statusBadge.drift{background:rgba(251,191,36,0.15);color:#fbbf24}
+        .statusBadge.structural{background:rgba(251,191,36,0.2);color:#fbbf24}
+        .statusBadge.stress{background:rgba(239,68,68,0.15);color:#f87171}
+        .snapshotChange{display:flex;flex-direction:column;gap:4px}
+        .snapshotRow{display:flex;justify-content:space-between;font-size:11px}
+        .snapshotLabel{color:var(--text-muted)}
         .borrowHint,.premiumHint{font-size:11px;color:var(--text-secondary);margin-top:6px;padding:8px 10px;background:var(--bg-primary);border-radius:6px;border:1px solid var(--border)}
         .loanItem{background:var(--bg-secondary);border:1px solid rgba(210,153,34,.3);border-left:3px solid var(--warning)}
         .loanAmount{font-size:20px;font-weight:600}
@@ -1454,7 +1798,7 @@ export default function App() {
         .modalFooter{display:flex;gap:12px;justify-content:flex-end}
         .onboardingPanel{height:100%;display:flex;flex-direction:column;gap:12px}
         .welcomeCard{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:14px;padding:24px;text-align:center}
-        .welcomeIcon{font-size:48px;margin-bottom:14px}
+        .welcomeIconSmall{width:48px;height:48px;background:var(--accent);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:white;margin:0 auto 14px}
         .welcomeCard h2{margin:0 0 8px 0;font-weight:600;font-size:18px;color:var(--text-primary)}
         .welcomeCard p{color:var(--text-secondary);margin:0 0 16px 0;font-size:13px}
         .welcomeFeatures{text-align:left}
@@ -1485,26 +1829,47 @@ export default function App() {
         .detailName{font-weight:500;font-size:12px;flex:1}
         .detailPct{font-weight:500;font-size:12px}
         .detailAssets{font-size:11px;color:var(--text-muted);margin-left:14px;margin-top:2px}
-        .investPreviewCard{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:12px;padding:14px}
-        .investPreviewCard h3{margin:0 0 14px 0;font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted);font-weight:500}
-        .investTotal{text-align:center;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)}
-        .investBreakdown{display:flex;flex-direction:column;gap:8px}
-        .breakdownRow{display:flex;justify-content:space-between;align-items:center}
-        .breakdownLeft{display:flex;align-items:center;gap:8px}
-        .breakdownAmount{font-weight:500;font-size:13px}
-        .breakdownRight{text-align:right}
-        .investPlaceholder{padding:30px;text-align:center}
-        .investWarning{font-size:12px;color:var(--warning);margin-top:6px}
-        .investMinHint{font-size:11px;color:var(--text-muted);margin-top:8px}
+        /* Issue 4: Investment preview styles */
+        .investPreviewCard{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:12px;padding:20px}
+        .previewHeader{font-size:12px;font-weight:600;color:var(--text-muted);letter-spacing:0.05em;margin-bottom:16px}
+        .previewTotal{font-size:28px;font-weight:600;color:var(--accent);margin-bottom:20px}
+        .previewBreakdown{display:flex;flex-direction:column;gap:4px}
+        .previewLayer{display:flex;align-items:center;gap:8px;padding:12px 0;border-bottom:1px solid var(--border)}
+        .layerName{flex:1;font-size:13px;font-weight:500}
+        .layerAmount{font-size:13px;font-weight:500;color:var(--text-secondary)}
+        .previewLayerAssets{font-size:11px;color:var(--text-muted);padding:4px 0 12px 14px}
+        .previewReady{margin-top:20px;font-size:14px;color:var(--text-muted);text-align:center}
+        .previewEmpty{padding:40px 20px;text-align:center}
+        .previewEmpty p{margin:0 0 8px 0;color:var(--text-secondary)}
+        .previewMinimum{font-size:11px;color:var(--text-muted)}
+        /* Issue 4: Investment input styles */
+        .investmentInputPanel{}
+        .investmentHeader h2{font-size:18px;font-weight:600;margin:0 0 8px 0;color:var(--text-primary)}
+        .investmentHeader p{font-size:14px;color:var(--text-secondary);margin:0 0 20px 0}
+        .presetAmounts{display:flex;gap:8px;margin-bottom:16px}
+        .presetBtn{flex:1;padding:12px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-primary);font-size:14px;font-weight:500;cursor:pointer;transition:all 0.2s}
+        .presetBtn:hover{border-color:var(--accent)}
+        .presetBtn.active{background:var(--gradient-primary);border-color:transparent;color:white}
+        .customAmount{position:relative;margin-bottom:12px}
+        .customAmount .input{padding-right:50px}
+        .currencyLabel{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--text-muted)}
+        .investmentReassurance{font-size:13px;color:var(--text-muted);margin:0 0 16px 0}
         .protectionItem{background:var(--bg-secondary);border:1px solid var(--accent-border);border-left:3px solid var(--accent)}
         .stack{display:flex;flex-direction:column;gap:0}
         .portfolioValue{font-size:28px;font-weight:600;color:var(--text-primary)}
+        /* Issue 1: Welcome screen with prominent motto */
         .welcomeScreen{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:40px 24px}
-        .welcomeLogo{width:64px;height:64px;background:var(--accent);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:white;margin-bottom:24px}
+        .welcomeIcon{width:64px;height:64px;background:var(--accent);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:white;margin-bottom:24px}
         .welcomeTitle{font-size:28px;font-weight:600;color:var(--text-primary);margin:0 0 8px 0}
-        .welcomeMotto{font-size:16px;color:var(--text-secondary);margin:0 0 8px 0;font-weight:400}
-        .welcomeTagline{font-size:13px;color:var(--text-muted);margin:0 0 32px 0}
+        .welcomeMotto{font-size:20px;font-weight:500;color:var(--text-primary);margin:8px 0 24px 0}
+        .welcomeValues{display:flex;flex-direction:column;gap:8px;margin-bottom:32px}
+        .welcomeValues p{font-size:15px;color:var(--text-secondary);margin:0}
         .welcomeCta{padding:12px 40px;font-size:14px}
+        /* Issue 6: Header badge styles */
+        .headerBadge{padding:6px 12px;border-radius:6px;font-size:13px;font-weight:500}
+        .badgeSuccess{background:rgba(52,211,153,0.15);color:#34d399;border:1px solid rgba(52,211,153,0.3)}
+        .badgeWarning{background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.3)}
+        .badgeInfo{background:rgba(139,92,246,0.15);color:#a78bfa;border:1px solid rgba(139,92,246,0.3)}
       `}</style>
       <div className="container">
         <div className="panel">
@@ -1522,17 +1887,22 @@ export default function App() {
           <div className="footer"><OnboardingControls state={state} dispatch={dispatch} /></div>
         </div>
         <div className="panel">
+          {/* Issue 6: Contextual header */}
           <div className="header">
             <div style={{ flex: 1 }}>
-              <div className="h-title">{state.stage === STAGES.ACTIVE ? 'Portfolio' : 'Getting Started'}</div>
-              <div className="h-sub">{state.stage === STAGES.ACTIVE ? `Cash: ${formatIRR(state.cashIRR || 0)}` : 'Complete the steps'}</div>
+              <div className="h-title">{headerContent.title}</div>
             </div>
             <div className="rightMeta">
-              {state.stage === STAGES.ACTIVE && (
-                <>
-                  <PortfolioHealthBadge snapshot={snapshot} />
-                  {state.loan && <div className="pill" style={{ color: '#fb923c', borderColor: 'rgba(249,115,22,.3)' }}><span>Loan</span><span>{formatIRR(state.loan.amountIRR)}</span></div>}
-                </>
+              {state.stage === STAGES.ACTIVE && headerContent.badge && (
+                <span className={`headerBadge badge${headerContent.badge.variant.charAt(0).toUpperCase() + headerContent.badge.variant.slice(1)}`}>
+                  {headerContent.badge.text}
+                </span>
+              )}
+              {state.stage === STAGES.ACTIVE && state.loan && (
+                <div className="pill" style={{ color: '#fb923c', borderColor: 'rgba(249,115,22,.3)' }}>
+                  <span>Loan</span>
+                  <span>{formatIRRShort(state.loan.amountIRR)}</span>
+                </div>
               )}
             </div>
           </div>
