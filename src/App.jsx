@@ -1,23 +1,37 @@
 import React, { useEffect, useMemo, useReducer, useState, useRef } from 'react';
 
-// ====== BLU MARKETS v9.6 ======
-// UI Refinement: 13 Visual & Layout Improvements
-// 1. Lock icon shows "IRR" unit (🔒 7.0M IRR locked)
-// 2. Portfolio value breakdown: two mini-cards (Invested/Cash)
-// 3. Protection status inline in Holdings (☂️ Protected Xd)
-// 4. Zero-value assets grayed out, only Buy enabled
-// 5. Trade amounts shown in History with colored +/- icons
-// 6. Protection tab shows "X days left" format
-// 7. Premium storage verified correct
-// 8. All tabs use purple gradient consistently
-// 9. Footer reorganized: 4 actions row 1, Reset alone row 2
-// 10. Disabled buttons at 35% opacity
-// 11. Buy trades: green +, Sell trades: red -
-// 12. Loan card: collateral value, % used, risk alerts
-// 13. Allocation bar removed, cards only remain
+// ====== BLU MARKETS v9.6 REFACTORED ======
+// Architecture: Single reducer + deterministic engine
+// All actions flow: PREVIEW_* -> pendingAction -> CONFIRM_PENDING -> ledger
+
+// Engine imports
+import { computeSnapshot } from './engine/snapshot.js';
+import { computePortfolioStatus } from './engine/portfolioStatus.js';
+import { classifyActionBoundary, frictionCopyForBoundary } from './engine/boundary.js';
+import { calcPremiumIRR, calcLiquidationIRR } from './engine/pricing.js';
+import {
+  validateAddFunds,
+  validateTrade,
+  validateProtect,
+  validateBorrow,
+  validateRepay,
+  validateRebalance,
+} from './engine/validate.js';
+import {
+  cloneState,
+  previewAddFunds,
+  previewTrade,
+  previewProtect,
+  previewBorrow,
+  previewRepay,
+  previewRebalance,
+} from './engine/preview.js';
+
+// Domain imports
+import { ASSETS, ASSET_LAYER, LAYER_RANGES } from './state/domain.js';
 
 const questionnaire = {
-  "version": "v9.1",
+  "version": "v9.6",
   "consent_exact": "متوجه ریسک این سبد دارایی شدم و باهاش موافق هستم.",
   "consent_english": "I understand the risk of this portfolio and I agree with it.",
   "questions": [
@@ -66,13 +80,13 @@ const questionnaire = {
 };
 
 const LAYER_EXPLANATIONS = {
-  foundation: { name: 'Foundation', nameFa: 'پایه', icon: '🛡️', assets: ['USDT', 'Fixed Income'], description: 'Stable assets. Your safety net.', descriptionFa: 'دارایی‌های پایدار. پشتوانه‌ی امنت.' },
-  growth: { name: 'Growth', nameFa: 'رشد', icon: '📈', assets: ['Gold', 'BTC', 'ETH', 'QQQ'], description: 'Balanced assets for steady growth.', descriptionFa: 'دارایی‌های متعادل برای رشد تدریجی.' },
-  upside: { name: 'Upside', nameFa: 'رشد بالا', icon: '🚀', assets: ['SOL', 'TON'], description: 'Higher potential, more ups and downs.', descriptionFa: 'پتانسیل بالاتر، بالا و پایین بیشتر.' },
+  FOUNDATION: { name: 'Foundation', nameFa: 'پایه', icon: '🛡️', assets: ['USDT', 'Fixed Income'], description: 'Stable assets. Your safety net.', descriptionFa: 'دارایی‌های پایدار. پشتوانه‌ی امنت.' },
+  GROWTH: { name: 'Growth', nameFa: 'رشد', icon: '📈', assets: ['Gold', 'BTC', 'QQQ'], description: 'Balanced assets for steady growth.', descriptionFa: 'دارایی‌های متعادل برای رشد تدریجی.' },
+  UPSIDE: { name: 'Upside', nameFa: 'رشد بالا', icon: '🚀', assets: ['ETH', 'SOL', 'TON'], description: 'Higher potential, more ups and downs.', descriptionFa: 'پتانسیل بالاتر، بالا و پایین بیشتر.' },
 };
 
-const PORTFOLIO_HEALTH_LABELS = { SAFE: 'Balanced', DRIFT: 'Slightly Off', STRUCTURAL: 'Rebalance Needed', STRESS: 'Attention Required' };
-const PORTFOLIO_HEALTH_LABELS_FA = { SAFE: 'متعادل', DRIFT: 'کمی نامتعادل', STRUCTURAL: 'نیاز به تعادل', STRESS: 'نیاز به توجه' };
+const PORTFOLIO_STATUS_LABELS = { BALANCED: 'Balanced', SLIGHTLY_OFF: 'Slightly Off', ATTENTION_REQUIRED: 'Attention Required' };
+const BOUNDARY_LABELS = { SAFE: 'Safe', DRIFT: 'Drift', STRUCTURAL: 'Structural', STRESS: 'Stress' };
 
 function formatIRR(n) { return Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' IRR'; }
 function formatIRRShort(n) {
@@ -85,12 +99,6 @@ function formatIRRShort(n) {
 function formatTime(ts) { return new Date(ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }); }
 function formatTimestamp(ts) { return new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
 
-const WEIGHTS = {
-  foundation: { IRR_FIXED_INCOME: 0.55, USDT: 0.45 },
-  growth: { GOLD: 0.20, BTC: 0.30, ETH: 0.20, QQQ: 0.30 },
-  upside: { SOL: 0.55, TON: 0.45 },
-};
-
 const ASSET_DISPLAY_NAMES = {
   'IRR_FIXED_INCOME': 'Fixed Income (IRR)',
   'USDT': 'USDT',
@@ -102,320 +110,66 @@ const ASSET_DISPLAY_NAMES = {
   'TON': 'Toncoin',
 };
 function getAssetDisplayName(assetId) { return ASSET_DISPLAY_NAMES[assetId] || assetId; }
-const PREMIUM_RATES = { foundation: 0.01, growth: 0.02, upside: 0.03 };
-const LTV_LIMITS = { foundation: { max: 0.7, recommended: 0.5 }, growth: { max: 0.6, recommended: 0.5 }, upside: { max: 0.5, recommended: 0.4 } };
-const THRESHOLDS = { FOUNDATION_MIN_PCT: 40, UPSIDE_MAX_PCT: 25, MIN_AMOUNT_IRR: 1_000_000, DRIFT_SUGGEST_REBALANCE: 5, DRIFT_WARN: 10 };
 
-function buildPortfolio(totalIRR, layers) {
-  const holdings = [];
-  for (const layer of ['foundation', 'growth', 'upside']) {
-    const pct = (layers[layer] ?? 0) / 100;
+const THRESHOLDS = { MIN_AMOUNT_IRR: 1_000_000 };
+
+// Asset weights for initial portfolio distribution
+const WEIGHTS = {
+  FOUNDATION: { IRR_FIXED_INCOME: 0.55, USDT: 0.45 },
+  GROWTH: { GOLD: 0.20, BTC: 0.50, QQQ: 0.30 },
+  UPSIDE: { ETH: 0.40, SOL: 0.35, TON: 0.25 },
+};
+
+// Build initial portfolio holdings from investment amount and target allocation
+function buildInitialHoldings(totalIRR, targetLayerPct) {
+  const holdings = ASSETS.map(assetId => ({ assetId, valueIRR: 0, frozen: false }));
+
+  for (const layer of ['FOUNDATION', 'GROWTH', 'UPSIDE']) {
+    const pct = (targetLayerPct[layer] ?? 0) / 100;
     const layerAmount = Math.floor(totalIRR * pct);
     const weights = WEIGHTS[layer] || {};
     let layerAllocated = 0;
-    for (const asset of Object.keys(weights)) {
-      const amt = Math.floor(layerAmount * weights[asset]);
-      if (amt <= 0) continue;
-      holdings.push({ asset, layer, amountIRR: amt, frozen: false });
+
+    for (const assetId of Object.keys(weights)) {
+      const h = holdings.find(x => x.assetId === assetId);
+      if (!h) continue;
+      const amt = Math.floor(layerAmount * weights[assetId]);
+      h.valueIRR = amt;
       layerAllocated += amt;
     }
+
+    // Remainder to last asset in layer
     const remainder = layerAmount - layerAllocated;
     if (remainder > 0) {
-      const last = [...holdings].reverse().find(h => h.layer === layer);
-      if (last) last.amountIRR += remainder;
+      const layerAssets = Object.keys(weights);
+      const lastAsset = layerAssets[layerAssets.length - 1];
+      const h = holdings.find(x => x.assetId === lastAsset);
+      if (h) h.valueIRR += remainder;
     }
   }
-  return { totalIRR: holdings.reduce((s, h) => s + h.amountIRR, 0), layers, holdings };
+
+  return holdings;
 }
 
-// v9.1 FIX: Calculate from ASSETS ONLY (not cash)
-function calcLayerPercents(holdings) {
-  const sums = { foundation: 0, growth: 0, upside: 0 };
-  for (const h of holdings || []) sums[h.layer] = (sums[h.layer] || 0) + (h.amountIRR || 0);
-  const total = sums.foundation + sums.growth + sums.upside;
-  return {
-    sums,
-    pct: {
-      foundation: total ? (sums.foundation / total) * 100 : 0,
-      growth: total ? (sums.growth / total) * 100 : 0,
-      upside: total ? (sums.upside / total) * 100 : 0,
-    },
-    totalIRR: total,
-  };
+// ====== UNIFIED REDUCER ======
+// All state transitions go through this single reducer
+// Actions flow: PREVIEW_* -> pendingAction -> CONFIRM_PENDING -> ledger
+
+const STAGES = {
+  WELCOME: 'WELCOME',
+  ONBOARDING_PHONE: 'ONBOARDING_PHONE',
+  ONBOARDING_QUESTIONNAIRE: 'ONBOARDING_QUESTIONNAIRE',
+  ONBOARDING_RESULT: 'ONBOARDING_RESULT',
+  AMOUNT_REQUIRED: 'AMOUNT_REQUIRED',
+  ACTIVE: 'ACTIVE',
+};
+
+function uid() {
+  return `${Math.random().toString(16).slice(2)}-${Date.now().toString(16)}`;
 }
 
-function tradeAsset(portfolio, cashIRR, assetId, side, amountIRR) {
-  const amt = Math.max(0, Math.floor(Number(amountIRR) || 0));
-  if (!portfolio?.holdings || !assetId || !side || amt <= 0) return { portfolio, cashIRR };
-  const holdings = portfolio.holdings.map(h => ({ ...h }));
-  const h = holdings.find(x => x.asset === assetId);
-  if (!h) return { portfolio, cashIRR };
-  if (h.frozen && side === 'SELL') return { portfolio, cashIRR };
-  let cash = Math.max(0, Math.floor(Number(cashIRR) || 0));
-  if (side === 'BUY') {
-    const spend = Math.min(cash, amt);
-    if (spend <= 0) return { portfolio, cashIRR: cash };
-    cash -= spend;
-    h.amountIRR += spend;
-  } else {
-    const sell = Math.min(h.amountIRR, amt);
-    if (sell <= 0) return { portfolio, cashIRR: cash };
-    h.amountIRR -= sell;
-    cash += sell;
-  }
-  return { portfolio: { ...portfolio, holdings, totalIRR: holdings.reduce((s, x) => s + x.amountIRR, 0) }, cashIRR: cash };
-}
-
-function rebalanceToTarget(portfolio, cashIRR, targetLayers) {
-  if (!portfolio || !targetLayers) return { portfolio, cashIRR };
-  const holdings = portfolio.holdings.map(h => ({ ...h }));
-  const frozen = holdings.filter(h => h.frozen);
-  const unfrozen = holdings.filter(h => !h.frozen);
-  const frozenByLayer = { foundation: 0, growth: 0, upside: 0 };
-  for (const h of frozen) frozenByLayer[h.layer] += h.amountIRR;
-  const unfrozenValue = unfrozen.reduce((s, h) => s + h.amountIRR, 0);
-  const totalAssetValue = unfrozenValue + frozen.reduce((s, h) => s + h.amountIRR, 0);
-  if (unfrozenValue <= 0) return { portfolio, cashIRR };
-  const targetAmounts = {
-    foundation: Math.floor(totalAssetValue * targetLayers.foundation / 100),
-    growth: Math.floor(totalAssetValue * targetLayers.growth / 100),
-    upside: Math.floor(totalAssetValue * targetLayers.upside / 100),
-  };
-  const unfrozenTargets = {
-    foundation: Math.max(0, targetAmounts.foundation - frozenByLayer.foundation),
-    growth: Math.max(0, targetAmounts.growth - frozenByLayer.growth),
-    upside: Math.max(0, targetAmounts.upside - frozenByLayer.upside),
-  };
-  const unfrozenTargetTotal = unfrozenTargets.foundation + unfrozenTargets.growth + unfrozenTargets.upside;
-  const scale = unfrozenTargetTotal > 0 ? unfrozenValue / unfrozenTargetTotal : 0;
-  const adjustedTargets = {
-    foundation: Math.floor(unfrozenTargets.foundation * scale),
-    growth: Math.floor(unfrozenTargets.growth * scale),
-    upside: Math.floor(unfrozenTargets.upside * scale),
-  };
-  const newUnfrozen = [];
-  for (const layer of ['foundation', 'growth', 'upside']) {
-    const layerAmount = adjustedTargets[layer];
-    if (layerAmount <= 0) continue;
-    const weights = WEIGHTS[layer] || {};
-    let layerAllocated = 0;
-    for (const asset of Object.keys(weights)) {
-      if (frozen.some(h => h.asset === asset)) continue;
-      const amt = Math.floor(layerAmount * weights[asset]);
-      if (amt <= 0) continue;
-      newUnfrozen.push({ asset, layer, amountIRR: amt, frozen: false });
-      layerAllocated += amt;
-    }
-    const remainder = layerAmount - layerAllocated;
-    if (remainder > 0) {
-      const last = [...newUnfrozen].reverse().find(h => h.layer === layer);
-      if (last) last.amountIRR += remainder;
-    }
-  }
-  const finalHoldings = [...frozen, ...newUnfrozen];
-  return { portfolio: { ...portfolio, holdings: finalHoldings, totalIRR: finalHoldings.reduce((s, h) => s + h.amountIRR, 0) }, cashIRR };
-}
-
-const BOUNDARY_STATES = { SAFE: 'SAFE', DRIFT: 'DRIFT', STRUCTURAL: 'STRUCTURAL', STRESS: 'STRESS' };
-const DRIFT_THRESHOLDS = { SAFE: 5, DRIFT: 10, STRUCTURAL: 20 };
-
-function computeDrift(currentLayers, targetLayers) {
-  if (!currentLayers || !targetLayers) return { foundation: 0, growth: 0, upside: 0, total: 0, max: 0 };
-  const f = currentLayers.foundation - targetLayers.foundation;
-  const g = currentLayers.growth - targetLayers.growth;
-  const u = currentLayers.upside - targetLayers.upside;
-  return { foundation: f, growth: g, upside: u, total: Math.abs(f) + Math.abs(g) + Math.abs(u), max: Math.max(Math.abs(f), Math.abs(g), Math.abs(u)) };
-}
-
-function computeBoundary(state) {
-  if (!state.portfolio || !state.targetLayers) return { state: BOUNDARY_STATES.SAFE, drift: null, warnings: [], constraints: [] };
-  const exposure = calcLayerPercents(state.portfolio.holdings);
-  const drift = computeDrift(exposure.pct, state.targetLayers);
-  const constraints = [];
-  if (exposure.pct.foundation < THRESHOLDS.FOUNDATION_MIN_PCT) constraints.push(`Foundation below ${THRESHOLDS.FOUNDATION_MIN_PCT}%`);
-  if (exposure.pct.upside > THRESHOLDS.UPSIDE_MAX_PCT) constraints.push(`Upside above ${THRESHOLDS.UPSIDE_MAX_PCT}%`);
-  const frozen = (state.portfolio.holdings || []).filter(h => h.frozen);
-  if (frozen.length > 0 && state.loan) {
-    const collateralValue = frozen.reduce((s, h) => s + h.amountIRR, 0);
-    if (collateralValue < state.loan.liquidationIRR * 1.1) constraints.push('Collateral near liquidation');
-  }
-  let boundaryState;
-  if (constraints.length > 0) boundaryState = BOUNDARY_STATES.STRESS;
-  else if (drift.total > DRIFT_THRESHOLDS.STRUCTURAL) boundaryState = BOUNDARY_STATES.STRESS;
-  else if (drift.total > DRIFT_THRESHOLDS.DRIFT) boundaryState = BOUNDARY_STATES.STRUCTURAL;
-  else if (drift.total > DRIFT_THRESHOLDS.SAFE) boundaryState = BOUNDARY_STATES.DRIFT;
-  else boundaryState = BOUNDARY_STATES.SAFE;
-  return { state: boundaryState, drift, exposure: exposure.pct, warnings: [], constraints };
-}
-
-function calcFundingOptions(state, shortfallIRR) {
-  const options = { shortfall: shortfallIRR, addFunds: { amount: shortfallIRR }, sellOptions: [] };
-  if (!state.portfolio) return options;
-  const foundationHoldings = state.portfolio.holdings.filter(h => h.layer === 'foundation' && !h.frozen && h.amountIRR > 0).sort((a, b) => b.amountIRR - a.amountIRR);
-  for (const h of foundationHoldings) {
-    const sellAmount = Math.min(h.amountIRR, shortfallIRR);
-    const afterTrade = tradeAsset(state.portfolio, state.cashIRR, h.asset, 'SELL', sellAmount);
-    const afterBoundary = computeBoundary({ ...state, portfolio: afterTrade.portfolio, cashIRR: afterTrade.cashIRR });
-    options.sellOptions.push({ asset: h.asset, layer: h.layer, available: h.amountIRR, sellAmount, coversShortfall: sellAmount >= shortfallIRR, resultingBoundary: afterBoundary.state });
-  }
-  return options;
-}
-
-const STAGES = { WELCOME: 'WELCOME', PHONE_REQUIRED: 'PHONE_REQUIRED', QUESTIONNAIRE: 'QUESTIONNAIRE', ALLOCATION_PROPOSED: 'ALLOCATION_PROPOSED', AMOUNT_REQUIRED: 'AMOUNT_REQUIRED', EXECUTED: 'EXECUTED' };
-const POST_ACTIONS = { NONE: 'NONE', ADD_FUNDS: 'ADD_FUNDS', TRADE: 'TRADE', TRADE_PREVIEW: 'TRADE_PREVIEW', REBALANCE: 'REBALANCE', REBALANCE_PREVIEW: 'REBALANCE_PREVIEW', PROTECT: 'PROTECT', PROTECT_PREVIEW: 'PROTECT_PREVIEW', PROTECT_FUNDING: 'PROTECT_FUNDING', BORROW: 'BORROW', BORROW_PREVIEW: 'BORROW_PREVIEW', REPAY_LOAN: 'REPAY_LOAN', REPAY_LOAN_PREVIEW: 'REPAY_LOAN_PREVIEW' };
-const CONSENT_EXACT = questionnaire.consent_exact;
-
-function validateAction(state, actionType, params = {}) {
-  const result = { allowed: true, boundary: computeBoundary(state), warnings: [], errors: [], requiresAcknowledgment: false, acknowledgmentMessage: null, projectedBoundary: null, fundingOptions: null };
-  if (state.user.stage !== STAGES.EXECUTED) return result;
-  let projectedState = { ...state };
-  switch (actionType) {
-    case 'ADD_FUNDS': {
-      const amount = Number(params.amountIRR) || 0;
-      if (amount < THRESHOLDS.MIN_AMOUNT_IRR) { result.errors.push(`Minimum: ${formatIRR(THRESHOLDS.MIN_AMOUNT_IRR)}`); result.allowed = false; }
-      projectedState = { ...state, cashIRR: (state.cashIRR || 0) + amount };
-      break;
-    }
-    case 'TRADE': {
-      const { assetId, side, amountIRR } = params;
-      const amount = Number(amountIRR) || 0;
-      if (amount < THRESHOLDS.MIN_AMOUNT_IRR) { result.errors.push(`Minimum: ${formatIRR(THRESHOLDS.MIN_AMOUNT_IRR)}`); result.allowed = false; }
-      const holding = state.portfolio?.holdings?.find(h => h.asset === assetId);
-      if (side === 'BUY' && amount > (state.cashIRR || 0)) { result.errors.push('Insufficient cash'); result.allowed = false; }
-      if (side === 'SELL') {
-        if (holding?.frozen) { result.errors.push('Asset is frozen as collateral'); result.allowed = false; }
-        if (holding && amount > holding.amountIRR) result.warnings.push('Will sell maximum available');
-      }
-      if (result.allowed) {
-        const after = tradeAsset(state.portfolio, state.cashIRR, assetId, side, amount);
-        projectedState = { ...state, portfolio: after.portfolio, cashIRR: after.cashIRR };
-        const projectedExposure = calcLayerPercents(after.portfolio.holdings);
-        if (projectedExposure.pct.foundation < THRESHOLDS.FOUNDATION_MIN_PCT) {
-          result.requiresAcknowledgment = true;
-          result.acknowledgmentMessage = `Foundation will be ${projectedExposure.pct.foundation.toFixed(1)}% (below ${THRESHOLDS.FOUNDATION_MIN_PCT}% guideline)`;
-          result.warnings.push(result.acknowledgmentMessage);
-        }
-        if (projectedExposure.pct.upside > THRESHOLDS.UPSIDE_MAX_PCT && side === 'BUY' && holding?.layer === 'upside') {
-          result.requiresAcknowledgment = true;
-          result.acknowledgmentMessage = `Upside will be ${projectedExposure.pct.upside.toFixed(1)}% (above ${THRESHOLDS.UPSIDE_MAX_PCT}% guideline)`;
-          result.warnings.push(result.acknowledgmentMessage);
-        }
-      }
-      break;
-    }
-    case 'REBALANCE': {
-      const { portfolio: afterPortfolio, cashIRR: afterCash } = rebalanceToTarget(state.portfolio, state.cashIRR, state.targetLayers);
-      const frozen = state.portfolio?.holdings?.filter(h => h.frozen) || [];
-      if (frozen.length > 0) result.warnings.push('Frozen collateral unchanged');
-      result.warnings.push('Cash wallet unchanged');
-      projectedState = { ...state, portfolio: afterPortfolio, cashIRR: afterCash };
-      break;
-    }
-    case 'PROTECT': {
-      const { assetId, months } = params;
-      const holding = state.portfolio?.holdings?.find(h => h.asset === assetId);
-      if (!holding) { result.errors.push('Asset not found'); result.allowed = false; break; }
-      const rate = PREMIUM_RATES[holding.layer] || 0.02;
-      const premium = Math.floor(holding.amountIRR * rate * (months / 3));
-      const existing = (state.protections || []).find(p => p.assetId === assetId);
-      if (existing) { result.errors.push(`Already protected until ${existing.protectedUntil}`); result.allowed = false; break; }
-      if (premium > (state.cashIRR || 0)) {
-        const shortfall = premium - (state.cashIRR || 0);
-        result.errors.push(`Need ${formatIRR(shortfall)} more cash`);
-        result.allowed = false;
-        result.fundingOptions = calcFundingOptions(state, shortfall);
-        result.fundingOptions.premium = premium;
-      }
-      if (result.allowed) projectedState = { ...state, cashIRR: (state.cashIRR || 0) - premium };
-      break;
-    }
-    case 'BORROW': {
-      const { assetId, ltv, amountIRR } = params;
-      const amount = Number(amountIRR) || 0;
-      const holding = state.portfolio?.holdings?.find(h => h.asset === assetId);
-      if (!holding) { result.errors.push('Asset not found'); result.allowed = false; break; }
-      if (holding.frozen) { result.errors.push('Asset already used as collateral'); result.allowed = false; break; }
-      if (state.loan) { result.errors.push('Active loan exists'); result.allowed = false; break; }
-      const limits = LTV_LIMITS[holding.layer] || LTV_LIMITS.growth;
-      if (ltv > limits.max) { result.errors.push(`Max LTV: ${Math.round(limits.max * 100)}%`); result.allowed = false; }
-      if (ltv > limits.recommended) {
-        result.requiresAcknowledgment = true;
-        result.acknowledgmentMessage = `LTV ${Math.round(ltv * 100)}% exceeds recommended ${Math.round(limits.recommended * 100)}%`;
-        result.warnings.push(result.acknowledgmentMessage);
-      }
-      const maxBorrow = Math.floor(holding.amountIRR * ltv);
-      if (amount > maxBorrow) { result.errors.push(`Max borrow: ${formatIRR(maxBorrow)}`); result.allowed = false; }
-      if (amount < THRESHOLDS.MIN_AMOUNT_IRR) { result.errors.push(`Minimum: ${formatIRR(THRESHOLDS.MIN_AMOUNT_IRR)}`); result.allowed = false; }
-      if (result.allowed) {
-        const afterCash = (state.cashIRR || 0) + amount;
-        const holdings = state.portfolio.holdings.map(h => ({ ...h }));
-        const collateral = holdings.find(x => x.asset === assetId);
-        if (collateral) collateral.frozen = true;
-        const simulatedExposure = calcLayerPercents(holdings);
-        if (simulatedExposure.pct.foundation < THRESHOLDS.FOUNDATION_MIN_PCT) {
-          result.requiresAcknowledgment = true;
-          result.acknowledgmentMessage = `Foundation will be ${simulatedExposure.pct.foundation.toFixed(1)}%`;
-          result.warnings.push(result.acknowledgmentMessage);
-        }
-        if (holding.layer === 'upside' && ltv >= 0.5) result.warnings.push('High liquidation risk on Upside collateral');
-        projectedState = { ...state, cashIRR: afterCash };
-      }
-      break;
-    }
-    case 'REPAY_LOAN': {
-      if (!state.loan) { result.errors.push('No active loan'); result.allowed = false; break; }
-      if ((state.cashIRR || 0) < state.loan.amountIRR) { result.errors.push(`Need ${formatIRR(state.loan.amountIRR - (state.cashIRR || 0))} more`); result.allowed = false; }
-      if (result.allowed) projectedState = { ...state, cashIRR: (state.cashIRR || 0) - state.loan.amountIRR };
-      break;
-    }
-  }
-  if (result.allowed) {
-    result.projectedBoundary = computeBoundary(projectedState);
-    if (result.projectedBoundary.state === BOUNDARY_STATES.STRESS && result.boundary.state !== BOUNDARY_STATES.STRESS) {
-      result.requiresAcknowledgment = true;
-      result.acknowledgmentMessage = `Portfolio Health → ${PORTFOLIO_HEALTH_LABELS[result.projectedBoundary.state]}`;
-      result.warnings.push(result.acknowledgmentMessage);
-    } else if (result.projectedBoundary.state === BOUNDARY_STATES.STRUCTURAL && result.boundary.state !== BOUNDARY_STATES.STRUCTURAL && result.boundary.state !== BOUNDARY_STATES.STRESS) {
-      result.requiresAcknowledgment = true;
-      result.acknowledgmentMessage = `Portfolio Health → ${PORTFOLIO_HEALTH_LABELS[result.projectedBoundary.state]}`;
-      result.warnings.push(result.acknowledgmentMessage);
-    }
-  }
-  return result;
-}
-
-function createLedgerEntry(actionType, params, stateBefore, stateAfter) {
-  const boundaryBefore = computeBoundary(stateBefore);
-  const boundaryAfter = computeBoundary(stateAfter);
-  const exposureBefore = stateBefore.portfolio ? calcLayerPercents(stateBefore.portfolio.holdings) : null;
-  const exposureAfter = stateAfter.portfolio ? calcLayerPercents(stateAfter.portfolio.holdings) : null;
-  return {
-    id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    timestamp: Date.now(),
-    actionType,
-    params,
-    boundary: { before: boundaryBefore.state, after: boundaryAfter.state },
-    snapshot: {
-      before: exposureBefore ? { totalIRR: exposureBefore.totalIRR, cashIRR: stateBefore.cashIRR || 0, layers: exposureBefore.pct } : null,
-      after: exposureAfter ? { totalIRR: exposureAfter.totalIRR, cashIRR: stateAfter.cashIRR || 0, layers: exposureAfter.pct } : null,
-    },
-  };
-}
-
-function initialState() {
-  return {
-    protectError: null, user: { stage: STAGES.WELCOME, phone: '', investAmountIRR: null },
-    questionnaire: { index: 0, answers: {} }, targetLayers: null, portfolio: null, cashIRR: 0,
-    tab: 'PORTFOLIO', protections: [], loan: null, postAction: POST_ACTIONS.NONE,
-    pendingAmountIRR: null, tradeDraft: null, protectDraft: null, borrowDraft: null,
-    preview: null, validation: null, fundingOptions: null, lastAction: null,
-    acknowledged: false, showResetConfirm: false, actionLog: [], ledger: [],
-  };
-}
-
-function addLogEntry(state, type, data = {}) {
-  if (['STAGE_CHANGE', 'ALLOCATION_COMPUTED', 'CONSENT_GIVEN'].includes(type)) return state;
-  return { ...state, actionLog: [...state.actionLog, { id: Date.now(), timestamp: Date.now(), type, ...data }] };
+function nowISO() {
+  return new Date().toISOString();
 }
 
 function computeTargetLayersFromAnswers(answers) {
@@ -424,323 +178,418 @@ function computeTargetLayersFromAnswers(answers) {
     const opt = q.options.find(o => o.id === answers[q.id]);
     risk += (opt?.risk ?? 0);
   }
-  if (risk <= 5) return { foundation: 65, growth: 30, upside: 5 };
-  if (risk <= 10) return { foundation: 50, growth: 35, upside: 15 };
-  return { foundation: 40, growth: 40, upside: 20 };
+  if (risk <= 5) return { FOUNDATION: 65, GROWTH: 30, UPSIDE: 5 };
+  if (risk <= 10) return { FOUNDATION: 50, GROWTH: 35, UPSIDE: 15 };
+  return { FOUNDATION: 40, GROWTH: 40, UPSIDE: 20 };
 }
 
-function exposureSnapshot(portfolio) {
-  const { pct, totalIRR } = calcLayerPercents(portfolio?.holdings || []);
-  return { totalIRR, layers: pct };
-}
+function buildPending(state, kind, payload, validation, afterState) {
+  const before = computeSnapshot(state);
+  const after = computeSnapshot(afterState);
+  const boundary = classifyActionBoundary({
+    kind,
+    validation,
+    before,
+    after,
+    stressMode: state.stressMode,
+  });
 
-function buildPreview(beforePortfolio, beforeCash, afterPortfolio, afterCash, targetLayers) {
-  const before = exposureSnapshot(beforePortfolio);
-  const after = exposureSnapshot(afterPortfolio);
-  const beforeDrift = targetLayers ? computeDrift(before.layers, targetLayers) : null;
-  const afterDrift = targetLayers ? computeDrift(after.layers, targetLayers) : null;
   return {
-    before: { ...before, cashIRR: beforeCash }, after: { ...after, cashIRR: afterCash },
-    deltas: { totalIRR: after.totalIRR - before.totalIRR, layers: { foundation: after.layers.foundation - before.layers.foundation, growth: after.layers.growth - before.layers.growth, upside: after.layers.upside - before.layers.upside } },
-    beforeDrift, afterDrift, driftChange: afterDrift && beforeDrift ? afterDrift.total - beforeDrift.total : 0,
+    kind,
+    payload,
+    before,
+    after,
+    validation,
+    boundary,
+    frictionCopy: frictionCopyForBoundary(boundary),
   };
 }
 
-function requireExecuted(state) { return state.user.stage === STAGES.EXECUTED && state.portfolio; }
+function initialState() {
+  return {
+    // Core state from spec
+    stage: STAGES.WELCOME,
+    phone: null,
+    cashIRR: 0,
+    holdings: ASSETS.map(a => ({ assetId: a, valueIRR: 0, frozen: false })),
+    targetLayerPct: { FOUNDATION: 50, GROWTH: 35, UPSIDE: 15 },
+    protections: [],
+    loan: null,
+    ledger: [],
+    pendingAction: null,
+    stressMode: false,
 
-function reduce(state, event) {
-  switch (event.type) {
-    case 'RESET': return initialState();
-    case 'SHOW_RESET_CONFIRM': return { ...state, showResetConfirm: true };
-    case 'HIDE_RESET_CONFIRM': return { ...state, showResetConfirm: false };
-    case 'SET_TAB': return { ...state, tab: event.tab };
-    case 'SET_PHONE': return { ...state, user: { ...state.user, phone: String(event.phone || '') } };
-    case 'START_ONBOARDING': return { ...state, user: { ...state.user, stage: STAGES.PHONE_REQUIRED } };
-    case 'SUBMIT_PHONE': {
-      const phone = String(state.user.phone || '');
-      if (!phone.startsWith('+989') || phone.length !== 13) return state;
-      return { ...state, user: { ...state.user, stage: STAGES.QUESTIONNAIRE } };
+    // UI state
+    questionnaire: { index: 0, answers: {} },
+    investAmountIRR: null,
+    tab: 'PORTFOLIO',
+    lastAction: null,
+    showResetConfirm: false,
+    actionLog: [],
+
+    // Draft state for UI input collection
+    tradeDraft: null,
+    protectDraft: null,
+    borrowDraft: null,
+    repayDraft: null,
+    addFundsDraft: null,
+    rebalanceDraft: null,
+  };
+}
+
+function addLogEntry(state, type, data = {}) {
+  return { ...state, actionLog: [...state.actionLog, { id: Date.now(), timestamp: Date.now(), type, ...data }] };
+}
+
+function reducer(state, action) {
+  switch (action.type) {
+    // ====== GLOBAL ======
+    case 'RESET':
+      return initialState();
+
+    case 'SHOW_RESET_CONFIRM':
+      return { ...state, showResetConfirm: true };
+
+    case 'HIDE_RESET_CONFIRM':
+      return { ...state, showResetConfirm: false };
+
+    case 'SET_TAB':
+      return { ...state, tab: action.tab };
+
+    case 'SET_STRESS_MODE':
+      return { ...state, stressMode: Boolean(action.payload?.on) };
+
+    case 'DISMISS_LAST_ACTION':
+      return { ...state, lastAction: null };
+
+    // ====== ONBOARDING ======
+    case 'START_ONBOARDING':
+      return { ...state, stage: STAGES.ONBOARDING_PHONE };
+
+    case 'SET_PHONE': {
+      const phone = String(action.phone || '').trim();
+      return { ...state, phone };
     }
+
+    case 'SUBMIT_PHONE': {
+      const phone = String(state.phone || '').trim();
+      if (!phone.startsWith('+989') || phone.length !== 13) return state;
+      return { ...state, stage: STAGES.ONBOARDING_QUESTIONNAIRE };
+    }
+
     case 'ANSWER_QUESTION': {
-      if (state.user.stage !== STAGES.QUESTIONNAIRE) return state;
-      const answers = { ...state.questionnaire.answers, [event.qId]: event.optionId };
+      if (state.stage !== STAGES.ONBOARDING_QUESTIONNAIRE) return state;
+      const answers = { ...state.questionnaire.answers, [action.qId]: action.optionId };
       let idx = state.questionnaire.index + 1;
       let s = { ...state, questionnaire: { index: idx, answers } };
+
       if (idx >= questionnaire.questions.length) {
-        const targetLayers = computeTargetLayersFromAnswers(answers);
-        s = { ...s, targetLayers, user: { ...s.user, stage: STAGES.ALLOCATION_PROPOSED } };
+        const targetLayerPct = computeTargetLayersFromAnswers(answers);
+        s = { ...s, targetLayerPct, stage: STAGES.ONBOARDING_RESULT };
       }
       return s;
     }
+
     case 'SUBMIT_CONSENT': {
-      if (state.user.stage !== STAGES.ALLOCATION_PROPOSED) return state;
-      if (String(event.text || '') !== CONSENT_EXACT) return state;
-      return { ...state, user: { ...state.user, stage: STAGES.AMOUNT_REQUIRED } };
+      if (state.stage !== STAGES.ONBOARDING_RESULT) return state;
+      if (String(action.text || '') !== questionnaire.consent_exact) return state;
+      return { ...state, stage: STAGES.AMOUNT_REQUIRED };
     }
+
     case 'SET_INVEST_AMOUNT': {
-      if (state.user.stage !== STAGES.AMOUNT_REQUIRED) return state;
-      return { ...state, user: { ...state.user, investAmountIRR: event.investAmountIRR ?? event.amountIRR } };
+      if (state.stage !== STAGES.AMOUNT_REQUIRED) return state;
+      return { ...state, investAmountIRR: action.amountIRR };
     }
+
     case 'EXECUTE_PORTFOLIO': {
-      if (state.user.stage !== STAGES.AMOUNT_REQUIRED) return state;
-      const n = Math.floor(Number(state.user.investAmountIRR) || 0);
+      if (state.stage !== STAGES.AMOUNT_REQUIRED) return state;
+      const n = Math.floor(Number(state.investAmountIRR) || 0);
       if (n < THRESHOLDS.MIN_AMOUNT_IRR) return state;
-      const portfolio = buildPortfolio(n, state.targetLayers);
-      let s = { ...state, portfolio, cashIRR: 0, user: { ...state.user, stage: STAGES.EXECUTED } };
-      const entry = createLedgerEntry('PORTFOLIO_CREATED', { amountIRR: n }, state, s);
+
+      const holdings = buildInitialHoldings(n, state.targetLayerPct);
+      let s = { ...state, holdings, cashIRR: 0, stage: STAGES.ACTIVE };
+
+      // Create ledger entry
+      const entry = {
+        id: uid(),
+        tsISO: nowISO(),
+        type: 'PORTFOLIO_CREATED_COMMIT',
+        details: { amountIRR: n, targetLayerPct: state.targetLayerPct },
+      };
       s = { ...s, ledger: [entry], lastAction: { type: 'PORTFOLIO_CREATED', timestamp: Date.now() } };
-      s = addLogEntry(s, 'PORTFOLIO_CREATED', { amountIRR: n, targetLayers: state.targetLayers });
+      s = addLogEntry(s, 'PORTFOLIO_CREATED', { amountIRR: n });
       return s;
     }
-    case 'CANCEL_POST_ACTION': {
-      if (!requireExecuted(state)) return state;
-      return { ...state, postAction: POST_ACTIONS.NONE, pendingAmountIRR: null, tradeDraft: null, protectDraft: null, borrowDraft: null, preview: null, validation: null, fundingOptions: null, acknowledged: false };
-    }
-    case 'SET_ACKNOWLEDGED': return { ...state, acknowledged: event.value };
-    case 'DISMISS_LAST_ACTION': return { ...state, lastAction: null };
+
+    // ====== CANCEL PENDING ======
+    case 'CANCEL_PENDING':
+      return {
+        ...state,
+        pendingAction: null,
+        tradeDraft: null,
+        protectDraft: null,
+        borrowDraft: null,
+        repayDraft: null,
+        addFundsDraft: null,
+        rebalanceDraft: null,
+      };
+
+    // ====== ADD FUNDS ======
     case 'START_ADD_FUNDS': {
-      if (!requireExecuted(state)) return state;
-      return { ...state, postAction: POST_ACTIONS.ADD_FUNDS, pendingAmountIRR: null, preview: null, validation: null, lastAction: null, acknowledged: false };
+      if (state.stage !== STAGES.ACTIVE) return state;
+      return { ...state, addFundsDraft: { amountIRR: null }, pendingAction: null };
     }
-    case 'SET_PENDING_AMOUNT': {
-      if (!requireExecuted(state)) return state;
-      return { ...state, pendingAmountIRR: event.amountIRR };
+
+    case 'SET_ADD_FUNDS_AMOUNT': {
+      if (!state.addFundsDraft) return state;
+      return { ...state, addFundsDraft: { ...state.addFundsDraft, amountIRR: action.amountIRR } };
     }
-    case 'CONFIRM_ADD_FUNDS': {
-      if (!requireExecuted(state)) return state;
-      const n = Number(state.pendingAmountIRR);
-      const validation = validateAction(state, 'ADD_FUNDS', { amountIRR: n });
-      if (!validation.allowed) return { ...state, validation };
-      const delta = Math.floor(n);
-      const stateBefore = state;
-      let s = { ...state, cashIRR: (state.cashIRR || 0) + delta, postAction: POST_ACTIONS.NONE, pendingAmountIRR: null, preview: null, validation: null, acknowledged: false };
-      const entry = createLedgerEntry('ADD_FUNDS', { amountIRR: delta }, stateBefore, s);
-      s = { ...s, ledger: [...state.ledger, entry], lastAction: { type: 'ADD_FUNDS', amountIRR: delta, boundary: entry.boundary, timestamp: Date.now() } };
-      s = addLogEntry(s, 'ADD_FUNDS', { amountIRR: delta });
-      return s;
+
+    case 'PREVIEW_ADD_FUNDS': {
+      if (state.stage !== STAGES.ACTIVE) return state;
+      const amountIRR = Number(state.addFundsDraft?.amountIRR || action.payload?.amountIRR);
+      const payload = { amountIRR };
+      const validation = validateAddFunds(payload);
+      const afterState = validation.ok ? previewAddFunds(state, payload) : cloneState(state);
+      return { ...state, pendingAction: buildPending(state, 'ADD_FUNDS', payload, validation, afterState) };
     }
+
+    // ====== TRADE ======
     case 'START_TRADE': {
-      if (!requireExecuted(state)) return state;
-      return { ...state, postAction: POST_ACTIONS.TRADE, tradeDraft: { assetId: String(event.assetId || ''), side: event.side === 'SELL' ? 'SELL' : 'BUY', amountIRR: null }, preview: null, validation: null, lastAction: null, acknowledged: false };
+      if (state.stage !== STAGES.ACTIVE) return state;
+      return {
+        ...state,
+        tradeDraft: { assetId: action.assetId, side: action.side || 'BUY', amountIRR: null },
+        pendingAction: null,
+      };
     }
+
     case 'SET_TRADE_SIDE': {
-      if (!requireExecuted(state) || !state.tradeDraft) return state;
-      return { ...state, tradeDraft: { ...state.tradeDraft, side: event.side === 'SELL' ? 'SELL' : 'BUY' } };
+      if (!state.tradeDraft) return state;
+      return { ...state, tradeDraft: { ...state.tradeDraft, side: action.side } };
     }
+
     case 'SET_TRADE_AMOUNT': {
-      if (!requireExecuted(state) || !state.tradeDraft) return state;
-      return { ...state, tradeDraft: { ...state.tradeDraft, amountIRR: event.amountIRR } };
+      if (!state.tradeDraft) return state;
+      return { ...state, tradeDraft: { ...state.tradeDraft, amountIRR: action.amountIRR } };
     }
+
     case 'PREVIEW_TRADE': {
-      if (!requireExecuted(state)) return state;
-      const d = state.tradeDraft;
-      if (!d) return state;
-      const validation = validateAction(state, 'TRADE', { assetId: d.assetId, side: d.side, amountIRR: Number(d.amountIRR) });
-      if (!validation.allowed) return { ...state, validation };
-      const after = tradeAsset(state.portfolio, state.cashIRR, d.assetId, d.side, Math.floor(Number(d.amountIRR)));
-      const preview = buildPreview(state.portfolio, state.cashIRR, after.portfolio, after.cashIRR, state.targetLayers);
-      return { ...state, preview, validation, postAction: POST_ACTIONS.TRADE_PREVIEW, acknowledged: false };
+      if (state.stage !== STAGES.ACTIVE || !state.tradeDraft) return state;
+      const payload = {
+        side: state.tradeDraft.side,
+        assetId: state.tradeDraft.assetId,
+        amountIRR: Number(state.tradeDraft.amountIRR),
+      };
+      const validation = validateTrade(payload, state);
+      const afterState = validation.ok ? previewTrade(state, payload) : cloneState(state);
+      return { ...state, pendingAction: buildPending(state, 'TRADE', payload, validation, afterState) };
     }
-    case 'CONFIRM_TRADE_FINAL': {
-      if (!requireExecuted(state)) return state;
-      const d = state.tradeDraft;
-      if (!d) return state;
-      const validation = validateAction(state, 'TRADE', { assetId: d.assetId, side: d.side, amountIRR: Number(d.amountIRR) });
-      if (validation.requiresAcknowledgment && !state.acknowledged) return state;
-      if (!validation.allowed) return { ...state, validation };
-      const stateBefore = state;
-      const after = tradeAsset(state.portfolio, state.cashIRR, d.assetId, d.side, Math.floor(Number(d.amountIRR)));
-      let s = { ...state, portfolio: after.portfolio, cashIRR: after.cashIRR, postAction: POST_ACTIONS.NONE, tradeDraft: null, preview: null, validation: null, acknowledged: false };
-      const entry = createLedgerEntry('TRADE', { assetId: d.assetId, side: d.side, amountIRR: Number(d.amountIRR) }, stateBefore, s);
-      s = { ...s, ledger: [...state.ledger, entry], lastAction: { type: 'TRADE', assetId: d.assetId, side: d.side, amountIRR: Number(d.amountIRR), boundary: entry.boundary, timestamp: Date.now() } };
-      s = addLogEntry(s, 'TRADE', { assetId: d.assetId, side: d.side, amountIRR: Number(d.amountIRR) });
-      return s;
-    }
-    case 'START_REBALANCE': {
-      if (!requireExecuted(state)) return state;
-      return { ...state, postAction: POST_ACTIONS.REBALANCE, preview: null, validation: validateAction(state, 'REBALANCE', {}), lastAction: null, acknowledged: false };
-    }
-    case 'PREVIEW_REBALANCE': {
-      if (!requireExecuted(state)) return state;
-      const { portfolio: afterPortfolio, cashIRR: afterCash } = rebalanceToTarget(state.portfolio, state.cashIRR, state.targetLayers);
-      const preview = buildPreview(state.portfolio, state.cashIRR, afterPortfolio, afterCash, state.targetLayers);
-      return { ...state, preview, validation: validateAction(state, 'REBALANCE', {}), postAction: POST_ACTIONS.REBALANCE_PREVIEW, acknowledged: false };
-    }
-    case 'CONFIRM_REBALANCE_FINAL': {
-      if (!requireExecuted(state)) return state;
-      const stateBefore = state;
-      const beforeExposure = calcLayerPercents(state.portfolio.holdings);
-      const { portfolio: nextPortfolio, cashIRR: nextCash } = rebalanceToTarget(state.portfolio, state.cashIRR, state.targetLayers);
-      const afterExposure = calcLayerPercents(nextPortfolio.holdings);
-      let s = { ...state, portfolio: nextPortfolio, cashIRR: nextCash, postAction: POST_ACTIONS.NONE, preview: null, validation: null, acknowledged: false };
-      const entry = createLedgerEntry('REBALANCE', { totalIRR: nextPortfolio.totalIRR }, stateBefore, s);
-      s = { ...s, ledger: [...state.ledger, entry], lastAction: { type: 'REBALANCE', beforeLayers: beforeExposure.pct, afterLayers: afterExposure.pct, boundary: entry.boundary, timestamp: Date.now() } };
-      s = addLogEntry(s, 'REBALANCE', { beforeLayers: beforeExposure.pct, afterLayers: afterExposure.pct });
-      return s;
-    }
+
+    // ====== PROTECT ======
     case 'START_PROTECT': {
-      if (!requireExecuted(state)) return state;
-      const preferred = event?.assetId || state.portfolio.holdings[0]?.asset;
-      if (!preferred) return state;
-      if ((state.protections || []).find(p => p.assetId === preferred)) return state;
-      return { ...state, postAction: POST_ACTIONS.PROTECT, protectDraft: { assetId: preferred, months: 3 }, preview: null, protectError: null, validation: null, fundingOptions: null, lastAction: null, acknowledged: false };
+      if (state.stage !== STAGES.ACTIVE) return state;
+      const assetId = action.assetId || state.holdings.find(h => h.valueIRR > 0)?.assetId;
+      if (!assetId) return state;
+      return {
+        ...state,
+        protectDraft: { assetId, months: 3 },
+        pendingAction: null,
+      };
     }
+
     case 'SET_PROTECT_ASSET': {
-      if (!requireExecuted(state) || !state.protectDraft) return state;
-      return { ...state, protectDraft: { ...state.protectDraft, assetId: event.assetId }, protectError: null, fundingOptions: null };
+      if (!state.protectDraft) return state;
+      return { ...state, protectDraft: { ...state.protectDraft, assetId: action.assetId } };
     }
+
     case 'SET_PROTECT_MONTHS': {
-      if (!requireExecuted(state) || !state.protectDraft) return state;
-      return { ...state, protectDraft: { ...state.protectDraft, months: event.months } };
+      if (!state.protectDraft) return state;
+      return { ...state, protectDraft: { ...state.protectDraft, months: action.months } };
     }
+
     case 'PREVIEW_PROTECT': {
-      if (!requireExecuted(state)) return state;
-      const d = state.protectDraft;
-      if (!d) return state;
-      const months = Math.min(6, Math.max(1, Math.floor(Number(d.months) || 0)));
-      const h = state.portfolio.holdings.find(x => x.asset === d.assetId);
-      if (!h) return state;
-      const rate = PREMIUM_RATES[h.layer] || 0.02;
-      const premium = Math.floor(h.amountIRR * rate * (months / 3));
-      const validation = validateAction(state, 'PROTECT', { assetId: d.assetId, months });
-      if (!validation.allowed && validation.fundingOptions) {
-        return { ...state, postAction: POST_ACTIONS.PROTECT_FUNDING, validation, fundingOptions: validation.fundingOptions, protectError: { premium, shortfall: validation.fundingOptions.shortfall, cashIRR: state.cashIRR || 0 } };
-      }
-      if (!validation.allowed) return { ...state, validation };
-      const afterCash = (state.cashIRR || 0) - premium;
-      const preview = buildPreview(state.portfolio, state.cashIRR, state.portfolio, afterCash, state.targetLayers);
-      return { ...state, preview: { ...preview, premium, months, assetId: d.assetId, layer: h.layer }, validation, postAction: POST_ACTIONS.PROTECT_PREVIEW, acknowledged: false };
+      if (state.stage !== STAGES.ACTIVE || !state.protectDraft) return state;
+      const payload = {
+        assetId: state.protectDraft.assetId,
+        months: Number(state.protectDraft.months),
+      };
+      const validation = validateProtect(payload, state);
+      const afterState = validation.ok ? previewProtect(state, payload) : cloneState(state);
+      return { ...state, pendingAction: buildPending(state, 'PROTECT', payload, validation, afterState) };
     }
-    case 'CONFIRM_PROTECT_FINAL': {
-      if (!requireExecuted(state)) return state;
-      const d = state.protectDraft;
-      if (!d) return state;
-      const months = Math.min(6, Math.max(1, Math.floor(Number(d.months) || 0)));
-      const h = state.portfolio.holdings.find(x => x.asset === d.assetId);
-      if (!h) return state;
-      const validation = validateAction(state, 'PROTECT', { assetId: d.assetId, months });
-      if (!validation.allowed) return { ...state, validation };
-      const rate = PREMIUM_RATES[h.layer] || 0.02;
-      const premium = Math.floor(h.amountIRR * rate * (months / 3));
-      const protectedUntil = new Date(); protectedUntil.setMonth(protectedUntil.getMonth() + months);
-      const stateBefore = state;
-      let s = { ...state, cashIRR: (state.cashIRR || 0) - premium, protections: [...(state.protections || []), { assetId: d.assetId, layer: h.layer, months, premiumIRR: premium, protectedUntil: protectedUntil.toISOString().split('T')[0] }], postAction: POST_ACTIONS.NONE, protectDraft: null, preview: null, validation: null, acknowledged: false };
-      const entry = createLedgerEntry('PROTECT', { assetId: d.assetId, months, premiumIRR: premium }, stateBefore, s);
-      s = { ...s, ledger: [...state.ledger, entry], lastAction: { type: 'PROTECT', assetId: d.assetId, months, boundary: entry.boundary, timestamp: Date.now() } };
-      s = addLogEntry(s, 'PROTECT', { assetId: d.assetId, months, premiumIRR: premium });
-      return s;
-    }
+
+    // ====== BORROW ======
     case 'START_BORROW': {
-      if (!requireExecuted(state)) return state;
-      const available = state.portfolio.holdings.filter(h => !h.frozen);
+      if (state.stage !== STAGES.ACTIVE) return state;
+      const available = state.holdings.filter(h => !h.frozen && h.valueIRR > 0);
       if (available.length === 0) return state;
-      const preferred = event?.assetId || available[0].asset;
-      const h = state.portfolio.holdings.find(x => x.asset === preferred);
-      if (!h || h.frozen) return state;
-      const limits = LTV_LIMITS[h.layer] || LTV_LIMITS.growth;
-      return { ...state, postAction: POST_ACTIONS.BORROW, borrowDraft: { assetId: preferred, ltv: limits.recommended, amountIRR: null }, preview: null, validation: null, lastAction: null, acknowledged: false };
+      const assetId = action.assetId || available[0].assetId;
+      return {
+        ...state,
+        borrowDraft: { assetId, ltv: 0.5, amountIRR: null },
+        pendingAction: null,
+      };
     }
+
     case 'SET_BORROW_ASSET': {
-      if (!requireExecuted(state) || !state.borrowDraft) return state;
-      const h = state.portfolio.holdings.find(x => x.asset === event.assetId);
-      if (!h) return state;
-      const limits = LTV_LIMITS[h.layer] || LTV_LIMITS.growth;
-      return { ...state, borrowDraft: { ...state.borrowDraft, assetId: event.assetId, ltv: limits.recommended } };
+      if (!state.borrowDraft) return state;
+      return { ...state, borrowDraft: { ...state.borrowDraft, assetId: action.assetId } };
     }
+
     case 'SET_BORROW_LTV': {
-      if (!requireExecuted(state) || !state.borrowDraft) return state;
-      return { ...state, borrowDraft: { ...state.borrowDraft, ltv: Number(event.ltv) } };
+      if (!state.borrowDraft) return state;
+      return { ...state, borrowDraft: { ...state.borrowDraft, ltv: Number(action.ltv) } };
     }
+
     case 'SET_BORROW_AMOUNT': {
-      if (!requireExecuted(state) || !state.borrowDraft) return state;
-      return { ...state, borrowDraft: { ...state.borrowDraft, amountIRR: event.amountIRR } };
+      if (!state.borrowDraft) return state;
+      return { ...state, borrowDraft: { ...state.borrowDraft, amountIRR: action.amountIRR } };
     }
+
     case 'PREVIEW_BORROW': {
-      if (!requireExecuted(state)) return state;
-      const d = state.borrowDraft;
-      if (!d) return state;
-      const validation = validateAction(state, 'BORROW', { assetId: d.assetId, ltv: d.ltv, amountIRR: Number(d.amountIRR) });
-      if (!validation.allowed) return { ...state, validation };
-      const h = state.portfolio.holdings.find(x => x.asset === d.assetId);
-      if (!h) return state;
-      const amount = Math.floor(Number(d.amountIRR) || 0);
-      const afterCash = (state.cashIRR || 0) + amount;
-      const holdings = state.portfolio.holdings.map(x => ({ ...x }));
-      const collateral = holdings.find(x => x.asset === d.assetId);
-      if (collateral) collateral.frozen = true;
-      const afterPortfolio = { ...state.portfolio, holdings };
-      const preview = buildPreview(state.portfolio, state.cashIRR, afterPortfolio, afterCash, state.targetLayers);
-      return { ...state, preview: { ...preview, loanAmount: amount, collateralAsset: d.assetId, collateralValue: h.amountIRR, ltv: d.ltv, liquidationIRR: Math.floor(h.amountIRR * (d.ltv + 0.1)) }, validation, postAction: POST_ACTIONS.BORROW_PREVIEW, acknowledged: false };
+      if (state.stage !== STAGES.ACTIVE || !state.borrowDraft) return state;
+      const payload = {
+        assetId: state.borrowDraft.assetId,
+        amountIRR: Number(state.borrowDraft.amountIRR),
+        ltv: Number(state.borrowDraft.ltv),
+      };
+      const validation = validateBorrow(payload, state);
+      const afterState = validation.ok ? previewBorrow(state, payload) : cloneState(state);
+      return { ...state, pendingAction: buildPending(state, 'BORROW', payload, validation, afterState) };
     }
-    case 'CONFIRM_BORROW_FINAL': {
-      if (!requireExecuted(state)) return state;
-      const d = state.borrowDraft;
-      if (!d) return state;
-      const validation = validateAction(state, 'BORROW', { assetId: d.assetId, ltv: d.ltv, amountIRR: Number(d.amountIRR) });
-      if (validation.requiresAcknowledgment && !state.acknowledged) return state;
-      if (!validation.allowed) return { ...state, validation };
-      const h = state.portfolio.holdings.find(x => x.asset === d.assetId);
-      if (!h) return state;
-      const amount = Math.floor(Number(d.amountIRR) || 0);
-      const holdings = state.portfolio.holdings.map(x => ({ ...x }));
-      const collateral = holdings.find(x => x.asset === d.assetId);
-      if (collateral) collateral.frozen = true;
-      const stateBefore = state;
-      let s = { ...state, portfolio: { ...state.portfolio, holdings }, cashIRR: (state.cashIRR || 0) + amount, loan: { amountIRR: amount, collateralAssetId: d.assetId, collateralValueIRR: h.amountIRR, ltv: d.ltv, liquidationIRR: Math.floor(h.amountIRR * (d.ltv + 0.1)), timestamp: Date.now() }, postAction: POST_ACTIONS.NONE, borrowDraft: null, preview: null, validation: null, acknowledged: false };
-      const entry = createLedgerEntry('BORROW', { amountIRR: amount, collateralAssetId: d.assetId, ltv: d.ltv }, stateBefore, s);
-      s = { ...s, ledger: [...state.ledger, entry], lastAction: { type: 'BORROW', amountIRR: amount, collateralAssetId: d.assetId, boundary: entry.boundary, timestamp: Date.now() } };
-      s = addLogEntry(s, 'BORROW', { amountIRR: amount, collateralAssetId: d.assetId });
-      return s;
+
+    // ====== REPAY ======
+    case 'START_REPAY': {
+      if (state.stage !== STAGES.ACTIVE || !state.loan) return state;
+      return {
+        ...state,
+        repayDraft: { amountIRR: state.loan.amountIRR },
+        pendingAction: null,
+      };
     }
-    case 'START_REPAY_LOAN': {
-      if (!requireExecuted(state) || !state.loan) return state;
-      return { ...state, postAction: POST_ACTIONS.REPAY_LOAN, preview: null, validation: null, lastAction: null, acknowledged: false };
+
+    case 'PREVIEW_REPAY': {
+      if (state.stage !== STAGES.ACTIVE || !state.loan) return state;
+      const payload = { amountIRR: state.loan.amountIRR };
+      const validation = validateRepay(payload, state);
+      const afterState = validation.ok ? previewRepay(state, payload) : cloneState(state);
+      return { ...state, pendingAction: buildPending(state, 'REPAY', payload, validation, afterState) };
     }
-    case 'PREVIEW_REPAY_LOAN': {
-      if (!requireExecuted(state) || !state.loan) return state;
-      const validation = validateAction(state, 'REPAY_LOAN', {});
-      if (!validation.allowed) return { ...state, validation };
-      const holdings = state.portfolio.holdings.map(h => ({ ...h }));
-      const collateral = holdings.find(h => h.asset === state.loan.collateralAssetId);
-      if (collateral) collateral.frozen = false;
-      const afterCash = (state.cashIRR || 0) - state.loan.amountIRR;
-      const afterPortfolio = { ...state.portfolio, holdings };
-      const preview = buildPreview(state.portfolio, state.cashIRR, afterPortfolio, afterCash, state.targetLayers);
-      return { ...state, preview: { ...preview, loanAmount: state.loan.amountIRR, collateralAsset: state.loan.collateralAssetId }, validation, postAction: POST_ACTIONS.REPAY_LOAN_PREVIEW, acknowledged: false };
+
+    // ====== REBALANCE ======
+    case 'START_REBALANCE': {
+      if (state.stage !== STAGES.ACTIVE) return state;
+      return {
+        ...state,
+        rebalanceDraft: { mode: 'HOLDINGS_PLUS_CASH' },
+        pendingAction: null,
+      };
     }
-    case 'CONFIRM_REPAY_LOAN_FINAL': {
-      if (!requireExecuted(state) || !state.loan) return state;
-      const validation = validateAction(state, 'REPAY_LOAN', {});
-      if (!validation.allowed) return { ...state, validation };
-      const holdings = state.portfolio.holdings.map(h => ({ ...h }));
-      const collateral = holdings.find(h => h.asset === state.loan.collateralAssetId);
-      if (collateral) collateral.frozen = false;
-      const stateBefore = state;
-      let s = { ...state, portfolio: { ...state.portfolio, holdings }, cashIRR: (state.cashIRR || 0) - state.loan.amountIRR, loan: null, postAction: POST_ACTIONS.NONE, preview: null, validation: null, acknowledged: false };
-      const entry = createLedgerEntry('REPAY_LOAN', { amountIRR: state.loan.amountIRR, collateralAssetId: state.loan.collateralAssetId }, stateBefore, s);
-      s = { ...s, ledger: [...state.ledger, entry], lastAction: { type: 'REPAY_LOAN', amountIRR: state.loan.amountIRR, boundary: entry.boundary, timestamp: Date.now() } };
-      s = addLogEntry(s, 'REPAY_LOAN', { amountIRR: state.loan.amountIRR });
-      return s;
+
+    case 'PREVIEW_REBALANCE': {
+      if (state.stage !== STAGES.ACTIVE) return state;
+      const payload = { mode: state.rebalanceDraft?.mode || 'HOLDINGS_PLUS_CASH' };
+      const validation = validateRebalance(payload);
+      const afterState = validation.ok ? previewRebalance(state, payload) : cloneState(state);
+      return { ...state, pendingAction: buildPending(state, 'REBALANCE', payload, validation, afterState) };
     }
-    default: return state;
+
+    // ====== CONFIRM PENDING ======
+    case 'CONFIRM_PENDING': {
+      const p = state.pendingAction;
+      if (!p || !p.validation.ok) return state;
+
+      let next = cloneState(state);
+
+      // Commit by replaying deterministic preview
+      if (p.kind === 'ADD_FUNDS') next = previewAddFunds(next, p.payload);
+      if (p.kind === 'TRADE') next = previewTrade(next, p.payload);
+      if (p.kind === 'BORROW') next = previewBorrow(next, p.payload);
+      if (p.kind === 'REPAY') next = previewRepay(next, p.payload);
+      if (p.kind === 'REBALANCE') next = previewRebalance(next, p.payload);
+
+      if (p.kind === 'PROTECT') {
+        const holding = next.holdings.find(h => h.assetId === p.payload.assetId);
+        if (holding) {
+          const premium = calcPremiumIRR({
+            assetId: holding.assetId,
+            notionalIRR: holding.valueIRR,
+            months: p.payload.months,
+          });
+          next.cashIRR -= premium;
+
+          const startISO = new Date().toISOString().slice(0, 10);
+          const end = new Date();
+          end.setMonth(end.getMonth() + p.payload.months);
+          const endISO = end.toISOString().slice(0, 10);
+
+          next.protections = [
+            ...next.protections,
+            {
+              id: uid(),
+              assetId: holding.assetId,
+              notionalIRR: holding.valueIRR,
+              premiumIRR: premium,
+              startISO,
+              endISO,
+            },
+          ];
+        }
+      }
+
+      const entry = {
+        id: uid(),
+        tsISO: nowISO(),
+        type: `${p.kind}_COMMIT`,
+        details: {
+          kind: p.kind,
+          payload: p.payload,
+          boundary: p.boundary,
+          validation: p.validation,
+          before: p.before,
+          after: computeSnapshot(next),
+        },
+      };
+
+      next.pendingAction = null;
+      next.tradeDraft = null;
+      next.protectDraft = null;
+      next.borrowDraft = null;
+      next.repayDraft = null;
+      next.addFundsDraft = null;
+      next.rebalanceDraft = null;
+      next.ledger = [...next.ledger, entry];
+      next.lastAction = { type: p.kind, timestamp: Date.now(), ...p.payload };
+      next = addLogEntry(next, p.kind, p.payload);
+
+      return next;
+    }
+
+    default:
+      return state;
   }
 }
 
 // ====== UI COMPONENTS ======
 
-function PortfolioHealthBadge({ boundary }) {
-  if (!boundary) return null;
-  const label = PORTFOLIO_HEALTH_LABELS[boundary.state];
-  const colorMap = { SAFE: { bg: 'rgba(34,197,94,.15)', border: 'rgba(34,197,94,.3)', color: '#4ade80' }, DRIFT: { bg: 'rgba(250,204,21,.15)', border: 'rgba(250,204,21,.3)', color: '#fde047' }, STRUCTURAL: { bg: 'rgba(249,115,22,.15)', border: 'rgba(249,115,22,.3)', color: '#fb923c' }, STRESS: { bg: 'rgba(239,68,68,.15)', border: 'rgba(239,68,68,.3)', color: '#f87171' } };
-  const colors = colorMap[boundary.state] || colorMap.SAFE;
-  return <div className="healthBadge" style={{ background: colors.bg, borderColor: colors.border, color: colors.color }}>{label}</div>;
+function PortfolioHealthBadge({ snapshot }) {
+  if (!snapshot) return null;
+  const { status } = computePortfolioStatus(snapshot.layerPct);
+  const colorMap = {
+    BALANCED: { bg: 'rgba(34,197,94,.15)', border: 'rgba(34,197,94,.3)', color: '#4ade80' },
+    SLIGHTLY_OFF: { bg: 'rgba(250,204,21,.15)', border: 'rgba(250,204,21,.3)', color: '#fde047' },
+    ATTENTION_REQUIRED: { bg: 'rgba(239,68,68,.15)', border: 'rgba(239,68,68,.3)', color: '#f87171' },
+  };
+  const colors = colorMap[status] || colorMap.BALANCED;
+  return <div className="healthBadge" style={{ background: colors.bg, borderColor: colors.border, color: colors.color }}>{PORTFOLIO_STATUS_LABELS[status]}</div>;
 }
 
 function LayerMini({ layer, pct, target }) {
   const info = LAYER_EXPLANATIONS[layer];
   return (
     <div className="mini">
-      <div className="layerHeader"><span className={`layerDot ${layer}`}></span><span className="tag">{info.name}</span></div>
+      <div className="layerHeader"><span className={`layerDot ${layer.toLowerCase()}`}></span><span className="tag">{info.name}</span></div>
       <div className="big" style={{ fontSize: 20 }}>{Math.round(pct)}%</div>
       <div className="muted">Target {target}%</div>
     </div>
@@ -751,34 +600,24 @@ function ActionLogPane({ actionLog }) {
   const logRef = useRef(null);
   useEffect(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [actionLog]);
   if (!actionLog || actionLog.length === 0) return <div className="actionLogEmpty"><div className="muted">No actions yet</div></div>;
+
   const renderLogEntry = (entry) => {
     const time = formatTime(entry.timestamp);
-    if (entry.type === 'REBALANCE' && entry.beforeLayers && entry.afterLayers) {
-      return (
-        <div className="logEntryRebalance">
-          <div className="logEntryHeader"><span className="logTime">{time}</span><span className="logAction">⚖️ Rebalanced</span></div>
-          <div className="logEntryDetails">
-            <div className="logDetailRow">🛡️ Foundation {Math.round(entry.beforeLayers.foundation)}% → {Math.round(entry.afterLayers.foundation)}%</div>
-            <div className="logDetailRow">📈 Growth {Math.round(entry.beforeLayers.growth)}% → {Math.round(entry.afterLayers.growth)}%</div>
-            <div className="logDetailRow">🚀 Upside {Math.round(entry.beforeLayers.upside)}% → {Math.round(entry.afterLayers.upside)}%</div>
-          </div>
-        </div>
-      );
+    if (entry.type === 'REBALANCE') {
+      return <span>{time}  ⚖️ Rebalanced</span>;
     }
-    let text;
     switch (entry.type) {
-      case 'PORTFOLIO_CREATED': text = `${time}  Started with ${formatIRRShort(entry.amountIRR)}`; break;
-      case 'ADD_FUNDS': text = `${time}  +${formatIRRShort(entry.amountIRR)} cash`; break;
-      case 'TRADE': text = `${time}  ${entry.side === 'BUY' ? '+' : '-'}${getAssetDisplayName(entry.assetId)} ${formatIRRShort(entry.amountIRR)}`; break;
-      case 'BORROW': text = `${time}  💰 Borrowed ${formatIRRShort(entry.amountIRR)} against ${getAssetDisplayName(entry.collateralAssetId)}`; break;
-      case 'REPAY_LOAN': text = `${time}  ✓ Repaid ${formatIRRShort(entry.amountIRR)}`; break;
-      case 'PROTECT': text = `${time}  ☂️ ${getAssetDisplayName(entry.assetId)} protected ${entry.months}mo`; break;
-      case 'REBALANCE': text = `${time}  ⚖️ Rebalanced`; break;
-      default: text = `${time}  ${entry.type}`;
+      case 'PORTFOLIO_CREATED': return `${time}  Started with ${formatIRRShort(entry.amountIRR)}`;
+      case 'ADD_FUNDS': return `${time}  +${formatIRRShort(entry.amountIRR)} cash`;
+      case 'TRADE': return `${time}  ${entry.side === 'BUY' ? '+' : '-'}${getAssetDisplayName(entry.assetId)} ${formatIRRShort(entry.amountIRR)}`;
+      case 'BORROW': return `${time}  💰 Borrowed ${formatIRRShort(entry.amountIRR)}`;
+      case 'REPAY': return `${time}  ✓ Repaid ${formatIRRShort(entry.amountIRR)}`;
+      case 'PROTECT': return `${time}  ☂️ ${getAssetDisplayName(entry.assetId)} protected ${entry.months}mo`;
+      default: return `${time}  ${entry.type}`;
     }
-    return text;
   };
-  return <div className="actionLog" ref={logRef}>{actionLog.map((entry) => <div key={entry.id} className={`logEntry ${entry.type === 'REBALANCE' ? 'rebalance' : ''}`}>{renderLogEntry(entry)}</div>)}</div>;
+
+  return <div className="actionLog" ref={logRef}>{actionLog.map((entry) => <div key={entry.id} className="logEntry">{renderLogEntry(entry)}</div>)}</div>;
 }
 
 function ExecutionSummary({ lastAction, dispatch }) {
@@ -789,13 +628,14 @@ function ExecutionSummary({ lastAction, dispatch }) {
     }
   }, [lastAction, dispatch]);
   if (!lastAction) return null;
+
   const formatSummary = () => {
     switch (lastAction.type) {
       case 'PORTFOLIO_CREATED': return '✓ Portfolio created';
       case 'ADD_FUNDS': return `✓ +${formatIRRShort(lastAction.amountIRR)} cash added`;
       case 'TRADE': return `✓ ${lastAction.side === 'BUY' ? 'Bought' : 'Sold'} ${getAssetDisplayName(lastAction.assetId)}`;
       case 'BORROW': return `✓ Borrowed ${formatIRRShort(lastAction.amountIRR)}`;
-      case 'REPAY_LOAN': return '✓ Loan repaid';
+      case 'REPAY': return '✓ Loan repaid';
       case 'PROTECT': return `✓ ${getAssetDisplayName(lastAction.assetId)} protected`;
       case 'REBALANCE': return '✓ Rebalanced successfully';
       default: return `✓ ${lastAction.type}`;
@@ -816,6 +656,20 @@ function ResetConfirmModal({ onConfirm, onCancel }) {
   );
 }
 
+function PhoneForm({ state, dispatch }) {
+  const isValid = (state.phone || '').startsWith('+989') && (state.phone || '').length === 13;
+  return (
+    <div>
+      <div className="muted" style={{ marginBottom: 10 }}>Sign in</div>
+      <div className="row">
+        <input className="input" type="tel" placeholder="+989XXXXXXXXX" value={state.phone || ''} onChange={(e) => dispatch({ type: 'SET_PHONE', phone: e.target.value })} />
+        <button className="btn primary" onClick={() => dispatch({ type: 'SUBMIT_PHONE' })} disabled={!isValid}>Continue</button>
+      </div>
+      {state.phone && !isValid && <div className="validationError">+989XXXXXXXXX</div>}
+    </div>
+  );
+}
+
 function OnboardingRightPanel({ stage, questionIndex, targetLayers, investAmount, dispatch }) {
   if (stage === STAGES.WELCOME) {
     return (
@@ -828,28 +682,67 @@ function OnboardingRightPanel({ stage, questionIndex, targetLayers, investAmount
       </div>
     );
   }
-  if (stage === STAGES.PHONE_REQUIRED) {
+  if (stage === STAGES.ONBOARDING_PHONE) {
     return (
       <div className="onboardingPanel">
-        <div className="welcomeCard"><div className="welcomeIcon">🏦</div><h2>Welcome</h2><p>A calm approach to building wealth.</p>
-        <div className="welcomeFeatures">{['foundation', 'growth', 'upside'].map(layer => { const info = LAYER_EXPLANATIONS[layer]; return <div key={layer} className="featureItem"><span className={`layerDot ${layer}`}></span><span>{`${info.name} — ${info.description.split('.')[0]}`}</span></div>; })}</div></div>
+        <div className="welcomeCard">
+          <div className="welcomeIcon">🏦</div>
+          <h2>Welcome</h2>
+          <p>A calm approach to building wealth.</p>
+          <div className="welcomeFeatures">
+            {['FOUNDATION', 'GROWTH', 'UPSIDE'].map(layer => {
+              const info = LAYER_EXPLANATIONS[layer];
+              return <div key={layer} className="featureItem"><span className={`layerDot ${layer.toLowerCase()}`}></span><span>{`${info.name} — ${info.description.split('.')[0]}`}</span></div>;
+            })}
+          </div>
+        </div>
       </div>
     );
   }
-  if (stage === STAGES.QUESTIONNAIRE) {
+  if (stage === STAGES.ONBOARDING_QUESTIONNAIRE) {
     const progress = (questionIndex / questionnaire.questions.length) * 100;
     return (
       <div className="onboardingPanel">
-        <div className="progressCard"><h3>Building Your Profile</h3><div className="bigProgress"><svg viewBox="0 0 100 100" className="progressRing"><circle cx="50" cy="50" r="45" fill="none" stroke="var(--border)" strokeWidth="6" /><circle cx="50" cy="50" r="45" fill="none" stroke="var(--accent)" strokeWidth="6" strokeDasharray={`${progress * 2.83} 283`} strokeLinecap="round" transform="rotate(-90 50 50)" /></svg><div className="progressText">{questionIndex}/{questionnaire.questions.length}</div></div></div>
-        <div className="layerPreviewCard"><h4>The Three Layers</h4>{['foundation', 'growth', 'upside'].map(layer => { const info = LAYER_EXPLANATIONS[layer]; return <div key={layer} className="layerPreviewRow"><span className={`layerDot ${layer}`} style={{ marginTop: 4 }}></span><div><div className="layerPreviewName">{info.name}</div><div className="layerPreviewDesc">{info.description}</div></div></div>; })}</div>
+        <div className="progressCard">
+          <h3>Building Your Profile</h3>
+          <div className="bigProgress">
+            <svg viewBox="0 0 100 100" className="progressRing">
+              <circle cx="50" cy="50" r="45" fill="none" stroke="var(--border)" strokeWidth="6" />
+              <circle cx="50" cy="50" r="45" fill="none" stroke="var(--accent)" strokeWidth="6" strokeDasharray={`${progress * 2.83} 283`} strokeLinecap="round" transform="rotate(-90 50 50)" />
+            </svg>
+            <div className="progressText">{questionIndex}/{questionnaire.questions.length}</div>
+          </div>
+        </div>
+        <div className="layerPreviewCard">
+          <h4>The Three Layers</h4>
+          {['FOUNDATION', 'GROWTH', 'UPSIDE'].map(layer => {
+            const info = LAYER_EXPLANATIONS[layer];
+            return <div key={layer} className="layerPreviewRow"><span className={`layerDot ${layer.toLowerCase()}`} style={{ marginTop: 4 }}></span><div><div className="layerPreviewName">{info.name}</div><div className="layerPreviewDesc">{info.description}</div></div></div>;
+          })}
+        </div>
       </div>
     );
   }
-  if (stage === STAGES.ALLOCATION_PROPOSED) {
+  if (stage === STAGES.ONBOARDING_RESULT) {
     return (
       <div className="onboardingPanel">
-        <div className="allocationPreviewCard"><h3>Your Allocation</h3><div className="allocationViz">{['foundation', 'growth', 'upside'].map(layer => { const info = LAYER_EXPLANATIONS[layer]; const pct = targetLayers?.[layer] || 0; return <div key={layer} className={`allocationBar ${layer}`} style={{ flex: pct }}><span className="barIcon">{info.icon}</span><span className="barPct">{pct}%</span></div>; })}</div>
-        <div className="allocationDetails">{['foundation', 'growth', 'upside'].map(layer => { const info = LAYER_EXPLANATIONS[layer]; const pct = targetLayers?.[layer] || 0; return <div key={layer} className="detailRow"><div className="detailHeader"><span className={`layerDot ${layer}`} style={{ marginRight: 8 }}></span><span className="detailName">{info.name}</span><span className="detailPct">{pct}%</span></div><div className="detailAssets">{info.assets.join(' · ')}</div></div>; })}</div></div>
+        <div className="allocationPreviewCard">
+          <h3>Your Allocation</h3>
+          <div className="allocationViz">
+            {['FOUNDATION', 'GROWTH', 'UPSIDE'].map(layer => {
+              const info = LAYER_EXPLANATIONS[layer];
+              const pct = targetLayers?.[layer] || 0;
+              return <div key={layer} className={`allocationBar ${layer.toLowerCase()}`} style={{ flex: pct }}><span className="barIcon">{info.icon}</span><span className="barPct">{pct}%</span></div>;
+            })}
+          </div>
+          <div className="allocationDetails">
+            {['FOUNDATION', 'GROWTH', 'UPSIDE'].map(layer => {
+              const info = LAYER_EXPLANATIONS[layer];
+              const pct = targetLayers?.[layer] || 0;
+              return <div key={layer} className="detailRow"><div className="detailHeader"><span className={`layerDot ${layer.toLowerCase()}`} style={{ marginRight: 8 }}></span><span className="detailName">{info.name}</span><span className="detailPct">{pct}%</span></div><div className="detailAssets">{info.assets.join(' · ')}</div></div>;
+            })}
+          </div>
+        </div>
       </div>
     );
   }
@@ -859,325 +752,581 @@ function OnboardingRightPanel({ stage, questionIndex, targetLayers, investAmount
     const hasInput = amount > 0;
     return (
       <div className="onboardingPanel">
-        <div className="investPreviewCard"><h3>Investment Preview</h3>
-        {hasInput ? (<>
-          <div className="investTotal"><div className="portfolioValue">{formatIRR(amount)}</div>{!isValid && <div className="investWarning">Minimum: {formatIRR(THRESHOLDS.MIN_AMOUNT_IRR)}</div>}</div>
-          {isValid && <div className="investBreakdown">{['foundation', 'growth', 'upside'].map(layer => { const info = LAYER_EXPLANATIONS[layer]; const pct = targetLayers?.[layer] || 0; return <div key={layer} className="breakdownRow"><div className="breakdownLeft"><span className={`layerDot ${layer}`} style={{ marginRight: 8 }}></span><span>{info.name}</span></div><div className="breakdownRight"><span className="breakdownAmount">{formatIRR(Math.floor(amount * pct / 100))}</span></div></div>; })}</div>}
-        </>) : (<div className="investPlaceholder"><div className="muted">Enter an amount to see your allocation</div><div className="investMinHint">Minimum: {formatIRR(THRESHOLDS.MIN_AMOUNT_IRR)}</div></div>)}</div>
+        <div className="investPreviewCard">
+          <h3>Investment Preview</h3>
+          {hasInput ? (
+            <>
+              <div className="investTotal">
+                <div className="portfolioValue">{formatIRR(amount)}</div>
+                {!isValid && <div className="investWarning">Minimum: {formatIRR(THRESHOLDS.MIN_AMOUNT_IRR)}</div>}
+              </div>
+              {isValid && <div className="investBreakdown">
+                {['FOUNDATION', 'GROWTH', 'UPSIDE'].map(layer => {
+                  const info = LAYER_EXPLANATIONS[layer];
+                  const pct = targetLayers?.[layer] || 0;
+                  return <div key={layer} className="breakdownRow"><div className="breakdownLeft"><span className={`layerDot ${layer.toLowerCase()}`} style={{ marginRight: 8 }}></span><span>{info.name}</span></div><div className="breakdownRight"><span className="breakdownAmount">{formatIRR(Math.floor(amount * pct / 100))}</span></div></div>;
+                })}
+              </div>}
+            </>
+          ) : (
+            <div className="investPlaceholder">
+              <div className="muted">Enter an amount to see your allocation</div>
+              <div className="investMinHint">Minimum: {formatIRR(THRESHOLDS.MIN_AMOUNT_IRR)}</div>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
   return null;
 }
 
-function HistoryPane({ ledger }) {
-  const [expanded, setExpanded] = useState({});
-  if (!ledger || ledger.length === 0) return <div className="card"><h3>Action History</h3><div className="muted">No actions yet.</div></div>;
-  const getActionIcon = (entry) => {
-    if (entry.actionType === 'TRADE') {
-      return entry.params?.side === 'BUY' ? '+' : '-';
-    }
-    const icons = { 'PORTFOLIO_CREATED': '✓', 'ADD_FUNDS': '+', 'REBALANCE': '⟲', 'PROTECT': '☂️', 'BORROW': '💰', 'REPAY_LOAN': '✓' };
-    return icons[entry.actionType] || '•';
-  };
-  const getTradeClass = (entry) => {
-    if (entry.actionType !== 'TRADE') return '';
-    return entry.params?.side === 'BUY' ? 'tradeBuy' : 'tradeSell';
-  };
-  const formatLedgerAction = (entry) => {
-    switch (entry.actionType) {
-      case 'PORTFOLIO_CREATED': return 'Portfolio Created';
-      case 'ADD_FUNDS': return 'Funds Added';
-      case 'TRADE': return `${entry.params?.side === 'BUY' ? 'Bought' : 'Sold'} ${getAssetDisplayName(entry.params?.assetId) || ''}`;
-      case 'REBALANCE': return 'Rebalanced';
-      case 'PROTECT': return `Protected ${getAssetDisplayName(entry.params?.assetId) || ''} (${entry.params?.months || 3}mo)`;
-      case 'BORROW': return `Borrowed (${getAssetDisplayName(entry.params?.collateralAssetId) || ''})`;
-      case 'REPAY_LOAN': return 'Loan Repaid';
-      default: return entry.actionType;
-    }
-  };
+function Tabs({ tab, dispatch }) {
   return (
-    <div className="card"><h3>Action History</h3><div className="ledgerList">{[...ledger].reverse().map((entry) => {
-      const showTransition = entry.boundary.before !== entry.boundary.after;
-      const isTrade = entry.actionType === 'TRADE';
-      return (
-        <div key={entry.id} className={`ledgerEntry ${getTradeClass(entry)}`}>
-          <div className="ledgerHeader" onClick={() => setExpanded(prev => ({ ...prev, [entry.id]: !prev[entry.id] }))} style={{ cursor: 'pointer' }}>
-            <span className={`ledgerIcon ${getTradeClass(entry)}`}>{getActionIcon(entry)}</span>
-            <span className="ledgerAction">{formatLedgerAction(entry)}</span>
-            {isTrade && <span className="ledgerAmount">{formatIRR(entry.params?.amountIRR || 0)}</span>}
-            <span className="ledgerTime">{formatTimestamp(entry.timestamp)}</span>
-            <span className="ledgerExpand">{expanded[entry.id] ? '−' : '+'}</span>
-          </div>
-          {showTransition && <div className="ledgerBoundary"><span className={`healthPill small ${entry.boundary.before.toLowerCase()}`}>{PORTFOLIO_HEALTH_LABELS[entry.boundary.before]}</span><span className="arrow">→</span><span className={`healthPill small ${entry.boundary.after.toLowerCase()}`}>{PORTFOLIO_HEALTH_LABELS[entry.boundary.after]}</span></div>}
-          {expanded[entry.id] && entry.snapshot.before && entry.snapshot.after && <div className="ledgerDetails"><div className="ledgerSnapshot"><div className="snapshotColumn"><div className="snapshotLabel">Before</div><div className="snapshotValue">{formatIRR(entry.snapshot.before.totalIRR)}</div></div><div className="snapshotColumn"><div className="snapshotLabel">After</div><div className="snapshotValue">{formatIRR(entry.snapshot.after.totalIRR)}</div></div></div></div>}
-        </div>
-      );
-    })}</div></div>
+    <div className="tabs" style={{ padding: '0 14px 10px' }}>
+      {['PORTFOLIO', 'PROTECTION', 'LOANS', 'HISTORY'].map((t) => {
+        const labels = { PORTFOLIO: 'Portfolio', PROTECTION: 'Protection', LOANS: 'Loans', HISTORY: 'History' };
+        return <div key={t} className={`tab ${tab === t ? 'active' : ''}`} onClick={() => dispatch({ type: 'SET_TAB', tab: t })}>{labels[t]}</div>;
+      })}
+    </div>
   );
 }
 
-function PortfolioHome({ portfolio, cashIRR, targetLayers, protections, onStartTrade, onStartProtect, onStartBorrow }) {
-  if (!portfolio) return <div className="card"><h3>Portfolio</h3><div className="muted">Complete onboarding to create your portfolio.</div></div>;
-  const exposure = calcLayerPercents(portfolio.holdings);
-  const total = exposure.totalIRR + (cashIRR || 0);
+function HistoryPane({ ledger }) {
+  const [expanded, setExpanded] = useState({});
+  if (!ledger || ledger.length === 0) return <div className="card"><h3>Action History</h3><div className="muted">No actions yet.</div></div>;
+
+  const getActionIcon = (entry) => {
+    const type = entry.type.replace('_COMMIT', '');
+    if (type === 'TRADE') return entry.details?.payload?.side === 'BUY' ? '+' : '-';
+    const icons = { 'PORTFOLIO_CREATED': '✓', 'ADD_FUNDS': '+', 'REBALANCE': '⟲', 'PROTECT': '☂️', 'BORROW': '💰', 'REPAY': '✓' };
+    return icons[type] || '•';
+  };
+
+  const formatLedgerAction = (entry) => {
+    const type = entry.type.replace('_COMMIT', '');
+    const payload = entry.details?.payload;
+    switch (type) {
+      case 'PORTFOLIO_CREATED': return 'Portfolio Created';
+      case 'ADD_FUNDS': return 'Funds Added';
+      case 'TRADE': return `${payload?.side === 'BUY' ? 'Bought' : 'Sold'} ${getAssetDisplayName(payload?.assetId)}`;
+      case 'REBALANCE': return 'Rebalanced';
+      case 'PROTECT': return `Protected ${getAssetDisplayName(payload?.assetId)} (${payload?.months}mo)`;
+      case 'BORROW': return `Borrowed`;
+      case 'REPAY': return 'Loan Repaid';
+      default: return type;
+    }
+  };
+
+  return (
+    <div className="card">
+      <h3>Action History</h3>
+      <div className="ledgerList">
+        {[...ledger].reverse().map((entry) => (
+          <div key={entry.id} className="ledgerEntry">
+            <div className="ledgerHeader" onClick={() => setExpanded(prev => ({ ...prev, [entry.id]: !prev[entry.id] }))} style={{ cursor: 'pointer' }}>
+              <span className="ledgerIcon">{getActionIcon(entry)}</span>
+              <span className="ledgerAction">{formatLedgerAction(entry)}</span>
+              <span className="ledgerTime">{formatTimestamp(new Date(entry.tsISO).getTime())}</span>
+              <span className="ledgerExpand">{expanded[entry.id] ? '−' : '+'}</span>
+            </div>
+            {entry.details?.boundary && <div className="ledgerBoundary"><span className={`healthPill small ${entry.details.boundary.toLowerCase()}`}>{BOUNDARY_LABELS[entry.details.boundary]}</span></div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PortfolioHome({ state, snapshot, onStartTrade, onStartProtect, onStartBorrow }) {
+  if (snapshot.holdingsIRR === 0 && state.cashIRR === 0) {
+    return <div className="card"><h3>Portfolio</h3><div className="muted">Complete onboarding to create your portfolio.</div></div>;
+  }
+
   const getProtectionDays = (assetId) => {
-    const p = (protections || []).find(x => x.assetId === assetId);
+    const p = (state.protections || []).find(x => x.assetId === assetId);
     if (!p) return null;
     const now = Date.now();
-    const until = new Date(p.protectedUntil).getTime();
+    const until = new Date(p.endISO).getTime();
     return Math.max(0, Math.ceil((until - now) / (1000 * 60 * 60 * 24)));
   };
+
   return (
     <div className="stack">
       <div className="portfolioValueCard">
         <div className="portfolioValueLabel">PORTFOLIO VALUE</div>
-        <div className="portfolioValueAmount">{formatIRR(total)}</div>
+        <div className="portfolioValueAmount">{formatIRR(snapshot.totalIRR)}</div>
         <div className="portfolioBreakdown">
           <div className="breakdownCard">
             <div className="breakdownCardIcon">📊</div>
             <div className="breakdownCardLabel">Invested</div>
-            <div className="breakdownCardValue">{formatIRR(exposure.totalIRR)}</div>
+            <div className="breakdownCardValue">{formatIRR(snapshot.holdingsIRR)}</div>
           </div>
           <div className="breakdownCard">
             <div className="breakdownCardIcon">💵</div>
             <div className="breakdownCardLabel">Cash</div>
-            <div className="breakdownCardValue">{formatIRR(cashIRR || 0)}</div>
+            <div className="breakdownCardValue">{formatIRR(snapshot.cashIRR)}</div>
           </div>
         </div>
       </div>
       <div className="card">
         <div className="sectionTitle">ASSET ALLOCATION</div>
-        <div className="grid3">{['foundation', 'growth', 'upside'].map(layer => <LayerMini key={layer} layer={layer} pct={exposure.pct[layer]} target={targetLayers?.[layer] ?? '-'} />)}</div>
-      </div>
-      <div className="card"><h3>Holdings</h3><div className="list">{portfolio.holdings.map((h) => {
-        const info = LAYER_EXPLANATIONS[h.layer];
-        const protDays = getProtectionDays(h.asset);
-        const isEmpty = h.amountIRR === 0;
-        return (
-        <div key={h.asset} className={`item ${isEmpty ? 'assetEmpty' : ''}`} style={{ alignItems: 'center' }}>
-          <div style={{ flex: 1 }}>
-            <div className="asset">{getAssetDisplayName(h.asset)}</div>
-            <div className="muted">{info.icon} {info.name}{protDays !== null ? ` · ☂️ Protected (${protDays}d)` : ''}{h.frozen ? ` · 🔒 ${formatIRRShort(h.amountIRR)} IRR locked` : ''}</div>
-          </div>
-          <div style={{ textAlign: 'right', minWidth: 150 }}>
-            <div className="asset">{formatIRR(h.amountIRR)}</div>
-            <div className="assetActions"><button className="btn tiny" onClick={() => onStartTrade(h.asset, 'BUY')}>Buy</button><button className="btn tiny" disabled={h.frozen || isEmpty} onClick={() => onStartTrade(h.asset, 'SELL')}>Sell</button><button className="btn tiny" disabled={isEmpty} onClick={() => onStartProtect?.(h.asset)}>Protect</button><button className="btn tiny" disabled={h.frozen || isEmpty} onClick={() => onStartBorrow?.(h.asset)}>Borrow</button></div>
-          </div>
+        <div className="grid3">
+          {['FOUNDATION', 'GROWTH', 'UPSIDE'].map(layer => (
+            <LayerMini key={layer} layer={layer} pct={snapshot.layerPct[layer]} target={state.targetLayerPct[layer]} />
+          ))}
         </div>
-      ); })}</div></div>
+      </div>
+      <div className="card">
+        <h3>Holdings</h3>
+        <div className="list">
+          {state.holdings.map((h) => {
+            const layer = ASSET_LAYER[h.assetId];
+            const info = LAYER_EXPLANATIONS[layer];
+            const protDays = getProtectionDays(h.assetId);
+            const isEmpty = h.valueIRR === 0;
+            return (
+              <div key={h.assetId} className={`item ${isEmpty ? 'assetEmpty' : ''}`} style={{ alignItems: 'center' }}>
+                <div style={{ flex: 1 }}>
+                  <div className="asset">{getAssetDisplayName(h.assetId)}</div>
+                  <div className="muted">
+                    {info.icon} {info.name}
+                    {protDays !== null ? ` · ☂️ Protected (${protDays}d)` : ''}
+                    {h.frozen ? ` · 🔒 ${formatIRRShort(h.valueIRR)} IRR locked` : ''}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right', minWidth: 150 }}>
+                  <div className="asset">{formatIRR(h.valueIRR)}</div>
+                  <div className="assetActions">
+                    <button className="btn tiny" onClick={() => onStartTrade(h.assetId, 'BUY')}>Buy</button>
+                    <button className="btn tiny" disabled={h.frozen || isEmpty} onClick={() => onStartTrade(h.assetId, 'SELL')}>Sell</button>
+                    <button className="btn tiny" disabled={isEmpty} onClick={() => onStartProtect?.(h.assetId)}>Protect</button>
+                    <button className="btn tiny" disabled={h.frozen || isEmpty} onClick={() => onStartBorrow?.(h.assetId)}>Borrow</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
 
 function Protection({ protections }) {
   const list = protections || [];
-  const getDaysRemaining = (protectedUntil) => {
+  const getDaysRemaining = (endISO) => {
     const now = Date.now();
-    const until = new Date(protectedUntil).getTime();
+    const until = new Date(endISO).getTime();
     return Math.max(0, Math.ceil((until - now) / (1000 * 60 * 60 * 24)));
   };
+
   return (
-    <div className="card"><h3>Active Protections</h3>
-    {list.length === 0 ? <div className="muted">No assets protected.</div> : <div className="list">{list.map((p, idx) => { const info = LAYER_EXPLANATIONS[p.layer]; const daysLeft = getDaysRemaining(p.protectedUntil); return <div key={p.assetId + '|' + idx} className="item protectionItem"><div style={{ flex: 1 }}><div className="asset">☂️ {getAssetDisplayName(p.assetId)}</div><div className="muted"><span className={`layerDot ${p.layer}`} style={{ marginRight: 6 }}></span>{info?.name} · {daysLeft} days left</div></div><div style={{ textAlign: 'right' }}><div className="asset">{formatIRR(p.premiumIRR)}</div><div className="muted">Premium paid</div></div></div>; })}</div>}</div>
+    <div className="card">
+      <h3>Active Protections</h3>
+      {list.length === 0 ? (
+        <div className="muted">No assets protected.</div>
+      ) : (
+        <div className="list">
+          {list.map((p, idx) => {
+            const layer = ASSET_LAYER[p.assetId];
+            const info = LAYER_EXPLANATIONS[layer];
+            const daysLeft = getDaysRemaining(p.endISO);
+            return (
+              <div key={p.id || idx} className="item protectionItem">
+                <div style={{ flex: 1 }}>
+                  <div className="asset">☂️ {getAssetDisplayName(p.assetId)}</div>
+                  <div className="muted"><span className={`layerDot ${layer.toLowerCase()}`} style={{ marginRight: 6 }}></span>{info?.name} · {daysLeft} days left</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div className="asset">{formatIRR(p.premiumIRR)}</div>
+                  <div className="muted">Premium paid</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
 function Loans({ loan, dispatch }) {
-  const getLoanStatus = (loanAmount, collateralValue) => {
-    const ltvPercent = (loanAmount / collateralValue) * 100;
+  if (!loan) {
+    return <div className="card"><h3>Active Loan</h3><div className="muted">No active loans.</div></div>;
+  }
+
+  const getLoanStatus = () => {
+    const ltvPercent = (loan.amountIRR / loan.liquidationIRR) * 100;
     if (ltvPercent > 75) return { level: 'critical', message: '🔴 Liquidation risk — repay or add collateral' };
     if (ltvPercent > 60) return { level: 'warning', message: '⚠️ Monitor collateral' };
     return null;
   };
+
+  const status = getLoanStatus();
+
   return (
-    <div className="card"><h3>Active Loan</h3>
-    {!loan ? <div className="muted">No active loans.</div> : <div className="list">
-      <div className="item loanItem">
-        <div style={{ flex: 1 }}>
-          <div className="loanAmount">{formatIRR(loan.amountIRR)}</div>
-          <div className="loanDetails">Collateral: {getAssetDisplayName(loan.collateralAssetId)} ({formatIRR(loan.collateralValueIRR)})</div>
-          <div className="loanUsage">Using {Math.round((loan.amountIRR / loan.collateralValueIRR) * 100)}% of collateral</div>
+    <div className="card">
+      <h3>Active Loan</h3>
+      <div className="list">
+        <div className="item loanItem">
+          <div style={{ flex: 1 }}>
+            <div className="loanAmount">{formatIRR(loan.amountIRR)}</div>
+            <div className="loanDetails">Collateral: {getAssetDisplayName(loan.collateralAssetId)}</div>
+            <div className="loanUsage">LTV: {Math.round(loan.ltv * 100)}%</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div className="liquidationValue">{formatIRR(loan.liquidationIRR)}</div>
+            <div className="muted">Liquidation</div>
+          </div>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <div className="liquidationValue">{formatIRR(loan.liquidationIRR)}</div>
-          <div className="muted">Liquidation</div>
-        </div>
+        {status && (
+          <div className={`loanStatus loanStatus${status.level.charAt(0).toUpperCase() + status.level.slice(1)}`}>
+            {status.message}
+          </div>
+        )}
+        <button className="btn primary" style={{ width: '100%', marginTop: 10 }} onClick={() => dispatch({ type: 'START_REPAY' })}>Repay Loan</button>
       </div>
-      {getLoanStatus(loan.amountIRR, loan.collateralValueIRR) && (
-        <div className={`loanStatus loanStatus${getLoanStatus(loan.amountIRR, loan.collateralValueIRR).level.charAt(0).toUpperCase() + getLoanStatus(loan.amountIRR, loan.collateralValueIRR).level.slice(1)}`}>
-          {getLoanStatus(loan.amountIRR, loan.collateralValueIRR).message}
-        </div>
-      )}
-      <button className="btn primary" style={{ width: '100%', marginTop: 10 }} onClick={() => dispatch({ type: 'START_REPAY_LOAN' })}>Repay Loan</button>
-    </div>}</div>
+    </div>
   );
 }
 
-function PhoneForm({ state, dispatch }) {
-  const isValid = state.user.phone.startsWith('+989') && state.user.phone.length === 13;
-  return (
-    <div><div className="muted" style={{ marginBottom: 10 }}>Sign in</div><div className="row"><input className="input" type="tel" placeholder="+989XXXXXXXXX" value={state.user.phone} onChange={(e) => dispatch({ type: 'SET_PHONE', phone: e.target.value })} /><button className="btn primary" onClick={() => dispatch({ type: 'SUBMIT_PHONE' })} disabled={!isValid}>Continue</button></div>{state.user.phone && !isValid && <div className="validationError">+989XXXXXXXXX</div>}</div>
-  );
+function ActionCard({ title, children }) {
+  return <div className="actionCard"><div className="actionTitle">{title}</div>{children}</div>;
 }
 
-function Tabs({ tab, dispatch }) {
-  return <div className="tabs" style={{ padding: '0 14px 10px' }}>{['PORTFOLIO', 'PROTECTION', 'LOANS', 'HISTORY'].map((t) => { const labels = { PORTFOLIO: 'Portfolio', PROTECTION: 'Protection', LOANS: 'Loans', HISTORY: 'History' }; return <div key={t} className={`tab ${tab === t ? 'active' : ''}`} onClick={() => dispatch({ type: 'SET_TAB', tab: t })}>{labels[t]}</div>; })}</div>;
-}
+function PendingActionModal({ pendingAction, dispatch }) {
+  if (!pendingAction) return null;
 
-function ActionCard({ title, children }) { return <div className="actionCard"><div className="actionTitle">{title}</div>{children}</div>; }
+  const { kind, payload, before, after, validation, boundary, frictionCopy } = pendingAction;
+  const isValid = validation.ok;
 
-function AcknowledgmentCheckbox({ validation, acknowledged, onChange }) {
-  if (!validation?.requiresAcknowledgment) return null;
-  return <div className="acknowledgment"><label className="ackLabel"><input type="checkbox" checked={acknowledged} onChange={(e) => onChange(e.target.checked)} /><span>I understand: {validation.acknowledgmentMessage}</span></label></div>;
-}
+  const getTitle = () => {
+    switch (kind) {
+      case 'ADD_FUNDS': return 'Add Funds';
+      case 'TRADE': return `${payload.side === 'BUY' ? 'Buy' : 'Sell'} ${getAssetDisplayName(payload.assetId)}`;
+      case 'PROTECT': return `Protect ${getAssetDisplayName(payload.assetId)}`;
+      case 'BORROW': return 'Borrow';
+      case 'REPAY': return 'Repay Loan';
+      case 'REBALANCE': return 'Rebalance Portfolio';
+      default: return kind;
+    }
+  };
 
-function PreviewPanel({ title, preview, validation, acknowledged, onAcknowledge, onConfirm, onBack, confirmLabel }) {
-  const canConfirm = !validation?.requiresAcknowledgment || acknowledged;
   return (
     <div className="previewPanel">
-      <div className="previewTitle">{title}</div>
-      {preview && <div className="previewCard"><div className="previewGrid"><div className="previewColumn"><div className="previewLabel">Before</div><div className="previewLayers">🛡️{Math.round(preview.before.layers.foundation)}% 📈{Math.round(preview.before.layers.growth)}% 🚀{Math.round(preview.before.layers.upside)}%</div><div className="previewTotal">{formatIRR(preview.before.totalIRR)}</div></div><div className="previewColumn"><div className="previewLabel">After</div><div className="previewLayers">🛡️{Math.round(preview.after.layers.foundation)}% 📈{Math.round(preview.after.layers.growth)}% 🚀{Math.round(preview.after.layers.upside)}%</div><div className="previewTotal">{formatIRR(preview.after.totalIRR)}</div></div></div>{validation?.projectedBoundary && <div className="projectedBoundary"><span className="projectedLabel">Portfolio Health:</span><span className={`healthPill ${validation.projectedBoundary.state.toLowerCase()}`}>{PORTFOLIO_HEALTH_LABELS[validation.projectedBoundary.state]}</span></div>}</div>}
-      {validation?.warnings?.length > 0 && <div className="validationDisplay">{validation.warnings.map((w, i) => <div key={i} className="validationWarning">{w}</div>)}</div>}
-      <AcknowledgmentCheckbox validation={validation} acknowledged={acknowledged} onChange={onAcknowledge} />
-      <div className="row" style={{ marginTop: 12 }}><button className="btn primary" onClick={onConfirm} disabled={!canConfirm}>{confirmLabel || 'Confirm'}</button><button className="btn" onClick={onBack}>Cancel</button></div>
+      <div className="previewTitle">{getTitle()}</div>
+
+      {!isValid && (
+        <div className="validationDisplay">
+          {validation.errors.map((e, i) => <div key={i} className="validationError">{e}</div>)}
+        </div>
+      )}
+
+      {isValid && (
+        <>
+          <div className="previewCard">
+            <div className="previewGrid">
+              <div className="previewColumn">
+                <div className="previewLabel">Before</div>
+                <div className="previewLayers">
+                  🛡️{Math.round(before.layerPct.FOUNDATION)}% 📈{Math.round(before.layerPct.GROWTH)}% 🚀{Math.round(before.layerPct.UPSIDE)}%
+                </div>
+                <div className="previewTotal">{formatIRR(before.totalIRR)}</div>
+              </div>
+              <div className="previewColumn">
+                <div className="previewLabel">After</div>
+                <div className="previewLayers">
+                  🛡️{Math.round(after.layerPct.FOUNDATION)}% 📈{Math.round(after.layerPct.GROWTH)}% 🚀{Math.round(after.layerPct.UPSIDE)}%
+                </div>
+                <div className="previewTotal">{formatIRR(after.totalIRR)}</div>
+              </div>
+            </div>
+            <div className="projectedBoundary">
+              <span className="projectedLabel">Boundary:</span>
+              <span className={`healthPill ${boundary.toLowerCase()}`}>{BOUNDARY_LABELS[boundary]}</span>
+            </div>
+          </div>
+
+          {frictionCopy.length > 0 && (
+            <div className="validationDisplay">
+              {frictionCopy.map((msg, i) => <div key={i} className="validationWarning">{msg}</div>)}
+            </div>
+          )}
+        </>
+      )}
+
+      <div className="row" style={{ marginTop: 12 }}>
+        <button className="btn primary" onClick={() => dispatch({ type: 'CONFIRM_PENDING' })} disabled={!isValid}>Confirm</button>
+        <button className="btn" onClick={() => dispatch({ type: 'CANCEL_PENDING' })}>Cancel</button>
+      </div>
     </div>
   );
 }
 
 function OnboardingControls({ state, dispatch }) {
   const [consentText, setConsentText] = useState('');
-  const isConsentMatch = consentText === CONSENT_EXACT;
+  const isConsentMatch = consentText === questionnaire.consent_exact;
 
-  if (state.user.stage === STAGES.WELCOME) return <div className="muted" style={{ textAlign: 'center', padding: 8 }}>Begin your mindful journey</div>;
-  if (state.user.stage === STAGES.PHONE_REQUIRED) return <PhoneForm state={state} dispatch={dispatch} />;
-  if (state.user.stage === STAGES.QUESTIONNAIRE) {
+  if (state.stage === STAGES.WELCOME) return <div className="muted" style={{ textAlign: 'center', padding: 8 }}>Begin your mindful journey</div>;
+
+  if (state.stage === STAGES.ONBOARDING_PHONE) return <PhoneForm state={state} dispatch={dispatch} />;
+
+  if (state.stage === STAGES.ONBOARDING_QUESTIONNAIRE) {
     const idx = state.questionnaire.index;
     if (idx >= questionnaire.questions.length) return null;
     const q = questionnaire.questions[idx];
     return (
-      <div><div className="questionnaireHeader"><span className="muted">{idx + 1}/{questionnaire.questions.length}</span></div>
-      <div className="q-card"><div className="q-title">{q.text}</div><div className="q-english">{q.english}</div><div className="q-options">{q.options.map((opt) => <button key={opt.id} className="opt" onClick={() => dispatch({ type: 'ANSWER_QUESTION', qId: q.id, optionId: opt.id })}>{opt.text}<div className="opt-english">{opt.english}</div></button>)}</div></div></div>
+      <div>
+        <div className="questionnaireHeader"><span className="muted">{idx + 1}/{questionnaire.questions.length}</span></div>
+        <div className="q-card">
+          <div className="q-title">{q.text}</div>
+          <div className="q-english">{q.english}</div>
+          <div className="q-options">
+            {q.options.map((opt) => (
+              <button key={opt.id} className="opt" onClick={() => dispatch({ type: 'ANSWER_QUESTION', qId: q.id, optionId: opt.id })}>
+                {opt.text}
+                <div className="opt-english">{opt.english}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
     );
   }
-  if (state.user.stage === STAGES.ALLOCATION_PROPOSED) {
+
+  if (state.stage === STAGES.ONBOARDING_RESULT) {
     return (
-      <div><div className="consentCard"><div className="consentHeader">Confirm allocation</div><div className="consentInstruction">Type the following sentence exactly:</div><div className="consentSentence"><div className="sentenceFa">{questionnaire.consent_exact}</div><div className="sentenceEn">{questionnaire.consent_english}</div></div><input className="input" type="text" dir="rtl" placeholder="Type consent here..." value={consentText} onChange={(e) => setConsentText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && isConsentMatch) dispatch({ type: 'SUBMIT_CONSENT', text: consentText }); }} /><button className="btn primary" style={{ marginTop: 10, width: '100%' }} disabled={!isConsentMatch} onClick={() => dispatch({ type: 'SUBMIT_CONSENT', text: consentText })}>Confirm</button></div></div>
+      <div>
+        <div className="consentCard">
+          <div className="consentHeader">Confirm allocation</div>
+          <div className="consentInstruction">Type the following sentence exactly:</div>
+          <div className="consentSentence">
+            <div className="sentenceFa">{questionnaire.consent_exact}</div>
+            <div className="sentenceEn">{questionnaire.consent_english}</div>
+          </div>
+          <input className="input" type="text" dir="rtl" placeholder="Type consent here..." value={consentText} onChange={(e) => setConsentText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && isConsentMatch) dispatch({ type: 'SUBMIT_CONSENT', text: consentText }); }} />
+          <button className="btn primary" style={{ marginTop: 10, width: '100%' }} disabled={!isConsentMatch} onClick={() => dispatch({ type: 'SUBMIT_CONSENT', text: consentText })}>Confirm</button>
+        </div>
+      </div>
     );
   }
-  if (state.user.stage === STAGES.AMOUNT_REQUIRED) {
-    const amount = Number(state.user.investAmountIRR) || 0;
+
+  if (state.stage === STAGES.AMOUNT_REQUIRED) {
+    const amount = Number(state.investAmountIRR) || 0;
     const isValid = amount >= THRESHOLDS.MIN_AMOUNT_IRR;
-    return <div><div className="muted" style={{ marginBottom: 10 }}>Investment amount (IRR)</div><div className="row"><input className="input" type="number" placeholder={formatIRR(THRESHOLDS.MIN_AMOUNT_IRR)} value={state.user.investAmountIRR || ''} onChange={(e) => dispatch({ type: 'SET_INVEST_AMOUNT', investAmountIRR: e.target.value })} /><button className="btn primary" onClick={() => dispatch({ type: 'EXECUTE_PORTFOLIO' })} disabled={!isValid}>Create Portfolio</button></div></div>;
+    return (
+      <div>
+        <div className="muted" style={{ marginBottom: 10 }}>Investment amount (IRR)</div>
+        <div className="row">
+          <input className="input" type="number" placeholder={formatIRR(THRESHOLDS.MIN_AMOUNT_IRR)} value={state.investAmountIRR || ''} onChange={(e) => dispatch({ type: 'SET_INVEST_AMOUNT', amountIRR: e.target.value })} />
+          <button className="btn primary" onClick={() => dispatch({ type: 'EXECUTE_PORTFOLIO' })} disabled={!isValid}>Create Portfolio</button>
+        </div>
+      </div>
+    );
   }
-  // EXECUTED
+
+  // ACTIVE stage - show drafts or pendingAction
+  if (state.pendingAction) {
+    return <PendingActionModal pendingAction={state.pendingAction} dispatch={dispatch} />;
+  }
+
+  // Draft forms
+  if (state.addFundsDraft) {
+    return (
+      <ActionCard title="Add Funds">
+        <input className="input" type="number" placeholder="Amount (IRR)" value={state.addFundsDraft.amountIRR || ''} onChange={(e) => dispatch({ type: 'SET_ADD_FUNDS_AMOUNT', amountIRR: e.target.value })} />
+        <div className="row" style={{ marginTop: 10 }}>
+          <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_ADD_FUNDS' })} disabled={!state.addFundsDraft.amountIRR}>Preview</button>
+          <button className="btn" onClick={() => dispatch({ type: 'CANCEL_PENDING' })}>Cancel</button>
+        </div>
+      </ActionCard>
+    );
+  }
+
+  if (state.tradeDraft) {
+    return (
+      <ActionCard title={`${state.tradeDraft.side === 'BUY' ? 'Buy' : 'Sell'} ${getAssetDisplayName(state.tradeDraft.assetId)}`}>
+        <div className="row" style={{ gap: 8 }}>
+          <button className={`chip ${state.tradeDraft.side === 'BUY' ? 'primary' : ''}`} onClick={() => dispatch({ type: 'SET_TRADE_SIDE', side: 'BUY' })}>Buy</button>
+          <button className={`chip ${state.tradeDraft.side === 'SELL' ? 'primary' : ''}`} onClick={() => dispatch({ type: 'SET_TRADE_SIDE', side: 'SELL' })}>Sell</button>
+        </div>
+        <input className="input" style={{ marginTop: 8 }} type="number" placeholder="Amount (IRR)" value={state.tradeDraft.amountIRR ?? ''} onChange={(e) => dispatch({ type: 'SET_TRADE_AMOUNT', amountIRR: e.target.value })} />
+        <div className="row" style={{ marginTop: 10 }}>
+          <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_TRADE' })} disabled={!state.tradeDraft.amountIRR}>Preview</button>
+          <button className="btn" onClick={() => dispatch({ type: 'CANCEL_PENDING' })}>Cancel</button>
+        </div>
+      </ActionCard>
+    );
+  }
+
+  if (state.protectDraft) {
+    const h = state.holdings.find(x => x.assetId === state.protectDraft.assetId);
+    const premium = h ? calcPremiumIRR({ assetId: h.assetId, notionalIRR: h.valueIRR, months: state.protectDraft.months }) : 0;
+    return (
+      <ActionCard title="☂️ Protect Asset">
+        <div className="row" style={{ gap: 8 }}>
+          <select className="input" value={state.protectDraft.assetId || ''} onChange={(e) => dispatch({ type: 'SET_PROTECT_ASSET', assetId: e.target.value })}>
+            {state.holdings.filter(h => h.valueIRR > 0).map((h) => {
+              const layer = ASSET_LAYER[h.assetId];
+              const info = LAYER_EXPLANATIONS[layer];
+              return <option key={h.assetId} value={h.assetId}>{info.icon} {getAssetDisplayName(h.assetId)}</option>;
+            })}
+          </select>
+          <select className="input" value={state.protectDraft.months ?? 3} onChange={(e) => dispatch({ type: 'SET_PROTECT_MONTHS', months: Number(e.target.value) })} style={{ width: 100 }}>
+            {[1, 2, 3, 4, 5, 6].map((m) => <option key={m} value={m}>{m} mo</option>)}
+          </select>
+        </div>
+        <div className="premiumHint">Premium: {formatIRR(premium)}</div>
+        <div className="row" style={{ marginTop: 10 }}>
+          <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_PROTECT' })}>Preview</button>
+          <button className="btn" onClick={() => dispatch({ type: 'CANCEL_PENDING' })}>Cancel</button>
+        </div>
+      </ActionCard>
+    );
+  }
+
+  if (state.borrowDraft) {
+    const h = state.holdings.find(x => x.assetId === state.borrowDraft.assetId);
+    const maxBorrow = h ? Math.floor(h.valueIRR * state.borrowDraft.ltv) : 0;
+    return (
+      <ActionCard title="💰 Borrow">
+        <div className="row" style={{ gap: 8 }}>
+          <select className="input" value={state.borrowDraft.assetId || ''} onChange={(e) => dispatch({ type: 'SET_BORROW_ASSET', assetId: e.target.value })}>
+            {state.holdings.filter(h => !h.frozen && h.valueIRR > 0).map((h) => {
+              const layer = ASSET_LAYER[h.assetId];
+              const info = LAYER_EXPLANATIONS[layer];
+              return <option key={h.assetId} value={h.assetId}>{info.icon} {getAssetDisplayName(h.assetId)}</option>;
+            })}
+          </select>
+          <select className="input" value={state.borrowDraft.ltv ?? 0.5} onChange={(e) => dispatch({ type: 'SET_BORROW_LTV', ltv: e.target.value })} style={{ width: 100 }}>
+            <option value={0.3}>30% LTV</option>
+            <option value={0.4}>40% LTV</option>
+            <option value={0.5}>50% LTV</option>
+            <option value={0.6}>60% LTV</option>
+            <option value={0.7}>70% LTV</option>
+          </select>
+        </div>
+        <input className="input" style={{ marginTop: 8 }} type="number" placeholder="Loan amount (IRR)" value={state.borrowDraft.amountIRR ?? ''} onChange={(e) => dispatch({ type: 'SET_BORROW_AMOUNT', amountIRR: e.target.value })} />
+        <div className="borrowHint">Max: {formatIRR(maxBorrow)}</div>
+        <div className="row" style={{ marginTop: 10 }}>
+          <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_BORROW' })} disabled={!state.borrowDraft.amountIRR}>Preview</button>
+          <button className="btn" onClick={() => dispatch({ type: 'CANCEL_PENDING' })}>Cancel</button>
+        </div>
+      </ActionCard>
+    );
+  }
+
+  if (state.repayDraft) {
+    return (
+      <ActionCard title="Repay Loan">
+        <div className="repayDetails">
+          <div className="repayRow"><span>Loan:</span><span>{formatIRR(state.loan?.amountIRR || 0)}</span></div>
+          <div className="repayRow"><span>Cash:</span><span>{formatIRR(state.cashIRR || 0)}</span></div>
+        </div>
+        <div className="row" style={{ marginTop: 10 }}>
+          <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_REPAY' })} disabled={(state.cashIRR || 0) < (state.loan?.amountIRR || 0)}>Preview</button>
+          <button className="btn" onClick={() => dispatch({ type: 'CANCEL_PENDING' })}>Cancel</button>
+        </div>
+      </ActionCard>
+    );
+  }
+
+  if (state.rebalanceDraft) {
+    return (
+      <ActionCard title="Rebalance">
+        <div className="muted">Reallocate assets to target. Cash will be deployed to underweight layers.</div>
+        <div className="row" style={{ marginTop: 10 }}>
+          <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_REBALANCE' })}>Preview</button>
+          <button className="btn" onClick={() => dispatch({ type: 'CANCEL_PENDING' })}>Cancel</button>
+        </div>
+      </ActionCard>
+    );
+  }
+
+  // Main action buttons
   return (
     <div>
-      {state.postAction === POST_ACTIONS.NONE && <div className="footerActions"><div className="footerRowPrimary"><button className="btn primary" onClick={() => dispatch({ type: 'START_ADD_FUNDS' })}>Add Funds</button><button className="btn" onClick={() => dispatch({ type: 'START_REBALANCE' })}>Rebalance</button><button className="btn" onClick={() => dispatch({ type: 'START_PROTECT' })}>☂️ Protect</button><button className="btn" onClick={() => dispatch({ type: 'START_BORROW' })}>💰 Borrow</button></div><div className="footerRowSecondary"><button className="btn resetBtn" onClick={() => dispatch({ type: 'SHOW_RESET_CONFIRM' })}>↺ Reset</button></div></div>}
-      {state.postAction === POST_ACTIONS.ADD_FUNDS && <ActionCard title="Add Funds"><input className="input" type="number" placeholder="Amount (IRR)" value={state.pendingAmountIRR || ''} onChange={(e) => dispatch({ type: 'SET_PENDING_AMOUNT', amountIRR: e.target.value })} />{state.validation?.errors?.length > 0 && <div className="validationDisplay">{state.validation.errors.map((e, i) => <div key={i} className="validationError">{e}</div>)}</div>}<div className="row" style={{ marginTop: 10 }}><button className="btn primary" onClick={() => dispatch({ type: 'CONFIRM_ADD_FUNDS' })} disabled={!state.pendingAmountIRR}>Add to Cash</button><button className="btn" onClick={() => dispatch({ type: 'CANCEL_POST_ACTION' })}>Cancel</button></div></ActionCard>}
-      {state.postAction === POST_ACTIONS.TRADE && <ActionCard title={`${state.tradeDraft?.side === 'BUY' ? 'Buy' : 'Sell'} ${state.tradeDraft?.assetId}`}><div className="row" style={{ gap: 8 }}><button className={`chip ${state.tradeDraft?.side === 'BUY' ? 'primary' : ''}`} onClick={() => dispatch({ type: 'SET_TRADE_SIDE', side: 'BUY' })}>Buy</button><button className={`chip ${state.tradeDraft?.side === 'SELL' ? 'primary' : ''}`} onClick={() => dispatch({ type: 'SET_TRADE_SIDE', side: 'SELL' })}>Sell</button></div><input className="input" style={{ marginTop: 8 }} type="number" placeholder="Amount (IRR)" value={state.tradeDraft?.amountIRR ?? ''} onChange={(e) => dispatch({ type: 'SET_TRADE_AMOUNT', amountIRR: e.target.value })} />{state.validation?.errors?.length > 0 && <div className="validationDisplay">{state.validation.errors.map((e, i) => <div key={i} className="validationError">{e}</div>)}</div>}<div className="row" style={{ marginTop: 10 }}><button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_TRADE' })} disabled={!state.tradeDraft?.amountIRR}>Preview</button><button className="btn" onClick={() => dispatch({ type: 'CANCEL_POST_ACTION' })}>Cancel</button></div></ActionCard>}
-      {state.postAction === POST_ACTIONS.TRADE_PREVIEW && <PreviewPanel title={`${state.tradeDraft?.side === 'BUY' ? 'Buy' : 'Sell'} ${state.tradeDraft?.assetId}`} preview={state.preview} validation={state.validation} acknowledged={state.acknowledged} onAcknowledge={(v) => dispatch({ type: 'SET_ACKNOWLEDGED', value: v })} onConfirm={() => dispatch({ type: 'CONFIRM_TRADE_FINAL' })} onBack={() => dispatch({ type: 'CANCEL_POST_ACTION' })} />}
-      {state.postAction === POST_ACTIONS.REBALANCE && <ActionCard title="Rebalance"><div className="muted">Reallocate assets to target. Cash and frozen assets unchanged.</div><div className="row" style={{ marginTop: 10 }}><button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_REBALANCE' })}>Preview</button><button className="btn" onClick={() => dispatch({ type: 'CANCEL_POST_ACTION' })}>Cancel</button></div></ActionCard>}
-      {state.postAction === POST_ACTIONS.REBALANCE_PREVIEW && <PreviewPanel title="Rebalance Preview" preview={state.preview} validation={state.validation} acknowledged={state.acknowledged} onAcknowledge={(v) => dispatch({ type: 'SET_ACKNOWLEDGED', value: v })} onConfirm={() => dispatch({ type: 'CONFIRM_REBALANCE_FINAL' })} onBack={() => dispatch({ type: 'CANCEL_POST_ACTION' })} confirmLabel="Rebalance" />}
-      {state.postAction === POST_ACTIONS.PROTECT && <ActionCard title="☂️ Protect Asset"><div className="row" style={{ gap: 8 }}><select className="input" value={state.protectDraft?.assetId || ''} onChange={(e) => dispatch({ type: 'SET_PROTECT_ASSET', assetId: e.target.value })}>{(state.portfolio?.holdings || []).map((h) => { const info = LAYER_EXPLANATIONS[h.layer]; const rate = PREMIUM_RATES[h.layer] || 0.02; return <option key={h.asset} value={h.asset}>{info.icon} {h.asset} — {Math.round(rate * 100)}% / 3mo</option>; })}</select><select className="input" value={state.protectDraft?.months ?? 3} onChange={(e) => dispatch({ type: 'SET_PROTECT_MONTHS', months: Number(e.target.value) })} style={{ width: 100 }}>{[1, 2, 3, 4, 5, 6].map((m) => <option key={m} value={m}>{m} mo</option>)}</select></div>{state.protectDraft?.assetId && <div className="premiumHint">{(() => { const h = state.portfolio?.holdings?.find(x => x.asset === state.protectDraft.assetId); if (!h) return null; const rate = PREMIUM_RATES[h.layer] || 0.02; const premium = Math.floor(h.amountIRR * rate * (state.protectDraft.months / 3)); return <span>Premium: {formatIRR(premium)}</span>; })()}</div>}{state.validation?.errors?.length > 0 && <div className="validationDisplay">{state.validation.errors.map((e, i) => <div key={i} className="validationError">{e}</div>)}</div>}<div className="row" style={{ marginTop: 10 }}><button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_PROTECT' })}>Preview</button><button className="btn" onClick={() => dispatch({ type: 'CANCEL_POST_ACTION' })}>Cancel</button></div></ActionCard>}
-      {state.postAction === POST_ACTIONS.PROTECT_PREVIEW && <PreviewPanel title="☂️ Protection Preview" preview={state.preview} validation={state.validation} acknowledged={state.acknowledged} onAcknowledge={(v) => dispatch({ type: 'SET_ACKNOWLEDGED', value: v })} onConfirm={() => dispatch({ type: 'CONFIRM_PROTECT_FINAL' })} onBack={() => dispatch({ type: 'CANCEL_POST_ACTION' })} confirmLabel="Protect" />}
-      {state.postAction === POST_ACTIONS.PROTECT_FUNDING && <ActionCard title="☂️ Insufficient Cash for Protection"><div className="fundingDetails"><div className="fundingRow"><span>Premium required:</span><span>{formatIRR(state.protectError?.premium || state.fundingOptions?.premium || 0)}</span></div><div className="fundingRow"><span>Cash available:</span><span>{formatIRR(state.cashIRR || 0)}</span></div><div className="fundingRow" style={{ fontWeight: 600, color: '#f87171' }}><span>Shortfall:</span><span>{formatIRR(state.protectError?.shortfall || state.fundingOptions?.shortfall || 0)}</span></div></div><div className="row" style={{ marginTop: 12 }}><button className="btn primary" onClick={() => { dispatch({ type: 'CANCEL_POST_ACTION' }); dispatch({ type: 'START_ADD_FUNDS' }); }}>Add Funds</button><button className="btn" onClick={() => dispatch({ type: 'CANCEL_POST_ACTION' })}>Cancel</button></div></ActionCard>}
-      {state.postAction === POST_ACTIONS.BORROW && <ActionCard title="💰 Borrow"><div className="row" style={{ gap: 8 }}><select className="input" value={state.borrowDraft?.assetId || ''} onChange={(e) => dispatch({ type: 'SET_BORROW_ASSET', assetId: e.target.value })}>{(state.portfolio?.holdings || []).filter(h => !h.frozen).map((h) => { const info = LAYER_EXPLANATIONS[h.layer]; const limits = LTV_LIMITS[h.layer] || LTV_LIMITS.growth; return <option key={h.asset} value={h.asset}>{info.icon} {h.asset} (max {Math.round(limits.max * 100)}% LTV)</option>; })}</select><select className="input" value={state.borrowDraft?.ltv ?? 0.5} onChange={(e) => dispatch({ type: 'SET_BORROW_LTV', ltv: e.target.value })} style={{ width: 100 }}><option value={0.4}>40% LTV</option><option value={0.5}>50% LTV</option><option value={0.6}>60% LTV</option></select></div><input className="input" style={{ marginTop: 8 }} type="number" placeholder="Loan amount (IRR)" value={state.borrowDraft?.amountIRR ?? ''} onChange={(e) => dispatch({ type: 'SET_BORROW_AMOUNT', amountIRR: e.target.value })} />{state.borrowDraft?.assetId && <div className="borrowHint">{(() => { const h = state.portfolio?.holdings?.find(x => x.asset === state.borrowDraft.assetId); if (!h) return null; const max = Math.floor(h.amountIRR * state.borrowDraft.ltv); return <span>Max: {formatIRR(max)}</span>; })()}</div>}{state.validation?.errors?.length > 0 && <div className="validationDisplay">{state.validation.errors.map((e, i) => <div key={i} className="validationError">{e}</div>)}</div>}<div className="row" style={{ marginTop: 10 }}><button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_BORROW' })} disabled={!state.borrowDraft?.amountIRR}>Preview</button><button className="btn" onClick={() => dispatch({ type: 'CANCEL_POST_ACTION' })}>Cancel</button></div></ActionCard>}
-      {state.postAction === POST_ACTIONS.BORROW_PREVIEW && <PreviewPanel title="💰 Borrow Preview" preview={state.preview} validation={state.validation} acknowledged={state.acknowledged} onAcknowledge={(v) => dispatch({ type: 'SET_ACKNOWLEDGED', value: v })} onConfirm={() => dispatch({ type: 'CONFIRM_BORROW_FINAL' })} onBack={() => dispatch({ type: 'CANCEL_POST_ACTION' })} confirmLabel="Borrow" />}
-      {state.postAction === POST_ACTIONS.REPAY_LOAN && <ActionCard title="Repay Loan"><div className="repayDetails"><div className="repayRow"><span>Loan:</span><span>{formatIRR(state.loan?.amountIRR || 0)}</span></div><div className="repayRow"><span>Cash:</span><span>{formatIRR(state.cashIRR || 0)}</span></div><div className="repayRow"><span>Collateral:</span><span>{state.loan?.collateralAssetId}</span></div></div>{state.validation?.errors?.length > 0 && <div className="validationDisplay">{state.validation.errors.map((e, i) => <div key={i} className="validationError">{e}</div>)}</div>}<div className="row" style={{ marginTop: 10 }}><button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_REPAY_LOAN' })} disabled={(state.cashIRR || 0) < (state.loan?.amountIRR || 0)}>Preview</button><button className="btn" onClick={() => dispatch({ type: 'CANCEL_POST_ACTION' })}>Cancel</button></div></ActionCard>}
-      {state.postAction === POST_ACTIONS.REPAY_LOAN_PREVIEW && <PreviewPanel title="Repay Loan Preview" preview={state.preview} validation={state.validation} acknowledged={state.acknowledged} onAcknowledge={(v) => dispatch({ type: 'SET_ACKNOWLEDGED', value: v })} onConfirm={() => dispatch({ type: 'CONFIRM_REPAY_LOAN_FINAL' })} onBack={() => dispatch({ type: 'CANCEL_POST_ACTION' })} confirmLabel="Repay" />}
+      <div className="footerActions">
+        <div className="footerRowPrimary">
+          <button className="btn primary" onClick={() => dispatch({ type: 'START_ADD_FUNDS' })}>Add Funds</button>
+          <button className="btn" onClick={() => dispatch({ type: 'START_REBALANCE' })}>Rebalance</button>
+          <button className="btn" onClick={() => dispatch({ type: 'START_PROTECT' })}>☂️ Protect</button>
+          <button className="btn" onClick={() => dispatch({ type: 'START_BORROW' })}>💰 Borrow</button>
+        </div>
+        <div className="footerRowSecondary">
+          <button className="btn resetBtn" onClick={() => dispatch({ type: 'SHOW_RESET_CONFIRM' })}>↺ Reset</button>
+        </div>
+      </div>
     </div>
   );
 }
 
 // ====== MAIN APP ======
 export default function App() {
-  const [state, dispatch] = useReducer(reduce, null, initialState);
-  const boundary = useMemo(() => computeBoundary(state), [state]);
-  const stepLabel = useMemo(() => {
-    const map = { [STAGES.WELCOME]: { idx: 0, name: 'Welcome' }, [STAGES.PHONE_REQUIRED]: { idx: 1, name: 'Phone' }, [STAGES.QUESTIONNAIRE]: { idx: 2, name: 'Profile' }, [STAGES.ALLOCATION_PROPOSED]: { idx: 3, name: 'Review' }, [STAGES.AMOUNT_REQUIRED]: { idx: 4, name: 'Fund' }, [STAGES.EXECUTED]: { idx: 5, name: 'Active' } };
-    const x = map[state.user.stage] || { idx: 0, name: state.user.stage };
-    return `${x.idx}/5 — ${x.name}`;
-  }, [state.user.stage]);
+  const [state, dispatch] = useReducer(reducer, null, initialState);
+
+  const snapshot = useMemo(() => computeSnapshot(state), [state]);
+
   const onStartTrade = (assetId, side) => dispatch({ type: 'START_TRADE', assetId, side });
   const onStartProtect = (assetId) => dispatch({ type: 'START_PROTECT', assetId });
   const onStartBorrow = (assetId) => dispatch({ type: 'START_BORROW', assetId });
+
   const right = useMemo(() => {
-    if (state.user.stage !== STAGES.EXECUTED) return <OnboardingRightPanel stage={state.user.stage} questionIndex={state.questionnaire.index} targetLayers={state.targetLayers} investAmount={state.user.investAmountIRR} dispatch={dispatch} />;
+    if (state.stage !== STAGES.ACTIVE) {
+      return <OnboardingRightPanel stage={state.stage} questionIndex={state.questionnaire.index} targetLayers={state.targetLayerPct} investAmount={state.investAmountIRR} dispatch={dispatch} />;
+    }
     if (state.tab === 'PROTECTION') return <Protection protections={state.protections} />;
     if (state.tab === 'LOANS') return <Loans loan={state.loan} dispatch={dispatch} />;
     if (state.tab === 'HISTORY') return <HistoryPane ledger={state.ledger} />;
-    return <PortfolioHome portfolio={state.portfolio} cashIRR={state.cashIRR} targetLayers={state.targetLayers} protections={state.protections} onStartTrade={onStartTrade} onStartProtect={onStartProtect} onStartBorrow={onStartBorrow} />;
-  }, [state.user.stage, state.tab, state.portfolio, state.cashIRR, state.targetLayers, state.protections, state.loan, state.ledger, state.questionnaire.index, state.user.investAmountIRR]);
+    return <PortfolioHome state={state} snapshot={snapshot} onStartTrade={onStartTrade} onStartProtect={onStartProtect} onStartBorrow={onStartBorrow} />;
+  }, [state, snapshot]);
 
   return (
     <>
       <style>{`
-        /* ===== BLU MARKETS - REFINED FINANCIAL UI ===== */
+        /* ===== BLU MARKETS v9.6 REFACTORED - FINANCIAL UI ===== */
         :root {
-          /* Backgrounds - Subtle dark palette */
           --bg-primary: #0f1419;
           --bg-secondary: #151c24;
           --bg-tertiary: #1c252e;
           --bg-elevated: #232d38;
-
-          /* Accent - Single calm blue */
           --accent: #3d7fff;
           --accent-muted: rgba(61, 127, 255, 0.12);
           --accent-border: rgba(61, 127, 255, 0.25);
-
-          /* Text - Clean hierarchy */
           --text-primary: #e6edf3;
           --text-secondary: #8b949e;
           --text-muted: #656d76;
-
-          /* Borders */
           --border: rgba(255, 255, 255, 0.08);
           --border-hover: rgba(255, 255, 255, 0.12);
-
-          /* Status colors - Muted */
           --success: #3fb950;
           --warning: #d29922;
           --danger: #f85149;
-
-          /* Shadows - Subtle */
           --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
           --shadow-md: 0 2px 8px rgba(0,0,0,0.25);
-
-          /* Farsi Typography */
           --font-farsi: 'Vazirmatn', system-ui, sans-serif;
           --farsi-line-height: 1.8;
           --farsi-letter-spacing: 0.01em;
         }
-
         *{box-sizing:border-box}
         html,body{height:100%;margin:0}
         body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg-primary);color:var(--text-primary);font-size:14px;line-height:1.5}
-
-        /* Scrollbar - Minimal */
         ::-webkit-scrollbar{width:8px}
         ::-webkit-scrollbar-track{background:transparent}
         ::-webkit-scrollbar-thumb{background:var(--bg-elevated);border-radius:4px;border:2px solid var(--bg-secondary)}
         ::-webkit-scrollbar-thumb:hover{background:var(--text-muted)}
-
-        /* Layout */
         .container{height:100vh;display:grid;grid-template-columns:400px 1fr;gap:1px;background:var(--border)}
         .panel{background:var(--bg-secondary);overflow:hidden;display:flex;flex-direction:column;min-height:0}
-
-        /* Header */
         .header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:12px}
         .logo{width:28px;height:28px;border-radius:6px;background:var(--accent);display:grid;place-items:center;font-weight:600;color:white;font-size:12px}
         .h-title{font-weight:600;font-size:15px;color:var(--text-primary)}
         .h-sub{font-size:12px;color:var(--text-muted);margin-top:2px}
+        .h-motto{font-size:11px;color:var(--text-muted);margin-top:2px;font-weight:400;letter-spacing:0.01em}
         .rightMeta{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
         .pill{display:inline-flex;gap:6px;align-items:center;padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-tertiary);font-weight:500;font-size:11px;color:var(--text-secondary)}
-
-        /* Body & Footer */
         .body{padding:16px;overflow:auto;flex:1;min-height:0}
         .footer{padding:14px 16px;border-top:1px solid var(--border);background:var(--bg-tertiary)}
         .row{display:flex;gap:8px;flex-wrap:wrap}
-
-        /* Buttons */
         .btn{appearance:none;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-primary);padding:10px 16px;border-radius:8px;font-weight:500;cursor:pointer;font-size:13px;transition:background 0.15s,border-color 0.15s}
         .btn:hover{background:var(--bg-elevated);border-color:var(--border-hover)}
         .btn.primary{background:var(--accent);border-color:var(--accent);color:white}
@@ -1187,44 +1336,32 @@ export default function App() {
         .btn:disabled{background:var(--bg-tertiary);color:var(--text-muted);border-color:var(--border);cursor:not-allowed;opacity:0.6}
         .btn.tiny{padding:6px 12px;font-size:12px;border-radius:6px}
         .btn.tiny:hover{background:var(--accent-muted);border-color:var(--accent-border);color:var(--accent)}
-        .btn.tiny.disabled{opacity:.5;cursor:not-allowed}
-
-        /* Inputs */
+        .btn.tiny:disabled{opacity:.35;cursor:not-allowed;background:transparent;border-color:transparent;color:var(--text-muted)}
         .input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);font-weight:400;outline:none;font-size:14px;transition:border-color 0.15s}
         .input:focus{border-color:var(--accent)}
         .input::placeholder{color:var(--text-muted)}
-
-        /* Cards */
         .card{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px}
         .card h3{margin:0 0 12px 0;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted)}
         .big{font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--text-primary)}
         .muted{color:var(--text-secondary);font-size:12px}
         .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-
-        /* Layer Mini Cards */
         .mini{border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--bg-secondary)}
         .tag{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.03em;font-weight:500}
         .list{display:flex;flex-direction:column;gap:8px}
-
-        /* Asset Items */
         .item{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:var(--bg-secondary);transition:border-color 0.15s}
         .item:hover{border-color:var(--border-hover)}
+        .item.assetEmpty{opacity:0.5}
+        .item.assetEmpty .asset{color:var(--text-muted)}
         .asset{font-weight:500;font-size:14px}
-
-        /* Tabs */
+        .assetActions{display:flex;justify-content:flex-end;gap:6px;margin-top:6px;flex-wrap:wrap}
         .tabs{display:flex;gap:4px;background:var(--bg-primary);padding:4px;border-radius:12px;border:1px solid var(--border)}
         .tab{flex:1;padding:10px 14px;border-radius:8px;border:none;background:transparent;font-weight:500;cursor:pointer;font-size:13px;color:var(--text-muted);transition:all 0.2s}
         .tab:hover:not(.active){color:var(--text-primary);background:var(--bg-tertiary)}
         .tab.active{color:white;background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 4px 12px rgba(139,92,246,0.3);font-weight:600}
-
-        /* Chips */
         .chip{padding:8px 14px;border-radius:6px;border:1px solid var(--border);background:var(--bg-tertiary);font-weight:500;font-size:12px;cursor:pointer;transition:border-color 0.15s}
         .chip:hover{border-color:var(--border-hover)}
         .chip.primary{background:var(--accent);border-color:var(--accent);color:white}
-
         @media(max-width:980px){.container{grid-template-columns:1fr}.panel{min-height:48vh}}
-
-        /* Health Badges */
         .healthBadge{display:inline-flex;align-items:center;padding:5px 10px;border-radius:6px;border:1px solid;font-size:11px;font-weight:500}
         .healthPill{padding:3px 8px;border-radius:4px;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.02em}
         .healthPill.small{padding:2px 6px;font-size:9px}
@@ -1232,29 +1369,15 @@ export default function App() {
         .healthPill.drift{background:rgba(210,153,34,.12);color:var(--warning);border:1px solid rgba(210,153,34,.2)}
         .healthPill.structural{background:rgba(210,153,34,.2);color:var(--warning);border:1px solid rgba(210,153,34,.3)}
         .healthPill.stress{background:rgba(248,81,73,.12);color:var(--danger);border:1px solid rgba(248,81,73,.2)}
-
-        /* Layer Indicators */
-        .layerIcon{font-size:13px;margin-right:4px}
         .layerHeader{display:flex;align-items:center;gap:6px;margin-bottom:4px}
         .layerDot{width:6px;height:6px;border-radius:50%;display:inline-block}
         .layerDot.foundation{background:var(--success)}
         .layerDot.growth{background:var(--accent)}
         .layerDot.upside{background:var(--warning)}
-
-        /* Action Log */
         .actionLog{display:flex;flex-direction:column;gap:0;font-family:ui-monospace,'SF Mono',monospace;font-size:11px;line-height:1.7}
         .actionLogEmpty{padding:20px;text-align:center}
         .logEntry{padding:6px 0;color:var(--text-secondary);border-bottom:1px solid var(--border)}
         .logEntry:last-child{border-bottom:none}
-        .logEntry.rebalance{padding:8px 0}
-        .logEntryRebalance{margin-bottom:4px}
-        .logEntryHeader{display:flex;gap:8px}
-        .logTime{color:var(--text-muted)}
-        .logAction{color:var(--text-secondary)}
-        .logEntryDetails{margin-left:52px;margin-top:4px}
-        .logDetailRow{font-size:11px;color:var(--text-muted);line-height:1.6}
-
-        /* Portfolio Value Card */
         .portfolioValueCard{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:12px}
         .portfolioValueLabel{font-size:12px;font-weight:600;color:var(--text-muted);letter-spacing:0.05em;margin-bottom:8px}
         .portfolioValueAmount{font-size:32px;font-weight:700;background:linear-gradient(135deg,#6366f1,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:16px}
@@ -1263,49 +1386,17 @@ export default function App() {
         .breakdownCardIcon{font-size:16px;margin-bottom:4px}
         .breakdownCardLabel{font-size:12px;color:var(--text-muted);margin-bottom:4px}
         .breakdownCardValue{font-size:16px;font-weight:600;color:var(--text-primary)}
-
-        /* Allocation Bar */
         .sectionTitle{font-size:12px;font-weight:600;color:var(--text-muted);letter-spacing:0.05em;margin-bottom:12px}
-        .allocationBar{height:12px;border-radius:6px;background:var(--bg-primary);overflow:hidden;display:flex;margin-bottom:16px}
-        .allocationSegment{height:100%;transition:width 0.3s ease}
-        .allocationSegment.foundation{background:linear-gradient(90deg,#10b981,#34d399)}
-        .allocationSegment.growth{background:linear-gradient(90deg,#6366f1,#8b5cf6)}
-        .allocationSegment.upside{background:linear-gradient(90deg,#f59e0b,#fbbf24)}
-
-        /* Asset Actions */
-        .assetActions{display:flex;justify-content:flex-end;gap:6px;margin-top:6px;flex-wrap:wrap}
-        .assetActions .btn.tiny:disabled{opacity:0.35;cursor:not-allowed;background:transparent;border-color:transparent;color:var(--text-muted)}
-
-        /* Empty Asset State */
-        .item.assetEmpty{opacity:0.5}
-        .item.assetEmpty .asset{color:var(--text-muted)}
-
-        /* Footer Actions */
         .footerActions{display:flex;flex-direction:column;gap:10px}
         .footerRowPrimary{display:flex;gap:8px;flex-wrap:wrap}
         .footerRowSecondary{display:flex;gap:8px}
         .resetBtn{color:var(--text-muted);opacity:0.6}
         .resetBtn:hover{color:var(--danger);border-color:var(--danger);background:rgba(248,81,73,0.08);opacity:1}
-
-        /* Toast Notifications */
         .toastContainer{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:900;pointer-events:none}
         .toast{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:14px 24px;font-size:14px;font-weight:500;color:var(--text-primary);box-shadow:0 8px 32px rgba(0,0,0,0.4);animation:toastIn 0.3s ease,toastOut 0.3s ease 3.7s forwards;pointer-events:auto}
         .toast.success{border-left:3px solid var(--success)}
-        .toast.error{border-left:3px solid var(--danger)}
-        .toast.warning{border-left:3px solid var(--warning)}
         @keyframes toastIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
         @keyframes toastOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-20px)}}
-
-        /* Execution Summary */
-        .executionSummary{background:rgba(63,185,80,.08);border:1px solid rgba(63,185,80,.2);border-radius:10px;padding:12px;margin-bottom:12px}
-        .summaryHeader{display:flex;align-items:center;gap:8px}
-        .summaryIcon{color:var(--success);font-size:14px}
-        .summaryText{flex:1;font-weight:500;font-size:13px}
-        .summaryDismiss{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:0}
-        .summaryBoundary{display:flex;align-items:center;gap:6px;margin-top:6px}
-        .arrow{color:var(--text-muted);font-size:11px}
-
-        /* Questionnaire */
         .questionnaireHeader{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
         .q-card{border:1px solid var(--border);border-radius:12px;padding:14px;background:var(--bg-tertiary)}
         .q-title{font-family:var(--font-farsi);font-weight:500;margin-bottom:6px;line-height:var(--farsi-line-height);font-size:15px;direction:rtl;text-align:right;letter-spacing:var(--farsi-letter-spacing)}
@@ -1314,8 +1405,6 @@ export default function App() {
         .opt{appearance:none;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-primary);padding:12px 14px;border-radius:8px;font-weight:400;cursor:pointer;text-align:right;direction:rtl;font-family:var(--font-farsi);line-height:var(--farsi-line-height);letter-spacing:var(--farsi-letter-spacing);transition:border-color 0.15s,background 0.15s}
         .opt:hover{border-color:var(--accent-border);background:var(--bg-tertiary)}
         .opt-english{font-size:10px;color:var(--text-muted);margin-top:4px;text-align:left;direction:ltr;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
-
-        /* Consent Card */
         .consentCard{border:1px solid var(--border);border-radius:12px;padding:16px;background:var(--bg-tertiary)}
         .consentHeader{font-weight:600;margin-bottom:8px;font-size:14px}
         .consentInstruction{font-size:12px;color:var(--text-secondary);margin-bottom:10px}
@@ -1323,12 +1412,8 @@ export default function App() {
         .sentenceFa{font-family:var(--font-farsi);font-weight:500;font-size:14px;line-height:var(--farsi-line-height);direction:rtl;text-align:right;letter-spacing:var(--farsi-letter-spacing)}
         .sentenceEn{font-size:11px;color:var(--text-muted);margin-top:6px;font-style:italic;text-align:left;direction:ltr}
         .consentCard input[dir="rtl"]{font-family:var(--font-farsi);text-align:right;line-height:var(--farsi-line-height);letter-spacing:var(--farsi-letter-spacing)}
-
-        /* Action Card */
         .actionCard{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:12px;padding:14px}
         .actionTitle{font-weight:500;font-size:12px;margin-bottom:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.03em}
-
-        /* Preview Panel */
         .previewPanel{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:12px;padding:14px}
         .previewTitle{font-weight:500;font-size:12px;margin-bottom:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.03em}
         .previewCard{border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--bg-secondary)}
@@ -1338,41 +1423,18 @@ export default function App() {
         .previewTotal{font-size:12px;color:var(--text-secondary);margin-top:4px}
         .projectedBoundary{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
         .projectedLabel{font-size:11px;color:var(--text-muted)}
-
-        /* Validation */
         .validationDisplay{margin-top:10px}
         .validationError{padding:10px 12px;border-radius:8px;background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.2);color:var(--danger);font-size:12px;margin-bottom:6px}
         .validationWarning{padding:10px 12px;border-radius:8px;background:rgba(210,153,34,.08);border:1px solid rgba(210,153,34,.2);color:var(--warning);font-size:12px;margin-bottom:6px}
-
-        /* Acknowledgment */
-        .acknowledgment{margin-top:12px;padding:12px;border:1px solid rgba(210,153,34,.25);border-radius:8px;background:rgba(210,153,34,.06)}
-        .ackLabel{display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12px;color:var(--warning)}
-        .ackLabel input{margin-top:2px}
-
-        /* Ledger/History */
         .ledgerList{display:flex;flex-direction:column;gap:8px}
         .ledgerEntry{border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--bg-secondary);transition:border-color 0.15s}
         .ledgerEntry:hover{border-color:var(--border-hover)}
         .ledgerHeader{display:flex;align-items:center;gap:8px}
         .ledgerIcon{font-size:12px;width:20px;font-weight:700}
-        .ledgerIcon.tradeBuy{color:#34d399}
-        .ledgerIcon.tradeSell{color:#f87171}
         .ledgerAction{font-weight:500;font-size:13px;flex:1}
-        .ledgerAmount{font-weight:500;font-size:12px;margin-right:16px}
         .ledgerTime{color:var(--text-muted);font-size:11px}
         .ledgerExpand{color:var(--text-muted);font-size:14px;width:20px;text-align:center}
         .ledgerBoundary{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
-        .ledgerDetails{margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
-        .ledgerSnapshot{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-        .snapshotLabel{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em}
-        .snapshotValue{font-weight:500;font-size:13px;margin-top:2px}
-
-        /* LTV Limits */
-        .ltvLimits{margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
-        .limitsTitle{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px}
-        .limitsRow{display:flex;justify-content:space-between;font-size:12px;padding:3px 0}
-
-        /* Loan Styling */
         .borrowHint,.premiumHint{font-size:11px;color:var(--text-secondary);margin-top:6px;padding:8px 10px;background:var(--bg-primary);border-radius:6px;border:1px solid var(--border)}
         .loanItem{background:var(--bg-secondary);border:1px solid rgba(210,153,34,.3);border-left:3px solid var(--warning)}
         .loanAmount{font-size:20px;font-weight:600}
@@ -1382,24 +1444,14 @@ export default function App() {
         .loanStatus{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:500}
         .loanStatusWarning{background:rgba(245,158,11,0.15);color:#fbbf24}
         .loanStatusCritical{background:rgba(239,68,68,0.15);color:#f87171}
-
-        /* Repay Details */
         .repayDetails{background:var(--bg-primary);border-radius:10px;padding:12px;border:1px solid var(--border)}
         .repayRow{display:flex;justify-content:space-between;font-size:12px;padding:4px 0}
-
-        /* Funding Details */
-        .fundingDetails{background:var(--bg-primary);border-radius:10px;padding:14px;margin-bottom:10px;border:1px solid var(--border)}
-        .fundingRow{display:flex;justify-content:space-between;font-size:13px;padding:4px 0}
-
-        /* Modal */
         .modalOverlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000}
         .modal{background:var(--bg-secondary);border:1px solid var(--border);border-radius:16px;padding:24px;max-width:400px;width:90%;box-shadow:var(--shadow-md)}
         .modalHeader{font-weight:600;font-size:18px;color:var(--text-primary);margin-bottom:12px}
         .modalBody{margin-bottom:20px}
         .modalMessage{margin:0;font-size:14px;color:var(--text-secondary);line-height:1.5}
         .modalFooter{display:flex;gap:12px;justify-content:flex-end}
-
-        /* Onboarding */
         .onboardingPanel{height:100%;display:flex;flex-direction:column;gap:12px}
         .welcomeCard{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:14px;padding:24px;text-align:center}
         .welcomeIcon{font-size:48px;margin-bottom:14px}
@@ -1408,24 +1460,17 @@ export default function App() {
         .welcomeFeatures{text-align:left}
         .featureItem{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
         .featureItem:last-child{border-bottom:none}
-        .featureIcon{font-size:16px}
-
-        /* Progress Card */
         .progressCard{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:14px;padding:20px;text-align:center}
         .progressCard h3{margin:0 0 16px 0;font-size:14px;font-weight:500}
         .bigProgress{position:relative;width:100px;height:100px;margin:0 auto 16px}
         .progressRing{width:100%;height:100%}
         .progressText{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-weight:600;font-size:18px}
-
-        /* Layer Preview Card */
         .layerPreviewCard{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:12px;padding:14px}
         .layerPreviewCard h4{margin:0 0 12px 0;font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted);font-weight:500}
         .layerPreviewRow{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px}
         .layerPreviewRow:last-child{margin-bottom:0}
         .layerPreviewName{font-weight:500;font-size:12px}
         .layerPreviewDesc{font-size:11px;color:var(--text-secondary)}
-
-        /* Allocation Preview */
         .allocationPreviewCard{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:12px;padding:14px}
         .allocationPreviewCard h3{margin:0 0 14px 0;font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted);font-weight:500}
         .allocationViz{display:flex;gap:2px;height:40px;margin-bottom:16px;border-radius:6px;overflow:hidden}
@@ -1433,7 +1478,6 @@ export default function App() {
         .allocationBar.foundation{background:var(--success)}
         .allocationBar.growth{background:var(--accent)}
         .allocationBar.upside{background:var(--warning)}
-        .allocationBar.cash{background:var(--text-muted)}
         .barIcon{font-size:14px}
         .barPct{font-size:11px;font-weight:500}
         .allocationDetails{display:flex;flex-direction:column;gap:10px}
@@ -1441,8 +1485,6 @@ export default function App() {
         .detailName{font-weight:500;font-size:12px;flex:1}
         .detailPct{font-weight:500;font-size:12px}
         .detailAssets{font-size:11px;color:var(--text-muted);margin-left:14px;margin-top:2px}
-
-        /* Invest Preview */
         .investPreviewCard{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:12px;padding:14px}
         .investPreviewCard h3{margin:0 0 14px 0;font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted);font-weight:500}
         .investTotal{text-align:center;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)}
@@ -1454,42 +1496,47 @@ export default function App() {
         .investPlaceholder{padding:30px;text-align:center}
         .investWarning{font-size:12px;color:var(--warning);margin-top:6px}
         .investMinHint{font-size:11px;color:var(--text-muted);margin-top:8px}
-
-        /* Protection Card Styling */
         .protectionItem{background:var(--bg-secondary);border:1px solid var(--accent-border);border-left:3px solid var(--accent)}
-        .protectionBadge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;background:var(--accent-muted);color:var(--accent);font-size:10px;font-weight:500;border-radius:4px}
-
         .stack{display:flex;flex-direction:column;gap:0}
-
-        /* Portfolio Value */
         .portfolioValue{font-size:28px;font-weight:600;color:var(--text-primary)}
-
-        /* Brand Motto */
-        .h-motto{font-size:11px;color:var(--text-muted);margin-top:2px;font-weight:400;letter-spacing:0.01em}
-
-        /* Welcome Screen */
         .welcomeScreen{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:40px 24px}
         .welcomeLogo{width:64px;height:64px;background:var(--accent);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:white;margin-bottom:24px}
         .welcomeTitle{font-size:28px;font-weight:600;color:var(--text-primary);margin:0 0 8px 0}
         .welcomeMotto{font-size:16px;color:var(--text-secondary);margin:0 0 8px 0;font-weight:400}
         .welcomeTagline{font-size:13px;color:var(--text-muted);margin:0 0 32px 0}
         .welcomeCta{padding:12px 40px;font-size:14px}
-
-        /* Empty State */
-        .emptyState{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;text-align:center}
-        .emptyIcon{font-size:40px;margin-bottom:16px;opacity:0.6}
-        .emptyTitle{font-size:16px;font-weight:500;color:var(--text-primary);margin:0 0 8px 0}
-        .emptySubtitle{font-size:13px;color:var(--text-muted);margin:0 0 20px 0}
       `}</style>
       <div className="container">
         <div className="panel">
-          <div className="header"><div className="logo">B</div><div style={{ flex: 1 }}><div className="h-title">Blu Markets</div><div className="h-motto">Markets, but mindful</div></div><div className="rightMeta">{state.user.phone && <div className="pill">{state.user.phone}</div>}</div></div>
+          <div className="header">
+            <div className="logo">B</div>
+            <div style={{ flex: 1 }}>
+              <div className="h-title">Blu Markets</div>
+              <div className="h-motto">Markets, but mindful</div>
+            </div>
+            <div className="rightMeta">
+              {state.phone && <div className="pill">{state.phone}</div>}
+            </div>
+          </div>
           <div className="body"><ActionLogPane actionLog={state.actionLog} /></div>
           <div className="footer"><OnboardingControls state={state} dispatch={dispatch} /></div>
         </div>
         <div className="panel">
-          <div className="header"><div style={{ flex: 1 }}><div className="h-title">{state.user.stage === STAGES.EXECUTED ? 'Portfolio' : 'Getting Started'}</div><div className="h-sub">{state.user.stage === STAGES.EXECUTED ? `Cash: ${formatIRR(state.cashIRR || 0)}` : 'Complete the steps'}</div></div><div className="rightMeta">{state.user.stage === STAGES.EXECUTED && <><PortfolioHealthBadge boundary={boundary} />{state.loan && <div className="pill" style={{ color: '#fb923c', borderColor: 'rgba(249,115,22,.3)' }}><span>Loan</span><span>{formatIRR(state.loan.amountIRR)}</span></div>}</>}</div></div>
-          {state.user.stage === STAGES.EXECUTED && <Tabs tab={state.tab} dispatch={dispatch} />}
+          <div className="header">
+            <div style={{ flex: 1 }}>
+              <div className="h-title">{state.stage === STAGES.ACTIVE ? 'Portfolio' : 'Getting Started'}</div>
+              <div className="h-sub">{state.stage === STAGES.ACTIVE ? `Cash: ${formatIRR(state.cashIRR || 0)}` : 'Complete the steps'}</div>
+            </div>
+            <div className="rightMeta">
+              {state.stage === STAGES.ACTIVE && (
+                <>
+                  <PortfolioHealthBadge snapshot={snapshot} />
+                  {state.loan && <div className="pill" style={{ color: '#fb923c', borderColor: 'rgba(249,115,22,.3)' }}><span>Loan</span><span>{formatIRR(state.loan.amountIRR)}</span></div>}
+                </>
+              )}
+            </div>
+          </div>
+          {state.stage === STAGES.ACTIVE && <Tabs tab={state.tab} dispatch={dispatch} />}
           <div className="body">{right}</div>
         </div>
       </div>
