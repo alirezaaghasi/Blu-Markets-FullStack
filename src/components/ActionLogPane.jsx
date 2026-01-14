@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import { formatTime, formatIRRShort, getAssetDisplayName } from '../helpers.js';
 
 /**
@@ -8,22 +8,25 @@ import { formatTime, formatIRRShort, getAssetDisplayName } from '../helpers.js';
 function ActionLogPane({ actionLog }) {
   const logRef = useRef(null);
 
+  // Memoize recent actions slice to avoid repeated slicing on re-renders
+  const recentActions = useMemo(
+    () => (actionLog || []).slice(-10),
+    [actionLog]
+  );
+
   useEffect(() => {
     if (logRef.current) {
       logRef.current.scrollTop = logRef.current.scrollHeight;
     }
   }, [actionLog]);
 
-  if (!actionLog || actionLog.length === 0) {
+  if (recentActions.length === 0) {
     return (
       <div className="actionLogEmpty">
         <div className="muted">No actions yet</div>
       </div>
     );
   }
-
-  // Limit to last 10 actions
-  const recentActions = actionLog.slice(-10);
 
   const renderLogEntry = (entry) => {
     const time = formatTime(entry.timestamp);

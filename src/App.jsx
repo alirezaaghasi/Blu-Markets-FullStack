@@ -41,7 +41,7 @@ import {
 // ====== HEADER CONTENT HELPER ======
 // Memoized via useMemo in component to avoid repeated computation
 
-function computeHeaderContent(activeTab, state, snapshot) {
+function computeHeaderContent(activeTab, state, snapshot, loansTotal) {
   switch (activeTab) {
     case 'PORTFOLIO': {
       const { status } = computePortfolioStatus(snapshot.layerPct);
@@ -64,11 +64,10 @@ function computeHeaderContent(activeTab, state, snapshot) {
     }
     case 'LOANS': {
       const loans = state.loans || [];
-      const totalLoan = loans.reduce((sum, l) => sum + l.amountIRR, 0);
       return {
         title: 'Your Loans',
         badge: loans.length > 0
-          ? { text: `${loans.length} Active: ${formatIRRShort(totalLoan)}`, variant: 'info' }
+          ? { text: `${loans.length} Active: ${formatIRRShort(loansTotal)}`, variant: 'info' }
           : null
       };
     }
@@ -86,13 +85,22 @@ function computeHeaderContent(activeTab, state, snapshot) {
 export default function App() {
   const [state, dispatch] = useReducer(reducer, null, initialState);
 
-  // Memoize snapshot computation
-  const snapshot = useMemo(() => computeSnapshot(state), [state]);
+  // Memoize snapshot computation - only depends on holdings and cash
+  const snapshot = useMemo(
+    () => computeSnapshot(state),
+    [state.holdings, state.cashIRR]
+  );
+
+  // Memoize loan total to avoid duplicate reductions
+  const loansTotal = useMemo(
+    () => (state.loans || []).reduce((sum, l) => sum + l.amountIRR, 0),
+    [state.loans]
+  );
 
   // Memoize header content to avoid repeated computation per render
   const headerContent = useMemo(
-    () => computeHeaderContent(state.tab, state, snapshot),
-    [state.tab, state.protections, state.loans, snapshot]
+    () => computeHeaderContent(state.tab, state, snapshot, loansTotal),
+    [state.tab, state.protections, state.loans, snapshot, loansTotal]
   );
 
   // Action handlers
@@ -147,7 +155,7 @@ export default function App() {
   const showLoansIndicator = state.stage === STAGES.ACTIVE && (state.loans || []).length > 0 && state.tab !== 'LOANS';
   const loansSummary = showLoansIndicator ? {
     count: state.loans.length,
-    total: formatIRR(state.loans.reduce((sum, l) => sum + l.amountIRR, 0))
+    total: formatIRR(loansTotal)
   } : null;
 
   return (
