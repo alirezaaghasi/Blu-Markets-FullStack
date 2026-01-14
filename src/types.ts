@@ -1,5 +1,5 @@
 // ============================================================================
-// BLU MARKETS v9.9 - TYPE DEFINITIONS
+// BLU MARKETS v10 - TYPE DEFINITIONS
 // ============================================================================
 // This file is the SINGLE SOURCE OF TRUTH for all data models.
 // All other modules derive from these types.

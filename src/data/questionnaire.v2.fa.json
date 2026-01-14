@@ -1,0 +1,217 @@
+{
+  "version": "v10.0",
+  "consent_exact": "متوجه ریسک این سبد دارایی شدم و باهاش موافق هستم.",
+  "consent_english": "I understand the risk of this portfolio and I agree with it.",
+  "blocks": [
+    {
+      "id": "block_capacity",
+      "title": "Your Financial Situation",
+      "title_fa": "وضعیت مالی شما",
+      "questions": ["q_life_stage", "q_income", "q_buffer", "q_proportion"]
+    },
+    {
+      "id": "block_goals",
+      "title": "Your Goals",
+      "title_fa": "اهداف شما",
+      "questions": ["q_goal", "q_horizon"]
+    },
+    {
+      "id": "block_behavior",
+      "title": "How You React",
+      "title_fa": "واکنش شما",
+      "questions": ["q_crash_20", "q_tradeoff", "q_past_behavior", "q_max_loss"]
+    },
+    {
+      "id": "block_confirm",
+      "title": "Quick Confirmation",
+      "title_fa": "تأیید نهایی",
+      "questions": ["q_self_assess", "q_double_check"]
+    }
+  ],
+  "questions": [
+    {
+      "id": "q_life_stage",
+      "text": "الان تو چه مرحله‌ای از زندگیت هستی؟",
+      "english": "What stage of life are you in?",
+      "dimension": "capacity",
+      "weight": 1.0,
+      "options": [
+        { "id": "stage_student", "text": "دانشجو یا تازه شروع کردم به کار", "english": "Student or just starting career", "score": 8 },
+        { "id": "stage_building", "text": "دارم زندگیم رو می‌سازم (۲۵-۴۰)", "english": "Building my life (25-40)", "score": 7 },
+        { "id": "stage_established", "text": "زندگیم جا افتاده (۴۰-۵۵)", "english": "Established (40-55)", "score": 5 },
+        { "id": "stage_preretire", "text": "نزدیک بازنشستگی یا بازنشسته", "english": "Near or at retirement", "score": 2 }
+      ]
+    },
+    {
+      "id": "q_income",
+      "text": "درآمدت چقدر قابل پیش‌بینیه؟",
+      "english": "How predictable is your income?",
+      "dimension": "capacity",
+      "weight": 1.0,
+      "options": [
+        { "id": "inc_fixed", "text": "ثابت و مطمئن (حقوق، مستمری)", "english": "Fixed and reliable (salary, pension)", "score": 8 },
+        { "id": "inc_mostly", "text": "تقریباً ثابت با کمی نوسان", "english": "Mostly stable with some variation", "score": 6 },
+        { "id": "inc_variable", "text": "متغیر (فریلنس، کسب‌وکار)", "english": "Variable (freelance, business)", "score": 4 },
+        { "id": "inc_uncertain", "text": "نامشخص یا بی‌کار", "english": "Uncertain or unemployed", "score": 1 }
+      ]
+    },
+    {
+      "id": "q_buffer",
+      "text": "بدون این پول، چند ماه می‌تونی خرج زندگیت رو بدی؟",
+      "english": "Without this money, how many months can you cover expenses?",
+      "dimension": "capacity",
+      "weight": 1.2,
+      "options": [
+        { "id": "buf_12plus", "text": "بیش از ۱۲ ماه", "english": "More than 12 months", "score": 10 },
+        { "id": "buf_6_12", "text": "۶ تا ۱۲ ماه", "english": "6 to 12 months", "score": 7 },
+        { "id": "buf_3_6", "text": "۳ تا ۶ ماه", "english": "3 to 6 months", "score": 4 },
+        { "id": "buf_under3", "text": "کمتر از ۳ ماه", "english": "Less than 3 months", "score": 1 }
+      ]
+    },
+    {
+      "id": "q_proportion",
+      "text": "این پول چند درصد از کل دارایی‌هاته؟",
+      "english": "What percentage of your total wealth is this?",
+      "dimension": "capacity",
+      "weight": 1.3,
+      "options": [
+        { "id": "prop_small", "text": "کمتر از ۲۵٪", "english": "Less than 25%", "score": 10 },
+        { "id": "prop_medium", "text": "۲۵٪ تا ۵۰٪", "english": "25% to 50%", "score": 6 },
+        { "id": "prop_large", "text": "۵۰٪ تا ۷۵٪", "english": "50% to 75%", "score": 3 },
+        { "id": "prop_most", "text": "بیشتر از ۷۵٪", "english": "More than 75%", "score": 1, "flag": "high_proportion" }
+      ]
+    },
+    {
+      "id": "q_goal",
+      "text": "هدف اصلیت از این سرمایه‌گذاری چیه؟",
+      "english": "What's your main goal for this investment?",
+      "dimension": "goal",
+      "weight": 1.0,
+      "options": [
+        { "id": "goal_preserve", "text": "حفظ ارزش پول در برابر تورم", "english": "Preserve value against inflation", "score": 2 },
+        { "id": "goal_income", "text": "درآمد ثابت (سود منظم)", "english": "Steady income (regular returns)", "score": 4 },
+        { "id": "goal_grow", "text": "رشد سرمایه در بلندمدت", "english": "Long-term wealth growth", "score": 7 },
+        { "id": "goal_maximize", "text": "حداکثر بازدهی (ریسک بالا قبوله)", "english": "Maximum returns (high risk OK)", "score": 10 }
+      ]
+    },
+    {
+      "id": "q_horizon",
+      "text": "کِی ممکنه بخوای این پول رو برداری؟",
+      "english": "When might you need to withdraw this money?",
+      "dimension": "horizon",
+      "weight": 1.0,
+      "hard_caps": {
+        "hz_1year": 3,
+        "hz_1_3": 5
+      },
+      "options": [
+        { "id": "hz_1year", "text": "کمتر از ۱ سال", "english": "Less than 1 year", "score": 1 },
+        { "id": "hz_1_3", "text": "۱ تا ۳ سال", "english": "1 to 3 years", "score": 4 },
+        { "id": "hz_3_7", "text": "۳ تا ۷ سال", "english": "3 to 7 years", "score": 7 },
+        { "id": "hz_7plus", "text": "بیش از ۷ سال", "english": "More than 7 years", "score": 10 }
+      ]
+    },
+    {
+      "id": "q_crash_20",
+      "text": "فرض کن ۳ ماه بعد از سرمایه‌گذاری، ارزش پورتفوت ۲۰٪ کم شده. چیکار می‌کنی؟",
+      "english": "Imagine 3 months after investing, your portfolio is down 20%. What do you do?",
+      "dimension": "willingness",
+      "weight": 2.0,
+      "options": [
+        { "id": "crash_sell_all", "text": "همه رو می‌فروشم که بیشتر ضرر نکنم", "english": "Sell everything to avoid more loss", "score": 1, "flag": "panic_seller" },
+        { "id": "crash_sell_some", "text": "یه مقدار می‌فروشم، بقیه رو نگه می‌دارم", "english": "Sell some, keep the rest", "score": 3 },
+        { "id": "crash_hold", "text": "صبر می‌کنم تا بازار برگرده", "english": "Wait for the market to recover", "score": 6 },
+        { "id": "crash_buy", "text": "بیشتر می‌خرم چون ارزون شده", "english": "Buy more because it's cheaper", "score": 9, "flag": "check_capacity" }
+      ]
+    },
+    {
+      "id": "q_tradeoff",
+      "text": "کدوم رو ترجیح میدی؟",
+      "english": "Which do you prefer?",
+      "dimension": "willingness",
+      "weight": 1.5,
+      "options": [
+        { "id": "trade_safe", "text": "سود تضمینی ۲۰٪ در سال", "english": "Guaranteed 20% annual return", "score": 2 },
+        { "id": "trade_moderate", "text": "۵۰٪ شانس سود ۴۰٪ یا ضرر ۱۰٪", "english": "50% chance of +40% or -10%", "score": 5 },
+        { "id": "trade_risky", "text": "۵۰٪ شانس سود ۸۰٪ یا ضرر ۲۵٪", "english": "50% chance of +80% or -25%", "score": 8 },
+        { "id": "trade_yolo", "text": "۵۰٪ شانس سود ۱۵۰٪ یا ضرر ۵۰٪", "english": "50% chance of +150% or -50%", "score": 10, "flag": "gambler" }
+      ]
+    },
+    {
+      "id": "q_past_behavior",
+      "text": "آخرین باری که یه سرمایه‌گذاریت افت کرد، چه حسی داشتی؟",
+      "english": "Last time an investment dropped, how did you feel?",
+      "dimension": "willingness",
+      "weight": 1.0,
+      "options": [
+        { "id": "past_panic", "text": "خیلی استرس داشتم، شب‌ها خوابم نمی‌برد", "english": "Very stressed, couldn't sleep", "score": 1 },
+        { "id": "past_worried", "text": "نگران بودم ولی دووم آوردم", "english": "Worried but managed", "score": 4 },
+        { "id": "past_calm", "text": "نسبتاً آروم بودم", "english": "Relatively calm", "score": 7 },
+        { "id": "past_none", "text": "تجربه‌ای ندارم", "english": "No experience", "score": 5, "flag": "inexperienced" }
+      ]
+    },
+    {
+      "id": "q_max_loss",
+      "text": "حداکثر چند درصد افت رو می‌تونی تحمل کنی بدون اینکه بفروشی؟",
+      "english": "What's the maximum drop you can tolerate without selling?",
+      "dimension": "willingness",
+      "weight": 1.5,
+      "options": [
+        { "id": "loss_5", "text": "۵٪ — بیشتر از این نه", "english": "5% — no more than this", "score": 1 },
+        { "id": "loss_15", "text": "۱۵٪ — یه کم درد داره ولی اوکیه", "english": "15% — hurts but OK", "score": 4 },
+        { "id": "loss_30", "text": "۳۰٪ — سخته ولی صبر می‌کنم", "english": "30% — tough but I'll wait", "score": 7 },
+        { "id": "loss_50", "text": "۵۰٪ یا بیشتر — بلندمدت فکر می‌کنم", "english": "50%+ — I think long-term", "score": 10, "flag": "check_capacity" }
+      ]
+    },
+    {
+      "id": "q_self_assess",
+      "text": "خودت رو چطور توصیف می‌کنی؟",
+      "english": "How would you describe yourself?",
+      "dimension": "check",
+      "weight": 0.5,
+      "options": [
+        { "id": "self_conservative", "text": "محتاط — امنیت مهم‌تره", "english": "Conservative — safety first", "score": 2 },
+        { "id": "self_balanced", "text": "متعادل — یه کم ریسک اوکیه", "english": "Balanced — some risk is OK", "score": 5 },
+        { "id": "self_growth", "text": "رشدگرا — آماده‌ی نوسانم", "english": "Growth-oriented — ready for swings", "score": 8 },
+        { "id": "self_aggressive", "text": "جسور — میخوام حداکثر سود ببرم", "english": "Aggressive — want maximum gains", "score": 10 }
+      ]
+    },
+    {
+      "id": "q_double_check",
+      "text": "اگه فردا خبر بد اقتصادی بیاد و بازار ۱۵٪ بریزه، اولین کارت چیه؟",
+      "english": "If bad economic news drops the market 15% tomorrow, what's your first move?",
+      "dimension": "consistency",
+      "weight": 1.0,
+      "options": [
+        { "id": "dc_exit", "text": "سریع می‌فروشم قبل از اینکه بدتر بشه", "english": "Sell quickly before it gets worse", "score": 1 },
+        { "id": "dc_wait", "text": "صبر می‌کنم ببینم چی میشه", "english": "Wait and see what happens", "score": 5 },
+        { "id": "dc_ignore", "text": "کاری نمی‌کنم، نگاهش هم نمی‌کنم", "english": "Do nothing, won't even look", "score": 7 },
+        { "id": "dc_buy", "text": "فرصته، بیشتر می‌خرم", "english": "It's an opportunity, I'll buy more", "score": 9 }
+      ]
+    }
+  ],
+  "profiles": {
+    "1": { "name": "Capital Preservation", "name_fa": "حفظ سرمایه" },
+    "2": { "name": "Capital Preservation", "name_fa": "حفظ سرمایه" },
+    "3": { "name": "Conservative", "name_fa": "محتاط" },
+    "4": { "name": "Conservative", "name_fa": "محتاط" },
+    "5": { "name": "Balanced", "name_fa": "متعادل" },
+    "6": { "name": "Balanced", "name_fa": "متعادل" },
+    "7": { "name": "Growth", "name_fa": "رشدگرا" },
+    "8": { "name": "Growth", "name_fa": "رشدگرا" },
+    "9": { "name": "Aggressive", "name_fa": "جسور" },
+    "10": { "name": "Aggressive", "name_fa": "جسور" }
+  },
+  "allocations": {
+    "1": { "FOUNDATION": 85, "GROWTH": 12, "UPSIDE": 3 },
+    "2": { "FOUNDATION": 80, "GROWTH": 15, "UPSIDE": 5 },
+    "3": { "FOUNDATION": 70, "GROWTH": 25, "UPSIDE": 5 },
+    "4": { "FOUNDATION": 65, "GROWTH": 30, "UPSIDE": 5 },
+    "5": { "FOUNDATION": 55, "GROWTH": 35, "UPSIDE": 10 },
+    "6": { "FOUNDATION": 50, "GROWTH": 35, "UPSIDE": 15 },
+    "7": { "FOUNDATION": 45, "GROWTH": 38, "UPSIDE": 17 },
+    "8": { "FOUNDATION": 40, "GROWTH": 40, "UPSIDE": 20 },
+    "9": { "FOUNDATION": 35, "GROWTH": 40, "UPSIDE": 25 },
+    "10": { "FOUNDATION": 30, "GROWTH": 40, "UPSIDE": 30 }
+  }
+}

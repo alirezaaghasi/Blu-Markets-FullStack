@@ -1,7 +1,7 @@
-// ====== BLU MARKETS REDUCER v9.9 ======
+// ====== BLU MARKETS REDUCER v10 ======
 // All state transitions go through this single reducer
 // Actions flow: PREVIEW_* -> pendingAction -> CONFIRM_PENDING -> ledger
-// v9.9: Holdings store quantities, values computed from live prices
+// v10: New 12-question risk profiling with pathological user detection
 
 import { computeSnapshot } from '../engine/snapshot.js';
 import { classifyActionBoundary, frictionCopyForBoundary } from '../engine/boundary.js';
@@ -26,10 +26,11 @@ import {
 } from '../engine/preview.js';
 
 import { ASSETS } from '../state/domain.js';
-import questionnaire from '../data/questionnaire.fa.json';
+import questionnaire from '../data/questionnaire.v2.fa.json';
 import { STAGES, THRESHOLDS, WEIGHTS, LAYERS } from '../constants/index.js';
-import { uid, nowISO, computeTargetLayersFromAnswers } from '../helpers.js';
+import { uid, nowISO } from '../helpers.js';
 import { DEFAULT_PRICES, DEFAULT_FX_RATE } from '../constants/index.js';
+import { calculateFinalRisk, answersToRichFormat } from '../engine/riskScoring.js';
 
 /**
  * Build initial portfolio holdings from investment amount and target allocation
@@ -144,6 +145,7 @@ export function initialState() {
 
     // UI state
     questionnaire: { index: 0, answers: {} },
+    profileResult: null,  // v10: Risk profile result from questionnaire
     consentStep: 0,
     consentMessages: [],
     investAmountIRR: null,
@@ -205,13 +207,19 @@ export function reducer(state, action) {
 
     case 'ANSWER_QUESTION': {
       if (state.stage !== STAGES.ONBOARDING_QUESTIONNAIRE) return state;
-      const answers = { ...state.questionnaire.answers, [action.qId]: action.optionId };
+      // v10: Store option index for new scoring system
+      const question = questionnaire.questions[state.questionnaire.index];
+      const optionIndex = question.options.findIndex(o => o.id === action.optionId);
+      const answers = { ...state.questionnaire.answers, [action.qId]: optionIndex };
       let idx = state.questionnaire.index + 1;
       let s = { ...state, questionnaire: { index: idx, answers } };
 
       if (idx >= questionnaire.questions.length) {
-        const targetLayerPct = computeTargetLayersFromAnswers(questionnaire, answers);
-        s = { ...s, targetLayerPct, stage: STAGES.ONBOARDING_RESULT };
+        // v10: Use new risk scoring engine
+        const richAnswers = answersToRichFormat(answers, questionnaire);
+        const profileResult = calculateFinalRisk(richAnswers, questionnaire);
+        const targetLayerPct = profileResult.allocation;
+        s = { ...s, targetLayerPct, profileResult, stage: STAGES.ONBOARDING_RESULT };
       }
       return s;
     }

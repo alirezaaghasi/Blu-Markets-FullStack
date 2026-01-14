@@ -1,4 +1,4 @@
-/* ===== BLU MARKETS v9.9 - FINANCIAL UI ===== */
+/* ===== BLU MARKETS v10 - FINANCIAL UI ===== */
 
 :root {
   --bg-primary: #0f1419;
@@ -610,3 +610,252 @@ body {
 .recommendationLayers { display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--bg-primary); border-radius: 8px; margin-bottom: 4px; }
 .recommendationLayer { display: flex; align-items: center; gap: 10px; font-size: 13px; }
 .recommendationLayer .layerDot { width: 8px; height: 8px; }
+
+/* =============================================
+   PROFILE RESULT STYLES (v10)
+   ============================================= */
+
+.profile-result {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px 16px;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+/* Profile Badge */
+.profile-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.profile-score {
+  font-size: 48px;
+  font-weight: 700;
+  color: #4ade80;
+  line-height: 1;
+}
+
+.profile-name {
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.profile-name-fa {
+  font-size: 16px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: var(--font-farsi);
+  direction: rtl;
+}
+
+/* Description */
+.profile-description {
+  text-align: center;
+}
+
+.profile-description h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.profile-description .headline-fa {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  font-family: var(--font-farsi);
+  direction: rtl;
+  margin-bottom: 12px;
+}
+
+.profile-description p {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.5;
+}
+
+.profile-description .expectation {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Allocation Preview */
+.allocation-preview {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.allocation-preview h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.allocation-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.allocation-row {
+  display: grid;
+  grid-template-columns: 20px 80px 40px 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.layer-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.layer-dot.foundation { background: #3b82f6; }
+.layer-dot.growth { background: #f59e0b; }
+.layer-dot.upside { background: #8b5cf6; }
+
+.layer-name {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.layer-percent {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  text-align: right;
+}
+
+.layer-bar {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.layer-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.layer-fill.foundation { background: #3b82f6; }
+.layer-fill.growth { background: #f59e0b; }
+.layer-fill.upside { background: #8b5cf6; }
+
+/* Limiting Factor */
+.limiting-factor {
+  text-align: center;
+  padding: 12px;
+  background: rgba(74, 222, 128, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(74, 222, 128, 0.2);
+}
+
+.limiting-factor .factor-label {
+  font-size: 13px;
+  color: rgba(74, 222, 128, 0.9);
+  margin: 0;
+}
+
+/* Warning */
+.profile-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(251, 191, 36, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+.profile-warning .warning-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  color: #fbbf24;
+  font-weight: 700;
+}
+
+.profile-warning p {
+  font-size: 13px;
+  color: rgba(251, 191, 36, 0.9);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Continue Button */
+.profile-result .continue-btn {
+  width: 100%;
+  padding: 16px;
+  background: #4ade80;
+  color: #000;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.profile-result .continue-btn:hover {
+  background: #22c55e;
+}
+
+/* =============================================
+   QUESTIONNAIRE PROGRESS INDICATOR (v10)
+   ============================================= */
+
+.questionnaire-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.progress-bar-container {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: #4ade80;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.block-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  text-align: center;
+  margin-bottom: 8px;
+}

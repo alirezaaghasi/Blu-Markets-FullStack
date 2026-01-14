@@ -6,6 +6,8 @@ import { ASSET_LAYER, ASSET_META } from '../../state/domain.js';
 import { calculateFixedIncomeValue } from '../../engine/fixedIncome.js';
 import PhoneForm from './PhoneForm.jsx';
 import PendingActionModal from '../PendingActionModal.jsx';
+import ProfileResult from '../ProfileResult.jsx';
+import questionnaireV2 from '../../data/questionnaire.v2.fa.json';
 
 /**
  * Compute holding value in IRR from quantity (v9.9)
@@ -89,14 +91,50 @@ function MoreMenu({ isOpen, onToggle, onProtect, onBorrow }) {
 }
 
 /**
+ * v10: QuestionnaireProgress - Shows progress with block title
+ */
+function QuestionnaireProgress({ currentQuestion, totalQuestions }) {
+  const progress = ((currentQuestion + 1) / totalQuestions) * 100;
+
+  // Get current block title based on question index
+  const getCurrentBlockTitle = () => {
+    let count = 0;
+    for (const block of questionnaireV2.blocks) {
+      count += block.questions.length;
+      if (currentQuestion < count) {
+        return block.title;
+      }
+    }
+    return '';
+  };
+
+  return (
+    <div className="questionnaire-progress">
+      <div className="block-title">{getCurrentBlockTitle()}</div>
+      <div className="progress-bar-container">
+        <div
+          className="progress-bar-fill"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      <div className="progress-label">
+        <span>Question {currentQuestion + 1} of {totalQuestions}</span>
+        <span>{Math.round(progress)}%</span>
+      </div>
+    </div>
+  );
+}
+
+/**
  * OnboardingControls - Left panel controls during onboarding and active stage
  * Handles questionnaire, consent flow, investment amount, and action forms
- * v9.9: Receives prices/fxRate to pass to EXECUTE_PORTFOLIO for accurate valuation
+ * v10: Updated for new 12-question questionnaire with ProfileResult screen
  */
 function OnboardingControls({ state, dispatch, questionnaire, prices, fxRate }) {
   const [consentText, setConsentText] = useState('');
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
-  const isConsentMatch = consentText === questionnaire.consent_exact;
+  const [showingProfile, setShowingProfile] = useState(true); // v10: Show profile before consent
+  const isConsentMatch = consentText === questionnaireV2.consent_exact;
 
   // Memoize protect draft calculations (v9.9: compute value from quantity)
   const protectData = useMemo(() => {
@@ -171,15 +209,18 @@ function OnboardingControls({ state, dispatch, questionnaire, prices, fxRate }) 
 
   if (state.stage === STAGES.ONBOARDING_QUESTIONNAIRE) {
     const idx = state.questionnaire.index;
-    if (idx >= questionnaire.questions.length) return null;
-    const q = questionnaire.questions[idx];
+    // v10: Use v2 questionnaire
+    const q = questionnaireV2.questions[idx];
+    if (!q) return null;
 
     return (
       <div>
         <OnboardingProgress currentStep={2} />
-        <div className="questionnaireHeader" style={{ marginTop: 16 }}>
-          <span className="muted">{idx + 1}/{questionnaire.questions.length}</span>
-        </div>
+        {/* v10: New progress indicator with block title */}
+        <QuestionnaireProgress
+          currentQuestion={idx}
+          totalQuestions={questionnaireV2.questions.length}
+        />
         <div className="q-card">
           <div className="q-title">{q.text}</div>
           <div className="q-english">{q.english}</div>
@@ -201,6 +242,19 @@ function OnboardingControls({ state, dispatch, questionnaire, prices, fxRate }) 
   }
 
   if (state.stage === STAGES.ONBOARDING_RESULT) {
+    // v10: Show ProfileResult first, then consent flow
+    if (showingProfile && state.profileResult) {
+      return (
+        <div>
+          <OnboardingProgress currentStep={3} />
+          <ProfileResult
+            result={state.profileResult}
+            onContinue={() => setShowingProfile(false)}
+          />
+        </div>
+      );
+    }
+
     const renderRecommendationMessage = () => (
       <div className="recommendationMessage">
         <p>Based on your answers, here's your recommended allocation:</p>
@@ -223,12 +277,6 @@ function OnboardingControls({ state, dispatch, questionnaire, prices, fxRate }) 
     );
 
     const CONSENT_STEPS = [
-      {
-        id: 'recommendation',
-        message: null,
-        renderMessage: renderRecommendationMessage,
-        button: 'Continue'
-      },
       {
         id: 'risk',
         message: `With this allocation:\n\n📈 Good year: +15-25%\n📉 Bad quarter: -10-15%\n⏱️ Recovery: typically 3-6 months\n\nMarkets are uncertain. This is not a guarantee.`,
@@ -293,8 +341,8 @@ function OnboardingControls({ state, dispatch, questionnaire, prices, fxRate }) 
           {isConsentStep && (
             <div className="consentInputSection">
               <div className="consentPrompt">Ready to start? Type this to confirm:</div>
-              <div className="consentTextFarsi">{questionnaire.consent_exact}</div>
-              <div className="consentTextEnglish">{questionnaire.consent_english}</div>
+              <div className="consentTextFarsi">{questionnaireV2.consent_exact}</div>
+              <div className="consentTextEnglish">{questionnaireV2.consent_english}</div>
 
               <input
                 type="text"
