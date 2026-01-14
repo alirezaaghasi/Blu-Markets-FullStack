@@ -10,7 +10,7 @@ import ProfileResult from '../ProfileResult.jsx';
 import questionnaireV2 from '../../data/questionnaire.v2.fa.json';
 
 /**
- * Compute holding value in IRR from quantity (v9.9)
+ * Compute holding value in IRR from quantity (v10)
  * @param {Object} holding - Holding with quantity
  * @param {Object} prices - Current prices in USD
  * @param {number} fxRate - USD/IRR exchange rate

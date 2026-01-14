@@ -97,7 +97,7 @@ function computeHeaderContent(activeTab, protections, loans, loansTotal, portfol
 export default function App() {
   const [state, dispatch] = useReducer(reducer, null, initialState);
 
-  // v9.9: Live price feeds for quantity-based holdings
+  // v10: Live price feeds for quantity-based holdings
   const { prices, fxRate, loading: pricesLoading, lastUpdated: pricesUpdatedAt, error: pricesError } = usePrices(30000);
 
   // Memoize snapshot computation - uses live prices for quantity-based holdings

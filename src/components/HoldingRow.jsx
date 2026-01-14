@@ -4,12 +4,12 @@ import { formatIRR, formatUSD, formatQuantity, getAssetDisplayName } from '../he
 /**
  * HoldingRow - Single asset holding with buy/sell/overflow menu
  * Shows layer-colored border, protection status, and frozen indicator
- * v9.9: Receives holdingValue (computed from quantity × price) instead of just holding
+ * v10: Receives holdingValue (computed from quantity × price) instead of just holding
  */
 function HoldingRow({ holding, holdingValue, layerInfo, layer, protDays, onStartTrade, onStartProtect, onStartBorrow }) {
   const [showOverflow, setShowOverflow] = useState(false);
 
-  // v9.9: Use computed valueIRR from holdingValue, fallback to holding.valueIRR for backwards compat
+  // v10: Use computed valueIRR from holdingValue, fallback to holding.valueIRR for backwards compat
   const valueIRR = holdingValue?.valueIRR ?? holding.valueIRR ?? 0;
   const isEmpty = valueIRR === 0;
   const isFixedIncome = holding.assetId === 'IRR_FIXED_INCOME';
@@ -37,7 +37,7 @@ function HoldingRow({ holding, holdingValue, layerInfo, layer, protDays, onStart
           {holding.frozen ? ` · 🔒 Locked` : ''}
         </div>
 
-        {/* v9.9: Show quantity and price for non-fixed-income assets */}
+        {/* v10: Show quantity and price for non-fixed-income assets */}
         {!isFixedIncome && quantity > 0 && (
           <div className="holdingQuantityPrice">
             <span className="holdingQty">{formatQuantity(quantity, holding.assetId)} units</span>
@@ -45,7 +45,7 @@ function HoldingRow({ holding, holdingValue, layerInfo, layer, protDays, onStart
           </div>
         )}
 
-        {/* v9.9: Special display for Fixed Income: Principal + Accrued */}
+        {/* v10: Special display for Fixed Income: Principal + Accrued */}
         {isFixedIncome && breakdown && !isEmpty && (
           <div className="fixedIncomeBreakdown">
             <span className="principal">{formatIRR(breakdown.principal)} Principal</span>

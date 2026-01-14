@@ -23,7 +23,7 @@ export function previewAddFunds(state, { amountIRR }) {
 
 /**
  * Preview a trade action (BUY or SELL)
- * v9.9: Updates quantity instead of valueIRR for quantity-based holdings
+ * v10: Updates quantity instead of valueIRR for quantity-based holdings
  *
  * @param {Object} state - Current state
  * @param {Object} params - Trade parameters
@@ -62,14 +62,14 @@ export function previewTrade(state, { side, assetId, amountIRR, prices = DEFAULT
 
 /**
  * Preview a protect action
- * v9.9: Computes notionalIRR from quantity × price × fxRate
+ * v10: Computes notionalIRR from quantity × price × fxRate
  */
 export function previewProtect(state, { assetId, months, prices = DEFAULT_PRICES, fxRate = DEFAULT_FX_RATE }) {
   const next = cloneState(state);
   const h = next.holdings.find((x) => x.assetId === assetId);
   if (!h) return next;
 
-  // v9.9: Compute notional from quantity
+  // v10: Compute notional from quantity
   const snap = computeSnapshot([h], 0, prices, fxRate);
   const notionalIRR = snap.holdingsIRRByAsset[assetId] || 0;
 
@@ -130,7 +130,7 @@ export function previewRepay(state, { loanId, amountIRR }) {
  * - Never sells frozen collateral.
  * - Leaves residual drift if constrained.
  * Returns state with _rebalanceMeta for constraint messaging.
- * v9.9: Updated to use quantity-based holdings with prices
+ * v10: Updated to use quantity-based holdings with prices
  *
  * @param {Object} state - Current state
  * @param {Object} params - Rebalance parameters
@@ -236,7 +236,7 @@ export function previewRebalance(state, { mode, prices = DEFAULT_PRICES, fxRate 
           const proportion = holdingIRR / layerTotal;
           const sellAmountIRR = Math.min(toSell * proportion, holdingIRR);
           if (sellAmountIRR > 0) {
-            // v9.9: Convert IRR to quantity change
+            // v10: Convert IRR to quantity change
             if (h.assetId === 'IRR_FIXED_INCOME') {
               h.quantity -= irrToFixedIncomeUnits(sellAmountIRR);
             } else {
@@ -268,7 +268,7 @@ export function previewRebalance(state, { mode, prices = DEFAULT_PRICES, fxRate 
         // Distribute buy evenly across assets in layer
         const perAssetIRR = layerBuy / assets.length;
         for (const h of assets) {
-          // v9.9: Convert IRR to quantity change
+          // v10: Convert IRR to quantity change
           if (h.assetId === 'IRR_FIXED_INCOME') {
             h.quantity += irrToFixedIncomeUnits(perAssetIRR);
           } else {
@@ -324,7 +324,7 @@ export function previewRebalance(state, { mode, prices = DEFAULT_PRICES, fxRate 
 
         const perAssetIRR = portion / assets.length;
         for (const h of assets) {
-          // v9.9: Convert IRR to quantity change
+          // v10: Convert IRR to quantity change
           if (h.assetId === 'IRR_FIXED_INCOME') {
             h.quantity += irrToFixedIncomeUnits(perAssetIRR);
           } else {

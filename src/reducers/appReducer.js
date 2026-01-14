@@ -34,7 +34,7 @@ import { calculateFinalRisk, answersToRichFormat } from '../engine/riskScoring.j
 
 /**
  * Build initial portfolio holdings from investment amount and target allocation
- * v9.9: Holdings now store quantities instead of valueIRR
+ * v10: Holdings now store quantities instead of valueIRR
  *
  * @param {number} totalIRR - Total investment amount in IRR
  * @param {Object} targetLayerPct - Target layer percentages
@@ -129,7 +129,7 @@ export function initialState() {
     stage: STAGES.WELCOME,
     phone: null,
     cashIRR: 0,
-    // v9.9: Holdings store quantities instead of valueIRR
+    // v10: Holdings store quantities instead of valueIRR
     holdings: ASSETS.map(a => ({
       assetId: a,
       quantity: 0,
@@ -255,7 +255,7 @@ export function reducer(state, action) {
       const n = Math.floor(Number(state.investAmountIRR) || 0);
       if (n < THRESHOLDS.MIN_AMOUNT_IRR) return state;
 
-      // v9.9: Pass creation timestamp for fixed income accrual
+      // v10: Pass creation timestamp for fixed income accrual
       // Prices can be passed via action if available from usePrices hook
       const prices = action.prices || DEFAULT_PRICES;
       const fxRate = action.fxRate || DEFAULT_FX_RATE;
@@ -331,7 +331,7 @@ export function reducer(state, action) {
 
     case 'PREVIEW_TRADE': {
       if (state.stage !== STAGES.ACTIVE || !state.tradeDraft) return state;
-      // v9.9: Include prices and fxRate for quantity-based trade execution
+      // v10: Include prices and fxRate for quantity-based trade execution
       const prices = action.prices || DEFAULT_PRICES;
       const fxRate = action.fxRate || DEFAULT_FX_RATE;
       const payload = {
@@ -349,7 +349,7 @@ export function reducer(state, action) {
     // ====== PROTECT ======
     case 'START_PROTECT': {
       if (state.stage !== STAGES.ACTIVE) return state;
-      // v9.9: Check quantity instead of valueIRR
+      // v10: Check quantity instead of valueIRR
       const assetId = action.assetId || state.holdings.find(h => h.quantity > 0)?.assetId;
       if (!assetId) return state;
       return {
@@ -371,7 +371,7 @@ export function reducer(state, action) {
 
     case 'PREVIEW_PROTECT': {
       if (state.stage !== STAGES.ACTIVE || !state.protectDraft) return state;
-      // v9.9: Include prices and fxRate for quantity-based value computation
+      // v10: Include prices and fxRate for quantity-based value computation
       const prices = action.prices || DEFAULT_PRICES;
       const fxRate = action.fxRate || DEFAULT_FX_RATE;
       const payload = {
@@ -388,7 +388,7 @@ export function reducer(state, action) {
     // ====== BORROW ======
     case 'START_BORROW': {
       if (state.stage !== STAGES.ACTIVE) return state;
-      // v9.9: Check quantity instead of valueIRR
+      // v10: Check quantity instead of valueIRR
       const available = state.holdings.filter(h => !h.frozen && h.quantity > 0);
       if (available.length === 0) return state;
       const assetId = action.assetId || available[0].assetId;
@@ -411,7 +411,7 @@ export function reducer(state, action) {
 
     case 'PREVIEW_BORROW': {
       if (state.stage !== STAGES.ACTIVE || !state.borrowDraft) return state;
-      // v9.9: Include prices and fxRate for quantity-based value computation
+      // v10: Include prices and fxRate for quantity-based value computation
       const prices = action.prices || DEFAULT_PRICES;
       const fxRate = action.fxRate || DEFAULT_FX_RATE;
       const payload = {
@@ -461,7 +461,7 @@ export function reducer(state, action) {
 
     case 'PREVIEW_REBALANCE': {
       if (state.stage !== STAGES.ACTIVE) return state;
-      // v9.9: Include prices and fxRate for quantity-based rebalance execution
+      // v10: Include prices and fxRate for quantity-based rebalance execution
       const prices = action.prices || DEFAULT_PRICES;
       const fxRate = action.fxRate || DEFAULT_FX_RATE;
       const payload = { mode: state.rebalanceDraft?.mode || 'HOLDINGS_ONLY', prices, fxRate };
@@ -487,7 +487,7 @@ export function reducer(state, action) {
       if (p.kind === 'PROTECT') {
         const holding = next.holdings.find(h => h.assetId === p.payload.assetId);
         if (holding) {
-          // v9.9: Get notionalIRR from computed snapshot, not holding directly
+          // v10: Get notionalIRR from computed snapshot, not holding directly
           const notionalIRR = p.after.holdingsIRRByAsset[holding.assetId] || 0;
 
           const premium = calcPremiumIRR({

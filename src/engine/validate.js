@@ -12,7 +12,7 @@ export function fail(errors, meta = {}) {
 }
 
 /**
- * Compute holding value in IRR from quantity (v9.9)
+ * Compute holding value in IRR from quantity (v10)
  * @param {Object} holding - Holding with quantity
  * @param {Object} prices - Current prices in USD
  * @param {number} fxRate - USD/IRR exchange rate
@@ -51,7 +51,7 @@ export function validateTrade({ side, assetId, amountIRR, prices, fxRate }, stat
     return ok();
   }
 
-  // SELL - v9.9: compute value from quantity
+  // SELL - v10: compute value from quantity
   if (h.frozen) return fail("ASSET_FROZEN");
   const holdingValueIRR = getHoldingValueIRR(h, prices, fxRate);
   if (holdingValueIRR < amountIRR) {
@@ -76,7 +76,7 @@ export function validateProtect({ assetId, months, prices, fxRate }, state) {
     return fail("INVALID_MONTHS");
   }
 
-  // Notional validation - v9.9: compute value from quantity
+  // Notional validation - v10: compute value from quantity
   const h = state.holdings.find((x) => x.assetId === assetId);
   const holdingValueIRR = getHoldingValueIRR(h, prices, fxRate);
   if (!h || holdingValueIRR <= 0) {
@@ -120,7 +120,7 @@ export function validateBorrow({ assetId, amountIRR, prices, fxRate }, state) {
   if (h.frozen) return fail("ASSET_ALREADY_FROZEN");
 
   // LTV is determined by asset's layer (volatility-based)
-  // v9.9: compute value from quantity
+  // v10: compute value from quantity
   const layer = ASSET_LAYER[assetId];
   const maxLtv = COLLATERAL_LTV_BY_LAYER[layer] || 0.3;
   const holdingValueIRR = getHoldingValueIRR(h, prices, fxRate);

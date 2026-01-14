@@ -1,4 +1,4 @@
-// Utility functions for Blu Markets v9.9
+// Utility functions for Blu Markets v10
 // Optimization: Cached Intl.NumberFormat instances to avoid repeated allocations
 
 import { THRESHOLDS, RISK_ALLOCATIONS } from './constants/index.js';
@@ -21,7 +21,7 @@ export function formatIRRShort(n) {
   return num.toString();
 }
 
-// v9.9: Format USD price (using cached formatters)
+// v10: Format USD price (using cached formatters)
 export function formatUSD(n) {
   const num = Number(n) || 0;
   if (num >= 1000) {
@@ -33,7 +33,7 @@ export function formatUSD(n) {
   return '$' + usdFormatter4.format(num);
 }
 
-// v9.9: Format quantity with appropriate decimals
+// v10: Format quantity with appropriate decimals
 export function formatQuantity(qty, assetId) {
   const num = Number(qty) || 0;
   // More decimals for crypto with small quantities

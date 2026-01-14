@@ -5,7 +5,7 @@
 // All other modules derive from these types.
 // Rule: Chat can propose actions, but only the deterministic engine can
 //       execute actions and update state.
-// v9.9: Updated Holding to use quantity-based system
+// v10: Updated Holding to use quantity-based system
 // ============================================================================
 
 // ============================================================================
@@ -111,7 +111,7 @@ export interface TargetAllocation {
 // PORTFOLIO STATE - HOLDINGS
 // ============================================================================
 
-/** Single asset holding in portfolio (v9.9 quantity-based) */
+/** Single asset holding in portfolio (v10 quantity-based) */
 export interface Holding {
   assetId: AssetId;
   quantity: number;        // Number of units held (value computed from quantity × price × fxRate)

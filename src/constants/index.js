@@ -1,4 +1,4 @@
-// Constants for Blu Markets v9.9
+// Constants for Blu Markets v10
 
 // Centralized default prices (single source of truth)
 // Used by: appReducer, snapshot, preview, usePrices

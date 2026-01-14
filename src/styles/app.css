@@ -1,5 +1,5 @@
 /* ===== BLU MARKETS v10 - FINANCIAL UI ===== */
-/* Color System v9.10 - Clean 5-color palette */
+/* Color System v10 - Clean 5-color palette */
 
 :root {
   /* === BACKGROUNDS === */
@@ -187,7 +187,7 @@ body {
 .sectionTitle { font-size: 12px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.05em; margin-bottom: 12px; }
 .portfolioValue { font-size: 28px; font-weight: 600; color: var(--text-primary); }
 
-/* v9.9: Price indicator */
+/* v10: Price indicator */
 .priceIndicator { display: flex; align-items: center; gap: 6px; margin-bottom: 16px; padding: 6px 0; }
 .priceIndicatorDot { width: 6px; height: 6px; border-radius: 50%; animation: pulse 2s infinite; }
 .priceIndicator.live .priceIndicatorDot { background: var(--success); }
@@ -200,13 +200,13 @@ body {
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
-/* v9.9: Fixed income breakdown */
+/* v10: Fixed income breakdown */
 .fixedIncomeBreakdown { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 11px; flex-wrap: wrap; }
 .fixedIncomeBreakdown .principal { color: var(--text-secondary); }
 .fixedIncomeBreakdown .accrued { color: var(--success); font-weight: 500; }
 .fixedIncomeBreakdown .daysHeld { color: var(--text-muted); }
 
-/* v9.9: Quantity and price display */
+/* v10: Quantity and price display */
 .holdingQuantityPrice { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 11px; }
 .holdingQty { color: var(--text-secondary); font-weight: 500; }
 .holdingPrice { color: var(--text-muted); font-weight: 500; }
@@ -332,7 +332,7 @@ body {
 .ledgerEntry.stress { border-left: 3px solid var(--danger); }
 .ledgerHeader { display: flex; align-items: center; gap: 8px; }
 .ledgerIcon { font-size: 12px; width: 20px; font-weight: 700; color: var(--text-muted); }
-/* v9.10: All activity dots are gray - monochrome design */
+/* v10: All activity dots are gray - monochrome design */
 .ledgerIcon.trade-buy { color: var(--text-muted); }
 .ledgerIcon.trade-sell { color: var(--text-muted); }
 .ledgerIcon.action-success { color: var(--text-muted); }
@@ -688,7 +688,7 @@ body {
 .rebalanceNoTrades .noTradesText { font-size: 13px; color: var(--text-secondary); }
 .rebalanceNoTrades .noTradesHint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
 
-/* Header badges - v9.10 */
+/* Header badges - v10 */
 .headerBadge { padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; }
 .badge-success { background: var(--success-bg); color: var(--success); border: 1px solid rgba(34, 197, 94, 0.3); }
 .badge-warning { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning-border); }

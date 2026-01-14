@@ -4,7 +4,7 @@ import { DEFAULT_PRICES, DEFAULT_FX_RATE } from "../constants/index.js";
 
 /**
  * Compute holding value in IRR
- * Supports both quantity-based (v9.9+) and legacy valueIRR holdings
+ * Supports both quantity-based (v10+) and legacy valueIRR holdings
  *
  * @param {Object} holding - Holding object
  * @param {Object} prices - Current prices in USD
@@ -17,7 +17,7 @@ function computeHoldingValue(holding, prices, fxRate) {
     return { valueIRR: holding.valueIRR, priceUSD: null, breakdown: null };
   }
 
-  // Quantity-based calculation (v9.9+)
+  // Quantity-based calculation (v10+)
   const quantity = holding.quantity || 0;
 
   if (holding.assetId === 'IRR_FIXED_INCOME') {

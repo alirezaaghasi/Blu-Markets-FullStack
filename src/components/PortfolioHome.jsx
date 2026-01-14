@@ -10,8 +10,8 @@ import StressTestCard from './StressTestCard.jsx';
  * PortfolioHome - Main portfolio dashboard
  * Shows portfolio value, allocation, holdings grouped by layer
  * Issue 3: Collapsible holdings by layer (default collapsed)
- * v9.9: Uses computed holdingValues from snapshot for live prices
- * v9.9: Accepts individual state slices instead of whole state object to avoid stale UI
+ * v10: Uses computed holdingValues from snapshot for live prices
+ * v10: Accepts individual state slices instead of whole state object to avoid stale UI
  */
 function PortfolioHome({ holdings, cashIRR, targetLayerPct, protections, loans, snapshot, portfolioStatus, onStartTrade, onStartProtect, onStartBorrow, onStartRebalance, pricesLoading, pricesUpdatedAt, pricesError }) {
   // Decision 8: Track expanded layers (default all expanded for better UX)
@@ -81,7 +81,7 @@ function PortfolioHome({ holdings, cashIRR, targetLayerPct, protections, loans, 
     return { loanList: list, totalLoanAmount: total, criticalRatio: maxRatio };
   }, [loans]);
 
-  // v9.9: Precompute holdings grouped by layer using snapshot.holdingValues
+  // v10: Precompute holdings grouped by layer using snapshot.holdingValues
   // This ensures we use live-computed values (quantity × price × fxRate)
   const holdingsByLayer = useMemo(() => {
     const result = { FOUNDATION: [], GROWTH: [], UPSIDE: [] };
@@ -128,7 +128,7 @@ function PortfolioHome({ holdings, cashIRR, targetLayerPct, protections, loans, 
       <div className="portfolioValueCard">
         <div className="portfolioValueLabel">PORTFOLIO VALUE</div>
         <div className="portfolioValueAmount">{formatIRR(snapshot.totalIRR)}</div>
-        {/* v9.9: Price feed status indicator */}
+        {/* v10: Price feed status indicator */}
         <div className={`priceIndicator ${pricesError ? 'error' : pricesLoading ? 'loading' : 'live'}`}>
           <span className="priceIndicatorDot"></span>
           <span className="priceIndicatorText">
