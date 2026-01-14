@@ -1,10 +1,21 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { getProfileDescription } from '../engine/riskScoring';
 
 /**
  * ProfileResult - Displays risk profile result after questionnaire
  */
 function ProfileResult({ result, onContinue }) {
+  const containerRef = useRef(null);
+
+  // Auto-scroll to show continue button when component mounts
+  useEffect(() => {
+    if (containerRef.current) {
+      // Small delay to ensure DOM is rendered
+      requestAnimationFrame(() => {
+        containerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+  }, []);
   const {
     score,
     profile,
@@ -22,7 +33,7 @@ function ProfileResult({ result, onContinue }) {
   const hasHighSeverityWarning = warnings.some(w => w.severity === 'high');
 
   return (
-    <div className="profile-result">
+    <div className="profile-result" ref={containerRef}>
       {/* Profile Badge */}
       <div className="profile-badge">
         <div className="profile-score">{score}</div>

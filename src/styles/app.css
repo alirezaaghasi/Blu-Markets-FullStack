@@ -51,7 +51,7 @@ body {
 .rightMeta { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .pill { display: inline-flex; gap: 6px; align-items: center; padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-tertiary); font-weight: 500; font-size: 11px; color: var(--text-secondary); }
 .body { padding: 16px; overflow: auto; flex: 1; min-height: 0; }
-.footer { padding: 14px 16px; border-top: 1px solid var(--border); background: var(--bg-tertiary); }
+.footer { padding: 14px 16px; border-top: 1px solid var(--border); background: var(--bg-tertiary); overflow-y: auto; max-height: 70vh; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; }
 .stack { display: flex; flex-direction: column; gap: 0; }
 
