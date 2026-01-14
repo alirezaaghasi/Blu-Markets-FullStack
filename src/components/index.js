@@ -17,5 +17,4 @@ export { default as HoldingRow } from './HoldingRow.jsx';
 export { default as PortfolioHealthBadge } from './PortfolioHealthBadge.jsx';
 export { default as LayerMini } from './LayerMini.jsx';
 export { default as PendingActionModal } from './PendingActionModal.jsx';
-export { default as StressTestCard } from './StressTestCard.jsx';
 export { default as ConfirmModal, ResetConfirmModalV2, LargeSellConfirmModal, CancelProtectionConfirmModal } from './ConfirmModal.jsx';

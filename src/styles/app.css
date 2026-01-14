@@ -679,32 +679,6 @@ body {
 .badge-warning { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning-border); }
 .badge-info { background: var(--info-bg); color: var(--text-muted); border: 1px solid var(--info-border); }
 
-/* Decision 17: Stress test card */
-.stressTestCard { background: var(--bg-secondary); }
-.stressTestHeader h3 { margin: 0 0 4px 0; font-size: 14px; font-weight: 600; }
-.stressTestSubtitle { color: var(--text-muted); font-size: 13px; margin: 0 0 16px 0; }
-.stressTestScenarios { display: flex; gap: 8px; margin-bottom: 16px; }
-.stressTestBtn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 8px; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
-.stressTestBtn:hover { border-color: var(--accent); }
-.stressTestBtn.active { background: var(--accent); border-color: var(--accent); }
-.stressTestBtnLabel { font-size: 13px; font-weight: 600; color: var(--text-primary); }
-.stressTestBtn.active .stressTestBtnLabel { color: white; }
-.stressTestBtnDesc { font-size: 10px; color: var(--text-muted); text-align: center; }
-.stressTestBtn.active .stressTestBtnDesc { color: rgba(255, 255, 255, 0.7); }
-.stressTestResult { padding: 14px; background: var(--bg-tertiary); border-radius: 8px; }
-.stressTestResultRow { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; color: var(--text-secondary); }
-.stressTestResultRow:not(:last-child) { border-bottom: 1px solid var(--border); }
-.stressTestResultRow.loss { font-weight: 500; }
-.stressTestAfter { color: var(--text-primary); font-weight: 500; }
-.stressTestLoss { color: var(--danger); font-weight: 600; }
-.stressTestWarning { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; padding: 10px 12px; background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 6px; font-size: 12px; color: var(--warning); }
-.stressTestWarning .warningIcon { flex-shrink: 0; }
-
-/* Stress mode toggle (legacy) */
-.stressModeToggle { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-muted); font-size: 11px; font-weight: 500; cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s; }
-.stressModeToggle:hover { border-color: var(--border-hover); color: var(--text-secondary); }
-.stressModeToggle.active { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); color: #f87171; }
-
 /* Donut chart */
 .donutChartContainer { display: flex; justify-content: center; margin-bottom: 20px; }
 .donutChart { transform: rotate(-90deg); }
