@@ -2,6 +2,7 @@ import React from 'react';
 import { formatIRR } from '../helpers.js';
 import { ASSET_LAYER } from '../state/domain.js';
 import { LAYER_EXPLANATIONS } from '../constants/index.js';
+import { computePortfolioStatus } from '../engine/portfolioStatus.js';
 import LayerMini from './LayerMini.jsx';
 import HoldingRow from './HoldingRow.jsx';
 
@@ -9,7 +10,7 @@ import HoldingRow from './HoldingRow.jsx';
  * PortfolioHome - Main portfolio dashboard
  * Shows portfolio value, allocation, holdings grouped by layer
  */
-function PortfolioHome({ state, snapshot, onStartTrade, onStartProtect, onStartBorrow }) {
+function PortfolioHome({ state, snapshot, onStartTrade, onStartProtect, onStartBorrow, onStartRebalance }) {
   if (snapshot.holdingsIRR === 0 && state.cashIRR === 0) {
     return (
       <div className="card">
@@ -18,6 +19,16 @@ function PortfolioHome({ state, snapshot, onStartTrade, onStartProtect, onStartB
       </div>
     );
   }
+
+  // Calculate drift from target
+  const { status } = computePortfolioStatus(snapshot.layerPct);
+  const isOff = status === 'SLIGHTLY_OFF' || status === 'ATTENTION_REQUIRED';
+  const isAttention = status === 'ATTENTION_REQUIRED';
+
+  // Calculate total drift percentage
+  const totalDrift = ['FOUNDATION', 'GROWTH', 'UPSIDE'].reduce((sum, layer) => {
+    return sum + Math.abs(snapshot.layerPct[layer] - state.targetLayerPct[layer]);
+  }, 0);
 
   const getProtectionDays = (assetId) => {
     const p = (state.protections || []).find(x => x.assetId === assetId);
@@ -40,6 +51,26 @@ function PortfolioHome({ state, snapshot, onStartTrade, onStartProtect, onStartB
 
   return (
     <div className="stack">
+      {/* Drift warning banner - shows when portfolio is off target */}
+      {isOff && (
+        <div className={`driftBanner ${isAttention ? 'attention' : ''}`}>
+          <span className="driftIcon">{isAttention ? '⚠️' : '📊'}</span>
+          <div className="driftText">
+            <strong>{isAttention ? 'Attention required' : 'Portfolio drifted'}</strong>
+            {' — '}
+            {Math.round(totalDrift)}% from target allocation.
+            {isAttention
+              ? ' Consider rebalancing to reduce risk.'
+              : ' You can rebalance when ready.'}
+          </div>
+          {onStartRebalance && (
+            <button className="btn small driftAction" onClick={onStartRebalance}>
+              Rebalance
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="portfolioValueCard">
         <div className="portfolioValueLabel">PORTFOLIO VALUE</div>
         <div className="portfolioValueAmount">{formatIRR(snapshot.totalIRR)}</div>

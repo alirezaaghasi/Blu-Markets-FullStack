@@ -34,7 +34,19 @@ function HoldingRow({ holding, layerInfo, layer, protDays, onStartTrade, onStart
 
       <div className="holdingActions">
         <button className="btn small" onClick={() => onStartTrade(holding.assetId, 'BUY')}>Buy</button>
-        <button className="btn small" disabled={holding.frozen || isEmpty} onClick={() => onStartTrade(holding.assetId, 'SELL')}>Sell</button>
+        <div className="sellButtonWrapper">
+          <button
+            className="btn small"
+            disabled={holding.frozen || isEmpty}
+            onClick={() => onStartTrade(holding.assetId, 'SELL')}
+            title={holding.frozen ? 'Locked as loan collateral — repay loan to unlock' : ''}
+          >
+            Sell
+          </button>
+          {holding.frozen && (
+            <div className="frozenTooltip">🔒 Repay loan to sell</div>
+          )}
+        </div>
 
         <div className="overflowContainer">
           <button className="btn small overflowTrigger" onClick={(e) => { e.stopPropagation(); setShowOverflow(!showOverflow); }}>⋯</button>

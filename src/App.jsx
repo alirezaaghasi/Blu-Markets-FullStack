@@ -99,6 +99,7 @@ export default function App() {
   const onStartTrade = (assetId, side) => dispatch({ type: 'START_TRADE', assetId, side });
   const onStartProtect = (assetId) => dispatch({ type: 'START_PROTECT', assetId });
   const onStartBorrow = (assetId) => dispatch({ type: 'START_BORROW', assetId });
+  const onStartRebalance = () => dispatch({ type: 'START_REBALANCE' });
 
   // Memoize right panel content
   const rightContent = useMemo(() => {
@@ -124,6 +125,7 @@ export default function App() {
         onStartTrade={onStartTrade}
         onStartProtect={onStartProtect}
         onStartBorrow={onStartBorrow}
+        onStartRebalance={onStartRebalance}
       />
     );
   }, [state, snapshot]);
