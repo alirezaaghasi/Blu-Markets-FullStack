@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { formatIRR, formatIRRShort } from '../helpers.js';
 import { ASSET_LAYER } from '../state/domain.js';
 import { LAYER_EXPLANATIONS } from '../constants/index.js';
@@ -33,29 +33,50 @@ function PortfolioHome({ state, snapshot, onStartTrade, onStartProtect, onStartB
   const isOff = status === 'SLIGHTLY_OFF' || status === 'ATTENTION_REQUIRED';
   const isAttention = status === 'ATTENTION_REQUIRED';
 
-  // Calculate total drift percentage
-  const totalDrift = ['FOUNDATION', 'GROWTH', 'UPSIDE'].reduce((sum, layer) => {
-    return sum + Math.abs(snapshot.layerPct[layer] - state.targetLayerPct[layer]);
-  }, 0);
+  // Memoize total drift calculation
+  const totalDrift = useMemo(() => {
+    return ['FOUNDATION', 'GROWTH', 'UPSIDE'].reduce((sum, layer) => {
+      return sum + Math.abs(snapshot.layerPct[layer] - state.targetLayerPct[layer]);
+    }, 0);
+  }, [snapshot.layerPct, state.targetLayerPct]);
 
-  const getProtectionDays = (assetId) => {
-    const p = (state.protections || []).find(x => x.assetId === assetId);
-    if (!p) return null;
+  // Memoize protection days as a Map keyed by assetId for O(1) lookups
+  const protectionDaysMap = useMemo(() => {
+    const map = new Map();
     const now = Date.now();
-    const until = new Date(p.endISO).getTime();
-    return Math.max(0, Math.ceil((until - now) / (1000 * 60 * 60 * 24)));
-  };
+    for (const p of state.protections || []) {
+      const until = new Date(p.endISO).getTime();
+      map.set(p.assetId, Math.max(0, Math.ceil((until - now) / (1000 * 60 * 60 * 24))));
+    }
+    return map;
+  }, [state.protections]);
 
-  const loans = state.loans || [];
-  const totalLoanAmount = loans.reduce((sum, l) => sum + l.amountIRR, 0);
+  // Memoize loan summary calculations
+  const { loans, totalLoanAmount, criticalRatio } = useMemo(() => {
+    const loanList = state.loans || [];
+    const total = loanList.reduce((sum, l) => sum + l.amountIRR, 0);
+    // Find highest LTV ratio in single pass
+    let maxRatio = 0;
+    for (const loan of loanList) {
+      const ratio = loan.amountIRR / loan.liquidationIRR;
+      if (ratio > maxRatio) maxRatio = ratio;
+    }
+    return { loans: loanList, totalLoanAmount: total, criticalRatio: maxRatio };
+  }, [state.loans]);
 
-  // Find the most critical loan (highest LTV ratio)
-  const mostCriticalLoan = loans.reduce((worst, loan) => {
-    const ratio = loan.amountIRR / loan.liquidationIRR;
-    const worstRatio = worst ? worst.amountIRR / worst.liquidationIRR : 0;
-    return ratio > worstRatio ? loan : worst;
-  }, null);
-  const criticalRatio = mostCriticalLoan ? mostCriticalLoan.amountIRR / mostCriticalLoan.liquidationIRR : 0;
+  // Precompute holdings grouped by layer with totals
+  const holdingsByLayer = useMemo(() => {
+    const result = { FOUNDATION: [], GROWTH: [], UPSIDE: [] };
+    const totals = { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
+    for (const h of state.holdings) {
+      const layer = ASSET_LAYER[h.assetId];
+      if (layer && result[layer]) {
+        result[layer].push(h);
+        totals[layer] += h.valueIRR;
+      }
+    }
+    return { holdings: result, totals };
+  }, [state.holdings]);
 
   return (
     <div className="stack">
@@ -136,10 +157,10 @@ function PortfolioHome({ state, snapshot, onStartTrade, onStartProtect, onStartB
       <div className="card">
         <h3>HOLDINGS</h3>
         {['FOUNDATION', 'GROWTH', 'UPSIDE'].map(layer => {
-          const layerHoldings = state.holdings.filter(h => ASSET_LAYER[h.assetId] === layer);
+          const layerHoldings = holdingsByLayer.holdings[layer];
           if (layerHoldings.length === 0) return null;
           const layerInfo = LAYER_EXPLANATIONS[layer];
-          const layerTotal = layerHoldings.reduce((sum, h) => sum + h.valueIRR, 0);
+          const layerTotal = holdingsByLayer.totals[layer];
           const isExpanded = expandedLayers[layer];
           const currentPct = snapshot.layerPct[layer];
           const targetPct = state.targetLayerPct[layer];
@@ -166,21 +187,18 @@ function PortfolioHome({ state, snapshot, onStartTrade, onStartProtect, onStartB
               </div>
               {isExpanded && (
                 <div className="holdingsList">
-                  {layerHoldings.map((h) => {
-                    const protDays = getProtectionDays(h.assetId);
-                    return (
-                      <HoldingRow
-                        key={h.assetId}
-                        holding={h}
-                        layerInfo={layerInfo}
-                        layer={layer}
-                        protDays={protDays}
-                        onStartTrade={onStartTrade}
-                        onStartProtect={onStartProtect}
-                        onStartBorrow={onStartBorrow}
-                      />
-                    );
-                  })}
+                  {layerHoldings.map((h) => (
+                    <HoldingRow
+                      key={h.assetId}
+                      holding={h}
+                      layerInfo={layerInfo}
+                      layer={layer}
+                      protDays={protectionDaysMap.get(h.assetId) ?? null}
+                      onStartTrade={onStartTrade}
+                      onStartProtect={onStartProtect}
+                      onStartBorrow={onStartBorrow}
+                    />
+                  ))}
                 </div>
               )}
             </div>

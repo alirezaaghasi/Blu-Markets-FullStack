@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { formatIRR, getAssetDisplayName } from '../helpers.js';
 
 /**
@@ -36,7 +36,10 @@ function Loans({ loans, dispatch }) {
     return { level: 'healthy', color: '#34d399', message: null };
   };
 
-  const totalLoanAmount = loanList.reduce((sum, l) => sum + l.amountIRR, 0);
+  const totalLoanAmount = useMemo(
+    () => loanList.reduce((sum, l) => sum + l.amountIRR, 0),
+    [loanList]
+  );
 
   // Issue 17: Consolidate loan header - just show title, total in subtitle
   return (
