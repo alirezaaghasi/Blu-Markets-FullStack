@@ -75,8 +75,9 @@ function MoreMenu({ isOpen, onToggle, onProtect, onBorrow }) {
 /**
  * OnboardingControls - Left panel controls during onboarding and active stage
  * Handles questionnaire, consent flow, investment amount, and action forms
+ * v9.9: Receives prices/fxRate to pass to EXECUTE_PORTFOLIO for accurate valuation
  */
-function OnboardingControls({ state, dispatch, questionnaire }) {
+function OnboardingControls({ state, dispatch, questionnaire, prices, fxRate }) {
   const [consentText, setConsentText] = useState('');
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const isConsentMatch = consentText === questionnaire.consent_exact;
@@ -353,7 +354,7 @@ function OnboardingControls({ state, dispatch, questionnaire }) {
         <button
           className={`btn primary ${isValid ? '' : 'disabled'}`}
           style={{ width: '100%' }}
-          onClick={() => dispatch({ type: 'EXECUTE_PORTFOLIO' })}
+          onClick={() => dispatch({ type: 'EXECUTE_PORTFOLIO', prices, fxRate })}
           disabled={!isValid}
         >
           {isValid ? 'Start Investing' : 'Enter amount to start'}

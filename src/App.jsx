@@ -197,7 +197,7 @@ export default function App() {
             <ActionLogPane actionLog={state.actionLog} />
           </div>
           <div className="footer">
-            <OnboardingControls state={state} dispatch={dispatch} questionnaire={questionnaire} />
+            <OnboardingControls state={state} dispatch={dispatch} questionnaire={questionnaire} prices={prices} fxRate={fxRate} />
           </div>
         </div>
 
