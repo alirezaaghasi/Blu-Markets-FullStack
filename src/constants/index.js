@@ -1,4 +1,4 @@
-// Constants for Blu Markets v9.6
+// Constants for Blu Markets v9.7
 
 export const STAGES = {
   WELCOME: 'WELCOME',
