@@ -1,6 +1,6 @@
 import React, { useMemo, useReducer } from 'react';
 
-// ====== BLU MARKETS v9.7 REFACTORED ======
+// ====== BLU MARKETS v9.8 REFACTORED ======
 // Architecture: Single reducer + deterministic engine
 // All actions flow: PREVIEW_* -> pendingAction -> CONFIRM_PENDING -> ledger
 // Rule: Chat can propose, only engine can execute

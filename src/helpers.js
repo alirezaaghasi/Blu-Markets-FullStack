@@ -1,4 +1,4 @@
-// Utility functions for Blu Markets v9.7
+// Utility functions for Blu Markets v9.8
 
 export function formatIRR(n) {
   return Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' IRR';

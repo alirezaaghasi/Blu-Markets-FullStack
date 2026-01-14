@@ -1,4 +1,4 @@
-# Blu Markets v9.7
+# Blu Markets v9.8
 
 Production-ready portfolio management prototype with:
 - Phone-number onboarding + Persian questionnaire
@@ -23,7 +23,7 @@ Open the webview on port **5173** (or next available).
 - **Deterministic engine**: `src/engine/` contains pure functions for validation, preview, snapshots
 - **Centralized constants**: `src/constants/index.js` for all thresholds, labels, config
 
-## Key Features (v9.7)
+## Key Features (v9.8)
 
 - Multiple simultaneous loans (one per unfrozen asset)
 - Automatic LTV based on asset layer volatility:
