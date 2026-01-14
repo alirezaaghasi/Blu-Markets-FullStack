@@ -1,6 +1,6 @@
-# Blu Markets v9.9
+# Blu Markets v10
 
-Production-ready portfolio management prototype with live price feeds.
+Production-ready portfolio management prototype with live price feeds and advanced risk profiling.
 
 ## Features
 
@@ -28,7 +28,7 @@ Open the webview on port **5173** (or next available).
 - **Live prices**: `src/hooks/usePrices.js` polls APIs every 30 seconds
 - **Centralized constants**: `src/constants/index.js` for thresholds, labels, config
 
-## Key Features (v9.9)
+## Key Features (v10)
 
 - **Live Prices**: BTC, ETH, SOL, TON, USDT, GOLD from CoinGecko; QQQ from Finnhub
 - **USD/IRR Rate**: Live rate from Bonbast with fallback
