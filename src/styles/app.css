@@ -95,7 +95,7 @@ body {
 
 /* Tabs */
 .tabs { display: flex; gap: 4px; background: var(--bg-primary); padding: 4px; border-radius: 12px; border: 1px solid var(--border); }
-.tab { flex: 1; padding: 10px 14px; border-radius: 8px; border: none; background: transparent; font-weight: 500; cursor: pointer; font-size: 13px; color: var(--text-muted); transition: all 0.2s; }
+.tab { flex: 1; padding: 10px 14px; border-radius: 8px; border: none; background: transparent; font-weight: 500; cursor: pointer; font-size: 13px; color: var(--text-muted); transition: color 0.2s, background 0.2s, box-shadow 0.2s; }
 .tab:hover:not(.active) { color: var(--text-primary); background: var(--bg-tertiary); }
 .tab.active { color: white; background: linear-gradient(135deg, #6366f1, #8b5cf6); box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3); font-weight: 600; }
 
@@ -359,7 +359,7 @@ body {
 .onboardingProgress { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
 .progressSteps { display: flex; justify-content: space-between; }
 .progressStep { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; }
-.progressStep .stepNumber { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; background: var(--bg-primary); color: var(--text-muted); border: 2px solid var(--border); transition: all 0.2s; }
+.progressStep .stepNumber { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; background: var(--bg-primary); color: var(--text-muted); border: 2px solid var(--border); transition: background 0.2s, border-color 0.2s, color 0.2s; }
 .progressStep .stepLabel { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
 .progressStep.current .stepNumber { background: var(--accent); border-color: var(--accent); color: white; }
 .progressStep.current .stepLabel { color: var(--text-primary); font-weight: 500; }
@@ -448,7 +448,7 @@ body {
 
 /* Quick amounts */
 .quickAmounts { display: flex; gap: 8px; margin-bottom: 12px; }
-.quickAmountBtn { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-secondary); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s ease; }
+.quickAmountBtn { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-secondary); font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s; }
 .quickAmountBtn:hover { border-color: var(--accent); color: var(--text-primary); }
 .quickAmountBtn.selected { background: var(--accent); border-color: var(--accent); color: white; }
 
@@ -565,7 +565,7 @@ body {
 .badge-info { background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.3); }
 
 /* Stress mode */
-.stressModeToggle { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-muted); font-size: 11px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+.stressModeToggle { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-muted); font-size: 11px; font-weight: 500; cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s; }
 .stressModeToggle:hover { border-color: var(--border-hover); color: var(--text-secondary); }
 .stressModeToggle.active { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); color: #f87171; }
 
