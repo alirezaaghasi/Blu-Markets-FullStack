@@ -66,6 +66,7 @@ function OnboardingRightPanel({ stage, questionIndex, targetLayers, investAmount
         </div>
         <div className="layerPreviewCard">
           <h4>The Three Layers</h4>
+          {/* Issue 13: Two-line layer descriptions with tagline */}
           {['FOUNDATION', 'GROWTH', 'UPSIDE'].map(layer => {
             const info = LAYER_EXPLANATIONS[layer];
             return (
@@ -73,6 +74,7 @@ function OnboardingRightPanel({ stage, questionIndex, targetLayers, investAmount
                 <span className={`layerDot ${layer.toLowerCase()}`} style={{ marginTop: 4 }}></span>
                 <div>
                   <div className="layerPreviewName">{info.name}</div>
+                  <div className="layerPreviewTagline">{info.tagline}</div>
                   <div className="layerPreviewDesc">{info.description}</div>
                 </div>
               </div>

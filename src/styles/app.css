@@ -393,8 +393,9 @@ body {
 .layerPreviewCard h4 { margin: 0 0 12px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); font-weight: 500; }
 .layerPreviewRow { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
 .layerPreviewRow:last-child { margin-bottom: 0; }
-.layerPreviewName { font-weight: 500; font-size: 12px; }
-.layerPreviewDesc { font-size: 11px; color: var(--text-secondary); }
+.layerPreviewName { font-weight: 600; font-size: 13px; color: var(--text-primary); }
+.layerPreviewTagline { font-size: 12px; color: var(--accent); margin-top: 2px; font-weight: 500; }
+.layerPreviewDesc { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
 
 /* Allocation preview */
 .allocationPreviewCard { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
