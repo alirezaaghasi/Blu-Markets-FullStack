@@ -1,10 +1,26 @@
 import React, { useState, useMemo } from 'react';
-import { STAGES, LAYER_EXPLANATIONS, THRESHOLDS, COLLATERAL_LTV_BY_LAYER, ONBOARDING_STEPS } from '../../constants/index.js';
+import { STAGES, LAYER_EXPLANATIONS, THRESHOLDS, COLLATERAL_LTV_BY_LAYER, ONBOARDING_STEPS, DEFAULT_PRICES, DEFAULT_FX_RATE } from '../../constants/index.js';
 import { formatIRR, getAssetDisplayName } from '../../helpers.js';
 import { calcPremiumIRR } from '../../engine/pricing.js';
-import { ASSET_LAYER } from '../../state/domain.js';
+import { ASSET_LAYER, ASSET_META } from '../../state/domain.js';
+import { calculateFixedIncomeValue } from '../../engine/fixedIncome.js';
 import PhoneForm from './PhoneForm.jsx';
 import PendingActionModal from '../PendingActionModal.jsx';
+
+/**
+ * Compute holding value in IRR from quantity (v9.9)
+ * @param {Object} holding - Holding with quantity
+ * @param {Object} prices - Current prices in USD
+ * @param {number} fxRate - USD/IRR exchange rate
+ */
+function getHoldingValueIRR(holding, prices, fxRate) {
+  if (!holding || holding.quantity <= 0) return 0;
+  if (holding.assetId === 'IRR_FIXED_INCOME') {
+    return calculateFixedIncomeValue(holding.quantity, holding.purchasedAt);
+  }
+  const priceUSD = prices[holding.assetId] || DEFAULT_PRICES[holding.assetId] || 0;
+  return Math.round(holding.quantity * priceUSD * fxRate);
+}
 
 /**
  * ActionCard - Simple card wrapper for action forms
@@ -82,28 +98,30 @@ function OnboardingControls({ state, dispatch, questionnaire, prices, fxRate }) 
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const isConsentMatch = consentText === questionnaire.consent_exact;
 
-  // Memoize protect draft calculations
+  // Memoize protect draft calculations (v9.9: compute value from quantity)
   const protectData = useMemo(() => {
     if (!state.protectDraft) return null;
     const h = state.holdings.find(x => x.assetId === state.protectDraft.assetId);
-    const premium = h ? calcPremiumIRR({ assetId: h.assetId, notionalIRR: h.valueIRR, months: state.protectDraft.months }) : 0;
-    return { holding: h, premium };
-  }, [state.protectDraft, state.holdings]);
+    const notionalIRR = getHoldingValueIRR(h, prices, fxRate);
+    const premium = h ? calcPremiumIRR({ assetId: h.assetId, notionalIRR, months: state.protectDraft.months }) : 0;
+    return { holding: h, notionalIRR, premium };
+  }, [state.protectDraft, state.holdings, prices, fxRate]);
 
-  // Memoize borrow draft calculations
+  // Memoize borrow draft calculations (v9.9: compute value from quantity)
   const borrowData = useMemo(() => {
     if (!state.borrowDraft) return null;
     const h = state.holdings.find(x => x.assetId === state.borrowDraft.assetId);
     const layer = h ? ASSET_LAYER[h.assetId] : 'UPSIDE';
     const layerLtv = COLLATERAL_LTV_BY_LAYER[layer] || 0.3;
-    const maxBorrow = h ? Math.floor(h.valueIRR * layerLtv) : 0;
+    const holdingValueIRR = getHoldingValueIRR(h, prices, fxRate);
+    const maxBorrow = h ? Math.floor(holdingValueIRR * layerLtv) : 0;
     const layerInfo = LAYER_EXPLANATIONS[layer];
-    return { holding: h, layer, layerLtv, maxBorrow, layerInfo };
-  }, [state.borrowDraft, state.holdings]);
+    return { holding: h, layer, layerLtv, maxBorrow, layerInfo, holdingValueIRR };
+  }, [state.borrowDraft, state.holdings, prices, fxRate]);
 
-  // Memoize select options for protect/borrow
+  // Memoize select options for protect/borrow (v9.9: filter by quantity > 0)
   const protectOptions = useMemo(() => {
-    return state.holdings.filter(h => h.valueIRR > 0).map(h => {
+    return state.holdings.filter(h => h.quantity > 0).map(h => {
       const layer = ASSET_LAYER[h.assetId];
       const info = LAYER_EXPLANATIONS[layer];
       return { assetId: h.assetId, label: `${info.icon} ${getAssetDisplayName(h.assetId)}` };
@@ -111,7 +129,7 @@ function OnboardingControls({ state, dispatch, questionnaire, prices, fxRate }) 
   }, [state.holdings]);
 
   const borrowOptions = useMemo(() => {
-    return state.holdings.filter(h => !h.frozen && h.valueIRR > 0).map(h => {
+    return state.holdings.filter(h => !h.frozen && h.quantity > 0).map(h => {
       const layer = ASSET_LAYER[h.assetId];
       const info = LAYER_EXPLANATIONS[layer];
       const ltv = COLLATERAL_LTV_BY_LAYER[layer] || 0.3;
