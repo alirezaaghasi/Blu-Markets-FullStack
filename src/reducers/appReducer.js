@@ -62,8 +62,8 @@ export function buildInitialHoldings(totalIRR, targetLayerPct) {
 }
 
 function buildPending(state, kind, payload, validation, afterState) {
-  const before = computeSnapshot(state);
-  const after = computeSnapshot(afterState);
+  const before = computeSnapshot(state.holdings, state.cashIRR);
+  const after = computeSnapshot(afterState.holdings, afterState.cashIRR);
   const boundary = classifyActionBoundary({
     kind,
     validation,

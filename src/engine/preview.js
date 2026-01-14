@@ -100,7 +100,7 @@ export function previewRepay(state, { loanId, amountIRR }) {
  */
 export function previewRebalance(state, { mode }) {
   const next = cloneState(state);
-  const snap = computeSnapshot(next);
+  const snap = computeSnapshot(next.holdings, next.cashIRR);
   const holdingsTotal = snap.holdingsIRR || 1;
 
   // Build holdings lookup by layer once - O(n) instead of O(n*m) repeated filters
@@ -280,7 +280,7 @@ export function previewRebalance(state, { mode }) {
   }
 
   // After rebalance, compute residual drift from target
-  const afterSnap = computeSnapshot(next);
+  const afterSnap = computeSnapshot(next.holdings, next.cashIRR);
   const driftFromTarget = ['FOUNDATION', 'GROWTH', 'UPSIDE'].reduce((sum, layer) => {
     const target = state.targetLayerPct[layer];
     const actual = afterSnap.layerPct[layer];

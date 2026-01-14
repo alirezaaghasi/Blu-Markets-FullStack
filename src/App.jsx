@@ -84,13 +84,13 @@ function computeHeaderContent(activeTab, state, snapshot, loansTotal, portfolioS
 export default function App() {
   const [state, dispatch] = useReducer(reducer, null, initialState);
 
-  // Memoize snapshot computation - only depends on holdings and cash
+  // Memoize snapshot computation - pass individual params to avoid stale closures
   const snapshot = useMemo(
-    () => computeSnapshot(state),
+    () => computeSnapshot(state.holdings, state.cashIRR),
     [state.holdings, state.cashIRR]
   );
 
-  // Memoize portfolio status - reused by header, PortfolioHome, and PortfolioHealthBadge
+  // Memoize portfolio status - reused by header and PortfolioHome
   const portfolioStatus = useMemo(
     () => computePortfolioStatus(snapshot.layerPct).status,
     [snapshot.layerPct]

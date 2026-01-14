@@ -5,8 +5,8 @@ import { LAYER_EXPLANATIONS } from '../constants/index.js';
 import LayerMini from './LayerMini.jsx';
 import HoldingRow from './HoldingRow.jsx';
 
-// Hoist static array to module level to avoid recreation on each render
-const LAYERS = LAYERS;
+// Hoisted to module level to avoid per-render array allocation
+const LAYERS = ['FOUNDATION', 'GROWTH', 'UPSIDE'];
 
 /**
  * PortfolioHome - Main portfolio dashboard
