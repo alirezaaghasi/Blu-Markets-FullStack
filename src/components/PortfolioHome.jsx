@@ -37,16 +37,17 @@ function PortfolioHome({ holdings, cashIRR, targetLayerPct, protections, loans, 
     );
   }
 
-  // Use pre-computed portfolio status from App.jsx
-  const isOff = portfolioStatus === 'SLIGHTLY_OFF' || portfolioStatus === 'ATTENTION_REQUIRED';
-  const isAttention = portfolioStatus === 'ATTENTION_REQUIRED';
-
-  // Memoize total drift calculation
+  // Memoize total drift calculation (sum of absolute differences from target)
   const totalDrift = useMemo(() => {
     return LAYERS.reduce((sum, layer) => {
       return sum + Math.abs(snapshot.layerPct[layer] - targetLayerPct[layer]);
     }, 0);
   }, [snapshot.layerPct, targetLayerPct]);
+
+  // Only show drift banner if there's meaningful drift (>1%)
+  // portfolioStatus uses fixed ranges, but we care about drift from user's actual target
+  const isOff = totalDrift > 1;
+  const isAttention = portfolioStatus === 'ATTENTION_REQUIRED' && totalDrift > 1;
 
   // Memoize protection days as a Map keyed by assetId for O(1) lookups
   // clockTick dependency ensures this recalculates every minute for live countdown
