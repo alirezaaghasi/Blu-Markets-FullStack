@@ -29,18 +29,7 @@ import { ASSETS } from '../state/domain.js';
 import questionnaire from '../data/questionnaire.fa.json';
 import { STAGES, THRESHOLDS, WEIGHTS, LAYERS } from '../constants/index.js';
 import { uid, nowISO, computeTargetLayersFromAnswers } from '../helpers.js';
-
-// Default prices for initial portfolio creation (before live prices load)
-const DEFAULT_PRICES = {
-  BTC: 97500,
-  ETH: 3200,
-  SOL: 185,
-  TON: 5.20,
-  USDT: 1.0,
-  GOLD: 2650,
-  QQQ: 520,
-};
-const DEFAULT_FX_RATE = 1456000;
+import { DEFAULT_PRICES, DEFAULT_FX_RATE } from '../constants/index.js';
 
 /**
  * Build initial portfolio holdings from investment amount and target allocation
@@ -326,10 +315,15 @@ export function reducer(state, action) {
 
     case 'PREVIEW_TRADE': {
       if (state.stage !== STAGES.ACTIVE || !state.tradeDraft) return state;
+      // v9.9: Include prices and fxRate for quantity-based trade execution
+      const prices = action.prices || DEFAULT_PRICES;
+      const fxRate = action.fxRate || DEFAULT_FX_RATE;
       const payload = {
         side: state.tradeDraft.side,
         assetId: state.tradeDraft.assetId,
         amountIRR: Number(state.tradeDraft.amountIRR),
+        prices,
+        fxRate,
       };
       const validation = validateTrade(payload, state);
       const afterState = validation.ok ? previewTrade(state, payload) : cloneState(state);
@@ -441,7 +435,10 @@ export function reducer(state, action) {
 
     case 'PREVIEW_REBALANCE': {
       if (state.stage !== STAGES.ACTIVE) return state;
-      const payload = { mode: state.rebalanceDraft?.mode || 'HOLDINGS_ONLY' };
+      // v9.9: Include prices and fxRate for quantity-based rebalance execution
+      const prices = action.prices || DEFAULT_PRICES;
+      const fxRate = action.fxRate || DEFAULT_FX_RATE;
+      const payload = { mode: state.rebalanceDraft?.mode || 'HOLDINGS_ONLY', prices, fxRate };
       const validation = validateRebalance(payload);
       const afterState = validation.ok ? previewRebalance(state, payload) : cloneState(state);
       return { ...state, pendingAction: buildPending(state, 'REBALANCE', payload, validation, afterState) };

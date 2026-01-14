@@ -7,21 +7,21 @@
  * - Bonbast: USD/IRR rate
  */
 
-// CoinGecko IDs for our assets
-const COINGECKO_IDS = {
-  BTC: 'bitcoin',
-  ETH: 'ethereum',
-  SOL: 'solana',
-  TON: 'the-open-network',
-  USDT: 'tether',
-  GOLD: 'pax-gold',  // Using PAXG as gold proxy (1 PAXG = 1 oz gold)
-};
+import { ASSET_META } from '../state/domain.js';
+import { DEFAULT_FX_RATE } from '../constants/index.js';
+
+// Build CoinGecko IDs map from ASSET_META (single source of truth)
+const COINGECKO_IDS = Object.fromEntries(
+  Object.entries(ASSET_META)
+    .filter(([_, meta]) => meta.source === 'coingecko' && meta.coingeckoId)
+    .map(([assetId, meta]) => [assetId, meta.coingeckoId])
+);
 
 // Finnhub API key from environment
 const FINNHUB_API_KEY = import.meta.env.VITE_FINNHUB_API_KEY || '';
 
-// Fallback rate from environment or default
-const FALLBACK_RATE = parseInt(import.meta.env.VITE_FALLBACK_USD_IRR) || 1456000;
+// Fallback rate from environment or centralized default
+const FALLBACK_RATE = parseInt(import.meta.env.VITE_FALLBACK_USD_IRR) || DEFAULT_FX_RATE;
 
 /**
  * Fetch crypto prices from CoinGecko

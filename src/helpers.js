@@ -1,5 +1,7 @@
 // Utility functions for Blu Markets v9.9
 
+import { THRESHOLDS, RISK_ALLOCATIONS } from './constants/index.js';
+
 export function formatIRR(n) {
   return Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' IRR';
 }
@@ -78,7 +80,8 @@ export function computeTargetLayersFromAnswers(questionnaire, answers) {
     const opt = q.options.find(o => o.id === answers[q.id]);
     risk += (opt?.risk ?? 0);
   }
-  if (risk <= 5) return { FOUNDATION: 65, GROWTH: 30, UPSIDE: 5 };
-  if (risk <= 10) return { FOUNDATION: 50, GROWTH: 35, UPSIDE: 15 };
-  return { FOUNDATION: 40, GROWTH: 40, UPSIDE: 20 };
+  // Use centralized thresholds and allocations from constants
+  if (risk <= THRESHOLDS.RISK_LOW_THRESHOLD) return { ...RISK_ALLOCATIONS.LOW };
+  if (risk <= THRESHOLDS.RISK_MED_THRESHOLD) return { ...RISK_ALLOCATIONS.MEDIUM };
+  return { ...RISK_ALLOCATIONS.HIGH };
 }

@@ -403,7 +403,7 @@ function OnboardingControls({ state, dispatch, questionnaire, prices, fxRate }) 
           onChange={(e) => dispatch({ type: 'SET_TRADE_AMOUNT', amountIRR: e.target.value })}
         />
         <div className="row" style={{ marginTop: 10 }}>
-          <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_TRADE' })} disabled={!state.tradeDraft.amountIRR}>Preview</button>
+          <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_TRADE', prices, fxRate })} disabled={!state.tradeDraft.amountIRR}>Preview</button>
           <button className="btn" onClick={() => dispatch({ type: 'CANCEL_PENDING' })}>Cancel</button>
         </div>
       </ActionCard>
@@ -498,7 +498,7 @@ function OnboardingControls({ state, dispatch, questionnaire, prices, fxRate }) 
       <ActionCard title="Rebalance">
         <div className="muted">Reallocate assets to target. Cash will be deployed to underweight layers.</div>
         <div className="row" style={{ marginTop: 10 }}>
-          <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_REBALANCE' })}>Preview</button>
+          <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_REBALANCE', prices, fxRate })}>Preview</button>
           <button className="btn" onClick={() => dispatch({ type: 'CANCEL_PENDING' })}>Cancel</button>
         </div>
       </ActionCard>

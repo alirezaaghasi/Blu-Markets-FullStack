@@ -10,8 +10,9 @@ import HoldingRow from './HoldingRow.jsx';
  * Shows portfolio value, allocation, holdings grouped by layer
  * Issue 3: Collapsible holdings by layer (default collapsed)
  * v9.9: Uses computed holdingValues from snapshot for live prices
+ * v9.9: Accepts individual state slices instead of whole state object to avoid stale UI
  */
-function PortfolioHome({ state, snapshot, portfolioStatus, onStartTrade, onStartProtect, onStartBorrow, onStartRebalance, pricesLoading, pricesUpdatedAt, pricesError }) {
+function PortfolioHome({ holdings, cashIRR, targetLayerPct, protections, loans, snapshot, portfolioStatus, onStartTrade, onStartProtect, onStartBorrow, onStartRebalance, pricesLoading, pricesUpdatedAt, pricesError }) {
   // Issue 3: Track expanded layers (default all collapsed)
   const [expandedLayers, setExpandedLayers] = useState({});
 
@@ -27,7 +28,7 @@ function PortfolioHome({ state, snapshot, portfolioStatus, onStartTrade, onStart
     setExpandedLayers(prev => ({ ...prev, [layer]: !prev[layer] }));
   };
 
-  if (snapshot.holdingsIRR === 0 && state.cashIRR === 0) {
+  if (snapshot.holdingsIRR === 0 && cashIRR === 0) {
     return (
       <div className="card">
         <h3>Portfolio</h3>
@@ -43,34 +44,34 @@ function PortfolioHome({ state, snapshot, portfolioStatus, onStartTrade, onStart
   // Memoize total drift calculation
   const totalDrift = useMemo(() => {
     return LAYERS.reduce((sum, layer) => {
-      return sum + Math.abs(snapshot.layerPct[layer] - state.targetLayerPct[layer]);
+      return sum + Math.abs(snapshot.layerPct[layer] - targetLayerPct[layer]);
     }, 0);
-  }, [snapshot.layerPct, state.targetLayerPct]);
+  }, [snapshot.layerPct, targetLayerPct]);
 
   // Memoize protection days as a Map keyed by assetId for O(1) lookups
   // clockTick dependency ensures this recalculates every minute for live countdown
   const protectionDaysMap = useMemo(() => {
     const map = new Map();
     const now = Date.now();
-    for (const p of state.protections || []) {
+    for (const p of protections || []) {
       const until = new Date(p.endISO).getTime();
       map.set(p.assetId, Math.max(0, Math.ceil((until - now) / (1000 * 60 * 60 * 24))));
     }
     return map;
-  }, [state.protections, clockTick]);
+  }, [protections, clockTick]);
 
   // Memoize loan summary calculations
-  const { loans, totalLoanAmount, criticalRatio } = useMemo(() => {
-    const loanList = state.loans || [];
-    const total = loanList.reduce((sum, l) => sum + l.amountIRR, 0);
+  const { loanList, totalLoanAmount, criticalRatio } = useMemo(() => {
+    const list = loans || [];
+    const total = list.reduce((sum, l) => sum + l.amountIRR, 0);
     // Find highest LTV ratio in single pass
     let maxRatio = 0;
-    for (const loan of loanList) {
+    for (const loan of list) {
       const ratio = loan.amountIRR / loan.liquidationIRR;
       if (ratio > maxRatio) maxRatio = ratio;
     }
-    return { loans: loanList, totalLoanAmount: total, criticalRatio: maxRatio };
-  }, [state.loans]);
+    return { loanList: list, totalLoanAmount: total, criticalRatio: maxRatio };
+  }, [loans]);
 
   // v9.9: Precompute holdings grouped by layer using snapshot.holdingValues
   // This ensures we use live-computed values (quantity × price × fxRate)
@@ -83,7 +84,7 @@ function PortfolioHome({ state, snapshot, portfolioStatus, onStartTrade, onStart
       holdingValueMap.set(hv.assetId, hv);
     }
     // Group holdings with their computed values
-    for (const h of state.holdings) {
+    for (const h of holdings) {
       const layer = ASSET_LAYER[h.assetId];
       if (layer && result[layer]) {
         const holdingValue = holdingValueMap.get(h.assetId);
@@ -92,7 +93,7 @@ function PortfolioHome({ state, snapshot, portfolioStatus, onStartTrade, onStart
       }
     }
     return { holdings: result, totals };
-  }, [state.holdings, snapshot.holdingValues]);
+  }, [holdings, snapshot.holdingValues]);
 
   return (
     <div className="stack">
@@ -145,10 +146,10 @@ function PortfolioHome({ state, snapshot, portfolioStatus, onStartTrade, onStart
         </div>
 
         {/* Loan health indicator - shows summary when loans exist */}
-        {loans.length > 0 && (
+        {loanList.length > 0 && (
           <div className="loanSummaryCard">
             <div className="loanSummaryHeader">
-              <span className="loanSummaryLabel">💰 Active Loans ({loans.length})</span>
+              <span className="loanSummaryLabel">💰 Active Loans ({loanList.length})</span>
               <span className="loanSummaryAmount">{formatIRR(totalLoanAmount)}</span>
             </div>
             <div className="loanHealthIndicator">
@@ -176,7 +177,7 @@ function PortfolioHome({ state, snapshot, portfolioStatus, onStartTrade, onStart
         <div className="sectionTitle">ASSET ALLOCATION</div>
         <div className="grid3">
           {LAYERS.map(layer => (
-            <LayerMini key={layer} layer={layer} pct={snapshot.layerPct[layer]} target={state.targetLayerPct[layer]} />
+            <LayerMini key={layer} layer={layer} pct={snapshot.layerPct[layer]} target={targetLayerPct[layer]} />
           ))}
         </div>
       </div>
@@ -191,7 +192,7 @@ function PortfolioHome({ state, snapshot, portfolioStatus, onStartTrade, onStart
           const layerTotal = holdingsByLayer.totals[layer];
           const isExpanded = expandedLayers[layer];
           const currentPct = snapshot.layerPct[layer];
-          const targetPct = state.targetLayerPct[layer];
+          const targetPct = targetLayerPct[layer];
           const isOnTarget = Math.abs(currentPct - targetPct) < 3;
 
           return (

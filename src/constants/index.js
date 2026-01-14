@@ -1,5 +1,21 @@
 // Constants for Blu Markets v9.9
 
+// Centralized default prices (single source of truth)
+// Used by: appReducer, snapshot, preview, usePrices
+export const DEFAULT_PRICES = {
+  BTC: 97500,
+  ETH: 3200,
+  SOL: 185,
+  TON: 5.20,
+  USDT: 1.0,
+  GOLD: 2650,
+  QQQ: 520,
+};
+
+// Centralized default FX rate (single source of truth)
+// 1 USD = 1,456,000 IRR
+export const DEFAULT_FX_RATE = 1456000;
+
 export const STAGES = {
   WELCOME: 'WELCOME',
   ONBOARDING_PHONE: 'ONBOARDING_PHONE',

@@ -1,10 +1,11 @@
 // ============================================================================
-// BLU MARKETS v9.8 - TYPE DEFINITIONS
+// BLU MARKETS v9.9 - TYPE DEFINITIONS
 // ============================================================================
 // This file is the SINGLE SOURCE OF TRUTH for all data models.
 // All other modules derive from these types.
 // Rule: Chat can propose actions, but only the deterministic engine can
 //       execute actions and update state.
+// v9.9: Updated Holding to use quantity-based system
 // ============================================================================
 
 // ============================================================================
@@ -110,14 +111,14 @@ export interface TargetAllocation {
 // PORTFOLIO STATE - HOLDINGS
 // ============================================================================
 
-/** Single asset holding in portfolio */
+/** Single asset holding in portfolio (v9.9 quantity-based) */
 export interface Holding {
   assetId: AssetId;
-  valueIRR: number;        // Current value in IRR
+  quantity: number;        // Number of units held (value computed from quantity × price × fxRate)
   frozen: boolean;         // True if locked as loan collateral
-  // Derived fields (can be computed but stored for convenience)
-  layer?: Layer;           // Asset's layer classification
-  units?: number;          // Number of units (for future price tracking)
+  purchasedAt?: string;    // ISO timestamp for accrual calculations (fixed income)
+  // Derived fields (computed on-demand, not stored)
+  layer?: Layer;           // Asset's layer classification (from ASSET_LAYER)
 }
 
 // ============================================================================

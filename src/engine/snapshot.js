@@ -1,18 +1,6 @@
 import { ASSET_LAYER } from "../state/domain.js";
 import { calculateFixedIncomeValue } from "./fixedIncome.js";
-
-// Default prices for fallback
-const DEFAULT_PRICES = {
-  BTC: 97500,
-  ETH: 3200,
-  SOL: 185,
-  TON: 5.20,
-  USDT: 1.0,
-  GOLD: 2650,
-  QQQ: 520,
-};
-
-const DEFAULT_FX_RATE = 1456000;
+import { DEFAULT_PRICES, DEFAULT_FX_RATE } from "../constants/index.js";
 
 /**
  * Compute holding value in IRR

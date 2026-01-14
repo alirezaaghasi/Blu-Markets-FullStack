@@ -45,7 +45,8 @@ import {
 // ====== HEADER CONTENT HELPER ======
 // Memoized via useMemo in component to avoid repeated computation
 
-function computeHeaderContent(activeTab, state, snapshot, loansTotal, portfolioStatus) {
+// Removed unused snapshot parameter to avoid unnecessary useMemo invalidations
+function computeHeaderContent(activeTab, protections, loans, loansTotal, portfolioStatus) {
   switch (activeTab) {
     case 'PORTFOLIO': {
       const needsRebalance = portfolioStatus === 'SLIGHTLY_OFF' || portfolioStatus === 'ATTENTION_REQUIRED';
@@ -57,7 +58,7 @@ function computeHeaderContent(activeTab, state, snapshot, loansTotal, portfolioS
       };
     }
     case 'PROTECTION': {
-      const protectedCount = state.protections?.length || 0;
+      const protectedCount = protections?.length || 0;
       return {
         title: 'Your Protections',
         badge: protectedCount > 0
@@ -66,7 +67,6 @@ function computeHeaderContent(activeTab, state, snapshot, loansTotal, portfolioS
       };
     }
     case 'LOANS': {
-      const loans = state.loans || [];
       return {
         title: 'Your Loans',
         badge: loans.length > 0
@@ -110,9 +110,10 @@ export default function App() {
   );
 
   // Memoize header content to avoid repeated computation per render
+  // Note: Removed snapshot dependency - function doesn't use it
   const headerContent = useMemo(
-    () => computeHeaderContent(state.tab, state, snapshot, loansTotal, portfolioStatus),
-    [state.tab, state.protections, state.loans, snapshot, loansTotal, portfolioStatus]
+    () => computeHeaderContent(state.tab, state.protections, state.loans, loansTotal, portfolioStatus),
+    [state.tab, state.protections, state.loans, loansTotal, portfolioStatus]
   );
 
   // Action handlers
@@ -121,8 +122,8 @@ export default function App() {
   const onStartBorrow = (assetId) => dispatch({ type: 'START_BORROW', assetId });
   const onStartRebalance = () => dispatch({ type: 'START_REBALANCE' });
 
-  // Memoize right panel content - narrow dependencies to avoid recomputation
-  // when unrelated state fields (actionLog, pendingAction, drafts, etc.) change
+  // Memoize right panel content - pass only specific state slices to avoid
+  // stale UI when unrelated state fields (actionLog, pendingAction, drafts) change
   const rightContent = useMemo(() => {
     if (state.stage !== STAGES.ACTIVE) {
       return (
@@ -139,9 +140,14 @@ export default function App() {
     if (state.tab === 'PROTECTION') return <Protection protections={state.protections} dispatch={dispatch} />;
     if (state.tab === 'LOANS') return <Loans loans={state.loans} dispatch={dispatch} />;
     if (state.tab === 'HISTORY') return <HistoryPane ledger={state.ledger} />;
+    // Pass only specific state slices PortfolioHome needs (not whole state object)
     return (
       <PortfolioHome
-        state={state}
+        holdings={state.holdings}
+        cashIRR={state.cashIRR}
+        targetLayerPct={state.targetLayerPct}
+        protections={state.protections}
+        loans={state.loans}
         snapshot={snapshot}
         portfolioStatus={portfolioStatus}
         onStartTrade={onStartTrade}

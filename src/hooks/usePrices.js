@@ -1,18 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchAllPrices } from '../services/priceService.js';
-
-// Default prices (fallback if APIs fail)
-const DEFAULT_PRICES = {
-  BTC: 97500,
-  ETH: 3200,
-  SOL: 185,
-  TON: 5.20,
-  USDT: 1.0,
-  GOLD: 2650,  // per oz
-  QQQ: 520,
-};
-
-const DEFAULT_FX_RATE = 1456000;  // 1 USD = 1,456,000 IRR
+import { DEFAULT_PRICES, DEFAULT_FX_RATE } from '../constants/index.js';
 
 /**
  * usePrices - Hook for live price feeds
