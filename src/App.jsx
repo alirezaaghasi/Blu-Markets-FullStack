@@ -26,6 +26,7 @@ import {
   PORTFOLIO_STATUS_LABELS,
   ERROR_MESSAGES,
   COLLATERAL_LTV_BY_LAYER,
+  BOUNDARY_LABELS,
 } from './constants/index.js';
 
 // Utility imports
