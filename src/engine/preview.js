@@ -485,22 +485,38 @@ export function previewRebalance(state, { mode, useCashAmount = 0, prices = DEFA
         const assets = holdingsByLayer[layer];
         if (!assets.length) continue;
 
-        // Distribute buy evenly across assets in layer
-        const perAssetIRR = layerBuy / assets.length;
-        for (const h of assets) {
-          // v10: Convert IRR to quantity change
-          if (h.assetId === 'IRR_FIXED_INCOME') {
-            h.quantity += irrToFixedIncomeUnits(perAssetIRR);
-          } else {
-            const priceUSD = prices[h.assetId] || DEFAULT_PRICES[h.assetId] || 1;
-            h.quantity += perAssetIRR / (priceUSD * fxRate);
+        // Distribute buy according to layer weights (ETH 40%, SOL 35%, TON 25%, etc.)
+        const layerWeights = WEIGHTS[layer] || {};
+        const weightedAssets = assets.filter(h => layerWeights[h.assetId]);
+
+        if (weightedAssets.length > 0) {
+          // Use weights for distribution
+          const totalWeight = weightedAssets.reduce((sum, h) => sum + (layerWeights[h.assetId] || 0), 0);
+          for (const h of weightedAssets) {
+            const assetWeight = layerWeights[h.assetId] || 0;
+            const assetPortionIRR = layerBuy * (assetWeight / totalWeight);
+            if (assetPortionIRR > 0) {
+              if (h.assetId === 'IRR_FIXED_INCOME') {
+                h.quantity += irrToFixedIncomeUnits(assetPortionIRR);
+              } else {
+                const priceUSD = prices[h.assetId] || DEFAULT_PRICES[h.assetId] || 1;
+                h.quantity += assetPortionIRR / (priceUSD * fxRate);
+              }
+              meta.trades.push({ layer, assetId: h.assetId, amountIRR: assetPortionIRR, side: 'BUY' });
+            }
           }
-          meta.trades.push({
-            layer,
-            assetId: h.assetId,
-            amountIRR: perAssetIRR,
-            side: 'BUY',
-          });
+        } else {
+          // Fallback: equal distribution if no weights defined
+          const perAssetIRR = layerBuy / assets.length;
+          for (const h of assets) {
+            if (h.assetId === 'IRR_FIXED_INCOME') {
+              h.quantity += irrToFixedIncomeUnits(perAssetIRR);
+            } else {
+              const priceUSD = prices[h.assetId] || DEFAULT_PRICES[h.assetId] || 1;
+              h.quantity += perAssetIRR / (priceUSD * fxRate);
+            }
+            meta.trades.push({ layer, assetId: h.assetId, amountIRR: perAssetIRR, side: 'BUY' });
+          }
         }
       }
     }
@@ -559,7 +575,7 @@ export function previewRebalance(state, { mode, useCashAmount = 0, prices = DEFA
         }
       }
 
-      // BUY into underweight
+      // BUY into underweight - use weights for distribution
       for (const layer of Object.keys(deficits)) {
         const layerBuy = (deficits[layer] / totalDeficit) * amountToMove;
         if (layerBuy <= 0) continue;
@@ -567,15 +583,37 @@ export function previewRebalance(state, { mode, useCashAmount = 0, prices = DEFA
         const assets = holdingsByLayer[layer];
         if (!assets.length) continue;
 
-        const perAssetIRR = layerBuy / assets.length;
-        for (const h of assets) {
-          if (h.assetId === 'IRR_FIXED_INCOME') {
-            h.quantity += irrToFixedIncomeUnits(perAssetIRR);
-          } else {
-            const priceUSD = prices[h.assetId] || DEFAULT_PRICES[h.assetId] || 1;
-            h.quantity += perAssetIRR / (priceUSD * fxRate);
+        // Distribute according to layer weights
+        const layerWeights = WEIGHTS[layer] || {};
+        const weightedAssets = assets.filter(h => layerWeights[h.assetId]);
+
+        if (weightedAssets.length > 0) {
+          const totalWeight = weightedAssets.reduce((sum, h) => sum + (layerWeights[h.assetId] || 0), 0);
+          for (const h of weightedAssets) {
+            const assetWeight = layerWeights[h.assetId] || 0;
+            const assetPortionIRR = layerBuy * (assetWeight / totalWeight);
+            if (assetPortionIRR > 0) {
+              if (h.assetId === 'IRR_FIXED_INCOME') {
+                h.quantity += irrToFixedIncomeUnits(assetPortionIRR);
+              } else {
+                const priceUSD = prices[h.assetId] || DEFAULT_PRICES[h.assetId] || 1;
+                h.quantity += assetPortionIRR / (priceUSD * fxRate);
+              }
+              meta.trades.push({ layer, assetId: h.assetId, amountIRR: assetPortionIRR, side: 'BUY' });
+            }
           }
-          meta.trades.push({ layer, assetId: h.assetId, amountIRR: perAssetIRR, side: 'BUY' });
+        } else {
+          // Fallback: equal distribution if no weights
+          const perAssetIRR = layerBuy / assets.length;
+          for (const h of assets) {
+            if (h.assetId === 'IRR_FIXED_INCOME') {
+              h.quantity += irrToFixedIncomeUnits(perAssetIRR);
+            } else {
+              const priceUSD = prices[h.assetId] || DEFAULT_PRICES[h.assetId] || 1;
+              h.quantity += perAssetIRR / (priceUSD * fxRate);
+            }
+            meta.trades.push({ layer, assetId: h.assetId, amountIRR: perAssetIRR, side: 'BUY' });
+          }
         }
       }
     }
@@ -697,21 +735,37 @@ export function previewRebalance(state, { mode, useCashAmount = 0, prices = DEFA
         const assets = holdingsByLayer[layer];
         if (!assets.length) continue;
 
-        const perAssetIRR = portion / assets.length;
-        for (const h of assets) {
-          // v10: Convert IRR to quantity change
-          if (h.assetId === 'IRR_FIXED_INCOME') {
-            h.quantity += irrToFixedIncomeUnits(perAssetIRR);
-          } else {
-            const priceUSD = prices[h.assetId] || DEFAULT_PRICES[h.assetId] || 1;
-            h.quantity += perAssetIRR / (priceUSD * fxRate);
+        // Distribute according to layer weights
+        const layerWeights = WEIGHTS[layer] || {};
+        const weightedAssets = assets.filter(h => layerWeights[h.assetId]);
+
+        if (weightedAssets.length > 0) {
+          const totalWeight = weightedAssets.reduce((sum, h) => sum + (layerWeights[h.assetId] || 0), 0);
+          for (const h of weightedAssets) {
+            const assetWeight = layerWeights[h.assetId] || 0;
+            const assetPortionIRR = portion * (assetWeight / totalWeight);
+            if (assetPortionIRR > 0) {
+              if (h.assetId === 'IRR_FIXED_INCOME') {
+                h.quantity += irrToFixedIncomeUnits(assetPortionIRR);
+              } else {
+                const priceUSD = prices[h.assetId] || DEFAULT_PRICES[h.assetId] || 1;
+                h.quantity += assetPortionIRR / (priceUSD * fxRate);
+              }
+              meta.trades.push({ layer, assetId: h.assetId, amountIRR: assetPortionIRR, side: 'BUY' });
+            }
           }
-          meta.trades.push({
-            layer,
-            assetId: h.assetId,
-            amountIRR: perAssetIRR,
-            side: 'BUY',
-          });
+        } else {
+          // Fallback: equal distribution if no weights
+          const perAssetIRR = portion / assets.length;
+          for (const h of assets) {
+            if (h.assetId === 'IRR_FIXED_INCOME') {
+              h.quantity += irrToFixedIncomeUnits(perAssetIRR);
+            } else {
+              const priceUSD = prices[h.assetId] || DEFAULT_PRICES[h.assetId] || 1;
+              h.quantity += perAssetIRR / (priceUSD * fxRate);
+            }
+            meta.trades.push({ layer, assetId: h.assetId, amountIRR: perAssetIRR, side: 'BUY' });
+          }
         }
       }
 
