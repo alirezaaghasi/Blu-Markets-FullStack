@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { formatIRR, formatIRRShort, getAssetDisplayName } from '../helpers.js';
-import { ERROR_MESSAGES, BOUNDARY_LABELS } from '../constants/index.js';
+import { ERROR_MESSAGES } from '../constants/index.js';
+import { LAYERS, LAYER_EXPLANATIONS } from '../constants/index.js';
 
 /**
  * Issue 9: Collapsible rebalance trades section with summary
@@ -68,12 +69,88 @@ function RebalanceTradesSection({ trades, cashDeployed }) {
 }
 
 /**
+ * AllocationImpactVisual - Shows visual before/after/target for each layer
+ * Helps users understand how an action affects their target allocation
+ */
+function AllocationImpactVisual({ before, after, targetLayerPct }) {
+  // Calculate if moving toward or away from target for each layer
+  const layerImpacts = useMemo(() => {
+    return LAYERS.map(layer => {
+      const beforePct = before.layerPct[layer];
+      const afterPct = after.layerPct[layer];
+      const targetPct = targetLayerPct?.[layer] ?? 50;
+
+      const beforeDiff = Math.abs(beforePct - targetPct);
+      const afterDiff = Math.abs(afterPct - targetPct);
+      const movingToward = afterDiff < beforeDiff;
+      const change = afterPct - beforePct;
+
+      return {
+        layer,
+        name: LAYER_EXPLANATIONS[layer]?.name || layer,
+        beforePct: Math.round(beforePct),
+        afterPct: Math.round(afterPct),
+        targetPct: Math.round(targetPct),
+        movingToward,
+        change,
+        isOnTarget: afterDiff < 3
+      };
+    });
+  }, [before, after, targetLayerPct]);
+
+  // Overall impact assessment
+  const overallImpact = useMemo(() => {
+    const improvingCount = layerImpacts.filter(l => l.movingToward).length;
+    if (improvingCount === 3) return { label: 'Moves toward target', type: 'positive' };
+    if (improvingCount === 0) return { label: 'Moves away from target', type: 'negative' };
+    return { label: 'Mixed impact on target', type: 'neutral' };
+  }, [layerImpacts]);
+
+  return (
+    <div className="allocationImpact">
+      <div className="impactHeader">
+        <span className="impactTitle">Allocation Impact</span>
+        <span className={`impactBadge ${overallImpact.type}`}>{overallImpact.label}</span>
+      </div>
+      <div className="impactBars">
+        {layerImpacts.map(({ layer, name, beforePct, afterPct, targetPct, movingToward, change, isOnTarget }) => (
+          <div key={layer} className="impactRow">
+            <div className="impactLabel">
+              <span className={`layerDot ${layer.toLowerCase()}`}></span>
+              <span className="impactLayerName">{name}</span>
+            </div>
+            <div className="impactBarContainer">
+              {/* Target marker line */}
+              <div className="targetMarker" style={{ left: `${targetPct}%` }}>
+                <div className="targetLine"></div>
+                <div className="targetLabel">Target</div>
+              </div>
+              {/* Before bar (faded) */}
+              <div className="beforeBar" style={{ width: `${beforePct}%` }}></div>
+              {/* After bar (solid) */}
+              <div className={`afterBar ${movingToward ? 'toward' : 'away'}`} style={{ width: `${afterPct}%` }}></div>
+            </div>
+            <div className="impactValues">
+              <span className="beforeValue">{beforePct}%</span>
+              <span className={`changeArrow ${movingToward ? 'toward' : 'away'}`}>
+                {change > 0 ? '→' : change < 0 ? '→' : '='}
+              </span>
+              <span className={`afterValue ${isOnTarget ? 'on-target' : ''}`}>{afterPct}%</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
  * PendingActionModal - Preview and confirm modal for pending actions
  *
  * Simple confirmation for: ADD_FUNDS, PROTECT, BORROW, REPAY
  * Full before/after preview for: TRADE, REBALANCE
  */
-function PendingActionModal({ pendingAction, dispatch }) {
+function PendingActionModal({ pendingAction, targetLayerPct, dispatch }) {
   if (!pendingAction) return null;
 
   const { kind, payload, before, after, validation, boundary, frictionCopy, rebalanceMeta } = pendingAction;
@@ -186,30 +263,9 @@ function PendingActionModal({ pendingAction, dispatch }) {
           {/* Simple summary for ADD_FUNDS, PROTECT, BORROW, REPAY */}
           {!showFullPreview && renderSimpleSummary()}
 
-          {/* Full before/after preview for TRADE and REBALANCE */}
+          {/* Full visual allocation impact for TRADE and REBALANCE */}
           {showFullPreview && (
-            <div className="previewCard">
-              <div className="previewGrid">
-                <div className="previewColumn">
-                  <div className="previewLabel">Before</div>
-                  <div className="previewLayers">
-                    <span className="layerDot foundation"></span> Foundation {Math.round(before.layerPct.FOUNDATION)}% · <span className="layerDot growth"></span> Growth {Math.round(before.layerPct.GROWTH)}% · <span className="layerDot upside"></span> Upside {Math.round(before.layerPct.UPSIDE)}%
-                  </div>
-                  <div className="previewTotal">{formatIRR(before.totalIRR)}</div>
-                </div>
-                <div className="previewColumn">
-                  <div className="previewLabel">After</div>
-                  <div className="previewLayers">
-                    <span className="layerDot foundation"></span> Foundation {Math.round(after.layerPct.FOUNDATION)}% · <span className="layerDot growth"></span> Growth {Math.round(after.layerPct.GROWTH)}% · <span className="layerDot upside"></span> Upside {Math.round(after.layerPct.UPSIDE)}%
-                  </div>
-                  <div className="previewTotal">{formatIRR(after.totalIRR)}</div>
-                </div>
-              </div>
-              <div className="projectedBoundary">
-                <span className="projectedLabel">Boundary:</span>
-                <span className={`healthPill ${boundary.toLowerCase()}`}>{BOUNDARY_LABELS[boundary]}</span>
-              </div>
-            </div>
+            <AllocationImpactVisual before={before} after={after} targetLayerPct={targetLayerPct} />
           )}
 
           {/* Issue 9: Collapsible rebalance trade preview with summary */}

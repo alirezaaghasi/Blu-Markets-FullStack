@@ -431,7 +431,7 @@ function OnboardingControls({ state, dispatch, questionnaire, prices, fxRate }) 
 
   // ACTIVE stage - show drafts or pendingAction
   if (state.pendingAction) {
-    return <PendingActionModal pendingAction={state.pendingAction} dispatch={dispatch} />;
+    return <PendingActionModal pendingAction={state.pendingAction} targetLayerPct={state.targetLayerPct} dispatch={dispatch} />;
   }
 
   // Draft forms

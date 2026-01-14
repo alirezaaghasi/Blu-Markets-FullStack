@@ -273,6 +273,39 @@ body {
 .projectedLabel { font-size: 11px; color: var(--text-muted); }
 .previewPlaceholder { opacity: 0.5; }
 
+/* Allocation Impact Visual - shows before/after/target bars */
+.allocationImpact { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+.impactHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.impactTitle { font-size: 11px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.impactBadge { padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 500; }
+.impactBadge.positive { background: var(--success-bg); color: var(--success); }
+.impactBadge.negative { background: var(--warning-bg); color: var(--warning); }
+.impactBadge.neutral { background: var(--info-bg); color: var(--text-secondary); }
+
+.impactBars { display: flex; flex-direction: column; gap: 12px; }
+.impactRow { display: flex; align-items: center; gap: 10px; }
+.impactLabel { display: flex; align-items: center; gap: 6px; min-width: 80px; }
+.impactLayerName { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+
+.impactBarContainer { flex: 1; height: 20px; background: var(--bg-tertiary); border-radius: 4px; position: relative; overflow: visible; }
+.beforeBar { position: absolute; top: 0; left: 0; height: 100%; background: var(--text-muted); opacity: 0.3; border-radius: 4px 0 0 4px; transition: width 0.2s; }
+.afterBar { position: absolute; top: 0; left: 0; height: 100%; border-radius: 4px 0 0 4px; transition: width 0.2s; }
+.afterBar.toward { background: var(--success); opacity: 0.7; }
+.afterBar.away { background: var(--warning); opacity: 0.7; }
+
+.targetMarker { position: absolute; top: -4px; bottom: -4px; z-index: 2; transform: translateX(-50%); }
+.targetLine { width: 2px; height: 100%; background: var(--text-primary); opacity: 0.6; }
+.targetLabel { position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 9px; color: var(--text-muted); white-space: nowrap; opacity: 0; transition: opacity 0.15s; }
+.impactRow:hover .targetLabel { opacity: 1; }
+
+.impactValues { display: flex; align-items: center; gap: 4px; min-width: 75px; justify-content: flex-end; }
+.beforeValue { font-size: 11px; color: var(--text-muted); }
+.changeArrow { font-size: 11px; color: var(--text-muted); }
+.changeArrow.toward { color: var(--success); }
+.changeArrow.away { color: var(--warning); }
+.afterValue { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+.afterValue.on-target { color: var(--success); }
+
 /* Simple summary for non-allocation actions */
 .simpleSummary { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
 .summaryRow { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }

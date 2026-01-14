@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { formatIRR, formatIRRShort, getAssetDisplayName } from '../helpers.js';
-import { BOUNDARY_LABELS } from '../constants/index.js';
 
 /**
  * Helper to group entries by date
@@ -45,7 +44,7 @@ function formatTimeOnly(timestamp) {
 
 /**
  * HistoryPane - Full action history with expandable details
- * Groups entries by date, shows boundary badges, portfolio impact
+ * Groups entries by date, shows portfolio impact with before/after allocation
  */
 function HistoryPane({ ledger }) {
   const [expanded, setExpanded] = useState({});
@@ -129,10 +128,9 @@ function HistoryPane({ ledger }) {
   };
 
   const hasDetails = (entry) => {
-    const boundary = entry.details?.boundary;
     const before = entry.details?.before;
     const after = entry.details?.after;
-    return (boundary && boundary !== 'SAFE') || (before && after);
+    return before && after;
   };
 
   // Memoize grouped entries to avoid re-grouping on every render
@@ -174,14 +172,6 @@ function HistoryPane({ ledger }) {
 
                   {isExpanded && showExpand && (
                     <div className="historyEntryDetails">
-                      {entry.details?.boundary && entry.details.boundary !== 'SAFE' && (
-                        <div className="statusChange">
-                          <span className="statusLabel">Boundary:</span>
-                          <span className={`boundaryPill ${entry.details.boundary.toLowerCase()}`}>
-                            {BOUNDARY_LABELS[entry.details.boundary]}
-                          </span>
-                        </div>
-                      )}
                       {entry.details?.before && entry.details?.after && (
                         <div className="ledgerImpact">
                           <div className="impactRow">
