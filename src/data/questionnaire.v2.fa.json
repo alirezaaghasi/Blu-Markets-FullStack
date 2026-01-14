@@ -1,5 +1,5 @@
 {
-  "version": "v10.2",
+  "version": "v10.1",
   "consent_exact": "متوجه ریسک این سبد دارایی شدم و باهاش موافق هستم.",
   "consent_english": "I understand the risk of this portfolio and I agree with it.",
   "blocks": [
@@ -7,7 +7,7 @@
       "id": "block_capacity",
       "title": "Your Financial Situation",
       "title_fa": "وضعیت مالی شما",
-      "questions": ["q_life_stage", "q_income", "q_buffer", "q_proportion"]
+      "questions": ["q_income", "q_buffer", "q_proportion"]
     },
     {
       "id": "block_goals",
@@ -20,28 +20,9 @@
       "title": "How You React",
       "title_fa": "واکنش شما",
       "questions": ["q_crash_20", "q_tradeoff", "q_past_behavior", "q_max_loss"]
-    },
-    {
-      "id": "block_confirm",
-      "title": "Final Check",
-      "title_fa": "بررسی نهایی",
-      "questions": ["q_sleep_test", "q_double_check"]
     }
   ],
   "questions": [
-    {
-      "id": "q_life_stage",
-      "text": "الان تو چه مرحله‌ای از زندگیت هستی؟",
-      "english": "What stage of life are you in?",
-      "dimension": "capacity",
-      "weight": 1.0,
-      "options": [
-        { "id": "stage_student", "text": "دانشجو یا تازه شروع کردم به کار", "english": "Student or just starting career", "score": 8 },
-        { "id": "stage_building", "text": "دارم زندگیم رو می‌سازم (۲۵-۴۰)", "english": "Building my life (25-40)", "score": 7 },
-        { "id": "stage_established", "text": "زندگیم جا افتاده (۴۰-۵۵)", "english": "Established (40-55)", "score": 5 },
-        { "id": "stage_preretire", "text": "نزدیک بازنشستگی یا بازنشسته", "english": "Near or at retirement", "score": 2 }
-      ]
-    },
     {
       "id": "q_income",
       "text": "درآمدت چقدر قابل پیش‌بینیه؟",
@@ -161,32 +142,6 @@
         { "id": "loss_15", "text": "۱۵٪ — یه کم درد داره ولی اوکیه", "english": "15% — hurts but OK", "score": 4 },
         { "id": "loss_30", "text": "۳۰٪ — سخته ولی صبر می‌کنم", "english": "30% — tough but I'll wait", "score": 7 },
         { "id": "loss_50", "text": "۵۰٪ یا بیشتر — بلندمدت فکر می‌کنم", "english": "50%+ — I think long-term", "score": 10, "flag": "check_capacity" }
-      ]
-    },
-    {
-      "id": "q_sleep_test",
-      "text": "اگه پورتفوت ۲۵٪ افت کنه، شب راحت می‌خوابی؟",
-      "english": "If your portfolio drops 25%, can you sleep well at night?",
-      "dimension": "willingness",
-      "weight": 1.0,
-      "options": [
-        { "id": "sleep_no", "text": "نه، خیلی استرس دارم", "english": "No, I'd be very stressed", "score": 2 },
-        { "id": "sleep_worried", "text": "سخته، ولی تحمل می‌کنم", "english": "Hard, but I'd manage", "score": 5 },
-        { "id": "sleep_ok", "text": "آره، بخشی از بازاره", "english": "Yes, it's part of the market", "score": 8 },
-        { "id": "sleep_buy", "text": "آره، حتی شاید بیشتر بخرم", "english": "Yes, might even buy more", "score": 10 }
-      ]
-    },
-    {
-      "id": "q_double_check",
-      "text": "اگه فردا خبر بد اقتصادی بیاد و بازار ۱۵٪ بریزه، اولین کارت چیه؟",
-      "english": "If bad economic news drops the market 15% tomorrow, what's your first move?",
-      "dimension": "consistency",
-      "weight": 1.0,
-      "options": [
-        { "id": "dc_exit", "text": "سریع می‌فروشم قبل از اینکه بدتر بشه", "english": "Sell quickly before it gets worse", "score": 1 },
-        { "id": "dc_wait", "text": "صبر می‌کنم ببینم چی میشه", "english": "Wait and see what happens", "score": 5 },
-        { "id": "dc_ignore", "text": "کاری نمی‌کنم، نگاهش هم نمی‌کنم", "english": "Do nothing, won't even look", "score": 7 },
-        { "id": "dc_buy", "text": "فرصته، بیشتر می‌خرم", "english": "It's an opportunity, I'll buy more", "score": 9 }
       ]
     }
   ],

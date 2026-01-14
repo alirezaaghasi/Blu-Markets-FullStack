@@ -1,20 +1,21 @@
 /**
  * Risk Scoring Engine for Blu Markets v10
  *
- * Implements:
- * - Multi-dimensional scoring (Capacity, Willingness, Horizon, Goal)
+ * Implements (per Canonical User Profiling Document v2.0):
+ * - Four dimensions: Capacity (40%), Willingness (35%), Horizon (15%), Goal (10%)
  * - Conservative dominance rule: Final = min(Capacity, Willingness)
- * - Pathological user detection
+ * - Pathological user detection (panic_seller, gambler, dangerous_novice)
  * - Consistency checking with penalties
+ * - Horizon hard caps
  */
 
-// Question IDs by dimension (v10.2: 12 questions)
-const CAPACITY_QUESTIONS = ['q_life_stage', 'q_income', 'q_buffer', 'q_proportion'];
-const WILLINGNESS_QUESTIONS = ['q_crash_20', 'q_tradeoff', 'q_past_behavior', 'q_max_loss', 'q_sleep_test'];
+// Question IDs by dimension (v10.1: 9 questions per canonical spec)
+const CAPACITY_QUESTIONS = ['q_income', 'q_buffer', 'q_proportion'];
+const WILLINGNESS_QUESTIONS = ['q_crash_20', 'q_tradeoff', 'q_past_behavior', 'q_max_loss'];
 const HORIZON_QUESTION = 'q_horizon';
 const GOAL_QUESTION = 'q_goal';
 const CRASH_QUESTION = 'q_crash_20';
-const CONSISTENCY_QUESTION = 'q_double_check';
+const MAX_LOSS_QUESTION = 'q_max_loss';
 
 /**
  * Calculate weighted average score for a set of questions
@@ -54,7 +55,11 @@ function collectFlags(answers) {
 
 /**
  * Calculate sub-scores for each dimension
- * v10.1: Simplified - removed self-assessment per guidelines
+ * Per canonical spec section 7.1:
+ * - Capacity (C): weighted avg of q_income, q_buffer, q_proportion
+ * - Willingness (W): weighted avg of q_crash_20, q_tradeoff, q_past_behavior, q_max_loss
+ * - Horizon (H): direct from q_horizon
+ * - Goal (G): direct from q_goal
  */
 export function calculateSubScores(answers, questionnaire) {
   // Capacity Score (C): Financial ability to take risk
@@ -74,35 +79,16 @@ export function calculateSubScores(answers, questionnaire) {
 
 /**
  * Check for inconsistencies between answers
- * v10.2: Compares crash scenario (q_crash_20) with double-check (q_double_check)
+ * Per canonical spec: Compares crash scenario (q_crash_20) with max_loss tolerance
  */
 export function checkConsistency(answers) {
   const penalties = [];
 
-  // Q7 (crash) vs Q12 (double check) — should be similar
   const crashAnswer = answers[CRASH_QUESTION];
-  const doubleCheckAnswer = answers[CONSISTENCY_QUESTION];
+  const maxLossAnswer = answers[MAX_LOSS_QUESTION];
 
-  if (crashAnswer && doubleCheckAnswer) {
-    const drift = Math.abs(crashAnswer.score - doubleCheckAnswer.score);
-
-    if (drift > 5) {
-      penalties.push({
-        type: 'inconsistent_panic',
-        amount: -2,
-        message: 'Inconsistent responses to crash scenarios'
-      });
-    } else if (drift > 3) {
-      penalties.push({
-        type: 'mild_inconsistency',
-        amount: -1,
-        message: 'Slightly inconsistent crash responses'
-      });
-    }
-  }
-
-  // Also check crash vs max loss tolerance
-  const maxLossAnswer = answers['q_max_loss'];
+  // Inconsistency: Claims to tolerate 30%+ loss but would sell at -20%
+  // Per canonical spec section 7.2
   if (crashAnswer && maxLossAnswer) {
     if (crashAnswer.score <= 2 && maxLossAnswer.score >= 7) {
       penalties.push({
@@ -118,7 +104,11 @@ export function checkConsistency(answers) {
 
 /**
  * Detect pathological user patterns
- * v10.1: Removed "liar" detection (required self-assess question removed per guidelines)
+ * Per canonical spec section 8 - Four dangerous archetypes:
+ * - Panic Seller: hard_cap_3
+ * - Gambler + High Stakes: hard_cap_5
+ * - Gambler alone: cap_willingness_7
+ * - Dangerous Novice (inexperienced + gambler): hard_cap_5
  */
 export function detectPathologicalUser(answers, flags, scores) {
   const warnings = [];
@@ -189,9 +179,10 @@ export function getHorizonCap(answers, questionnaire) {
 }
 
 /**
- * Main scoring function
+ * Main scoring function - per canonical spec section 7.3
+ * Implements Conservative Dominance Rule: R_final = min(C, W)
+ * Then applies horizon caps, consistency penalties, pathological user caps
  * Returns final risk score (1-10) with all metadata
- * v10.1: Simplified per guidelines - removed self-assessment checks
  */
 export function calculateFinalRisk(answers, questionnaire) {
   // Step 1: Calculate sub-scores
