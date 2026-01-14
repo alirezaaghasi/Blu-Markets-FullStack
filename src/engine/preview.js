@@ -1,13 +1,14 @@
 import { computeSnapshot } from "./snapshot.js";
 import { calcPremiumIRR, calcLiquidationIRR } from "./pricing.js";
 import { ASSET_LAYER } from "../state/domain.js";
+import { COLLATERAL_LTV_BY_LAYER } from "../constants/index.js";
 
 export function cloneState(state) {
   return {
     ...state,
     holdings: state.holdings.map((h) => ({ ...h })),
     protections: state.protections.map((p) => ({ ...p })),
-    loan: state.loan ? { ...state.loan } : null,
+    loans: (state.loans || []).map((l) => ({ ...l })),
     ledger: state.ledger.slice(),
     pendingAction: null,
   };
@@ -44,33 +45,47 @@ export function previewProtect(state, { assetId, months }) {
   return next;
 }
 
-export function previewBorrow(state, { assetId, amountIRR, ltv }) {
+export function previewBorrow(state, { assetId, amountIRR }) {
   const next = cloneState(state);
   const h = next.holdings.find((x) => x.assetId === assetId);
   if (!h) return next;
+
+  // LTV is determined by asset's layer (volatility-based)
+  const layer = ASSET_LAYER[assetId];
+  const ltv = COLLATERAL_LTV_BY_LAYER[layer] || 0.3;
 
   h.frozen = true;
   next.cashIRR += amountIRR;
 
   const liquidationIRR = calcLiquidationIRR({ amountIRR, ltv });
   const todayISO = new Date().toISOString().slice(0, 10);
-  next.loan = { amountIRR, collateralAssetId: assetId, ltv, liquidationIRR, startISO: todayISO };
+  const loanId = `loan_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+  // Add to loans array (supports multiple loans)
+  next.loans = [
+    ...next.loans,
+    { id: loanId, amountIRR, collateralAssetId: assetId, ltv, liquidationIRR, startISO: todayISO },
+  ];
 
   return next;
 }
 
-export function previewRepay(state, { amountIRR }) {
+export function previewRepay(state, { loanId, amountIRR }) {
   const next = cloneState(state);
-  if (!next.loan) return next;
+  const loanIndex = next.loans.findIndex((l) => l.id === loanId);
+  if (loanIndex === -1) return next;
 
-  const repay = Math.min(amountIRR, next.cashIRR, next.loan.amountIRR);
+  const loan = next.loans[loanIndex];
+  const repay = Math.min(amountIRR, next.cashIRR, loan.amountIRR);
   next.cashIRR -= repay;
-  next.loan.amountIRR -= repay;
+  loan.amountIRR -= repay;
 
-  if (next.loan.amountIRR <= 0) {
-    const collateral = next.holdings.find((x) => x.assetId === next.loan.collateralAssetId);
+  if (loan.amountIRR <= 0) {
+    // Unfreeze collateral when loan is fully repaid
+    const collateral = next.holdings.find((x) => x.assetId === loan.collateralAssetId);
     if (collateral) collateral.frozen = false;
-    next.loan = null;
+    // Remove the loan from the array
+    next.loans = next.loans.filter((l) => l.id !== loanId);
   }
   return next;
 }

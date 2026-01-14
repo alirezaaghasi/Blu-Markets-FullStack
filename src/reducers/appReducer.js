@@ -95,7 +95,7 @@ export function initialState() {
     holdings: ASSETS.map(a => ({ assetId: a, valueIRR: 0, frozen: false })),
     targetLayerPct: { FOUNDATION: 50, GROWTH: 35, UPSIDE: 15 },
     protections: [],
-    loan: null,
+    loans: [],
     ledger: [],
     pendingAction: null,
     stressMode: false,
@@ -317,7 +317,7 @@ export function reducer(state, action) {
       const assetId = action.assetId || available[0].assetId;
       return {
         ...state,
-        borrowDraft: { assetId, ltv: 0.5, amountIRR: null },
+        borrowDraft: { assetId, amountIRR: null },
         pendingAction: null,
       };
     }
@@ -325,11 +325,6 @@ export function reducer(state, action) {
     case 'SET_BORROW_ASSET': {
       if (!state.borrowDraft) return state;
       return { ...state, borrowDraft: { ...state.borrowDraft, assetId: action.assetId } };
-    }
-
-    case 'SET_BORROW_LTV': {
-      if (!state.borrowDraft) return state;
-      return { ...state, borrowDraft: { ...state.borrowDraft, ltv: Number(action.ltv) } };
     }
 
     case 'SET_BORROW_AMOUNT': {
@@ -342,7 +337,6 @@ export function reducer(state, action) {
       const payload = {
         assetId: state.borrowDraft.assetId,
         amountIRR: Number(state.borrowDraft.amountIRR),
-        ltv: Number(state.borrowDraft.ltv),
       };
       const validation = validateBorrow(payload, state);
       const afterState = validation.ok ? previewBorrow(state, payload) : cloneState(state);
@@ -351,17 +345,23 @@ export function reducer(state, action) {
 
     // ====== REPAY ======
     case 'START_REPAY': {
-      if (state.stage !== STAGES.ACTIVE || !state.loan) return state;
+      if (state.stage !== STAGES.ACTIVE) return state;
+      const loans = state.loans || [];
+      if (loans.length === 0) return state;
+      // Select the loan to repay (passed via action or default to first loan)
+      const loanId = action.loanId || loans[0].id;
+      const loan = loans.find((l) => l.id === loanId);
+      if (!loan) return state;
       return {
         ...state,
-        repayDraft: { amountIRR: state.loan.amountIRR },
+        repayDraft: { loanId: loan.id, amountIRR: loan.amountIRR },
         pendingAction: null,
       };
     }
 
     case 'PREVIEW_REPAY': {
-      if (state.stage !== STAGES.ACTIVE || !state.loan) return state;
-      const payload = { amountIRR: state.loan.amountIRR };
+      if (state.stage !== STAGES.ACTIVE || !state.repayDraft) return state;
+      const payload = { loanId: state.repayDraft.loanId, amountIRR: state.repayDraft.amountIRR };
       const validation = validateRepay(payload, state);
       const afterState = validation.ok ? previewRepay(state, payload) : cloneState(state);
       return { ...state, pendingAction: buildPending(state, 'REPAY', payload, validation, afterState) };

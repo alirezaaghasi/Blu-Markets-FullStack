@@ -41,12 +41,18 @@ export const THRESHOLDS = {
   // Protection
   PROTECTION_MIN_MONTHS: 1,
   PROTECTION_MAX_MONTHS: 6,
-  // Borrow
-  LTV_MIN: 0.2,
-  LTV_MAX: 0.7,
   // Risk score thresholds for allocation calculation
   RISK_LOW_THRESHOLD: 5,
   RISK_MED_THRESHOLD: 10,
+};
+
+// Collateral LTV limits by layer (based on asset volatility)
+// Foundation = stable = higher LTV allowed
+// Upside = volatile = lower LTV to protect user
+export const COLLATERAL_LTV_BY_LAYER = {
+  FOUNDATION: 0.7,  // 70% - stable assets
+  GROWTH: 0.5,      // 50% - moderate volatility
+  UPSIDE: 0.3,      // 30% - high volatility
 };
 
 // Target allocations based on risk score
@@ -62,6 +68,9 @@ export const PREMIUM_RATES = {
   GROWTH: 0.008,
   UPSIDE: 0.012,
 };
+
+// Assets eligible for protection (must have liquid derivative markets)
+export const PROTECTION_ELIGIBLE_ASSETS = ['BTC', 'ETH', 'GOLD', 'QQQ', 'SOL'];
 
 export const WEIGHTS = {
   FOUNDATION: { IRR_FIXED_INCOME: 0.55, USDT: 0.45 },
@@ -99,12 +108,11 @@ export const ERROR_MESSAGES = {
   NO_NOTIONAL: 'This asset has no value to protect.',
   ASSET_ALREADY_PROTECTED: 'This asset already has active protection.',
   INSUFFICIENT_CASH_FOR_PREMIUM: 'Not enough cash to pay the protection premium.',
+  ASSET_NOT_ELIGIBLE_FOR_PROTECTION: 'This asset is not eligible for protection. Only assets with liquid derivative markets (BTC, ETH, GOLD, QQQ, SOL) can be protected.',
 
   // Borrow
-  INVALID_LTV: 'LTV must be between 20% and 70%.',
-  LOAN_ALREADY_ACTIVE: 'You already have an active loan. Repay it first.',
-  ASSET_ALREADY_FROZEN: 'This asset is already used as collateral.',
-  EXCEEDS_MAX_BORROW: 'Requested amount exceeds maximum borrowable.',
+  ASSET_ALREADY_FROZEN: 'This asset is already used as collateral for another loan.',
+  EXCEEDS_MAX_BORROW: 'Amount exceeds maximum you can borrow against this asset.',
 
   // Repay
   NO_ACTIVE_LOAN: 'No active loan to repay.',

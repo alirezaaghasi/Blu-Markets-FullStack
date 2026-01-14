@@ -24,6 +24,8 @@ import {
   LAYER_EXPLANATIONS,
   THRESHOLDS,
   PORTFOLIO_STATUS_LABELS,
+  ERROR_MESSAGES,
+  COLLATERAL_LTV_BY_LAYER,
 } from './constants/index.js';
 
 // Utility imports
@@ -683,32 +685,43 @@ function PortfolioHome({ state, snapshot, onStartTrade, onStartProtect, onStartB
             <div className="breakdownCardValue">{formatIRR(snapshot.cashIRR)}</div>
           </div>
         </div>
-        {/* Fix 5: Loan health indicator */}
-        {state.loan && (
-          <div style={{ marginTop: 16, padding: '12px 14px', background: 'var(--bg-primary)', borderRadius: 10, border: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>💰 Active Loan</span>
-              <span style={{ fontSize: 13, fontWeight: 500 }}>{formatIRR(state.loan.amountIRR)}</span>
-            </div>
-            <div className="loanHealthIndicator">
-              <div className="loanHealthBar">
-                <div
-                  className={`loanHealthFill ${
-                    (state.loan.amountIRR / state.loan.liquidationIRR) > 0.75 ? 'critical' :
-                    (state.loan.amountIRR / state.loan.liquidationIRR) > 0.6 ? 'warning' : 'healthy'
-                  }`}
-                  style={{ width: `${Math.min(100, (state.loan.amountIRR / state.loan.liquidationIRR) * 100)}%` }}
-                />
+        {/* Fix 5: Loan health indicator - shows summary when loans exist */}
+        {(state.loans || []).length > 0 && (() => {
+          const loans = state.loans || [];
+          const totalLoanAmount = loans.reduce((sum, l) => sum + l.amountIRR, 0);
+          // Find the most critical loan (highest LTV ratio)
+          const mostCriticalLoan = loans.reduce((worst, loan) => {
+            const ratio = loan.amountIRR / loan.liquidationIRR;
+            const worstRatio = worst ? worst.amountIRR / worst.liquidationIRR : 0;
+            return ratio > worstRatio ? loan : worst;
+          }, null);
+          const criticalRatio = mostCriticalLoan ? mostCriticalLoan.amountIRR / mostCriticalLoan.liquidationIRR : 0;
+          return (
+            <div style={{ marginTop: 16, padding: '12px 14px', background: 'var(--bg-primary)', borderRadius: 10, border: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>💰 Active Loans ({loans.length})</span>
+                <span style={{ fontSize: 13, fontWeight: 500 }}>{formatIRR(totalLoanAmount)}</span>
               </div>
-              <span className={`loanHealthText ${
-                (state.loan.amountIRR / state.loan.liquidationIRR) > 0.75 ? 'critical' :
-                (state.loan.amountIRR / state.loan.liquidationIRR) > 0.6 ? 'warning' : 'healthy'
-              }`}>
-                {Math.round((state.loan.amountIRR / state.loan.liquidationIRR) * 100)}%
-              </span>
+              <div className="loanHealthIndicator">
+                <div className="loanHealthBar">
+                  <div
+                    className={`loanHealthFill ${
+                      criticalRatio > 0.75 ? 'critical' :
+                      criticalRatio > 0.6 ? 'warning' : 'healthy'
+                    }`}
+                    style={{ width: `${Math.min(100, criticalRatio * 100)}%` }}
+                  />
+                </div>
+                <span className={`loanHealthText ${
+                  criticalRatio > 0.75 ? 'critical' :
+                  criticalRatio > 0.6 ? 'warning' : 'healthy'
+                }`}>
+                  {Math.round(criticalRatio * 100)}%
+                </span>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
       <div className="card">
         <div className="sectionTitle">ASSET ALLOCATION</div>
@@ -818,41 +831,56 @@ function Protection({ protections }) {
   );
 }
 
-function Loans({ loan, dispatch }) {
-  if (!loan) {
-    return <div className="card"><h3>Active Loan</h3><div className="muted">No active loans.</div></div>;
+function Loans({ loans, dispatch }) {
+  const loanList = loans || [];
+
+  if (loanList.length === 0) {
+    return <div className="card"><h3>Active Loans</h3><div className="muted">No active loans.</div></div>;
   }
 
-  const getLoanStatus = () => {
+  const getLoanStatus = (loan) => {
     const ltvPercent = (loan.amountIRR / loan.liquidationIRR) * 100;
     if (ltvPercent > 75) return { level: 'critical', message: '🔴 Liquidation risk — repay or add collateral' };
     if (ltvPercent > 60) return { level: 'warning', message: '⚠️ Monitor collateral' };
     return null;
   };
 
-  const status = getLoanStatus();
+  const totalLoanAmount = loanList.reduce((sum, l) => sum + l.amountIRR, 0);
 
   return (
     <div className="card">
-      <h3>Active Loan</h3>
-      <div className="list">
-        <div className="item loanItem">
-          <div style={{ flex: 1 }}>
-            <div className="loanAmount">{formatIRR(loan.amountIRR)}</div>
-            <div className="loanDetails">Collateral: {getAssetDisplayName(loan.collateralAssetId)}</div>
-            <div className="loanUsage">LTV: {Math.round(loan.ltv * 100)}%</div>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div className="liquidationValue">{formatIRR(loan.liquidationIRR)}</div>
-            <div className="muted">Liquidation</div>
-          </div>
+      <h3>Active Loans ({loanList.length})</h3>
+      {loanList.length > 1 && (
+        <div style={{ marginBottom: 12, padding: '8px 12px', background: 'var(--bg-tertiary)', borderRadius: 8 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Total borrowed: </span>
+          <span style={{ fontWeight: 600 }}>{formatIRR(totalLoanAmount)}</span>
         </div>
-        {status && (
-          <div className={`loanStatus loanStatus${status.level.charAt(0).toUpperCase() + status.level.slice(1)}`}>
-            {status.message}
-          </div>
-        )}
-        <button className="btn primary" style={{ width: '100%', marginTop: 10 }} onClick={() => dispatch({ type: 'START_REPAY' })}>Repay Loan</button>
+      )}
+      <div className="list">
+        {loanList.map((loan) => {
+          const status = getLoanStatus(loan);
+          return (
+            <div key={loan.id} className="item loanItem" style={{ marginBottom: 12, padding: '12px', borderRadius: 8, background: 'var(--bg-secondary)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <div className="loanAmount">{formatIRR(loan.amountIRR)}</div>
+                  <div className="loanDetails">Collateral: {getAssetDisplayName(loan.collateralAssetId)}</div>
+                  <div className="loanUsage">LTV: {Math.round(loan.ltv * 100)}%</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div className="liquidationValue">{formatIRR(loan.liquidationIRR)}</div>
+                  <div className="muted">Liquidation</div>
+                </div>
+              </div>
+              {status && (
+                <div className={`loanStatus loanStatus${status.level.charAt(0).toUpperCase() + status.level.slice(1)}`} style={{ marginBottom: 8 }}>
+                  {status.message}
+                </div>
+              )}
+              <button className="btn primary" style={{ width: '100%' }} onClick={() => dispatch({ type: 'START_REPAY', loanId: loan.id })}>Repay</button>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -1234,24 +1262,23 @@ function OnboardingControls({ state, dispatch }) {
 
   if (state.borrowDraft) {
     const h = state.holdings.find(x => x.assetId === state.borrowDraft.assetId);
-    const maxBorrow = h ? Math.floor(h.valueIRR * state.borrowDraft.ltv) : 0;
+    const layer = h ? ASSET_LAYER[h.assetId] : 'UPSIDE';
+    const layerLtv = COLLATERAL_LTV_BY_LAYER[layer] || 0.3;
+    const maxBorrow = h ? Math.floor(h.valueIRR * layerLtv) : 0;
+    const layerInfo = LAYER_EXPLANATIONS[layer];
     return (
       <ActionCard title="💰 Borrow">
-        <div className="row" style={{ gap: 8 }}>
-          <select className="input" value={state.borrowDraft.assetId || ''} onChange={(e) => dispatch({ type: 'SET_BORROW_ASSET', assetId: e.target.value })}>
-            {state.holdings.filter(h => !h.frozen && h.valueIRR > 0).map((h) => {
-              const layer = ASSET_LAYER[h.assetId];
-              const info = LAYER_EXPLANATIONS[layer];
-              return <option key={h.assetId} value={h.assetId}>{info.icon} {getAssetDisplayName(h.assetId)}</option>;
-            })}
-          </select>
-          <select className="input" value={state.borrowDraft.ltv ?? 0.5} onChange={(e) => dispatch({ type: 'SET_BORROW_LTV', ltv: e.target.value })} style={{ width: 100 }}>
-            <option value={0.3}>30% LTV</option>
-            <option value={0.4}>40% LTV</option>
-            <option value={0.5}>50% LTV</option>
-            <option value={0.6}>60% LTV</option>
-            <option value={0.7}>70% LTV</option>
-          </select>
+        <select className="input" value={state.borrowDraft.assetId || ''} onChange={(e) => dispatch({ type: 'SET_BORROW_ASSET', assetId: e.target.value })}>
+          {state.holdings.filter(h => !h.frozen && h.valueIRR > 0).map((h) => {
+            const assetLayer = ASSET_LAYER[h.assetId];
+            const info = LAYER_EXPLANATIONS[assetLayer];
+            const ltv = COLLATERAL_LTV_BY_LAYER[assetLayer] || 0.3;
+            return <option key={h.assetId} value={h.assetId}>{info.icon} {getAssetDisplayName(h.assetId)} ({Math.round(ltv * 100)}% LTV)</option>;
+          })}
+        </select>
+        <div className="borrowLtvInfo" style={{ marginTop: 8, padding: '8px 12px', background: 'var(--bg-tertiary)', borderRadius: 8, fontSize: 12 }}>
+          <span style={{ color: 'var(--text-secondary)' }}>{layerInfo?.icon} {layerInfo?.name} assets: </span>
+          <span style={{ fontWeight: 600 }}>{Math.round(layerLtv * 100)}% max LTV</span>
         </div>
         <input className="input" style={{ marginTop: 8 }} type="number" placeholder="Loan amount (IRR)" value={state.borrowDraft.amountIRR ?? ''} onChange={(e) => dispatch({ type: 'SET_BORROW_AMOUNT', amountIRR: e.target.value })} />
         <div className="borrowHint">Max: {formatIRR(maxBorrow)}</div>
@@ -1264,14 +1291,17 @@ function OnboardingControls({ state, dispatch }) {
   }
 
   if (state.repayDraft) {
+    const loan = (state.loans || []).find(l => l.id === state.repayDraft.loanId);
+    const loanAmount = loan?.amountIRR || state.repayDraft.amountIRR || 0;
     return (
       <ActionCard title="Repay Loan">
         <div className="repayDetails">
-          <div className="repayRow"><span>Loan:</span><span>{formatIRR(state.loan?.amountIRR || 0)}</span></div>
+          <div className="repayRow"><span>Loan:</span><span>{formatIRR(loanAmount)}</span></div>
+          {loan && <div className="repayRow"><span>Collateral:</span><span>{getAssetDisplayName(loan.collateralAssetId)}</span></div>}
           <div className="repayRow"><span>Cash:</span><span>{formatIRR(state.cashIRR || 0)}</span></div>
         </div>
         <div className="row" style={{ marginTop: 10 }}>
-          <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_REPAY' })} disabled={(state.cashIRR || 0) < (state.loan?.amountIRR || 0)}>Preview</button>
+          <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_REPAY' })} disabled={(state.cashIRR || 0) < loanAmount}>Preview</button>
           <button className="btn" onClick={() => dispatch({ type: 'CANCEL_PENDING' })}>Cancel</button>
         </div>
       </ActionCard>
@@ -1331,11 +1361,12 @@ function getHeaderContent(activeTab, state, snapshot) {
       };
     }
     case 'LOANS': {
-      const totalLoan = state.loan?.amountIRR || 0;
+      const loans = state.loans || [];
+      const totalLoan = loans.reduce((sum, l) => sum + l.amountIRR, 0);
       return {
         title: 'Your Loans',
-        badge: totalLoan > 0
-          ? { text: `Active: ${formatIRRShort(totalLoan)}`, variant: 'info' }
+        badge: loans.length > 0
+          ? { text: `${loans.length} Active: ${formatIRRShort(totalLoan)}`, variant: 'info' }
           : null
       };
     }
@@ -1364,7 +1395,7 @@ export default function App() {
       return <OnboardingRightPanel stage={state.stage} questionIndex={state.questionnaire.index} targetLayers={state.targetLayerPct} investAmount={state.investAmountIRR} dispatch={dispatch} />;
     }
     if (state.tab === 'PROTECTION') return <Protection protections={state.protections} />;
-    if (state.tab === 'LOANS') return <Loans loan={state.loan} dispatch={dispatch} />;
+    if (state.tab === 'LOANS') return <Loans loans={state.loans} dispatch={dispatch} />;
     if (state.tab === 'HISTORY') return <HistoryPane ledger={state.ledger} />;
     return <PortfolioHome state={state} snapshot={snapshot} onStartTrade={onStartTrade} onStartProtect={onStartProtect} onStartBorrow={onStartBorrow} />;
   }, [state, snapshot]);
@@ -1410,7 +1441,7 @@ export default function App() {
                       {getHeaderContent(state.tab, state, snapshot).badge.text}
                     </span>
                   )}
-                  {state.loan && state.tab !== 'LOANS' && <div className="pill" style={{ color: '#fb923c', borderColor: 'rgba(249,115,22,.3)' }}><span>Loan</span><span>{formatIRR(state.loan.amountIRR)}</span></div>}
+                  {(state.loans || []).length > 0 && state.tab !== 'LOANS' && <div className="pill" style={{ color: '#fb923c', borderColor: 'rgba(249,115,22,.3)' }}><span>Loans ({state.loans.length})</span><span>{formatIRR(state.loans.reduce((sum, l) => sum + l.amountIRR, 0))}</span></div>}
                   {/* S-1: Stress mode toggle - explicit and reversible */}
                   <button
                     className={`stressModeToggle ${state.stressMode ? 'active' : ''}`}
