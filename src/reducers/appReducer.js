@@ -421,6 +421,7 @@ export function reducer(state, action) {
               assetId: holding.assetId,
               notionalIRR: holding.valueIRR,
               premiumIRR: premium,
+              durationMonths: p.payload.months,
               startISO,
               endISO,
             },
@@ -458,6 +459,38 @@ export function reducer(state, action) {
 
       // G-3: Portfolio Gravity - return to Portfolio Home after any action
       next.tab = 'PORTFOLIO';
+
+      return next;
+    }
+
+    // ====== CANCEL PROTECTION ======
+    case 'CANCEL_PROTECTION': {
+      if (state.stage !== STAGES.ACTIVE) return state;
+      const protectionId = action.protectionId;
+      const protection = state.protections.find(p => p.id === protectionId);
+      if (!protection) return state;
+
+      // Remove protection (no refund - premium was for the coverage period)
+      const newProtections = state.protections.filter(p => p.id !== protectionId);
+
+      // Create ledger entry
+      const entry = {
+        id: uid(),
+        tsISO: nowISO(),
+        type: 'PROTECTION_CANCELLED_COMMIT',
+        details: {
+          protectionId,
+          assetId: protection.assetId,
+        },
+      };
+
+      let next = {
+        ...state,
+        protections: newProtections,
+        ledger: [...state.ledger, entry],
+        lastAction: { type: 'PROTECTION_CANCELLED', timestamp: Date.now(), assetId: protection.assetId },
+      };
+      next = addLogEntry(next, 'PROTECTION_CANCELLED', { assetId: protection.assetId });
 
       return next;
     }

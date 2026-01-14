@@ -447,6 +447,19 @@ body {
 .protectionProgressFill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s; }
 .protectionProgressText { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); margin-top: 4px; }
 
+/* Protection cancel confirmation */
+.cancelConfirm { display: flex; align-items: center; gap: 6px; }
+.cancelText { font-size: 12px; color: var(--text-secondary); margin-right: 4px; }
+.btn.tiny.danger { background: transparent; border-color: var(--danger); color: var(--danger); }
+.btn.tiny.danger:hover { background: rgba(248, 81, 73, 0.15); }
+
+/* Expired protections */
+.protectionItem.expired { opacity: 0.6; border-color: var(--border); border-left-color: var(--text-muted); }
+.expiredBadge { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 500; background: rgba(139, 148, 158, 0.15); color: var(--text-muted); text-transform: uppercase; }
+.expiredSection { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.expiredHeader { font-size: 11px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 10px; }
+.expiredDate { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+
 /* Rebalance */
 .rebalanceConstraintWarning { display: flex; gap: 12px; padding: 14px; background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 10px; margin-top: 12px; }
 .warningIcon { font-size: 20px; flex-shrink: 0; }

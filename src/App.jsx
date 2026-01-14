@@ -115,7 +115,7 @@ export default function App() {
         />
       );
     }
-    if (state.tab === 'PROTECTION') return <Protection protections={state.protections} />;
+    if (state.tab === 'PROTECTION') return <Protection protections={state.protections} dispatch={dispatch} />;
     if (state.tab === 'LOANS') return <Loans loans={state.loans} dispatch={dispatch} />;
     if (state.tab === 'HISTORY') return <HistoryPane ledger={state.ledger} />;
     return (
