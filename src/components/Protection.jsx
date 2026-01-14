@@ -103,6 +103,9 @@ function Protection({ protections, dispatch }) {
     );
   };
 
+  // Decision 18: Show education when few protections
+  const showEducation = activeProtections.length < 2;
+
   // Issue 18: Empty state with explanation and CTA
   // Issue 14: Protection tab context header
   return (
@@ -124,6 +127,22 @@ function Protection({ protections, dispatch }) {
               Protect an Asset
             </button>
           )}
+
+          {/* Decision 18: Educational content */}
+          <div className="protectionEducation">
+            <div className="educationDivider" />
+            <h4>How Protection Works</h4>
+            <p>
+              Protection acts like insurance for your assets. If the price drops
+              below your protected value, you receive the difference.
+            </p>
+            <ul className="educationList">
+              <li>Choose an asset and protection duration (1-6 months)</li>
+              <li>Pay a one-time premium upfront</li>
+              <li>If price crashes, you're covered for the loss</li>
+              <li>If price stays up, your premium is the only cost</li>
+            </ul>
+          </div>
         </div>
       ) : (
         <>
@@ -148,6 +167,29 @@ function Protection({ protections, dispatch }) {
               <div className="list">
                 {expiredProtections.map(p => renderProtectionItem(p, true))}
               </div>
+            </div>
+          )}
+
+          {/* Decision 18: Show education when few active protections */}
+          {showEducation && (
+            <div className="protectionEducation">
+              <div className="educationDivider" />
+              <h4>How Protection Works</h4>
+              <p>
+                Protection acts like insurance for your assets. If the price drops
+                below your protected value, you receive the difference.
+              </p>
+              <ul className="educationList">
+                <li>Choose an asset and protection duration (1-6 months)</li>
+                <li>Pay a one-time premium upfront</li>
+                <li>If price crashes, you're covered for the loss</li>
+                <li>If price stays up, your premium is the only cost</li>
+              </ul>
+              {dispatch && (
+                <button className="btn primary" onClick={() => dispatch({ type: 'START_PROTECT' })}>
+                  + Protect an Asset
+                </button>
+              )}
             </div>
           )}
         </>

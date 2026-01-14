@@ -4,6 +4,7 @@ import { ASSET_LAYER } from '../state/domain.js';
 import { LAYER_EXPLANATIONS, LAYERS } from '../constants/index.js';
 import LayerMini from './LayerMini.jsx';
 import HoldingRow from './HoldingRow.jsx';
+import StressTestCard from './StressTestCard.jsx';
 
 /**
  * PortfolioHome - Main portfolio dashboard
@@ -242,6 +243,9 @@ function PortfolioHome({ holdings, cashIRR, targetLayerPct, protections, loans, 
           );
         })}
       </div>
+
+      {/* Decision 17: Stress test as separate card */}
+      <StressTestCard snapshot={snapshot} loans={loans} />
     </div>
   );
 }

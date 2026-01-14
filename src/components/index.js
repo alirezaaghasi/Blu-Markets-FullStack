@@ -9,6 +9,8 @@ export { default as Tabs } from './Tabs.jsx';
 export { default as ResetConfirmModal } from './ResetConfirmModal.jsx';
 export { default as HistoryPane } from './HistoryPane.jsx';
 export { default as PendingActionModal } from './PendingActionModal.jsx';
+export { default as StressTestCard } from './StressTestCard.jsx';
+export { default as ConfirmModal, ResetConfirmModalV2, LargeSellConfirmModal, CancelProtectionConfirmModal } from './ConfirmModal.jsx';
 
 // Tab Content Components
 export { default as PortfolioHome } from './PortfolioHome.jsx';

@@ -441,6 +441,14 @@ body {
 .loanWarning .warningIcon { font-size: 14px; flex-shrink: 0; }
 .loanWarning .warningText { font-size: 12px; color: var(--text-primary); line-height: 1.4; }
 
+/* Decision 11: Loan liquidation display */
+.loanLiquidation { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.liquidationRow { display: flex; justify-content: space-between; align-items: center; }
+.liquidationLabel { font-size: 12px; color: var(--text-secondary); }
+.liquidationPrice { font-size: 14px; font-weight: 600; color: var(--warning); }
+.liquidationExplain { margin: 8px 0 0 0; font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+.loanHeaderSummary { font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+
 /* Repay */
 .repayDetails { background: var(--bg-primary); border-radius: 10px; padding: 12px; border: 1px solid var(--border); }
 .repayRow { display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; }
@@ -452,6 +460,18 @@ body {
 .modalBody { margin-bottom: 20px; }
 .modalMessage { margin: 0; font-size: 14px; color: var(--text-secondary); line-height: 1.5; }
 .modalFooter { display: flex; gap: 12px; justify-content: flex-end; }
+
+/* Decision 20: Confirmation modal */
+.confirmModal { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; width: 100%; max-width: 400px; padding: 24px; box-shadow: var(--shadow-md); }
+.confirmModalHeader { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.confirmModalIcon { font-size: 24px; }
+.confirmModalHeader h3 { margin: 0; font-size: 18px; font-weight: 600; color: var(--text-primary); }
+.confirmModalBody p { color: var(--text-secondary); font-size: 14px; line-height: 1.5; margin: 0 0 24px 0; }
+.confirmModalActions { display: flex; gap: 12px; justify-content: flex-end; }
+.btn.danger { background: var(--danger); color: white; border-color: var(--danger); }
+.btn.danger:hover { background: #dc2626; border-color: #dc2626; }
+.btn.warning { background: var(--warning); color: black; border-color: var(--warning); }
+.btn.warning:hover { background: #d97706; border-color: #d97706; }
 
 /* Onboarding */
 .onboardingPanel { height: 100%; display: flex; flex-direction: column; gap: 12px; }
@@ -631,6 +651,15 @@ body {
 .expiredHeader { font-size: 11px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 10px; }
 .expiredDate { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
 
+/* Decision 18: Protection education */
+.protectionEducation { margin-top: 24px; }
+.educationDivider { height: 1px; background: var(--border); margin-bottom: 20px; }
+.protectionEducation h4 { margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.protectionEducation p { color: var(--text-secondary); font-size: 13px; line-height: 1.5; margin: 0 0 14px 0; }
+.educationList { list-style: none; padding: 0; margin: 0 0 16px 0; }
+.educationList li { position: relative; padding-left: 20px; margin-bottom: 8px; color: var(--text-muted); font-size: 12px; line-height: 1.4; }
+.educationList li::before { content: '✓'; position: absolute; left: 0; color: var(--success); }
+
 /* Rebalance */
 .rebalanceConstraintWarning { display: flex; gap: 12px; padding: 14px; background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 10px; margin-top: 12px; }
 .warningIcon { font-size: 20px; flex-shrink: 0; }
@@ -665,7 +694,28 @@ body {
 .badge-warning { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning-border); }
 .badge-info { background: var(--info-bg); color: var(--text-muted); border: 1px solid var(--info-border); }
 
-/* Stress mode */
+/* Decision 17: Stress test card */
+.stressTestCard { background: var(--bg-secondary); }
+.stressTestHeader h3 { margin: 0 0 4px 0; font-size: 14px; font-weight: 600; }
+.stressTestSubtitle { color: var(--text-muted); font-size: 13px; margin: 0 0 16px 0; }
+.stressTestScenarios { display: flex; gap: 8px; margin-bottom: 16px; }
+.stressTestBtn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 8px; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+.stressTestBtn:hover { border-color: var(--accent); }
+.stressTestBtn.active { background: var(--accent); border-color: var(--accent); }
+.stressTestBtnLabel { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.stressTestBtn.active .stressTestBtnLabel { color: white; }
+.stressTestBtnDesc { font-size: 10px; color: var(--text-muted); text-align: center; }
+.stressTestBtn.active .stressTestBtnDesc { color: rgba(255, 255, 255, 0.7); }
+.stressTestResult { padding: 14px; background: var(--bg-tertiary); border-radius: 8px; }
+.stressTestResultRow { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; color: var(--text-secondary); }
+.stressTestResultRow:not(:last-child) { border-bottom: 1px solid var(--border); }
+.stressTestResultRow.loss { font-weight: 500; }
+.stressTestAfter { color: var(--text-primary); font-weight: 500; }
+.stressTestLoss { color: var(--danger); font-weight: 600; }
+.stressTestWarning { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; padding: 10px 12px; background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 6px; font-size: 12px; color: var(--warning); }
+.stressTestWarning .warningIcon { flex-shrink: 0; }
+
+/* Stress mode toggle (legacy) */
 .stressModeToggle { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-muted); font-size: 11px; font-weight: 500; cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s; }
 .stressModeToggle:hover { border-color: var(--border-hover); color: var(--text-secondary); }
 .stressModeToggle.active { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); color: #f87171; }

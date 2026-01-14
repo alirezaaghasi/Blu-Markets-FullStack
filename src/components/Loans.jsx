@@ -1,11 +1,11 @@
 import React, { useMemo } from 'react';
-import { formatIRR, getAssetDisplayName } from '../helpers.js';
+import { formatIRR, formatUSD, getAssetDisplayName } from '../helpers.js';
 
 /**
  * Loans - Active loans list with LTV health indicators
- * Shows loan details, collateral, liquidation thresholds
+ * Decision 11: Shows liquidation price in USD with explanation
  */
-function Loans({ loans, dispatch }) {
+function Loans({ loans, holdings, prices, fxRate, dispatch }) {
   const loanList = loans || [];
 
   // Issue 18: Empty state with explanation and CTA
@@ -34,6 +34,14 @@ function Loans({ loans, dispatch }) {
     if (usedPercent >= 65) return { level: 'warning', color: '#f97316', message: 'Close to limit. Consider repaying soon.' };
     if (usedPercent >= 50) return { level: 'caution', color: '#fbbf24', message: null };
     return { level: 'healthy', color: '#34d399', message: null };
+  };
+
+  // Decision 11: Calculate liquidation price in USD for each loan
+  const getLiquidationPriceUSD = (loan) => {
+    const holding = holdings?.find(h => h.assetId === loan.collateralAssetId);
+    if (!holding || holding.quantity <= 0 || !fxRate) return null;
+    // Liquidation price = (liquidationIRR / fxRate) / quantity
+    return loan.liquidationIRR / fxRate / holding.quantity;
   };
 
   const totalLoanAmount = useMemo(
@@ -81,6 +89,23 @@ function Loans({ loans, dispatch }) {
                   <span className="healthLimit">Limit: {formatIRR(loan.liquidationIRR)}</span>
                 </div>
               </div>
+
+              {/* Decision 11: Liquidation price with explanation */}
+              {(() => {
+                const liquidationPrice = getLiquidationPriceUSD(loan);
+                if (!liquidationPrice) return null;
+                return (
+                  <div className="loanLiquidation">
+                    <div className="liquidationRow">
+                      <span className="liquidationLabel">Liquidation price:</span>
+                      <span className="liquidationPrice">{formatUSD(liquidationPrice)}</span>
+                    </div>
+                    <p className="liquidationExplain">
+                      If {getAssetDisplayName(loan.collateralAssetId)} drops below this price, your collateral will be sold.
+                    </p>
+                  </div>
+                );
+              })()}
 
               {/* Warning message if applicable */}
               {health.message && (

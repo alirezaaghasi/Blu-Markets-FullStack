@@ -170,7 +170,7 @@ export default function App() {
     if (state.tab === 'LOANS') {
       return (
         <Suspense fallback={<TabLoadingFallback />}>
-          <Loans loans={state.loans} dispatch={dispatch} />
+          <Loans loans={state.loans} holdings={state.holdings} prices={prices} fxRate={fxRate} dispatch={dispatch} />
         </Suspense>
       );
     }
