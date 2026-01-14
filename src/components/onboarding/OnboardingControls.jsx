@@ -619,12 +619,12 @@ function OnboardingControls({ state, dispatch, questionnaire, prices, fxRate }) 
           </div>
         )}
 
-        {/* Add funds suggestion */}
-        {showAddFundsSuggestion && !state.rebalanceDraft.useCash && (
+        {/* Add funds suggestion - only show AFTER user opts to use cash */}
+        {showAddFundsSuggestion && state.rebalanceDraft.useCash && (
           <div className="rebalanceAddFundsSuggestion">
             <div className="suggestionIcon">💡</div>
             <div className="suggestionText">
-              Add {formatIRR(gap.cashShortfall)} to reach perfect balance.
+              Still {formatIRR(gap.cashShortfall)} short of perfect balance.
             </div>
             <button
               className="btn small"
