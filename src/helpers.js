@@ -32,17 +32,19 @@ export function nowISO() {
   return new Date().toISOString();
 }
 
+// Hoisted to module scope to avoid per-call allocation
+const ASSET_DISPLAY_NAMES = {
+  'IRR_FIXED_INCOME': 'Fixed Income (IRR)',
+  'USDT': 'USDT',
+  'GOLD': 'Gold',
+  'BTC': 'Bitcoin',
+  'ETH': 'Ethereum',
+  'QQQ': 'QQQ',
+  'SOL': 'Solana',
+  'TON': 'Toncoin',
+};
+
 export function getAssetDisplayName(assetId) {
-  const ASSET_DISPLAY_NAMES = {
-    'IRR_FIXED_INCOME': 'Fixed Income (IRR)',
-    'USDT': 'USDT',
-    'GOLD': 'Gold',
-    'BTC': 'Bitcoin',
-    'ETH': 'Ethereum',
-    'QQQ': 'QQQ',
-    'SOL': 'Solana',
-    'TON': 'Toncoin',
-  };
   return ASSET_DISPLAY_NAMES[assetId] || assetId;
 }
 
