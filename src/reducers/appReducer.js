@@ -355,9 +355,14 @@ export function reducer(state, action) {
 
     case 'PREVIEW_PROTECT': {
       if (state.stage !== STAGES.ACTIVE || !state.protectDraft) return state;
+      // v9.9: Include prices and fxRate for quantity-based value computation
+      const prices = action.prices || DEFAULT_PRICES;
+      const fxRate = action.fxRate || DEFAULT_FX_RATE;
       const payload = {
         assetId: state.protectDraft.assetId,
         months: Number(state.protectDraft.months),
+        prices,
+        fxRate,
       };
       const validation = validateProtect(payload, state);
       const afterState = validation.ok ? previewProtect(state, payload) : cloneState(state);
@@ -390,9 +395,14 @@ export function reducer(state, action) {
 
     case 'PREVIEW_BORROW': {
       if (state.stage !== STAGES.ACTIVE || !state.borrowDraft) return state;
+      // v9.9: Include prices and fxRate for quantity-based value computation
+      const prices = action.prices || DEFAULT_PRICES;
+      const fxRate = action.fxRate || DEFAULT_FX_RATE;
       const payload = {
         assetId: state.borrowDraft.assetId,
         amountIRR: Number(state.borrowDraft.amountIRR),
+        prices,
+        fxRate,
       };
       const validation = validateBorrow(payload, state);
       const afterState = validation.ok ? previewBorrow(state, payload) : cloneState(state);

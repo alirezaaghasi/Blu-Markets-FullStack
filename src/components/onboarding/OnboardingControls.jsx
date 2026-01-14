@@ -452,7 +452,7 @@ function OnboardingControls({ state, dispatch, questionnaire, prices, fxRate }) 
         </div>
         <div className="premiumHint">Premium: {formatIRR(protectData.premium)}</div>
         <div className="row" style={{ marginTop: 10 }}>
-          <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_PROTECT' })}>Preview</button>
+          <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_PROTECT', prices, fxRate })}>Preview</button>
           <button className="btn" onClick={() => dispatch({ type: 'CANCEL_PENDING' })}>Cancel</button>
         </div>
       </ActionCard>
@@ -485,7 +485,7 @@ function OnboardingControls({ state, dispatch, questionnaire, prices, fxRate }) 
         />
         <div className="borrowHint">Max: {formatIRR(borrowData.maxBorrow)}</div>
         <div className="row" style={{ marginTop: 10 }}>
-          <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_BORROW' })} disabled={!state.borrowDraft.amountIRR}>Preview</button>
+          <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_BORROW', prices, fxRate })} disabled={!state.borrowDraft.amountIRR}>Preview</button>
           <button className="btn" onClick={() => dispatch({ type: 'CANCEL_PENDING' })}>Cancel</button>
         </div>
       </ActionCard>

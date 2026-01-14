@@ -1,6 +1,7 @@
 import { calcPremiumIRR } from "./pricing.js";
-import { THRESHOLDS, PROTECTION_ELIGIBLE_ASSETS, COLLATERAL_LTV_BY_LAYER } from "../constants/index.js";
+import { THRESHOLDS, PROTECTION_ELIGIBLE_ASSETS, COLLATERAL_LTV_BY_LAYER, DEFAULT_PRICES, DEFAULT_FX_RATE } from "../constants/index.js";
 import { ASSET_LAYER } from "../state/domain.js";
+import { calculateFixedIncomeValue } from "./fixedIncome.js";
 
 export function ok(meta = {}) {
   return { ok: true, errors: [], meta };
@@ -10,12 +11,32 @@ export function fail(errors, meta = {}) {
   return { ok: false, errors: Array.isArray(errors) ? errors : [String(errors)], meta };
 }
 
+/**
+ * Compute holding value in IRR from quantity (v9.9)
+ * @param {Object} holding - Holding with quantity
+ * @param {Object} prices - Current prices in USD
+ * @param {number} fxRate - USD/IRR exchange rate
+ */
+function getHoldingValueIRR(holding, prices = DEFAULT_PRICES, fxRate = DEFAULT_FX_RATE) {
+  if (!holding) return 0;
+  // Legacy support: if valueIRR exists and quantity doesn't, use valueIRR
+  if (holding.valueIRR !== undefined && holding.quantity === undefined) {
+    return holding.valueIRR;
+  }
+  if (!holding.quantity || holding.quantity <= 0) return 0;
+  if (holding.assetId === 'IRR_FIXED_INCOME') {
+    return calculateFixedIncomeValue(holding.quantity, holding.purchasedAt);
+  }
+  const priceUSD = prices[holding.assetId] || DEFAULT_PRICES[holding.assetId] || 0;
+  return Math.round(holding.quantity * priceUSD * fxRate);
+}
+
 export function validateAddFunds({ amountIRR }) {
   if (!Number.isFinite(amountIRR) || amountIRR <= 0) return fail("INVALID_AMOUNT");
   return ok();
 }
 
-export function validateTrade({ side, assetId, amountIRR }, state) {
+export function validateTrade({ side, assetId, amountIRR, prices, fxRate }, state) {
   if (!["BUY", "SELL"].includes(side)) return fail("INVALID_SIDE");
   if (!state.holdings.some((h) => h.assetId === assetId)) return fail("INVALID_ASSET");
   if (!Number.isFinite(amountIRR) || amountIRR <= 0) return fail("INVALID_AMOUNT");
@@ -30,15 +51,16 @@ export function validateTrade({ side, assetId, amountIRR }, state) {
     return ok();
   }
 
-  // SELL
+  // SELL - v9.9: compute value from quantity
   if (h.frozen) return fail("ASSET_FROZEN");
-  if (h.valueIRR < amountIRR) {
-    return fail(["INSUFFICIENT_ASSET_VALUE"], { available: h.valueIRR });
+  const holdingValueIRR = getHoldingValueIRR(h, prices, fxRate);
+  if (holdingValueIRR < amountIRR) {
+    return fail(["INSUFFICIENT_ASSET_VALUE"], { available: holdingValueIRR });
   }
   return ok();
 }
 
-export function validateProtect({ assetId, months }, state) {
+export function validateProtect({ assetId, months, prices, fxRate }, state) {
   // Asset validation
   if (!state.holdings.some((h) => h.assetId === assetId)) {
     return fail("INVALID_ASSET");
@@ -54,9 +76,10 @@ export function validateProtect({ assetId, months }, state) {
     return fail("INVALID_MONTHS");
   }
 
-  // Notional validation
+  // Notional validation - v9.9: compute value from quantity
   const h = state.holdings.find((x) => x.assetId === assetId);
-  if (!h || h.valueIRR <= 0) {
+  const holdingValueIRR = getHoldingValueIRR(h, prices, fxRate);
+  if (!h || holdingValueIRR <= 0) {
     return fail("NO_NOTIONAL");
   }
 
@@ -74,7 +97,7 @@ export function validateProtect({ assetId, months }, state) {
   // Premium cash sufficiency check (at preview time for immediate feedback)
   const premium = calcPremiumIRR({
     assetId,
-    notionalIRR: h.valueIRR,
+    notionalIRR: holdingValueIRR,
     months,
   });
 
@@ -85,10 +108,10 @@ export function validateProtect({ assetId, months }, state) {
     );
   }
 
-  return ok();
+  return ok({ notionalIRR: holdingValueIRR });
 }
 
-export function validateBorrow({ assetId, amountIRR }, state) {
+export function validateBorrow({ assetId, amountIRR, prices, fxRate }, state) {
   if (!state.holdings.some((h) => h.assetId === assetId)) return fail("INVALID_ASSET");
   if (!Number.isFinite(amountIRR) || amountIRR <= 0) return fail("INVALID_AMOUNT");
 
@@ -97,14 +120,16 @@ export function validateBorrow({ assetId, amountIRR }, state) {
   if (h.frozen) return fail("ASSET_ALREADY_FROZEN");
 
   // LTV is determined by asset's layer (volatility-based)
+  // v9.9: compute value from quantity
   const layer = ASSET_LAYER[assetId];
   const maxLtv = COLLATERAL_LTV_BY_LAYER[layer] || 0.3;
-  const maxBorrow = Math.floor(h.valueIRR * maxLtv);
+  const holdingValueIRR = getHoldingValueIRR(h, prices, fxRate);
+  const maxBorrow = Math.floor(holdingValueIRR * maxLtv);
 
   if (amountIRR > maxBorrow) {
     return fail(["EXCEEDS_MAX_BORROW"], { maxBorrow, maxLtv });
   }
-  return ok({ maxLtv, maxBorrow });
+  return ok({ maxLtv, maxBorrow, holdingValueIRR });
 }
 
 export function validateRepay({ loanId, amountIRR }, state) {

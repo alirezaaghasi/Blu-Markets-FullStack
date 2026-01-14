@@ -60,12 +60,20 @@ export function previewTrade(state, { side, assetId, amountIRR, prices = DEFAULT
   return next;
 }
 
-export function previewProtect(state, { assetId, months }) {
+/**
+ * Preview a protect action
+ * v9.9: Computes notionalIRR from quantity × price × fxRate
+ */
+export function previewProtect(state, { assetId, months, prices = DEFAULT_PRICES, fxRate = DEFAULT_FX_RATE }) {
   const next = cloneState(state);
   const h = next.holdings.find((x) => x.assetId === assetId);
   if (!h) return next;
 
-  const premiumIRR = calcPremiumIRR({ assetId, notionalIRR: h.valueIRR, months });
+  // v9.9: Compute notional from quantity
+  const snap = computeSnapshot([h], 0, prices, fxRate);
+  const notionalIRR = snap.holdingsIRRByAsset[assetId] || 0;
+
+  const premiumIRR = calcPremiumIRR({ assetId, notionalIRR, months });
   next.cashIRR = Math.max(0, next.cashIRR - premiumIRR);
   return next;
 }
