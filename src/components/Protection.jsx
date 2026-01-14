@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { formatIRR, getAssetDisplayName } from '../helpers.js';
 import { ASSET_LAYER } from '../state/domain.js';
 import { LAYER_EXPLANATIONS } from '../constants/index.js';
+
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 /**
  * Protection - Active protections list with progress bars
@@ -12,29 +14,28 @@ function Protection({ protections, dispatch }) {
   const [confirmCancel, setConfirmCancel] = useState(null);
   const list = protections || [];
 
-  const getDaysRemaining = (endISO) => {
+  // Memoize partitioned protections with precomputed date values in single pass
+  const { activeProtections, expiredProtections } = useMemo(() => {
     const now = Date.now();
-    const until = new Date(endISO).getTime();
-    return Math.ceil((until - now) / (1000 * 60 * 60 * 24));
-  };
+    const active = [];
+    const expired = [];
 
-  const getProgressPct = (startISO, endISO) => {
-    const now = Date.now();
-    const start = new Date(startISO).getTime();
-    const end = new Date(endISO).getTime();
-    const totalDuration = end - start;
-    const elapsed = now - start;
-    const remaining = Math.max(0, 100 - (elapsed / totalDuration) * 100);
-    return Math.min(100, Math.max(0, remaining));
-  };
-
-  const isExpired = (endISO) => {
-    return new Date(endISO).getTime() < Date.now();
-  };
-
-  // Separate active and expired protections
-  const activeProtections = list.filter(p => !isExpired(p.endISO));
-  const expiredProtections = list.filter(p => isExpired(p.endISO));
+    for (const p of list) {
+      const endTime = new Date(p.endISO).getTime();
+      if (endTime < now) {
+        expired.push(p);
+      } else {
+        // Precompute date-derived values for active protections
+        const startTime = new Date(p.startISO || p.tsISO).getTime();
+        const totalDuration = endTime - startTime;
+        const elapsed = now - startTime;
+        const progressPct = Math.min(100, Math.max(0, 100 - (elapsed / totalDuration) * 100));
+        const daysLeft = Math.ceil((endTime - now) / MS_PER_DAY);
+        active.push({ ...p, _daysLeft: daysLeft, _progressPct: progressPct });
+      }
+    }
+    return { activeProtections: active, expiredProtections: expired };
+  }, [list]);
 
   const handleCancel = (protectionId) => {
     dispatch({ type: 'CANCEL_PROTECTION', protectionId });
@@ -44,8 +45,6 @@ function Protection({ protections, dispatch }) {
   const renderProtectionItem = (p, isExpiredItem = false) => {
     const layer = ASSET_LAYER[p.assetId];
     const info = LAYER_EXPLANATIONS[layer];
-    const daysLeft = getDaysRemaining(p.endISO);
-    const progressPct = getProgressPct(p.startISO || p.tsISO, p.endISO);
 
     return (
       <div key={p.id} className={`item protectionItem ${isExpiredItem ? 'expired' : ''}`}>
@@ -60,15 +59,15 @@ function Protection({ protections, dispatch }) {
             {p.durationMonths && ` · ${p.durationMonths}mo coverage`}
           </div>
 
-          {/* Progress bar for active protections */}
+          {/* Progress bar for active protections - uses precomputed values */}
           {!isExpiredItem && (
             <div className="protectionProgress">
               <div className="protectionProgressBar">
-                <div className="protectionProgressFill" style={{ width: `${progressPct}%` }} />
+                <div className="protectionProgressFill" style={{ width: `${p._progressPct}%` }} />
               </div>
               <div className="protectionProgressText">
-                <span>{daysLeft} days remaining</span>
-                <span>{Math.round(progressPct)}% left</span>
+                <span>{p._daysLeft} days remaining</span>
+                <span>{Math.round(p._progressPct)}% left</span>
               </div>
             </div>
           )}

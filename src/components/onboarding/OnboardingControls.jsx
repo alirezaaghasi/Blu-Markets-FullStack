@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { STAGES, LAYER_EXPLANATIONS, THRESHOLDS, COLLATERAL_LTV_BY_LAYER, ONBOARDING_STEPS } from '../../constants/index.js';
 import { formatIRR, getAssetDisplayName } from '../../helpers.js';
 import { calcPremiumIRR } from '../../engine/pricing.js';
@@ -80,6 +80,43 @@ function OnboardingControls({ state, dispatch, questionnaire }) {
   const [consentText, setConsentText] = useState('');
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const isConsentMatch = consentText === questionnaire.consent_exact;
+
+  // Memoize protect draft calculations
+  const protectData = useMemo(() => {
+    if (!state.protectDraft) return null;
+    const h = state.holdings.find(x => x.assetId === state.protectDraft.assetId);
+    const premium = h ? calcPremiumIRR({ assetId: h.assetId, notionalIRR: h.valueIRR, months: state.protectDraft.months }) : 0;
+    return { holding: h, premium };
+  }, [state.protectDraft, state.holdings]);
+
+  // Memoize borrow draft calculations
+  const borrowData = useMemo(() => {
+    if (!state.borrowDraft) return null;
+    const h = state.holdings.find(x => x.assetId === state.borrowDraft.assetId);
+    const layer = h ? ASSET_LAYER[h.assetId] : 'UPSIDE';
+    const layerLtv = COLLATERAL_LTV_BY_LAYER[layer] || 0.3;
+    const maxBorrow = h ? Math.floor(h.valueIRR * layerLtv) : 0;
+    const layerInfo = LAYER_EXPLANATIONS[layer];
+    return { holding: h, layer, layerLtv, maxBorrow, layerInfo };
+  }, [state.borrowDraft, state.holdings]);
+
+  // Memoize select options for protect/borrow
+  const protectOptions = useMemo(() => {
+    return state.holdings.filter(h => h.valueIRR > 0).map(h => {
+      const layer = ASSET_LAYER[h.assetId];
+      const info = LAYER_EXPLANATIONS[layer];
+      return { assetId: h.assetId, label: `${info.icon} ${getAssetDisplayName(h.assetId)}` };
+    });
+  }, [state.holdings]);
+
+  const borrowOptions = useMemo(() => {
+    return state.holdings.filter(h => !h.frozen && h.valueIRR > 0).map(h => {
+      const layer = ASSET_LAYER[h.assetId];
+      const info = LAYER_EXPLANATIONS[layer];
+      const ltv = COLLATERAL_LTV_BY_LAYER[layer] || 0.3;
+      return { assetId: h.assetId, label: `${info.icon} ${getAssetDisplayName(h.assetId)} (${Math.round(ltv * 100)}% LTV)` };
+    });
+  }, [state.holdings]);
 
   // Issue 11: Determine current onboarding step
   const getOnboardingStep = () => {
@@ -372,10 +409,7 @@ function OnboardingControls({ state, dispatch, questionnaire }) {
     );
   }
 
-  if (state.protectDraft) {
-    const h = state.holdings.find(x => x.assetId === state.protectDraft.assetId);
-    const premium = h ? calcPremiumIRR({ assetId: h.assetId, notionalIRR: h.valueIRR, months: state.protectDraft.months }) : 0;
-
+  if (state.protectDraft && protectData) {
     return (
       <ActionCard title="☂️ Protect Asset">
         <div className="row" style={{ gap: 8 }}>
@@ -384,11 +418,9 @@ function OnboardingControls({ state, dispatch, questionnaire }) {
             value={state.protectDraft.assetId || ''}
             onChange={(e) => dispatch({ type: 'SET_PROTECT_ASSET', assetId: e.target.value })}
           >
-            {state.holdings.filter(h => h.valueIRR > 0).map((h) => {
-              const layer = ASSET_LAYER[h.assetId];
-              const info = LAYER_EXPLANATIONS[layer];
-              return <option key={h.assetId} value={h.assetId}>{info.icon} {getAssetDisplayName(h.assetId)}</option>;
-            })}
+            {protectOptions.map((opt) => (
+              <option key={opt.assetId} value={opt.assetId}>{opt.label}</option>
+            ))}
           </select>
           <select
             className="input"
@@ -399,7 +431,7 @@ function OnboardingControls({ state, dispatch, questionnaire }) {
             {[1, 2, 3, 4, 5, 6].map((m) => <option key={m} value={m}>{m} mo</option>)}
           </select>
         </div>
-        <div className="premiumHint">Premium: {formatIRR(premium)}</div>
+        <div className="premiumHint">Premium: {formatIRR(protectData.premium)}</div>
         <div className="row" style={{ marginTop: 10 }}>
           <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_PROTECT' })}>Preview</button>
           <button className="btn" onClick={() => dispatch({ type: 'CANCEL_PENDING' })}>Cancel</button>
@@ -408,13 +440,7 @@ function OnboardingControls({ state, dispatch, questionnaire }) {
     );
   }
 
-  if (state.borrowDraft) {
-    const h = state.holdings.find(x => x.assetId === state.borrowDraft.assetId);
-    const layer = h ? ASSET_LAYER[h.assetId] : 'UPSIDE';
-    const layerLtv = COLLATERAL_LTV_BY_LAYER[layer] || 0.3;
-    const maxBorrow = h ? Math.floor(h.valueIRR * layerLtv) : 0;
-    const layerInfo = LAYER_EXPLANATIONS[layer];
-
+  if (state.borrowDraft && borrowData) {
     return (
       <ActionCard title="💰 Borrow">
         <select
@@ -422,16 +448,13 @@ function OnboardingControls({ state, dispatch, questionnaire }) {
           value={state.borrowDraft.assetId || ''}
           onChange={(e) => dispatch({ type: 'SET_BORROW_ASSET', assetId: e.target.value })}
         >
-          {state.holdings.filter(h => !h.frozen && h.valueIRR > 0).map((h) => {
-            const assetLayer = ASSET_LAYER[h.assetId];
-            const info = LAYER_EXPLANATIONS[assetLayer];
-            const ltv = COLLATERAL_LTV_BY_LAYER[assetLayer] || 0.3;
-            return <option key={h.assetId} value={h.assetId}>{info.icon} {getAssetDisplayName(h.assetId)} ({Math.round(ltv * 100)}% LTV)</option>;
-          })}
+          {borrowOptions.map((opt) => (
+            <option key={opt.assetId} value={opt.assetId}>{opt.label}</option>
+          ))}
         </select>
         <div className="borrowLtvInfo" style={{ marginTop: 8, padding: '8px 12px', background: 'var(--bg-tertiary)', borderRadius: 8, fontSize: 12 }}>
-          <span style={{ color: 'var(--text-secondary)' }}>{layerInfo?.icon} {layerInfo?.name} assets: </span>
-          <span style={{ fontWeight: 600 }}>{Math.round(layerLtv * 100)}% max LTV</span>
+          <span style={{ color: 'var(--text-secondary)' }}>{borrowData.layerInfo?.icon} {borrowData.layerInfo?.name} assets: </span>
+          <span style={{ fontWeight: 600 }}>{Math.round(borrowData.layerLtv * 100)}% max LTV</span>
         </div>
         <input
           className="input"
@@ -441,7 +464,7 @@ function OnboardingControls({ state, dispatch, questionnaire }) {
           value={state.borrowDraft.amountIRR ?? ''}
           onChange={(e) => dispatch({ type: 'SET_BORROW_AMOUNT', amountIRR: e.target.value })}
         />
-        <div className="borrowHint">Max: {formatIRR(maxBorrow)}</div>
+        <div className="borrowHint">Max: {formatIRR(borrowData.maxBorrow)}</div>
         <div className="row" style={{ marginTop: 10 }}>
           <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_BORROW' })} disabled={!state.borrowDraft.amountIRR}>Preview</button>
           <button className="btn" onClick={() => dispatch({ type: 'CANCEL_PENDING' })}>Cancel</button>

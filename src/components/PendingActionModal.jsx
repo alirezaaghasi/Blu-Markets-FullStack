@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { formatIRR, formatIRRShort, getAssetDisplayName } from '../helpers.js';
 import { ERROR_MESSAGES, BOUNDARY_LABELS } from '../constants/index.js';
 
@@ -8,11 +8,23 @@ import { ERROR_MESSAGES, BOUNDARY_LABELS } from '../constants/index.js';
 function RebalanceTradesSection({ trades, cashDeployed }) {
   const [expanded, setExpanded] = useState(false);
 
-  // Calculate summary stats
-  const sells = trades.filter(t => t.side === 'SELL');
-  const buys = trades.filter(t => t.side === 'BUY');
-  const sellTotal = sells.reduce((sum, t) => sum + Math.abs(t.amountIRR), 0);
-  const buyTotal = buys.reduce((sum, t) => sum + Math.abs(t.amountIRR), 0);
+  // Memoize trade calculations
+  const { sells, buys, sellTotal, buyTotal } = useMemo(() => {
+    const sellList = [];
+    const buyList = [];
+    let sellSum = 0;
+    let buySum = 0;
+    for (const t of trades) {
+      if (t.side === 'SELL') {
+        sellList.push(t);
+        sellSum += Math.abs(t.amountIRR);
+      } else {
+        buyList.push(t);
+        buySum += Math.abs(t.amountIRR);
+      }
+    }
+    return { sells: sellList, buys: buyList, sellTotal: sellSum, buyTotal: buySum };
+  }, [trades]);
 
   return (
     <div className="rebalanceTradesCard">

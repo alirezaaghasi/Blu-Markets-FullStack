@@ -103,9 +103,26 @@ export function previewRebalance(state, { mode }) {
   const snap = computeSnapshot(next);
   const holdingsTotal = snap.holdingsIRR || 1;
 
+  // Build holdings lookup by layer once - O(n) instead of O(n*m) repeated filters
+  const holdingsByLayer = { FOUNDATION: [], GROWTH: [], UPSIDE: [] };
+  const sellableByLayer = { FOUNDATION: [], GROWTH: [], UPSIDE: [] };
+  let hasLockedCollateral = false;
+
+  for (const h of next.holdings) {
+    const layer = ASSET_LAYER[h.assetId];
+    if (layer && holdingsByLayer[layer]) {
+      holdingsByLayer[layer].push(h);
+      if (!h.frozen && h.valueIRR > 0) {
+        sellableByLayer[layer].push(h);
+      } else if (h.frozen && h.valueIRR > 0) {
+        hasLockedCollateral = true;
+      }
+    }
+  }
+
   // Track constraints for messaging
   const meta = {
-    hasLockedCollateral: state.holdings.some(h => h.frozen && h.valueIRR > 0),
+    hasLockedCollateral,
     insufficientCash: false,
     residualDrift: 0,
     trades: [],
@@ -158,14 +175,11 @@ export function previewRebalance(state, { mode }) {
         let toSell = sellByLayer[layer];
         if (toSell <= 0) continue;
 
-        // Get sellable assets (not frozen)
-        const assets = next.holdings.filter(
-          (h) => ASSET_LAYER[h.assetId] === layer && !h.frozen && h.valueIRR > 0
-        );
+        // Use precomputed sellable assets (not frozen)
+        const assets = sellableByLayer[layer];
 
         if (!assets.length) {
-          // All assets in this layer are frozen - constraint
-          meta.hasLockedCollateral = true;
+          // All assets in this layer are frozen - constraint already tracked
           continue;
         }
 
@@ -194,7 +208,7 @@ export function previewRebalance(state, { mode }) {
         const layerBuy = (deficits[layer] / totalDeficit) * amountToMove;
         if (layerBuy <= 0) continue;
 
-        const assets = next.holdings.filter((h) => ASSET_LAYER[h.assetId] === layer);
+        const assets = holdingsByLayer[layer];
         if (!assets.length) continue;
 
         // Distribute buy evenly across assets in layer
@@ -245,7 +259,7 @@ export function previewRebalance(state, { mode }) {
         const portion = spendByLayer[layer];
         if (portion <= 0) continue;
 
-        const assets = next.holdings.filter((h) => ASSET_LAYER[h.assetId] === layer);
+        const assets = holdingsByLayer[layer];
         if (!assets.length) continue;
 
         const per = portion / assets.length;
