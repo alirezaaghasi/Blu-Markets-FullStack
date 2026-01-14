@@ -28,12 +28,13 @@ function Loans({ loans, holdings, prices, fxRate, dispatch }) {
   }
 
   // Issue 5: Enhanced loan status with health bar colors
+  // v9.10: Color palette compliance - using semantic colors
   const getLoanHealth = (loan) => {
     const usedPercent = (loan.amountIRR / loan.liquidationIRR) * 100;
     if (usedPercent >= 75) return { level: 'critical', color: '#ef4444', message: `If ${getAssetDisplayName(loan.collateralAssetId)} drops ${Math.round(100 - usedPercent)}%, this loan will auto-close.` };
-    if (usedPercent >= 65) return { level: 'warning', color: '#f97316', message: 'Close to limit. Consider repaying soon.' };
-    if (usedPercent >= 50) return { level: 'caution', color: '#fbbf24', message: null };
-    return { level: 'healthy', color: '#34d399', message: null };
+    if (usedPercent >= 65) return { level: 'warning', color: '#f59e0b', message: 'Close to limit. Consider repaying soon.' };
+    if (usedPercent >= 50) return { level: 'caution', color: '#f59e0b', message: null };
+    return { level: 'healthy', color: '#3b82f6', message: null };
   };
 
   // Decision 11: Calculate liquidation price in USD for each loan

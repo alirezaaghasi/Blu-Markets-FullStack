@@ -885,7 +885,7 @@ body {
 }
 
 .profile-result .continue-btn:hover {
-  background: #22c55e;
+  background: var(--accent-hover);
 }
 
 /* =============================================
