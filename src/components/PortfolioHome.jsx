@@ -2,16 +2,18 @@ import React, { useState, useMemo } from 'react';
 import { formatIRR, formatIRRShort } from '../helpers.js';
 import { ASSET_LAYER } from '../state/domain.js';
 import { LAYER_EXPLANATIONS } from '../constants/index.js';
-import { computePortfolioStatus } from '../engine/portfolioStatus.js';
 import LayerMini from './LayerMini.jsx';
 import HoldingRow from './HoldingRow.jsx';
+
+// Hoist static array to module level to avoid recreation on each render
+const LAYERS = LAYERS;
 
 /**
  * PortfolioHome - Main portfolio dashboard
  * Shows portfolio value, allocation, holdings grouped by layer
  * Issue 3: Collapsible holdings by layer (default collapsed)
  */
-function PortfolioHome({ state, snapshot, onStartTrade, onStartProtect, onStartBorrow, onStartRebalance }) {
+function PortfolioHome({ state, snapshot, portfolioStatus, onStartTrade, onStartProtect, onStartBorrow, onStartRebalance }) {
   // Issue 3: Track expanded layers (default all collapsed)
   const [expandedLayers, setExpandedLayers] = useState({});
 
@@ -28,14 +30,13 @@ function PortfolioHome({ state, snapshot, onStartTrade, onStartProtect, onStartB
     );
   }
 
-  // Calculate drift from target
-  const { status } = computePortfolioStatus(snapshot.layerPct);
-  const isOff = status === 'SLIGHTLY_OFF' || status === 'ATTENTION_REQUIRED';
-  const isAttention = status === 'ATTENTION_REQUIRED';
+  // Use pre-computed portfolio status from App.jsx
+  const isOff = portfolioStatus === 'SLIGHTLY_OFF' || portfolioStatus === 'ATTENTION_REQUIRED';
+  const isAttention = portfolioStatus === 'ATTENTION_REQUIRED';
 
   // Memoize total drift calculation
   const totalDrift = useMemo(() => {
-    return ['FOUNDATION', 'GROWTH', 'UPSIDE'].reduce((sum, layer) => {
+    return LAYERS.reduce((sum, layer) => {
       return sum + Math.abs(snapshot.layerPct[layer] - state.targetLayerPct[layer]);
     }, 0);
   }, [snapshot.layerPct, state.targetLayerPct]);
@@ -147,7 +148,7 @@ function PortfolioHome({ state, snapshot, onStartTrade, onStartProtect, onStartB
       <div className="card">
         <div className="sectionTitle">ASSET ALLOCATION</div>
         <div className="grid3">
-          {['FOUNDATION', 'GROWTH', 'UPSIDE'].map(layer => (
+          {LAYERS.map(layer => (
             <LayerMini key={layer} layer={layer} pct={snapshot.layerPct[layer]} target={state.targetLayerPct[layer]} />
           ))}
         </div>
@@ -156,7 +157,7 @@ function PortfolioHome({ state, snapshot, onStartTrade, onStartProtect, onStartB
       {/* Issue 3: Collapsible holdings by layer */}
       <div className="card">
         <h3>HOLDINGS</h3>
-        {['FOUNDATION', 'GROWTH', 'UPSIDE'].map(layer => {
+        {LAYERS.map(layer => {
           const layerHoldings = holdingsByLayer.holdings[layer];
           if (layerHoldings.length === 0) return null;
           const layerInfo = LAYER_EXPLANATIONS[layer];

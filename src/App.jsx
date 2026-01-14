@@ -41,11 +41,10 @@ import {
 // ====== HEADER CONTENT HELPER ======
 // Memoized via useMemo in component to avoid repeated computation
 
-function computeHeaderContent(activeTab, state, snapshot, loansTotal) {
+function computeHeaderContent(activeTab, state, snapshot, loansTotal, portfolioStatus) {
   switch (activeTab) {
     case 'PORTFOLIO': {
-      const { status } = computePortfolioStatus(snapshot.layerPct);
-      const needsRebalance = status === 'SLIGHTLY_OFF' || status === 'ATTENTION_REQUIRED';
+      const needsRebalance = portfolioStatus === 'SLIGHTLY_OFF' || portfolioStatus === 'ATTENTION_REQUIRED';
       return {
         title: 'Your Portfolio',
         badge: needsRebalance
@@ -91,6 +90,12 @@ export default function App() {
     [state.holdings, state.cashIRR]
   );
 
+  // Memoize portfolio status - reused by header, PortfolioHome, and PortfolioHealthBadge
+  const portfolioStatus = useMemo(
+    () => computePortfolioStatus(snapshot.layerPct).status,
+    [snapshot.layerPct]
+  );
+
   // Memoize loan total to avoid duplicate reductions
   const loansTotal = useMemo(
     () => (state.loans || []).reduce((sum, l) => sum + l.amountIRR, 0),
@@ -99,8 +104,8 @@ export default function App() {
 
   // Memoize header content to avoid repeated computation per render
   const headerContent = useMemo(
-    () => computeHeaderContent(state.tab, state, snapshot, loansTotal),
-    [state.tab, state.protections, state.loans, snapshot, loansTotal]
+    () => computeHeaderContent(state.tab, state, snapshot, loansTotal, portfolioStatus),
+    [state.tab, state.protections, state.loans, snapshot, loansTotal, portfolioStatus]
   );
 
   // Action handlers
@@ -131,6 +136,7 @@ export default function App() {
       <PortfolioHome
         state={state}
         snapshot={snapshot}
+        portfolioStatus={portfolioStatus}
         onStartTrade={onStartTrade}
         onStartProtect={onStartProtect}
         onStartBorrow={onStartBorrow}
@@ -149,6 +155,7 @@ export default function App() {
     state.holdings,
     state.cashIRR,
     snapshot,
+    portfolioStatus,
   ]);
 
   // Compute loan summary for header (only when loans exist and not on loans tab)
