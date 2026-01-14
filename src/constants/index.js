@@ -58,3 +58,35 @@ export const BOUNDARY_LABELS = {
   STRUCTURAL: 'Structural',
   STRESS: 'Stress',
 };
+
+// User-friendly error messages for validation errors
+export const ERROR_MESSAGES = {
+  // General
+  INVALID_AMOUNT: 'Please enter a valid amount.',
+  INVALID_ASSET: 'Invalid asset selected.',
+  INSUFFICIENT_CASH: 'Not enough cash available for this action.',
+
+  // Trade
+  INVALID_SIDE: 'Invalid trade side. Choose Buy or Sell.',
+  INSUFFICIENT_ASSET_VALUE: 'Not enough of this asset to sell.',
+  ASSET_FROZEN: 'This asset is locked as loan collateral and cannot be sold.',
+
+  // Protect
+  INVALID_MONTHS: 'Please select a duration between 1 and 6 months.',
+  NO_NOTIONAL: 'This asset has no value to protect.',
+  ASSET_ALREADY_PROTECTED: 'This asset already has active protection.',
+  INSUFFICIENT_CASH_FOR_PREMIUM: 'Not enough cash to pay the protection premium.',
+
+  // Borrow
+  INVALID_LTV: 'LTV must be between 20% and 70%.',
+  LOAN_ALREADY_ACTIVE: 'You already have an active loan. Repay it first.',
+  ASSET_ALREADY_FROZEN: 'This asset is already used as collateral.',
+  EXCEEDS_MAX_BORROW: 'Requested amount exceeds maximum borrowable.',
+
+  // Repay
+  NO_ACTIVE_LOAN: 'No active loan to repay.',
+  NO_CASH: 'No cash available to make a repayment.',
+
+  // Rebalance
+  INVALID_MODE: 'Invalid rebalance mode.',
+};

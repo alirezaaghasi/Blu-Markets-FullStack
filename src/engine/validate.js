@@ -53,6 +53,17 @@ export function validateProtect({ assetId, months }, state) {
     return fail("NO_NOTIONAL");
   }
 
+  // P-2: Check for existing active protection on this asset
+  const existingProtection = (state.protections || []).find(p => {
+    if (p.assetId !== assetId) return false;
+    const endDate = new Date(p.endISO);
+    return endDate > new Date(); // Still active
+  });
+
+  if (existingProtection) {
+    return fail("ASSET_ALREADY_PROTECTED");
+  }
+
   // Premium cash sufficiency check (at preview time for immediate feedback)
   const premium = calcPremiumIRR({
     assetId,

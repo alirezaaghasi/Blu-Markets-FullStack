@@ -33,7 +33,29 @@ export function classifyActionBoundary({ kind, validation, before, after, stress
   return escalate("SAFE");
 }
 
-export function frictionCopyForBoundary(boundary) {
+/**
+ * Returns friction copy based on boundary and action context.
+ * Rebalance gets special messaging when constrained.
+ */
+export function frictionCopyForBoundary(boundary, kind = null, meta = {}) {
+  // Rebalance-specific messaging when constrained
+  if (kind === "REBALANCE" && boundary === "STRUCTURAL") {
+    const messages = ["Target allocation not fully reachable with current constraints."];
+
+    if (meta.hasLockedCollateral) {
+      messages.push("Some assets are locked as loan collateral and cannot be sold.");
+    }
+    if (meta.insufficientCash) {
+      messages.push("Insufficient cash to fully rebalance into underweight layers.");
+    }
+    if (meta.residualDrift && meta.residualDrift > 0) {
+      messages.push(`Residual drift remains: ${meta.residualDrift.toFixed(1)}% from target.`);
+    }
+
+    return messages;
+  }
+
+  // Default friction copy
   if (boundary === "SAFE") return [];
   if (boundary === "DRIFT") return ["This moves you away from your target allocation. You can proceed or rebalance later."];
   if (boundary === "STRUCTURAL") return ["This crosses a structural boundary. You can proceed, but you must acknowledge it."];

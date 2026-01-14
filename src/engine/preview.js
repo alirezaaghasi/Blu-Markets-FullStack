@@ -77,14 +77,25 @@ export function previewRepay(state, { amountIRR }) {
 
 /**
  * Deterministic rebalance for prototype:
- * - If mode includes cash: deploy cash into underweight layers.
+ * - HOLDINGS_ONLY mode: Sell from overweight layers, buy into underweight layers. Cash untouched.
+ * - HOLDINGS_PLUS_CASH mode: Also deploy cash into underweight layers.
  * - Never sells frozen collateral.
  * - Leaves residual drift if constrained.
+ * Returns state with _rebalanceMeta for constraint messaging.
  */
 export function previewRebalance(state, { mode }) {
   const next = cloneState(state);
   const snap = computeSnapshot(next);
   const holdingsTotal = snap.holdingsIRR || 1;
+
+  // Track constraints for messaging
+  const meta = {
+    hasLockedCollateral: state.holdings.some(h => h.frozen && h.valueIRR > 0),
+    insufficientCash: false,
+    residualDrift: 0,
+    trades: [],
+    cashDeployed: 0,
+  };
 
   // Target values based on holdings only (cash excluded from layer calc)
   const targetIRR = {
@@ -95,8 +106,99 @@ export function previewRebalance(state, { mode }) {
 
   const curIRR = { ...snap.layerIRR };
 
+  // HOLDINGS_ONLY: Rebalance by selling overweight and buying underweight (no cash used)
+  if (mode === "HOLDINGS_ONLY") {
+    // Calculate surpluses (overweight) and deficits (underweight)
+    const surpluses = {};
+    const deficits = {};
+
+    for (const layer of ['FOUNDATION', 'GROWTH', 'UPSIDE']) {
+      const diff = curIRR[layer] - targetIRR[layer];
+      if (diff > 0) {
+        surpluses[layer] = diff;
+      } else if (diff < 0) {
+        deficits[layer] = Math.abs(diff);
+      }
+    }
+
+    const totalSurplus = Object.values(surpluses).reduce((a, b) => a + b, 0);
+    const totalDeficit = Object.values(deficits).reduce((a, b) => a + b, 0);
+
+    // Amount to move is the minimum of total surplus and total deficit
+    const amountToMove = Math.min(totalSurplus, totalDeficit);
+
+    if (amountToMove > 0) {
+      // First: SELL from overweight layers (excluding frozen collateral)
+      let remainingToSell = amountToMove;
+      const sellByLayer = {};
+
+      for (const layer of Object.keys(surpluses)) {
+        // Proportion of this layer's surplus relative to total surplus
+        const layerSell = Math.min(surpluses[layer], (surpluses[layer] / totalSurplus) * amountToMove);
+        sellByLayer[layer] = layerSell;
+      }
+
+      // Execute sells
+      for (const layer of Object.keys(sellByLayer)) {
+        let toSell = sellByLayer[layer];
+        if (toSell <= 0) continue;
+
+        // Get sellable assets (not frozen)
+        const assets = next.holdings.filter(
+          (h) => ASSET_LAYER[h.assetId] === layer && !h.frozen && h.valueIRR > 0
+        );
+
+        if (!assets.length) {
+          // All assets in this layer are frozen - constraint
+          meta.hasLockedCollateral = true;
+          continue;
+        }
+
+        // Distribute sell proportionally across assets in layer
+        const layerTotal = assets.reduce((sum, h) => sum + h.valueIRR, 0);
+        for (const h of assets) {
+          const proportion = h.valueIRR / layerTotal;
+          const sellAmount = Math.min(toSell * proportion, h.valueIRR);
+          if (sellAmount > 0) {
+            h.valueIRR -= sellAmount;
+            meta.trades.push({
+              layer,
+              assetId: h.assetId,
+              amountIRR: -sellAmount,
+              side: 'SELL',
+            });
+          }
+        }
+      }
+
+      // Second: BUY into underweight layers
+      let remainingToBuy = amountToMove;
+
+      for (const layer of Object.keys(deficits)) {
+        // Proportion of this layer's deficit relative to total deficit
+        const layerBuy = (deficits[layer] / totalDeficit) * amountToMove;
+        if (layerBuy <= 0) continue;
+
+        const assets = next.holdings.filter((h) => ASSET_LAYER[h.assetId] === layer);
+        if (!assets.length) continue;
+
+        // Distribute buy evenly across assets in layer
+        const per = layerBuy / assets.length;
+        for (const h of assets) {
+          h.valueIRR += per;
+          meta.trades.push({
+            layer,
+            assetId: h.assetId,
+            amountIRR: per,
+            side: 'BUY',
+          });
+        }
+      }
+    }
+  }
+
+  // HOLDINGS_PLUS_CASH: Deploy cash into underweight layers (legacy behavior)
   if (mode === "HOLDINGS_PLUS_CASH" && next.cashIRR > 0) {
-    // Recalculate target based on total after deploying cash
     const newTotal = holdingsTotal + next.cashIRR;
     const newTargetIRR = {
       FOUNDATION: (state.targetLayerPct.FOUNDATION / 100) * newTotal,
@@ -114,6 +216,10 @@ export function previewRebalance(state, { mode }) {
     if (totalDef > 0) {
       const spend = Math.min(next.cashIRR, totalDef);
 
+      if (next.cashIRR < totalDef) {
+        meta.insufficientCash = true;
+      }
+
       const spendByLayer = {
         FOUNDATION: spend * (deficits.FOUNDATION / totalDef),
         GROWTH: spend * (deficits.GROWTH / totalDef),
@@ -128,13 +234,34 @@ export function previewRebalance(state, { mode }) {
         if (!assets.length) continue;
 
         const per = portion / assets.length;
-        for (const h of assets) h.valueIRR += per;
+        for (const h of assets) {
+          h.valueIRR += per;
+          meta.trades.push({
+            layer,
+            assetId: h.assetId,
+            amountIRR: per,
+            side: 'BUY',
+          });
+        }
       }
 
+      meta.cashDeployed = spend;
       next.cashIRR -= spend;
     }
   }
 
-  // No sell-based rebalancing in prototype; residual drift is expected and must be surfaced by boundary/status.
+  // After rebalance, compute residual drift from target
+  const afterSnap = computeSnapshot(next);
+  const driftFromTarget = ['FOUNDATION', 'GROWTH', 'UPSIDE'].reduce((sum, layer) => {
+    const target = state.targetLayerPct[layer];
+    const actual = afterSnap.layerPct[layer];
+    return sum + Math.abs(target - actual);
+  }, 0);
+
+  meta.residualDrift = driftFromTarget;
+
+  // Attach meta to state for boundary classification
+  next._rebalanceMeta = meta;
+
   return next;
 }
