@@ -1,8 +1,8 @@
-import React, { useMemo, useReducer } from 'react';
+import React, { useMemo, useReducer, useCallback, Suspense, lazy } from 'react';
 
-// ====== BLU MARKETS v9.9 ======
+// ====== BLU MARKETS v10 ======
 // Architecture: Single reducer + deterministic engine
-// v9.9: Quantity-based holdings with live price feeds
+// v10: Advanced risk profiling with pathological user detection
 // All actions flow: PREVIEW_* -> pendingAction -> CONFIRM_PENDING -> ledger
 // Rule: Chat can propose, only engine can execute
 
@@ -28,19 +28,28 @@ import { formatIRR, formatIRRShort } from './helpers.js';
 // Reducer imports
 import { reducer, initialState } from './reducers/appReducer.js';
 
-// Component imports
+// Component imports (core - always loaded)
 import {
   ActionLogPane,
   ExecutionSummary,
   Tabs,
   ResetConfirmModal,
-  HistoryPane,
   PortfolioHome,
-  Protection,
-  Loans,
   OnboardingRightPanel,
   OnboardingControls,
 } from './components/index.js';
+
+// Lazy-loaded tab panels (code-split for better initial load)
+const HistoryPane = lazy(() => import('./components/HistoryPane.jsx'));
+const Protection = lazy(() => import('./components/Protection.jsx'));
+const Loans = lazy(() => import('./components/Loans.jsx'));
+
+// Loading fallback for lazy components
+const TabLoadingFallback = () => (
+  <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)' }}>
+    Loading...
+  </div>
+);
 
 // ====== HEADER CONTENT HELPER ======
 // Memoized via useMemo in component to avoid repeated computation
@@ -116,14 +125,27 @@ export default function App() {
     [state.tab, state.protections, state.loans, loansTotal, portfolioStatus]
   );
 
-  // Action handlers
-  const onStartTrade = (assetId, side) => dispatch({ type: 'START_TRADE', assetId, side });
-  const onStartProtect = (assetId) => dispatch({ type: 'START_PROTECT', assetId });
-  const onStartBorrow = (assetId) => dispatch({ type: 'START_BORROW', assetId });
-  const onStartRebalance = () => dispatch({ type: 'START_REBALANCE' });
+  // Memoized action handlers to prevent unnecessary re-renders of memoized children
+  const onStartTrade = useCallback(
+    (assetId, side) => dispatch({ type: 'START_TRADE', assetId, side }),
+    []
+  );
+  const onStartProtect = useCallback(
+    (assetId) => dispatch({ type: 'START_PROTECT', assetId }),
+    []
+  );
+  const onStartBorrow = useCallback(
+    (assetId) => dispatch({ type: 'START_BORROW', assetId }),
+    []
+  );
+  const onStartRebalance = useCallback(
+    () => dispatch({ type: 'START_REBALANCE' }),
+    []
+  );
 
   // Memoize right panel content - pass only specific state slices to avoid
   // stale UI when unrelated state fields (actionLog, pendingAction, drafts) change
+  // Uses Suspense for code-split tab panels
   const rightContent = useMemo(() => {
     if (state.stage !== STAGES.ACTIVE) {
       return (
@@ -137,9 +159,28 @@ export default function App() {
         />
       );
     }
-    if (state.tab === 'PROTECTION') return <Protection protections={state.protections} dispatch={dispatch} />;
-    if (state.tab === 'LOANS') return <Loans loans={state.loans} dispatch={dispatch} />;
-    if (state.tab === 'HISTORY') return <HistoryPane ledger={state.ledger} />;
+    // Lazy-loaded tab panels wrapped in Suspense
+    if (state.tab === 'PROTECTION') {
+      return (
+        <Suspense fallback={<TabLoadingFallback />}>
+          <Protection protections={state.protections} dispatch={dispatch} />
+        </Suspense>
+      );
+    }
+    if (state.tab === 'LOANS') {
+      return (
+        <Suspense fallback={<TabLoadingFallback />}>
+          <Loans loans={state.loans} dispatch={dispatch} />
+        </Suspense>
+      );
+    }
+    if (state.tab === 'HISTORY') {
+      return (
+        <Suspense fallback={<TabLoadingFallback />}>
+          <HistoryPane ledger={state.ledger} />
+        </Suspense>
+      );
+    }
     // Pass only specific state slices PortfolioHome needs (not whole state object)
     return (
       <PortfolioHome

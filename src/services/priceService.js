@@ -5,6 +5,9 @@
  * - CoinGecko: BTC, ETH, SOL, TON, USDT, GOLD (free, no key)
  * - Finnhub: QQQ (free with API key)
  * - Bonbast: USD/IRR rate
+ *
+ * Optimizations:
+ * - AbortController support for cancellable requests
  */
 
 import { ASSET_META } from '../state/domain.js';
@@ -26,13 +29,14 @@ const FALLBACK_RATE = parseInt(import.meta.env.VITE_FALLBACK_USD_IRR) || DEFAULT
 /**
  * Fetch crypto prices from CoinGecko
  * Free API, no key needed, ~30 calls/min limit
+ * @param {AbortSignal} signal - Optional AbortController signal
  */
-export async function fetchCryptoPrices() {
+export async function fetchCryptoPrices(signal) {
   const ids = Object.values(COINGECKO_IDS).join(',');
   const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`;
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { signal });
     if (!response.ok) throw new Error(`CoinGecko error: ${response.status}`);
 
     const data = await response.json();
@@ -51,6 +55,9 @@ export async function fetchCryptoPrices() {
       updatedAt: new Date().toISOString(),
     };
   } catch (error) {
+    // Re-throw abort errors for proper handling upstream
+    if (error.name === 'AbortError') throw error;
+
     console.error('CoinGecko fetch error:', error);
     return { ok: false, error: error.message };
   }
@@ -59,8 +66,10 @@ export async function fetchCryptoPrices() {
 /**
  * Fetch QQQ price from Finnhub
  * Free tier: 60 calls/min
+ * @param {string} symbol - Stock symbol (default 'QQQ')
+ * @param {AbortSignal} signal - Optional AbortController signal
  */
-export async function fetchStockPrice(symbol = 'QQQ') {
+export async function fetchStockPrice(symbol = 'QQQ', signal) {
   if (!FINNHUB_API_KEY) {
     console.warn('Finnhub API key not configured');
     return { ok: false, error: 'API key not configured' };
@@ -69,7 +78,7 @@ export async function fetchStockPrice(symbol = 'QQQ') {
   const url = `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`;
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { signal });
     if (!response.ok) throw new Error(`Finnhub error: ${response.status}`);
 
     const data = await response.json();
@@ -84,6 +93,9 @@ export async function fetchStockPrice(symbol = 'QQQ') {
 
     throw new Error('No price data returned');
   } catch (error) {
+    // Re-throw abort errors for proper handling upstream
+    if (error.name === 'AbortError') throw error;
+
     console.error('Finnhub fetch error:', error);
     return { ok: false, error: error.message };
   }
@@ -92,11 +104,12 @@ export async function fetchStockPrice(symbol = 'QQQ') {
 /**
  * Fetch USD/IRR rate from Bonbast (community API)
  * Falls back to hardcoded rate if unavailable
+ * @param {AbortSignal} signal - Optional AbortController signal
  */
-export async function fetchUsdIrrRate() {
+export async function fetchUsdIrrRate(signal) {
   try {
     // Community scraper API
-    const response = await fetch('https://bonbast.amirhn.com/latest');
+    const response = await fetch('https://bonbast.amirhn.com/latest', { signal });
 
     if (!response.ok) {
       console.warn('Bonbast API unavailable, using fallback rate');
@@ -125,6 +138,9 @@ export async function fetchUsdIrrRate() {
 
     throw new Error('Invalid response format');
   } catch (error) {
+    // Re-throw abort errors for proper handling upstream
+    if (error.name === 'AbortError') throw error;
+
     console.error('Bonbast fetch error:', error);
     return {
       ok: true,
@@ -137,12 +153,13 @@ export async function fetchUsdIrrRate() {
 
 /**
  * Fetch all prices in one call
+ * @param {AbortSignal} signal - Optional AbortController signal
  */
-export async function fetchAllPrices() {
+export async function fetchAllPrices(signal) {
   const [cryptoResult, stockResult, fxResult] = await Promise.all([
-    fetchCryptoPrices(),
-    fetchStockPrice('QQQ'),
-    fetchUsdIrrRate(),
+    fetchCryptoPrices(signal),
+    fetchStockPrice('QQQ', signal),
+    fetchUsdIrrRate(signal),
   ]);
 
   const prices = {

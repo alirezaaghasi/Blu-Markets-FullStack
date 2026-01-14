@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { formatIRR, formatIRRShort, getAssetDisplayName } from '../helpers.js';
 import { BOUNDARY_LABELS } from '../constants/index.js';
 
@@ -135,8 +135,11 @@ function HistoryPane({ ledger }) {
     return (boundary && boundary !== 'SAFE') || (before && after);
   };
 
-  // Group entries by date (reversed for newest first)
-  const grouped = groupByDate([...ledger].reverse());
+  // Memoize grouped entries to avoid re-grouping on every render
+  const grouped = useMemo(
+    () => groupByDate([...ledger].reverse()),
+    [ledger]
+  );
 
   return (
     <div className="card">

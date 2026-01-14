@@ -164,9 +164,17 @@ export function initialState() {
   };
 }
 
+// Max entries to keep in actionLog to prevent unbounded memory growth
+const MAX_ACTION_LOG_SIZE = 50;
+
 function addLogEntry(state, type, data = {}) {
   const now = Date.now();
-  return { ...state, actionLog: [...state.actionLog, { id: now, timestamp: now, type, ...data }] };
+  const newLog = [...state.actionLog, { id: now, timestamp: now, type, ...data }];
+  // Cap log size to prevent unbounded growth
+  const cappedLog = newLog.length > MAX_ACTION_LOG_SIZE
+    ? newLog.slice(-MAX_ACTION_LOG_SIZE)
+    : newLog;
+  return { ...state, actionLog: cappedLog };
 }
 
 export function reducer(state, action) {
