@@ -287,6 +287,6 @@ Then you will have built something **rare**:
 
 1. **Blu_Markets_User_Agency_Contract.md** — This document (product doctrine)
 2. **Blu_Markets_Refactor_Spec_v3.1_Final.md** — Technical specification
-3. **Blu_Markets_v9.7_Changelog.md** — UI implementation changes
+3. **README.md** — Current version documentation (v9.9)
 
-The User Agency Contract governs product decisions. The spec implements the contract technically. The changelog implements the spec in UI.
+The User Agency Contract governs product decisions. The spec implements the contract technically. The README documents the current implementation.

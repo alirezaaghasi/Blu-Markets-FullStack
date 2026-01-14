@@ -1,11 +1,15 @@
-# Blu Markets v9.8
+# Blu Markets v9.9
 
-Production-ready portfolio management prototype with:
-- Phone-number onboarding + Persian questionnaire
-- Layer-based portfolio allocation (Foundation/Growth/Upside)
-- Trade, Protect, Borrow, Repay, Rebalance actions
-- Boundary classification system (Safe/Drift/Structural/Stress)
-- Multiple loans with automatic layer-based LTV
+Production-ready portfolio management prototype with live price feeds.
+
+## Features
+
+- **Live Price Feeds**: Real-time prices from CoinGecko, Finnhub, and Bonbast APIs
+- **Quantity-Based Holdings**: Portfolio values computed dynamically (quantity × price × fxRate)
+- **Fixed Income with Accrual**: 30% annual yield with principal + accrued interest display
+- **Layer-Based Allocation**: Foundation/Growth/Upside portfolio structure
+- **Trade, Protect, Borrow, Repay, Rebalance**: Full action suite
+- **Boundary Classification**: Safe/Drift/Structural/Stress status system
 
 ## Run
 
@@ -19,16 +23,17 @@ Open the webview on port **5173** (or next available).
 ## Architecture
 
 - **Single reducer pattern**: All state transitions via `src/reducers/appReducer.js`
-- **Preview-Confirm flow**: Actions go through PREVIEW_* -> pendingAction -> CONFIRM_PENDING -> ledger
+- **Preview-Confirm flow**: Actions go through PREVIEW_* → pendingAction → CONFIRM_PENDING → ledger
 - **Deterministic engine**: `src/engine/` contains pure functions for validation, preview, snapshots
-- **Centralized constants**: `src/constants/index.js` for all thresholds, labels, config
+- **Live prices**: `src/hooks/usePrices.js` polls APIs every 30 seconds
+- **Centralized constants**: `src/constants/index.js` for thresholds, labels, config
 
-## Key Features (v9.8)
+## Key Features (v9.9)
 
-- Multiple simultaneous loans (one per unfrozen asset)
-- Automatic LTV based on asset layer volatility:
-  - Foundation: 70% (stable assets)
-  - Growth: 50% (moderate volatility)
-  - Upside: 30% (high volatility)
-- Protection eligibility filter (BTC, ETH, GOLD, QQQ, SOL only)
-- Rebalance uses holdings only (cash wallet excluded)
+- **Live Prices**: BTC, ETH, SOL, TON, USDT, GOLD from CoinGecko; QQQ from Finnhub
+- **USD/IRR Rate**: Live rate from Bonbast with fallback
+- **Fixed Income**: 500K IRR/unit, 30% annual simple interest
+- **Price Indicator**: Shows live/loading/offline status
+- **Quantity Display**: Shows units held and current USD price per asset
+- **Multiple Loans**: One per unfrozen asset with layer-based LTV (70%/50%/30%)
+- **Protection**: For BTC, ETH, GOLD, QQQ, SOL only

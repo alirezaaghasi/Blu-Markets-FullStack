@@ -326,7 +326,7 @@ Blu Markets Product Documents
 ├── User_Agency_Contract.md      ← Product doctrine (WHY)
 ├── Acceptance_Tests.md          ← This document (PASS/FAIL)
 ├── Architecture_Refactor_v3.1.md ← Technical spec (HOW)
-└── v9.7_Changelog.md            ← UI implementation (WHAT)
+└── README.md                    ← Current version (v9.9)
 ```
 
 The Acceptance Tests validate that implementation honors the Contract.
