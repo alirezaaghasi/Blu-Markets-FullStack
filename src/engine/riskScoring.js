@@ -8,14 +8,11 @@
  * - Consistency checking with penalties
  */
 
-// Question IDs by dimension
-const CAPACITY_QUESTIONS = ['q_life_stage', 'q_income', 'q_buffer', 'q_proportion'];
+// Question IDs by dimension (v10.1: reduced to 9 questions per guidelines)
+const CAPACITY_QUESTIONS = ['q_income', 'q_buffer', 'q_proportion'];
 const WILLINGNESS_QUESTIONS = ['q_crash_20', 'q_tradeoff', 'q_past_behavior', 'q_max_loss'];
 const HORIZON_QUESTION = 'q_horizon';
 const GOAL_QUESTION = 'q_goal';
-const SELF_ASSESS_QUESTION = 'q_self_assess';
-const CONSISTENCY_QUESTION = 'q_double_check';
-const CRASH_QUESTION = 'q_crash_20';
 
 /**
  * Calculate weighted average score for a set of questions
@@ -55,6 +52,7 @@ function collectFlags(answers) {
 
 /**
  * Calculate sub-scores for each dimension
+ * v10.1: Simplified - removed self-assessment per guidelines
  */
 export function calculateSubScores(answers, questionnaire) {
   // Capacity Score (C): Financial ability to take risk
@@ -69,36 +67,28 @@ export function calculateSubScores(answers, questionnaire) {
   // Goal Score (G)
   const G = answers[GOAL_QUESTION]?.score || 5;
 
-  // Self Assessment (for consistency check)
-  const selfAssess = answers[SELF_ASSESS_QUESTION]?.score || 5;
-
-  return { C, W, H, G, selfAssess };
+  return { C, W, H, G };
 }
 
 /**
  * Check for inconsistencies between answers
+ * v10.1: Simplified - removed double-check question per guidelines
+ * Now uses internal consistency of willingness answers
  */
 export function checkConsistency(answers) {
   const penalties = [];
 
-  // Q7 (crash) vs Q12 (double check) — should be similar
-  const crashAnswer = answers[CRASH_QUESTION];
-  const doubleCheckAnswer = answers[CONSISTENCY_QUESTION];
+  // Check if crash response and max loss tolerance are consistent
+  const crashAnswer = answers['q_crash_20'];
+  const maxLossAnswer = answers['q_max_loss'];
 
-  if (crashAnswer && doubleCheckAnswer) {
-    const drift = Math.abs(crashAnswer.score - doubleCheckAnswer.score);
-
-    if (drift > 5) {
+  if (crashAnswer && maxLossAnswer) {
+    // If someone says they'd sell everything at -20% but claims to tolerate 30%+ loss
+    if (crashAnswer.score <= 2 && maxLossAnswer.score >= 7) {
       penalties.push({
-        type: 'inconsistent_panic',
-        amount: -2,
-        message: 'Inconsistent responses to crash scenarios'
-      });
-    } else if (drift > 3) {
-      penalties.push({
-        type: 'mild_inconsistency',
+        type: 'inconsistent_loss_tolerance',
         amount: -1,
-        message: 'Slightly inconsistent crash responses'
+        message: 'Stated loss tolerance higher than behavioral response suggests'
       });
     }
   }
@@ -107,27 +97,8 @@ export function checkConsistency(answers) {
 }
 
 /**
- * Check for overconfidence (self-assessment vs revealed behavior)
- */
-export function checkOverconfidence(answers, calculatedW) {
-  const penalties = [];
-
-  const selfScore = answers[SELF_ASSESS_QUESTION]?.score || 5;
-
-  // If self-assessment is much higher than revealed behavior
-  if (selfScore > calculatedW + 4) {
-    penalties.push({
-      type: 'overconfident',
-      amount: -1,
-      message: 'Self-assessment significantly exceeds behavioral indicators'
-    });
-  }
-
-  return penalties;
-}
-
-/**
  * Detect pathological user patterns
+ * v10.1: Removed "liar" detection (required self-assess question removed per guidelines)
  */
 export function detectPathologicalUser(answers, flags, scores) {
   const warnings = [];
@@ -158,18 +129,6 @@ export function detectPathologicalUser(answers, flags, scores) {
       action: 'cap_willingness_7',
       severity: 'medium',
       message: 'Gambling tendency detected. Willingness capped at 7.'
-    });
-  }
-
-  // THE LIAR
-  // Claims aggressive but reveals conservative
-  const selfScore = answers[SELF_ASSESS_QUESTION]?.score || 5;
-  if (selfScore >= 8 && scores.W <= 4) {
-    warnings.push({
-      type: 'likely_liar',
-      action: 'use_revealed',
-      severity: 'medium',
-      message: 'Claims aggressive but behavioral responses indicate conservative.'
     });
   }
 
@@ -212,43 +171,40 @@ export function getHorizonCap(answers, questionnaire) {
 /**
  * Main scoring function
  * Returns final risk score (1-10) with all metadata
+ * v10.1: Simplified per guidelines - removed self-assessment checks
  */
 export function calculateFinalRisk(answers, questionnaire) {
   // Step 1: Calculate sub-scores
   const scores = calculateSubScores(answers, questionnaire);
-  const { C, W, H, G, selfAssess } = scores;
+  const { C, W, H, G } = scores;
 
   // Step 2: Collect flags
   const flags = collectFlags(answers);
 
   // Step 3: Check consistency
-  const consistencyPenalties = checkConsistency(answers);
+  const penalties = checkConsistency(answers);
 
-  // Step 4: Check overconfidence
-  const overconfidencePenalties = checkOverconfidence(answers, W);
-
-  // Step 5: Detect pathological users
+  // Step 4: Detect pathological users
   const warnings = detectPathologicalUser(answers, flags, scores);
 
-  // Step 6: Apply CONSERVATIVE DOMINANCE RULE
+  // Step 5: Apply CONSERVATIVE DOMINANCE RULE
   // Final = min(Capacity, Willingness)
   let rawScore = Math.min(C, W);
 
   // Determine limiting factor
   const limitingFactor = C < W ? 'capacity' : 'willingness';
 
-  // Step 7: Apply horizon hard cap
+  // Step 6: Apply horizon hard cap
   const horizonCap = getHorizonCap(answers, questionnaire);
   if (horizonCap !== null) {
     rawScore = Math.min(rawScore, horizonCap);
   }
 
-  // Step 8: Apply consistency penalties
-  const allPenalties = [...consistencyPenalties, ...overconfidencePenalties];
-  const penaltyTotal = allPenalties.reduce((sum, p) => sum + p.amount, 0);
+  // Step 7: Apply consistency penalties
+  const penaltyTotal = penalties.reduce((sum, p) => sum + p.amount, 0);
   rawScore += penaltyTotal;
 
-  // Step 9: Apply hard caps from pathological detection
+  // Step 8: Apply hard caps from pathological detection
   for (const warning of warnings) {
     if (warning.action === 'hard_cap_3') {
       rawScore = Math.min(rawScore, 3);
@@ -261,10 +217,10 @@ export function calculateFinalRisk(answers, questionnaire) {
     }
   }
 
-  // Step 10: Clamp to valid range
+  // Step 9: Clamp to valid range
   const finalScore = Math.max(1, Math.min(10, Math.round(rawScore)));
 
-  // Step 11: Get profile and allocation
+  // Step 10: Get profile and allocation
   const profile = questionnaire.profiles[String(finalScore)];
   const allocation = questionnaire.allocations[String(finalScore)];
 
@@ -274,17 +230,16 @@ export function calculateFinalRisk(answers, questionnaire) {
     profile_fa: profile.name_fa,
     allocation,
 
-    // Detailed breakdown
+    // Detailed breakdown (internal use)
     capacity: Math.round(C * 10) / 10,
     willingness: Math.round(W * 10) / 10,
     horizon: H,
     goal: G,
-    selfAssessment: selfAssess,
 
     // Adjustments
     limitingFactor,
     horizonCap,
-    penalties: allPenalties,
+    penalties,
     warnings,
     flags,
 
@@ -385,7 +340,6 @@ export function answersToRichFormat(answersObj, questionnaire) {
 export default {
   calculateSubScores,
   checkConsistency,
-  checkOverconfidence,
   detectPathologicalUser,
   getHorizonCap,
   calculateFinalRisk,

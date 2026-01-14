@@ -34,17 +34,14 @@ function ProfileResult({ result, onContinue }) {
 
   return (
     <div className="profile-result" ref={containerRef}>
-      {/* Profile Badge */}
-      <div className="profile-badge">
-        <div className="profile-score">{score}</div>
-        <div className="profile-name">{profile}</div>
-        <div className="profile-name-fa">{profile_fa}</div>
+      {/* Simple header - no scores or labels per guidelines */}
+      <div className="profile-header">
+        <h3>سبد پیشنهادی شما</h3>
+        <p className="profile-header-en">Your Recommended Allocation</p>
       </div>
 
-      {/* Description */}
+      {/* Plain-language explanation */}
       <div className="profile-description">
-        <h3>{description.headline}</h3>
-        <p className="headline-fa">{description.headline_fa}</p>
         <p>{description.body}</p>
         <p className="expectation">{description.expectation}</p>
       </div>
