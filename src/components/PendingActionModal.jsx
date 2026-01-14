@@ -193,14 +193,14 @@ function PendingActionModal({ pendingAction, dispatch }) {
                 <div className="previewColumn">
                   <div className="previewLabel">Before</div>
                   <div className="previewLayers">
-                    <span className="layerDot foundation"></span> {Math.round(before.layerPct.FOUNDATION)}% · <span className="layerDot growth"></span> {Math.round(before.layerPct.GROWTH)}% · <span className="layerDot upside"></span> {Math.round(before.layerPct.UPSIDE)}%
+                    <span className="layerDot foundation"></span> Foundation {Math.round(before.layerPct.FOUNDATION)}% · <span className="layerDot growth"></span> Growth {Math.round(before.layerPct.GROWTH)}% · <span className="layerDot upside"></span> Upside {Math.round(before.layerPct.UPSIDE)}%
                   </div>
                   <div className="previewTotal">{formatIRR(before.totalIRR)}</div>
                 </div>
                 <div className="previewColumn">
                   <div className="previewLabel">After</div>
                   <div className="previewLayers">
-                    <span className="layerDot foundation"></span> {Math.round(after.layerPct.FOUNDATION)}% · <span className="layerDot growth"></span> {Math.round(after.layerPct.GROWTH)}% · <span className="layerDot upside"></span> {Math.round(after.layerPct.UPSIDE)}%
+                    <span className="layerDot foundation"></span> Foundation {Math.round(after.layerPct.FOUNDATION)}% · <span className="layerDot growth"></span> Growth {Math.round(after.layerPct.GROWTH)}% · <span className="layerDot upside"></span> Upside {Math.round(after.layerPct.UPSIDE)}%
                   </div>
                   <div className="previewTotal">{formatIRR(after.totalIRR)}</div>
                 </div>
