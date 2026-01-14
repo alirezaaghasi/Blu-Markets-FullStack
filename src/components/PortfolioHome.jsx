@@ -1,12 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { formatIRR, formatIRRShort } from '../helpers.js';
 import { ASSET_LAYER } from '../state/domain.js';
-import { LAYER_EXPLANATIONS } from '../constants/index.js';
+import { LAYER_EXPLANATIONS, LAYERS } from '../constants/index.js';
 import LayerMini from './LayerMini.jsx';
 import HoldingRow from './HoldingRow.jsx';
-
-// Hoisted to module level to avoid per-render array allocation
-const LAYERS = ['FOUNDATION', 'GROWTH', 'UPSIDE'];
 
 /**
  * PortfolioHome - Main portfolio dashboard
@@ -17,6 +14,14 @@ const LAYERS = ['FOUNDATION', 'GROWTH', 'UPSIDE'];
 function PortfolioHome({ state, snapshot, portfolioStatus, onStartTrade, onStartProtect, onStartBorrow, onStartRebalance, pricesLoading, pricesUpdatedAt, pricesError }) {
   // Issue 3: Track expanded layers (default all collapsed)
   const [expandedLayers, setExpandedLayers] = useState({});
+
+  // Timer tick for updating time-based calculations (protection countdown)
+  // Updates every minute since we show days remaining
+  const [clockTick, setClockTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setClockTick(t => t + 1), 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const toggleLayer = (layer) => {
     setExpandedLayers(prev => ({ ...prev, [layer]: !prev[layer] }));
@@ -43,6 +48,7 @@ function PortfolioHome({ state, snapshot, portfolioStatus, onStartTrade, onStart
   }, [snapshot.layerPct, state.targetLayerPct]);
 
   // Memoize protection days as a Map keyed by assetId for O(1) lookups
+  // clockTick dependency ensures this recalculates every minute for live countdown
   const protectionDaysMap = useMemo(() => {
     const map = new Map();
     const now = Date.now();
@@ -51,7 +57,7 @@ function PortfolioHome({ state, snapshot, portfolioStatus, onStartTrade, onStart
       map.set(p.assetId, Math.max(0, Math.ceil((until - now) / (1000 * 60 * 60 * 24))));
     }
     return map;
-  }, [state.protections]);
+  }, [state.protections, clockTick]);
 
   // Memoize loan summary calculations
   const { loans, totalLoanAmount, criticalRatio } = useMemo(() => {
@@ -140,10 +146,10 @@ function PortfolioHome({ state, snapshot, portfolioStatus, onStartTrade, onStart
 
         {/* Loan health indicator - shows summary when loans exist */}
         {loans.length > 0 && (
-          <div style={{ marginTop: 16, padding: '12px 14px', background: 'var(--bg-primary)', borderRadius: 10, border: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>💰 Active Loans ({loans.length})</span>
-              <span style={{ fontSize: 13, fontWeight: 500 }}>{formatIRR(totalLoanAmount)}</span>
+          <div className="loanSummaryCard">
+            <div className="loanSummaryHeader">
+              <span className="loanSummaryLabel">💰 Active Loans ({loans.length})</span>
+              <span className="loanSummaryAmount">{formatIRR(totalLoanAmount)}</span>
             </div>
             <div className="loanHealthIndicator">
               <div className="loanHealthBar">

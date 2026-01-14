@@ -9,6 +9,9 @@ export const STAGES = {
   ACTIVE: 'ACTIVE',
 };
 
+// Centralized layer list - use this everywhere to avoid drift
+export const LAYERS = ['FOUNDATION', 'GROWTH', 'UPSIDE'];
+
 // Issue 13: Two-line layer descriptions with tagline + explanation
 export const LAYER_EXPLANATIONS = {
   FOUNDATION: {

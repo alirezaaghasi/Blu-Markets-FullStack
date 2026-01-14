@@ -1,7 +1,7 @@
 import { computeSnapshot } from "./snapshot.js";
 import { calcPremiumIRR, calcLiquidationIRR } from "./pricing.js";
 import { ASSET_LAYER } from "../state/domain.js";
-import { COLLATERAL_LTV_BY_LAYER } from "../constants/index.js";
+import { COLLATERAL_LTV_BY_LAYER, LAYERS } from "../constants/index.js";
 
 export function cloneState(state) {
   return {
@@ -144,7 +144,7 @@ export function previewRebalance(state, { mode }) {
     const surpluses = {};
     const deficits = {};
 
-    for (const layer of ['FOUNDATION', 'GROWTH', 'UPSIDE']) {
+    for (const layer of LAYERS) {
       const diff = curIRR[layer] - targetIRR[layer];
       if (diff > 0) {
         surpluses[layer] = diff;
@@ -281,7 +281,7 @@ export function previewRebalance(state, { mode }) {
 
   // After rebalance, compute residual drift from target
   const afterSnap = computeSnapshot(next.holdings, next.cashIRR);
-  const driftFromTarget = ['FOUNDATION', 'GROWTH', 'UPSIDE'].reduce((sum, layer) => {
+  const driftFromTarget = LAYERS.reduce((sum, layer) => {
     const target = state.targetLayerPct[layer];
     const actual = afterSnap.layerPct[layer];
     return sum + Math.abs(target - actual);

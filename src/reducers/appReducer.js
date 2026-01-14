@@ -27,7 +27,7 @@ import {
 
 import { ASSETS } from '../state/domain.js';
 import questionnaire from '../data/questionnaire.fa.json';
-import { STAGES, THRESHOLDS, WEIGHTS } from '../constants/index.js';
+import { STAGES, THRESHOLDS, WEIGHTS, LAYERS } from '../constants/index.js';
 import { uid, nowISO, computeTargetLayersFromAnswers } from '../helpers.js';
 
 // Default prices for initial portfolio creation (before live prices load)
@@ -63,7 +63,7 @@ export function buildInitialHoldings(totalIRR, targetLayerPct, prices = DEFAULT_
   // Build O(1) lookup map to avoid repeated O(n) find calls
   const holdingsById = Object.fromEntries(holdings.map(h => [h.assetId, h]));
 
-  for (const layer of ['FOUNDATION', 'GROWTH', 'UPSIDE']) {
+  for (const layer of LAYERS) {
     const pct = (targetLayerPct[layer] ?? 0) / 100;
     const layerAmountIRR = Math.floor(totalIRR * pct);
     const weights = WEIGHTS[layer] || {};

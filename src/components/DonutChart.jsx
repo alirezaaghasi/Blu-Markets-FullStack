@@ -1,4 +1,5 @@
 import React from 'react';
+import { LAYERS } from '../constants/index.js';
 
 /**
  * DonutChart - Allocation visualization component
@@ -20,7 +21,7 @@ function DonutChart({ layers, size = 160 }) {
   let currentOffset = 0;
   const segments = [];
 
-  ['FOUNDATION', 'GROWTH', 'UPSIDE'].forEach((layer) => {
+  LAYERS.forEach((layer) => {
     const pct = (layers[layer] || 0) / total;
     const length = pct * circumference;
 

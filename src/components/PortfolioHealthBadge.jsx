@@ -1,5 +1,4 @@
 import React from 'react';
-import { computePortfolioStatus } from '../engine/portfolioStatus.js';
 import { PORTFOLIO_STATUS_LABELS } from '../constants/index.js';
 
 // Module-level constant to avoid recreation on every render
@@ -12,11 +11,11 @@ const COLOR_MAP = {
 /**
  * PortfolioHealthBadge - Shows portfolio health status badge
  * Colors: green (balanced), yellow (slightly off), red (attention required)
+ * Now accepts pre-computed status to avoid duplicate calculation
  */
-function PortfolioHealthBadge({ snapshot }) {
-  if (!snapshot) return null;
+function PortfolioHealthBadge({ status }) {
+  if (!status) return null;
 
-  const { status } = computePortfolioStatus(snapshot.layerPct);
   const colors = COLOR_MAP[status] || COLOR_MAP.BALANCED;
 
   return (

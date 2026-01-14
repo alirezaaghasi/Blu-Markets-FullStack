@@ -1,5 +1,5 @@
 import React from 'react';
-import { STAGES, LAYER_EXPLANATIONS, THRESHOLDS } from '../../constants/index.js';
+import { STAGES, LAYER_EXPLANATIONS, THRESHOLDS, LAYERS } from '../../constants/index.js';
 import { formatIRR } from '../../helpers.js';
 import DonutChart from '../DonutChart.jsx';
 
@@ -67,7 +67,7 @@ function OnboardingRightPanel({ stage, questionIndex, targetLayers, investAmount
         <div className="layerPreviewCard">
           <h4>The Three Layers</h4>
           {/* Issue 13: Two-line layer descriptions with tagline */}
-          {['FOUNDATION', 'GROWTH', 'UPSIDE'].map(layer => {
+          {LAYERS.map(layer => {
             const info = LAYER_EXPLANATIONS[layer];
             return (
               <div key={layer} className="layerPreviewRow">
@@ -92,7 +92,7 @@ function OnboardingRightPanel({ stage, questionIndex, targetLayers, investAmount
           <DonutChart layers={targetLayers} size={140} />
 
           <div className="allocationLegend">
-            {['FOUNDATION', 'GROWTH', 'UPSIDE'].map((layer) => {
+            {LAYERS.map((layer) => {
               const info = LAYER_EXPLANATIONS[layer];
               const pct = targetLayers?.[layer] || 0;
               return (
@@ -108,7 +108,7 @@ function OnboardingRightPanel({ stage, questionIndex, targetLayers, investAmount
           </div>
 
           <div className="allocationAssets">
-            {['FOUNDATION', 'GROWTH', 'UPSIDE'].map((layer) => {
+            {LAYERS.map((layer) => {
               const info = LAYER_EXPLANATIONS[layer];
               return (
                 <div key={layer} className="assetRow">
@@ -141,7 +141,7 @@ function OnboardingRightPanel({ stage, questionIndex, targetLayers, investAmount
               </div>
 
               <div className="placeholderBreakdown">
-                {['FOUNDATION', 'GROWTH', 'UPSIDE'].map((layer) => {
+                {LAYERS.map((layer) => {
                   const info = LAYER_EXPLANATIONS[layer];
                   return (
                     <div key={layer} className="placeholderRow">
@@ -171,7 +171,7 @@ function OnboardingRightPanel({ stage, questionIndex, targetLayers, investAmount
                     <DonutChart layers={targetLayers} size={100} />
                   </div>
                   <div className="investBreakdown">
-                    {['FOUNDATION', 'GROWTH', 'UPSIDE'].map((layer) => {
+                    {LAYERS.map((layer) => {
                       const info = LAYER_EXPLANATIONS[layer];
                       const pct = targetLayers?.[layer] || 0;
                       const layerAmount = Math.floor(amount * pct / 100);
