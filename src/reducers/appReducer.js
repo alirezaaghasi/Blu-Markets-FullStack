@@ -1,10 +1,12 @@
-// ====== BLU MARKETS REDUCER ======
+// ====== BLU MARKETS REDUCER v9.9 ======
 // All state transitions go through this single reducer
 // Actions flow: PREVIEW_* -> pendingAction -> CONFIRM_PENDING -> ledger
+// v9.9: Holdings store quantities, values computed from live prices
 
 import { computeSnapshot } from '../engine/snapshot.js';
 import { classifyActionBoundary, frictionCopyForBoundary } from '../engine/boundary.js';
 import { calcPremiumIRR } from '../engine/pricing.js';
+import { irrToFixedIncomeUnits } from '../engine/fixedIncome.js';
 import {
   validateAddFunds,
   validateTrade,
@@ -28,33 +30,76 @@ import questionnaire from '../data/questionnaire.fa.json';
 import { STAGES, THRESHOLDS, WEIGHTS } from '../constants/index.js';
 import { uid, nowISO, computeTargetLayersFromAnswers } from '../helpers.js';
 
-// Build initial portfolio holdings from investment amount and target allocation
-export function buildInitialHoldings(totalIRR, targetLayerPct) {
-  const holdings = ASSETS.map(assetId => ({ assetId, valueIRR: 0, frozen: false }));
+// Default prices for initial portfolio creation (before live prices load)
+const DEFAULT_PRICES = {
+  BTC: 97500,
+  ETH: 3200,
+  SOL: 185,
+  TON: 5.20,
+  USDT: 1.0,
+  GOLD: 2650,
+  QQQ: 520,
+};
+const DEFAULT_FX_RATE = 1456000;
+
+/**
+ * Build initial portfolio holdings from investment amount and target allocation
+ * v9.9: Holdings now store quantities instead of valueIRR
+ *
+ * @param {number} totalIRR - Total investment amount in IRR
+ * @param {Object} targetLayerPct - Target layer percentages
+ * @param {Object} prices - Current asset prices in USD (optional)
+ * @param {number} fxRate - USD/IRR exchange rate (optional)
+ * @param {string} createdAt - ISO timestamp for fixed income accrual (optional)
+ */
+export function buildInitialHoldings(totalIRR, targetLayerPct, prices = DEFAULT_PRICES, fxRate = DEFAULT_FX_RATE, createdAt = null) {
+  const holdings = ASSETS.map(assetId => ({
+    assetId,
+    quantity: 0,
+    purchasedAt: assetId === 'IRR_FIXED_INCOME' ? createdAt : null,
+    frozen: false,
+  }));
+
   // Build O(1) lookup map to avoid repeated O(n) find calls
   const holdingsById = Object.fromEntries(holdings.map(h => [h.assetId, h]));
 
   for (const layer of ['FOUNDATION', 'GROWTH', 'UPSIDE']) {
     const pct = (targetLayerPct[layer] ?? 0) / 100;
-    const layerAmount = Math.floor(totalIRR * pct);
+    const layerAmountIRR = Math.floor(totalIRR * pct);
     const weights = WEIGHTS[layer] || {};
     let layerAllocated = 0;
 
     for (const assetId of Object.keys(weights)) {
       const h = holdingsById[assetId];
       if (!h) continue;
-      const amt = Math.floor(layerAmount * weights[assetId]);
-      h.valueIRR = amt;
-      layerAllocated += amt;
+
+      const assetAmountIRR = Math.floor(layerAmountIRR * weights[assetId]);
+      layerAllocated += assetAmountIRR;
+
+      // Convert IRR to quantity based on asset type
+      if (assetId === 'IRR_FIXED_INCOME') {
+        h.quantity = irrToFixedIncomeUnits(assetAmountIRR);
+      } else {
+        // quantity = IRR / (priceUSD × fxRate)
+        const priceUSD = prices[assetId] || DEFAULT_PRICES[assetId] || 1;
+        h.quantity = assetAmountIRR / (priceUSD * fxRate);
+      }
     }
 
     // Remainder to last asset in layer
-    const remainder = layerAmount - layerAllocated;
-    if (remainder > 0) {
+    const remainderIRR = layerAmountIRR - layerAllocated;
+    if (remainderIRR > 0) {
       const layerAssets = Object.keys(weights);
       const lastAsset = layerAssets[layerAssets.length - 1];
       const h = holdingsById[lastAsset];
-      if (h) h.valueIRR += remainder;
+      if (h) {
+        if (lastAsset === 'IRR_FIXED_INCOME') {
+          h.quantity += irrToFixedIncomeUnits(remainderIRR);
+        } else {
+          const priceUSD = prices[lastAsset] || DEFAULT_PRICES[lastAsset] || 1;
+          h.quantity += remainderIRR / (priceUSD * fxRate);
+        }
+      }
     }
   }
 
@@ -94,7 +139,13 @@ export function initialState() {
     stage: STAGES.WELCOME,
     phone: null,
     cashIRR: 0,
-    holdings: ASSETS.map(a => ({ assetId: a, valueIRR: 0, frozen: false })),
+    // v9.9: Holdings store quantities instead of valueIRR
+    holdings: ASSETS.map(a => ({
+      assetId: a,
+      quantity: 0,
+      purchasedAt: null,  // Used for IRR_FIXED_INCOME accrual
+      frozen: false,
+    })),
     targetLayerPct: { FOUNDATION: 50, GROWTH: 35, UPSIDE: 15 },
     protections: [],
     loans: [],
@@ -199,13 +250,19 @@ export function reducer(state, action) {
       const n = Math.floor(Number(state.investAmountIRR) || 0);
       if (n < THRESHOLDS.MIN_AMOUNT_IRR) return state;
 
-      const holdings = buildInitialHoldings(n, state.targetLayerPct);
+      // v9.9: Pass creation timestamp for fixed income accrual
+      // Prices can be passed via action if available from usePrices hook
+      const prices = action.prices || DEFAULT_PRICES;
+      const fxRate = action.fxRate || DEFAULT_FX_RATE;
+      const createdAt = nowISO();
+
+      const holdings = buildInitialHoldings(n, state.targetLayerPct, prices, fxRate, createdAt);
       let s = { ...state, holdings, cashIRR: 0, stage: STAGES.ACTIVE };
 
       // Create ledger entry
       const entry = {
         id: uid(),
-        tsISO: nowISO(),
+        tsISO: createdAt,
         type: 'PORTFOLIO_CREATED_COMMIT',
         details: { amountIRR: n, targetLayerPct: state.targetLayerPct },
       };
@@ -282,7 +339,8 @@ export function reducer(state, action) {
     // ====== PROTECT ======
     case 'START_PROTECT': {
       if (state.stage !== STAGES.ACTIVE) return state;
-      const assetId = action.assetId || state.holdings.find(h => h.valueIRR > 0)?.assetId;
+      // v9.9: Check quantity instead of valueIRR
+      const assetId = action.assetId || state.holdings.find(h => h.quantity > 0)?.assetId;
       if (!assetId) return state;
       return {
         ...state,
@@ -315,7 +373,8 @@ export function reducer(state, action) {
     // ====== BORROW ======
     case 'START_BORROW': {
       if (state.stage !== STAGES.ACTIVE) return state;
-      const available = state.holdings.filter(h => !h.frozen && h.valueIRR > 0);
+      // v9.9: Check quantity instead of valueIRR
+      const available = state.holdings.filter(h => !h.frozen && h.quantity > 0);
       if (available.length === 0) return state;
       const assetId = action.assetId || available[0].assetId;
       return {
@@ -405,9 +464,12 @@ export function reducer(state, action) {
       if (p.kind === 'PROTECT') {
         const holding = next.holdings.find(h => h.assetId === p.payload.assetId);
         if (holding) {
+          // v9.9: Get notionalIRR from computed snapshot, not holding directly
+          const notionalIRR = p.after.holdingsIRRByAsset[holding.assetId] || 0;
+
           const premium = calcPremiumIRR({
             assetId: holding.assetId,
-            notionalIRR: holding.valueIRR,
+            notionalIRR,
             months: p.payload.months,
           });
           next.cashIRR -= premium;
@@ -422,7 +484,7 @@ export function reducer(state, action) {
             {
               id: uid(),
               assetId: holding.assetId,
-              notionalIRR: holding.valueIRR,
+              notionalIRR,
               premiumIRR: premium,
               durationMonths: p.payload.months,
               startISO,

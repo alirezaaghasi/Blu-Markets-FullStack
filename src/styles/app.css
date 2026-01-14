@@ -1,4 +1,4 @@
-/* ===== BLU MARKETS v9.8 - FINANCIAL UI ===== */
+/* ===== BLU MARKETS v9.9 - FINANCIAL UI ===== */
 
 :root {
   --bg-primary: #0f1419;
@@ -149,6 +149,25 @@ body {
 .breakdownCardValue { font-size: 16px; font-weight: 600; color: var(--text-primary); }
 .sectionTitle { font-size: 12px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.05em; margin-bottom: 12px; }
 .portfolioValue { font-size: 28px; font-weight: 600; color: var(--text-primary); }
+
+/* v9.9: Price indicator */
+.priceIndicator { display: flex; align-items: center; gap: 6px; margin-bottom: 16px; padding: 6px 0; }
+.priceIndicatorDot { width: 6px; height: 6px; border-radius: 50%; animation: pulse 2s infinite; }
+.priceIndicator.live .priceIndicatorDot { background: var(--success); }
+.priceIndicator.loading .priceIndicatorDot { background: var(--warning); animation: blink 1s infinite; }
+.priceIndicator.error .priceIndicatorDot { background: var(--text-muted); animation: none; }
+.priceIndicatorText { font-size: 11px; color: var(--text-secondary); font-weight: 500; }
+.priceIndicator.live .priceIndicatorText { color: var(--success); }
+.priceIndicator.error .priceIndicatorText { color: var(--text-muted); }
+.priceIndicatorTime { font-size: 10px; color: var(--text-muted); margin-left: 4px; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+/* v9.9: Fixed income breakdown */
+.fixedIncomeBreakdown { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 11px; flex-wrap: wrap; }
+.fixedIncomeBreakdown .principal { color: var(--text-secondary); }
+.fixedIncomeBreakdown .accrued { color: var(--success); font-weight: 500; }
+.fixedIncomeBreakdown .daysHeld { color: var(--text-muted); }
 
 /* Footer actions */
 .footerActions { display: flex; flex-direction: column; gap: 10px; }

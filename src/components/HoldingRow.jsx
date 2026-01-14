@@ -4,10 +4,16 @@ import { formatIRR, getAssetDisplayName } from '../helpers.js';
 /**
  * HoldingRow - Single asset holding with buy/sell/overflow menu
  * Shows layer-colored border, protection status, and frozen indicator
+ * v9.9: Receives holdingValue (computed from quantity × price) instead of just holding
  */
-function HoldingRow({ holding, layerInfo, layer, protDays, onStartTrade, onStartProtect, onStartBorrow }) {
+function HoldingRow({ holding, holdingValue, layerInfo, layer, protDays, onStartTrade, onStartProtect, onStartBorrow }) {
   const [showOverflow, setShowOverflow] = useState(false);
-  const isEmpty = holding.valueIRR === 0;
+
+  // v9.9: Use computed valueIRR from holdingValue, fallback to holding.valueIRR for backwards compat
+  const valueIRR = holdingValue?.valueIRR ?? holding.valueIRR ?? 0;
+  const isEmpty = valueIRR === 0;
+  const isFixedIncome = holding.assetId === 'IRR_FIXED_INCOME';
+  const breakdown = holdingValue?.breakdown;
 
   // Close overflow when clicking outside
   useEffect(() => {
@@ -28,9 +34,18 @@ function HoldingRow({ holding, layerInfo, layer, protDays, onStartTrade, onStart
           {protDays !== null ? ` · ☂️ Protected (${protDays}d)` : ''}
           {holding.frozen ? ` · 🔒 Locked` : ''}
         </div>
+
+        {/* v9.9: Special display for Fixed Income: Principal + Accrued */}
+        {isFixedIncome && breakdown && !isEmpty && (
+          <div className="fixedIncomeBreakdown">
+            <span className="principal">{formatIRR(breakdown.principal)} Principal</span>
+            <span className="accrued">+ {formatIRR(breakdown.accrued)} Accrued</span>
+            <span className="daysHeld">({breakdown.daysHeld} days)</span>
+          </div>
+        )}
       </div>
 
-      <div className="holdingValue">{formatIRR(holding.valueIRR)}</div>
+      <div className="holdingValue">{formatIRR(valueIRR)}</div>
 
       <div className="holdingActions">
         <button className="btn small" onClick={() => onStartTrade(holding.assetId, 'BUY')}>Buy</button>
@@ -56,7 +71,7 @@ function HoldingRow({ holding, layerInfo, layer, protDays, onStartTrade, onStart
               <button
                 className="overflowItem"
                 onClick={() => { onStartProtect?.(holding.assetId); setShowOverflow(false); }}
-                disabled={isEmpty}
+                disabled={isEmpty || isFixedIncome}  // Can't protect fixed income
               >
                 <span className="overflowIcon">☂️</span>
                 Protect

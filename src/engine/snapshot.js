@@ -1,23 +1,82 @@
 import { ASSET_LAYER } from "../state/domain.js";
+import { calculateFixedIncomeValue } from "./fixedIncome.js";
+
+// Default prices for fallback
+const DEFAULT_PRICES = {
+  BTC: 97500,
+  ETH: 3200,
+  SOL: 185,
+  TON: 5.20,
+  USDT: 1.0,
+  GOLD: 2650,
+  QQQ: 520,
+};
+
+const DEFAULT_FX_RATE = 1456000;
+
+/**
+ * Compute holding value in IRR
+ * Supports both quantity-based (v9.9+) and legacy valueIRR holdings
+ *
+ * @param {Object} holding - Holding object
+ * @param {Object} prices - Current prices in USD
+ * @param {number} fxRate - USD/IRR exchange rate
+ * @returns {Object} { valueIRR, breakdown }
+ */
+function computeHoldingValue(holding, prices, fxRate) {
+  // Legacy support: if valueIRR exists and quantity doesn't, use valueIRR directly
+  if (holding.valueIRR !== undefined && holding.quantity === undefined) {
+    return { valueIRR: holding.valueIRR, breakdown: null };
+  }
+
+  // Quantity-based calculation (v9.9+)
+  const quantity = holding.quantity || 0;
+
+  if (holding.assetId === 'IRR_FIXED_INCOME') {
+    // Special handling for fixed income
+    const breakdown = calculateFixedIncomeValue(quantity, holding.purchasedAt);
+    return { valueIRR: breakdown.total, breakdown };
+  }
+
+  // Standard: quantity × priceUSD × fxRate
+  const priceUSD = prices[holding.assetId] || DEFAULT_PRICES[holding.assetId] || 0;
+  const valueIRR = Math.round(quantity * priceUSD * fxRate);
+
+  return { valueIRR, breakdown: null };
+}
 
 /**
  * Compute portfolio snapshot from holdings and cash.
- * Takes individual params (not state) to enable precise useMemo dependencies
- * and avoid stale closure issues.
+ * Supports live prices for quantity-based holdings.
  *
- * @param {Array} holdings - Array of { assetId, valueIRR, frozen }
+ * @param {Array} holdings - Array of { assetId, quantity, frozen, purchasedAt? }
  * @param {number} cashIRR - Cash balance in IRR
+ * @param {Object} prices - Current asset prices in USD (optional)
+ * @param {number} fxRate - USD/IRR exchange rate (optional)
  */
-export function computeSnapshot(holdings, cashIRR) {
+export function computeSnapshot(holdings, cashIRR, prices = DEFAULT_PRICES, fxRate = DEFAULT_FX_RATE) {
   const holdingsIRRByAsset = {};
+  const holdingValues = [];
   let holdingsTotal = 0;
   const layerIRR = { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
 
-  // Single loop: build asset map, totals, and layer allocations
+  // Single loop: compute values, build asset map, totals, and layer allocations
   for (const h of holdings) {
-    holdingsIRRByAsset[h.assetId] = h.valueIRR;
-    holdingsTotal += h.valueIRR;
-    layerIRR[ASSET_LAYER[h.assetId]] += h.valueIRR;
+    const { valueIRR, breakdown } = computeHoldingValue(h, prices, fxRate);
+    const layer = ASSET_LAYER[h.assetId];
+
+    holdingsIRRByAsset[h.assetId] = valueIRR;
+    holdingsTotal += valueIRR;
+    layerIRR[layer] += valueIRR;
+
+    holdingValues.push({
+      assetId: h.assetId,
+      quantity: h.quantity,
+      valueIRR,
+      breakdown,
+      layer,
+      frozen: h.frozen,
+    });
   }
 
   // Total includes cash (for display), but layer calc excludes cash
@@ -35,6 +94,7 @@ export function computeSnapshot(holdings, cashIRR) {
     holdingsIRR: holdingsTotal,  // Holdings only
     cashIRR,                     // Cash separate
     holdingsIRRByAsset,
+    holdingValues,               // Computed values with breakdowns
     layerPct,                    // Based on holdings only
     layerIRR,                    // Based on holdings only
   };

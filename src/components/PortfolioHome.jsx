@@ -12,8 +12,9 @@ const LAYERS = ['FOUNDATION', 'GROWTH', 'UPSIDE'];
  * PortfolioHome - Main portfolio dashboard
  * Shows portfolio value, allocation, holdings grouped by layer
  * Issue 3: Collapsible holdings by layer (default collapsed)
+ * v9.9: Uses computed holdingValues from snapshot for live prices
  */
-function PortfolioHome({ state, snapshot, portfolioStatus, onStartTrade, onStartProtect, onStartBorrow, onStartRebalance }) {
+function PortfolioHome({ state, snapshot, portfolioStatus, onStartTrade, onStartProtect, onStartBorrow, onStartRebalance, pricesLoading, pricesUpdatedAt, pricesError }) {
   // Issue 3: Track expanded layers (default all collapsed)
   const [expandedLayers, setExpandedLayers] = useState({});
 
@@ -65,19 +66,27 @@ function PortfolioHome({ state, snapshot, portfolioStatus, onStartTrade, onStart
     return { loans: loanList, totalLoanAmount: total, criticalRatio: maxRatio };
   }, [state.loans]);
 
-  // Precompute holdings grouped by layer with totals
+  // v9.9: Precompute holdings grouped by layer using snapshot.holdingValues
+  // This ensures we use live-computed values (quantity × price × fxRate)
   const holdingsByLayer = useMemo(() => {
     const result = { FOUNDATION: [], GROWTH: [], UPSIDE: [] };
     const totals = { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
+    // Build map of holdingValues by assetId for O(1) lookup
+    const holdingValueMap = new Map();
+    for (const hv of snapshot.holdingValues || []) {
+      holdingValueMap.set(hv.assetId, hv);
+    }
+    // Group holdings with their computed values
     for (const h of state.holdings) {
       const layer = ASSET_LAYER[h.assetId];
       if (layer && result[layer]) {
-        result[layer].push(h);
-        totals[layer] += h.valueIRR;
+        const holdingValue = holdingValueMap.get(h.assetId);
+        result[layer].push({ holding: h, holdingValue });
+        totals[layer] += holdingValue?.valueIRR || 0;
       }
     }
     return { holdings: result, totals };
-  }, [state.holdings]);
+  }, [state.holdings, snapshot.holdingValues]);
 
   return (
     <div className="stack">
@@ -104,6 +113,18 @@ function PortfolioHome({ state, snapshot, portfolioStatus, onStartTrade, onStart
       <div className="portfolioValueCard">
         <div className="portfolioValueLabel">PORTFOLIO VALUE</div>
         <div className="portfolioValueAmount">{formatIRR(snapshot.totalIRR)}</div>
+        {/* v9.9: Price feed status indicator */}
+        <div className={`priceIndicator ${pricesError ? 'error' : pricesLoading ? 'loading' : 'live'}`}>
+          <span className="priceIndicatorDot"></span>
+          <span className="priceIndicatorText">
+            {pricesError ? 'Offline prices' : pricesLoading ? 'Updating...' : 'Live prices'}
+          </span>
+          {pricesUpdatedAt && !pricesLoading && (
+            <span className="priceIndicatorTime">
+              {new Date(pricesUpdatedAt).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+        </div>
         <div className="portfolioBreakdown">
           <div className="breakdownCard">
             <div className="breakdownCardIcon">📊</div>
@@ -188,13 +209,14 @@ function PortfolioHome({ state, snapshot, portfolioStatus, onStartTrade, onStart
               </div>
               {isExpanded && (
                 <div className="holdingsList">
-                  {layerHoldings.map((h) => (
+                  {layerHoldings.map(({ holding, holdingValue }) => (
                     <HoldingRow
-                      key={h.assetId}
-                      holding={h}
+                      key={holding.assetId}
+                      holding={holding}
+                      holdingValue={holdingValue}
                       layerInfo={layerInfo}
                       layer={layer}
-                      protDays={protectionDaysMap.get(h.assetId) ?? null}
+                      protDays={protectionDaysMap.get(holding.assetId) ?? null}
                       onStartTrade={onStartTrade}
                       onStartProtect={onStartProtect}
                       onStartBorrow={onStartBorrow}

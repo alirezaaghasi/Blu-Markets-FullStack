@@ -1,7 +1,8 @@
 import React, { useMemo, useReducer } from 'react';
 
-// ====== BLU MARKETS v9.8 REFACTORED ======
+// ====== BLU MARKETS v9.9 ======
 // Architecture: Single reducer + deterministic engine
+// v9.9: Quantity-based holdings with live price feeds
 // All actions flow: PREVIEW_* -> pendingAction -> CONFIRM_PENDING -> ledger
 // Rule: Chat can propose, only engine can execute
 
@@ -11,6 +12,9 @@ import './styles/app.css';
 // Engine imports
 import { computeSnapshot } from './engine/snapshot.js';
 import { computePortfolioStatus } from './engine/portfolioStatus.js';
+
+// Hook imports
+import { usePrices } from './hooks/usePrices.js';
 
 // Data imports
 import questionnaire from './data/questionnaire.fa.json';
@@ -84,10 +88,13 @@ function computeHeaderContent(activeTab, state, snapshot, loansTotal, portfolioS
 export default function App() {
   const [state, dispatch] = useReducer(reducer, null, initialState);
 
-  // Memoize snapshot computation - pass individual params to avoid stale closures
+  // v9.9: Live price feeds for quantity-based holdings
+  const { prices, fxRate, loading: pricesLoading, lastUpdated: pricesUpdatedAt, error: pricesError } = usePrices(30000);
+
+  // Memoize snapshot computation - uses live prices for quantity-based holdings
   const snapshot = useMemo(
-    () => computeSnapshot(state.holdings, state.cashIRR),
-    [state.holdings, state.cashIRR]
+    () => computeSnapshot(state.holdings, state.cashIRR, prices, fxRate),
+    [state.holdings, state.cashIRR, prices, fxRate]
   );
 
   // Memoize portfolio status - reused by header and PortfolioHome
@@ -141,6 +148,9 @@ export default function App() {
         onStartProtect={onStartProtect}
         onStartBorrow={onStartBorrow}
         onStartRebalance={onStartRebalance}
+        pricesLoading={pricesLoading}
+        pricesUpdatedAt={pricesUpdatedAt}
+        pricesError={pricesError}
       />
     );
   }, [
@@ -156,6 +166,9 @@ export default function App() {
     state.cashIRR,
     snapshot,
     portfolioStatus,
+    pricesLoading,
+    pricesUpdatedAt,
+    pricesError,
   ]);
 
   // Compute loan summary for header (only when loans exist and not on loans tab)
