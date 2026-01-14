@@ -1,10 +1,9 @@
 import { ASSET_LAYER } from "../state/domain.js";
+import { PREMIUM_RATES } from "../constants/index.js";
 
 export function baseRateForAsset(assetId) {
   const layer = ASSET_LAYER[assetId];
-  if (layer === "FOUNDATION") return 0.004;
-  if (layer === "GROWTH") return 0.008;
-  return 0.012;
+  return PREMIUM_RATES[layer] || PREMIUM_RATES.UPSIDE;
 }
 
 export function calcPremiumIRR({ assetId, notionalIRR, months }) {

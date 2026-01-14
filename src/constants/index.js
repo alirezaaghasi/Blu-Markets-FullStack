@@ -38,6 +38,29 @@ export const LAYER_EXPLANATIONS = {
 
 export const THRESHOLDS = {
   MIN_AMOUNT_IRR: 1_000_000,
+  // Protection
+  PROTECTION_MIN_MONTHS: 1,
+  PROTECTION_MAX_MONTHS: 6,
+  // Borrow
+  LTV_MIN: 0.2,
+  LTV_MAX: 0.7,
+  // Risk score thresholds for allocation calculation
+  RISK_LOW_THRESHOLD: 5,
+  RISK_MED_THRESHOLD: 10,
+};
+
+// Target allocations based on risk score
+export const RISK_ALLOCATIONS = {
+  LOW: { FOUNDATION: 65, GROWTH: 30, UPSIDE: 5 },
+  MEDIUM: { FOUNDATION: 50, GROWTH: 35, UPSIDE: 15 },
+  HIGH: { FOUNDATION: 40, GROWTH: 40, UPSIDE: 20 },
+};
+
+// Premium rates per layer for protection pricing
+export const PREMIUM_RATES = {
+  FOUNDATION: 0.004,
+  GROWTH: 0.008,
+  UPSIDE: 0.012,
 };
 
 export const WEIGHTS = {

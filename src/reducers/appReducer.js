@@ -1,0 +1,468 @@
+// ====== BLU MARKETS REDUCER ======
+// All state transitions go through this single reducer
+// Actions flow: PREVIEW_* -> pendingAction -> CONFIRM_PENDING -> ledger
+
+import { computeSnapshot } from '../engine/snapshot.js';
+import { classifyActionBoundary, frictionCopyForBoundary } from '../engine/boundary.js';
+import { calcPremiumIRR } from '../engine/pricing.js';
+import {
+  validateAddFunds,
+  validateTrade,
+  validateProtect,
+  validateBorrow,
+  validateRepay,
+  validateRebalance,
+} from '../engine/validate.js';
+import {
+  cloneState,
+  previewAddFunds,
+  previewTrade,
+  previewProtect,
+  previewBorrow,
+  previewRepay,
+  previewRebalance,
+} from '../engine/preview.js';
+
+import { ASSETS } from '../state/domain.js';
+import questionnaire from '../data/questionnaire.fa.json';
+import { STAGES, THRESHOLDS, WEIGHTS } from '../constants/index.js';
+import { uid, nowISO, computeTargetLayersFromAnswers } from '../helpers.js';
+
+// Build initial portfolio holdings from investment amount and target allocation
+export function buildInitialHoldings(totalIRR, targetLayerPct) {
+  const holdings = ASSETS.map(assetId => ({ assetId, valueIRR: 0, frozen: false }));
+
+  for (const layer of ['FOUNDATION', 'GROWTH', 'UPSIDE']) {
+    const pct = (targetLayerPct[layer] ?? 0) / 100;
+    const layerAmount = Math.floor(totalIRR * pct);
+    const weights = WEIGHTS[layer] || {};
+    let layerAllocated = 0;
+
+    for (const assetId of Object.keys(weights)) {
+      const h = holdings.find(x => x.assetId === assetId);
+      if (!h) continue;
+      const amt = Math.floor(layerAmount * weights[assetId]);
+      h.valueIRR = amt;
+      layerAllocated += amt;
+    }
+
+    // Remainder to last asset in layer
+    const remainder = layerAmount - layerAllocated;
+    if (remainder > 0) {
+      const layerAssets = Object.keys(weights);
+      const lastAsset = layerAssets[layerAssets.length - 1];
+      const h = holdings.find(x => x.assetId === lastAsset);
+      if (h) h.valueIRR += remainder;
+    }
+  }
+
+  return holdings;
+}
+
+function buildPending(state, kind, payload, validation, afterState) {
+  const before = computeSnapshot(state);
+  const after = computeSnapshot(afterState);
+  const boundary = classifyActionBoundary({
+    kind,
+    validation,
+    before,
+    after,
+    stressMode: state.stressMode,
+  });
+
+  // Extract rebalance meta if present for constraint messaging
+  const meta = afterState._rebalanceMeta || {};
+
+  return {
+    kind,
+    payload,
+    before,
+    after,
+    validation,
+    boundary,
+    frictionCopy: frictionCopyForBoundary(boundary, kind, meta),
+    // R-1: Include rebalance meta for trade details display
+    rebalanceMeta: kind === 'REBALANCE' ? meta : null,
+  };
+}
+
+export function initialState() {
+  return {
+    // Core state from spec
+    stage: STAGES.WELCOME,
+    phone: null,
+    cashIRR: 0,
+    holdings: ASSETS.map(a => ({ assetId: a, valueIRR: 0, frozen: false })),
+    targetLayerPct: { FOUNDATION: 50, GROWTH: 35, UPSIDE: 15 },
+    protections: [],
+    loan: null,
+    ledger: [],
+    pendingAction: null,
+    stressMode: false,
+
+    // UI state
+    questionnaire: { index: 0, answers: {} },
+    consentStep: 0,
+    consentMessages: [],
+    investAmountIRR: null,
+    tab: 'PORTFOLIO',
+    lastAction: null,
+    showResetConfirm: false,
+    actionLog: [],
+
+    // Draft state for UI input collection
+    tradeDraft: null,
+    protectDraft: null,
+    borrowDraft: null,
+    repayDraft: null,
+    addFundsDraft: null,
+    rebalanceDraft: null,
+  };
+}
+
+function addLogEntry(state, type, data = {}) {
+  return { ...state, actionLog: [...state.actionLog, { id: Date.now(), timestamp: Date.now(), type, ...data }] };
+}
+
+export function reducer(state, action) {
+  switch (action.type) {
+    // ====== GLOBAL ======
+    case 'RESET':
+      return initialState();
+
+    case 'SHOW_RESET_CONFIRM':
+      return { ...state, showResetConfirm: true };
+
+    case 'HIDE_RESET_CONFIRM':
+      return { ...state, showResetConfirm: false };
+
+    case 'SET_TAB':
+      return { ...state, tab: action.tab };
+
+    case 'SET_STRESS_MODE':
+      return { ...state, stressMode: Boolean(action.payload?.on) };
+
+    case 'DISMISS_LAST_ACTION':
+      return { ...state, lastAction: null };
+
+    // ====== ONBOARDING ======
+    case 'START_ONBOARDING':
+      return { ...state, stage: STAGES.ONBOARDING_PHONE };
+
+    case 'SET_PHONE': {
+      const phone = String(action.phone || '').trim();
+      return { ...state, phone };
+    }
+
+    case 'SUBMIT_PHONE': {
+      const phone = String(state.phone || '').trim();
+      if (!phone.startsWith('+989') || phone.length !== 13) return state;
+      return { ...state, stage: STAGES.ONBOARDING_QUESTIONNAIRE };
+    }
+
+    case 'ANSWER_QUESTION': {
+      if (state.stage !== STAGES.ONBOARDING_QUESTIONNAIRE) return state;
+      const answers = { ...state.questionnaire.answers, [action.qId]: action.optionId };
+      let idx = state.questionnaire.index + 1;
+      let s = { ...state, questionnaire: { index: idx, answers } };
+
+      if (idx >= questionnaire.questions.length) {
+        const targetLayerPct = computeTargetLayersFromAnswers(questionnaire, answers);
+        s = { ...s, targetLayerPct, stage: STAGES.ONBOARDING_RESULT };
+      }
+      return s;
+    }
+
+    case 'ADVANCE_CONSENT': {
+      if (state.stage !== STAGES.ONBOARDING_RESULT) return state;
+      const nextStep = state.consentStep + 1;
+      const newMessages = [...state.consentMessages, action.message];
+      return { ...state, consentStep: nextStep, consentMessages: newMessages };
+    }
+
+    case 'SUBMIT_CONSENT': {
+      if (state.stage !== STAGES.ONBOARDING_RESULT) return state;
+      if (String(action.text || '') !== questionnaire.consent_exact) return state;
+      return { ...state, stage: STAGES.AMOUNT_REQUIRED };
+    }
+
+    case 'SET_INVEST_AMOUNT': {
+      if (state.stage !== STAGES.AMOUNT_REQUIRED) return state;
+      return { ...state, investAmountIRR: action.amountIRR };
+    }
+
+    case 'EXECUTE_PORTFOLIO': {
+      if (state.stage !== STAGES.AMOUNT_REQUIRED) return state;
+      const n = Math.floor(Number(state.investAmountIRR) || 0);
+      if (n < THRESHOLDS.MIN_AMOUNT_IRR) return state;
+
+      const holdings = buildInitialHoldings(n, state.targetLayerPct);
+      let s = { ...state, holdings, cashIRR: 0, stage: STAGES.ACTIVE };
+
+      // Create ledger entry
+      const entry = {
+        id: uid(),
+        tsISO: nowISO(),
+        type: 'PORTFOLIO_CREATED_COMMIT',
+        details: { amountIRR: n, targetLayerPct: state.targetLayerPct },
+      };
+      s = { ...s, ledger: [entry], lastAction: { type: 'PORTFOLIO_CREATED', timestamp: Date.now() } };
+      s = addLogEntry(s, 'PORTFOLIO_CREATED', { amountIRR: n });
+      return s;
+    }
+
+    // ====== CANCEL PENDING ======
+    case 'CANCEL_PENDING':
+      return {
+        ...state,
+        pendingAction: null,
+        tradeDraft: null,
+        protectDraft: null,
+        borrowDraft: null,
+        repayDraft: null,
+        addFundsDraft: null,
+        rebalanceDraft: null,
+      };
+
+    // ====== ADD FUNDS ======
+    case 'START_ADD_FUNDS': {
+      if (state.stage !== STAGES.ACTIVE) return state;
+      return { ...state, addFundsDraft: { amountIRR: null }, pendingAction: null };
+    }
+
+    case 'SET_ADD_FUNDS_AMOUNT': {
+      if (!state.addFundsDraft) return state;
+      return { ...state, addFundsDraft: { ...state.addFundsDraft, amountIRR: action.amountIRR } };
+    }
+
+    case 'PREVIEW_ADD_FUNDS': {
+      if (state.stage !== STAGES.ACTIVE) return state;
+      const amountIRR = Number(state.addFundsDraft?.amountIRR || action.payload?.amountIRR);
+      const payload = { amountIRR };
+      const validation = validateAddFunds(payload);
+      const afterState = validation.ok ? previewAddFunds(state, payload) : cloneState(state);
+      return { ...state, pendingAction: buildPending(state, 'ADD_FUNDS', payload, validation, afterState) };
+    }
+
+    // ====== TRADE ======
+    case 'START_TRADE': {
+      if (state.stage !== STAGES.ACTIVE) return state;
+      return {
+        ...state,
+        tradeDraft: { assetId: action.assetId, side: action.side || 'BUY', amountIRR: null },
+        pendingAction: null,
+      };
+    }
+
+    case 'SET_TRADE_SIDE': {
+      if (!state.tradeDraft) return state;
+      return { ...state, tradeDraft: { ...state.tradeDraft, side: action.side } };
+    }
+
+    case 'SET_TRADE_AMOUNT': {
+      if (!state.tradeDraft) return state;
+      return { ...state, tradeDraft: { ...state.tradeDraft, amountIRR: action.amountIRR } };
+    }
+
+    case 'PREVIEW_TRADE': {
+      if (state.stage !== STAGES.ACTIVE || !state.tradeDraft) return state;
+      const payload = {
+        side: state.tradeDraft.side,
+        assetId: state.tradeDraft.assetId,
+        amountIRR: Number(state.tradeDraft.amountIRR),
+      };
+      const validation = validateTrade(payload, state);
+      const afterState = validation.ok ? previewTrade(state, payload) : cloneState(state);
+      return { ...state, pendingAction: buildPending(state, 'TRADE', payload, validation, afterState) };
+    }
+
+    // ====== PROTECT ======
+    case 'START_PROTECT': {
+      if (state.stage !== STAGES.ACTIVE) return state;
+      const assetId = action.assetId || state.holdings.find(h => h.valueIRR > 0)?.assetId;
+      if (!assetId) return state;
+      return {
+        ...state,
+        protectDraft: { assetId, months: 3 },
+        pendingAction: null,
+      };
+    }
+
+    case 'SET_PROTECT_ASSET': {
+      if (!state.protectDraft) return state;
+      return { ...state, protectDraft: { ...state.protectDraft, assetId: action.assetId } };
+    }
+
+    case 'SET_PROTECT_MONTHS': {
+      if (!state.protectDraft) return state;
+      return { ...state, protectDraft: { ...state.protectDraft, months: action.months } };
+    }
+
+    case 'PREVIEW_PROTECT': {
+      if (state.stage !== STAGES.ACTIVE || !state.protectDraft) return state;
+      const payload = {
+        assetId: state.protectDraft.assetId,
+        months: Number(state.protectDraft.months),
+      };
+      const validation = validateProtect(payload, state);
+      const afterState = validation.ok ? previewProtect(state, payload) : cloneState(state);
+      return { ...state, pendingAction: buildPending(state, 'PROTECT', payload, validation, afterState) };
+    }
+
+    // ====== BORROW ======
+    case 'START_BORROW': {
+      if (state.stage !== STAGES.ACTIVE) return state;
+      const available = state.holdings.filter(h => !h.frozen && h.valueIRR > 0);
+      if (available.length === 0) return state;
+      const assetId = action.assetId || available[0].assetId;
+      return {
+        ...state,
+        borrowDraft: { assetId, ltv: 0.5, amountIRR: null },
+        pendingAction: null,
+      };
+    }
+
+    case 'SET_BORROW_ASSET': {
+      if (!state.borrowDraft) return state;
+      return { ...state, borrowDraft: { ...state.borrowDraft, assetId: action.assetId } };
+    }
+
+    case 'SET_BORROW_LTV': {
+      if (!state.borrowDraft) return state;
+      return { ...state, borrowDraft: { ...state.borrowDraft, ltv: Number(action.ltv) } };
+    }
+
+    case 'SET_BORROW_AMOUNT': {
+      if (!state.borrowDraft) return state;
+      return { ...state, borrowDraft: { ...state.borrowDraft, amountIRR: action.amountIRR } };
+    }
+
+    case 'PREVIEW_BORROW': {
+      if (state.stage !== STAGES.ACTIVE || !state.borrowDraft) return state;
+      const payload = {
+        assetId: state.borrowDraft.assetId,
+        amountIRR: Number(state.borrowDraft.amountIRR),
+        ltv: Number(state.borrowDraft.ltv),
+      };
+      const validation = validateBorrow(payload, state);
+      const afterState = validation.ok ? previewBorrow(state, payload) : cloneState(state);
+      return { ...state, pendingAction: buildPending(state, 'BORROW', payload, validation, afterState) };
+    }
+
+    // ====== REPAY ======
+    case 'START_REPAY': {
+      if (state.stage !== STAGES.ACTIVE || !state.loan) return state;
+      return {
+        ...state,
+        repayDraft: { amountIRR: state.loan.amountIRR },
+        pendingAction: null,
+      };
+    }
+
+    case 'PREVIEW_REPAY': {
+      if (state.stage !== STAGES.ACTIVE || !state.loan) return state;
+      const payload = { amountIRR: state.loan.amountIRR };
+      const validation = validateRepay(payload, state);
+      const afterState = validation.ok ? previewRepay(state, payload) : cloneState(state);
+      return { ...state, pendingAction: buildPending(state, 'REPAY', payload, validation, afterState) };
+    }
+
+    // ====== REBALANCE ======
+    case 'START_REBALANCE': {
+      if (state.stage !== STAGES.ACTIVE) return state;
+      return {
+        ...state,
+        rebalanceDraft: { mode: 'HOLDINGS_ONLY' },  // Fixed: Don't use cash wallet
+        pendingAction: null,
+      };
+    }
+
+    case 'PREVIEW_REBALANCE': {
+      if (state.stage !== STAGES.ACTIVE) return state;
+      const payload = { mode: state.rebalanceDraft?.mode || 'HOLDINGS_ONLY' };
+      const validation = validateRebalance(payload);
+      const afterState = validation.ok ? previewRebalance(state, payload) : cloneState(state);
+      return { ...state, pendingAction: buildPending(state, 'REBALANCE', payload, validation, afterState) };
+    }
+
+    // ====== CONFIRM PENDING ======
+    case 'CONFIRM_PENDING': {
+      const p = state.pendingAction;
+      if (!p || !p.validation.ok) return state;
+
+      let next = cloneState(state);
+
+      // Commit by replaying deterministic preview
+      if (p.kind === 'ADD_FUNDS') next = previewAddFunds(next, p.payload);
+      if (p.kind === 'TRADE') next = previewTrade(next, p.payload);
+      if (p.kind === 'BORROW') next = previewBorrow(next, p.payload);
+      if (p.kind === 'REPAY') next = previewRepay(next, p.payload);
+      if (p.kind === 'REBALANCE') next = previewRebalance(next, p.payload);
+
+      if (p.kind === 'PROTECT') {
+        const holding = next.holdings.find(h => h.assetId === p.payload.assetId);
+        if (holding) {
+          const premium = calcPremiumIRR({
+            assetId: holding.assetId,
+            notionalIRR: holding.valueIRR,
+            months: p.payload.months,
+          });
+          next.cashIRR -= premium;
+
+          const startISO = new Date().toISOString().slice(0, 10);
+          const end = new Date();
+          end.setMonth(end.getMonth() + p.payload.months);
+          const endISO = end.toISOString().slice(0, 10);
+
+          next.protections = [
+            ...next.protections,
+            {
+              id: uid(),
+              assetId: holding.assetId,
+              notionalIRR: holding.valueIRR,
+              premiumIRR: premium,
+              startISO,
+              endISO,
+            },
+          ];
+        }
+      }
+
+      const entry = {
+        id: uid(),
+        tsISO: nowISO(),
+        type: `${p.kind}_COMMIT`,
+        details: {
+          kind: p.kind,
+          payload: p.payload,
+          boundary: p.boundary,
+          validation: p.validation,
+          before: p.before,
+          after: computeSnapshot(next),
+          // Issue 9: Store friction copy for ledger display
+          frictionCopy: p.frictionCopy || [],
+        },
+      };
+
+      next.pendingAction = null;
+      next.tradeDraft = null;
+      next.protectDraft = null;
+      next.borrowDraft = null;
+      next.repayDraft = null;
+      next.addFundsDraft = null;
+      next.rebalanceDraft = null;
+      next.ledger = [...next.ledger, entry];
+      next.lastAction = { type: p.kind, timestamp: Date.now(), ...p.payload };
+      // Fix 6: Include boundary in action log for indicators
+      next = addLogEntry(next, p.kind, { ...p.payload, boundary: p.boundary });
+
+      // G-3: Portfolio Gravity - return to Portfolio Home after any action
+      next.tab = 'PORTFOLIO';
+
+      return next;
+    }
+
+    default:
+      return state;
+  }
+}

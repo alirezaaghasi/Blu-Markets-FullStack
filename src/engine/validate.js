@@ -1,4 +1,5 @@
 import { calcPremiumIRR } from "./pricing.js";
+import { THRESHOLDS } from "../constants/index.js";
 
 export function ok(meta = {}) {
   return { ok: true, errors: [], meta };
@@ -43,7 +44,7 @@ export function validateProtect({ assetId, months }, state) {
   }
 
   // Duration validation
-  if (!Number.isFinite(months) || months < 1 || months > 6) {
+  if (!Number.isFinite(months) || months < THRESHOLDS.PROTECTION_MIN_MONTHS || months > THRESHOLDS.PROTECTION_MAX_MONTHS) {
     return fail("INVALID_MONTHS");
   }
 
@@ -84,7 +85,7 @@ export function validateProtect({ assetId, months }, state) {
 export function validateBorrow({ assetId, amountIRR, ltv }, state) {
   if (!state.holdings.some((h) => h.assetId === assetId)) return fail("INVALID_ASSET");
   if (!Number.isFinite(amountIRR) || amountIRR <= 0) return fail("INVALID_AMOUNT");
-  if (!Number.isFinite(ltv) || ltv < 0.2 || ltv > 0.7) return fail("INVALID_LTV");
+  if (!Number.isFinite(ltv) || ltv < THRESHOLDS.LTV_MIN || ltv > THRESHOLDS.LTV_MAX) return fail("INVALID_LTV");
   if (state.loan) return fail("LOAN_ALREADY_ACTIVE");
 
   const h = state.holdings.find((x) => x.assetId === assetId);
