@@ -31,6 +31,8 @@ import { uid, nowISO, computeTargetLayersFromAnswers } from '../helpers.js';
 // Build initial portfolio holdings from investment amount and target allocation
 export function buildInitialHoldings(totalIRR, targetLayerPct) {
   const holdings = ASSETS.map(assetId => ({ assetId, valueIRR: 0, frozen: false }));
+  // Build O(1) lookup map to avoid repeated O(n) find calls
+  const holdingsById = Object.fromEntries(holdings.map(h => [h.assetId, h]));
 
   for (const layer of ['FOUNDATION', 'GROWTH', 'UPSIDE']) {
     const pct = (targetLayerPct[layer] ?? 0) / 100;
@@ -39,7 +41,7 @@ export function buildInitialHoldings(totalIRR, targetLayerPct) {
     let layerAllocated = 0;
 
     for (const assetId of Object.keys(weights)) {
-      const h = holdings.find(x => x.assetId === assetId);
+      const h = holdingsById[assetId];
       if (!h) continue;
       const amt = Math.floor(layerAmount * weights[assetId]);
       h.valueIRR = amt;
@@ -51,7 +53,7 @@ export function buildInitialHoldings(totalIRR, targetLayerPct) {
     if (remainder > 0) {
       const layerAssets = Object.keys(weights);
       const lastAsset = layerAssets[layerAssets.length - 1];
-      const h = holdings.find(x => x.assetId === lastAsset);
+      const h = holdingsById[lastAsset];
       if (h) h.valueIRR += remainder;
     }
   }
@@ -121,7 +123,8 @@ export function initialState() {
 }
 
 function addLogEntry(state, type, data = {}) {
-  return { ...state, actionLog: [...state.actionLog, { id: Date.now(), timestamp: Date.now(), type, ...data }] };
+  const now = Date.now();
+  return { ...state, actionLog: [...state.actionLog, { id: now, timestamp: now, type, ...data }] };
 }
 
 export function reducer(state, action) {
@@ -429,6 +432,8 @@ export function reducer(state, action) {
         }
       }
 
+      // Reuse after snapshot from preview instead of recomputing
+      // (state is deterministic, so after snapshot is identical)
       const entry = {
         id: uid(),
         tsISO: nowISO(),
@@ -439,7 +444,7 @@ export function reducer(state, action) {
           boundary: p.boundary,
           validation: p.validation,
           before: p.before,
-          after: computeSnapshot(next),
+          after: p.after,
           // Issue 9: Store friction copy for ledger display
           frictionCopy: p.frictionCopy || [],
         },

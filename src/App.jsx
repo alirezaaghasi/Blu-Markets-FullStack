@@ -101,7 +101,8 @@ export default function App() {
   const onStartBorrow = (assetId) => dispatch({ type: 'START_BORROW', assetId });
   const onStartRebalance = () => dispatch({ type: 'START_REBALANCE' });
 
-  // Memoize right panel content
+  // Memoize right panel content - narrow dependencies to avoid recomputation
+  // when unrelated state fields (actionLog, pendingAction, drafts, etc.) change
   const rightContent = useMemo(() => {
     if (state.stage !== STAGES.ACTIVE) {
       return (
@@ -128,7 +129,19 @@ export default function App() {
         onStartRebalance={onStartRebalance}
       />
     );
-  }, [state, snapshot]);
+  }, [
+    state.stage,
+    state.tab,
+    state.questionnaire,
+    state.targetLayerPct,
+    state.investAmountIRR,
+    state.protections,
+    state.loans,
+    state.ledger,
+    state.holdings,
+    state.cashIRR,
+    snapshot,
+  ]);
 
   // Compute loan summary for header (only when loans exist and not on loans tab)
   const showLoansIndicator = state.stage === STAGES.ACTIVE && (state.loans || []).length > 0 && state.tab !== 'LOANS';

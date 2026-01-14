@@ -3,20 +3,17 @@ import { ASSET_LAYER } from "../state/domain.js";
 export function computeSnapshot(state) {
   const holdingsIRRByAsset = {};
   let holdingsTotal = 0;
+  const layerIRR = { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
 
+  // Single loop: build asset map, totals, and layer allocations
   for (const h of state.holdings) {
     holdingsIRRByAsset[h.assetId] = h.valueIRR;
     holdingsTotal += h.valueIRR;
+    layerIRR[ASSET_LAYER[h.assetId]] += h.valueIRR;
   }
 
   // Total includes cash (for display), but layer calc excludes cash
   const totalIRR = holdingsTotal + state.cashIRR;
-
-  // Layer allocation based on holdings only (cash excluded)
-  const layerIRR = { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
-  for (const h of state.holdings) {
-    layerIRR[ASSET_LAYER[h.assetId]] += h.valueIRR;
-  }
 
   // Layer percentages based on holdings total (not total with cash)
   const layerPct = {
