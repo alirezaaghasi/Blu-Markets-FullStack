@@ -159,8 +159,14 @@ body {
 .layerDot.faded { opacity: 0.4; }
 
 /* Action log */
-.actionLog { display: flex; flex-direction: column; gap: 0; font-family: ui-monospace, 'SF Mono', monospace; font-size: 11px; line-height: 1.7; }
+.actionLog { display: flex; flex-direction: column; gap: 0; font-size: 13px; line-height: 1.5; }
 .actionLogEmpty { padding: 20px; text-align: center; }
+
+/* Decision 15: Activity log verb-first styling */
+.activityItem { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; }
+.activityDot { color: var(--text-muted); font-size: 8px; line-height: 1.8; flex-shrink: 0; }
+.activityTime { color: var(--text-faint); font-size: 12px; min-width: 45px; flex-shrink: 0; }
+.activityMessage { color: var(--text-secondary); flex: 1; }
 .logEntry { padding: 6px 0; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
 .logEntry:last-child { border-bottom: none; }
 .logEntry.drift { border-left: 2px solid var(--warning); padding-left: 8px; margin-left: -2px; }

@@ -13,8 +13,12 @@ import HoldingRow from './HoldingRow.jsx';
  * v9.9: Accepts individual state slices instead of whole state object to avoid stale UI
  */
 function PortfolioHome({ holdings, cashIRR, targetLayerPct, protections, loans, snapshot, portfolioStatus, onStartTrade, onStartProtect, onStartBorrow, onStartRebalance, pricesLoading, pricesUpdatedAt, pricesError }) {
-  // Issue 3: Track expanded layers (default all collapsed)
-  const [expandedLayers, setExpandedLayers] = useState({});
+  // Decision 8: Track expanded layers (default all expanded for better UX)
+  const [expandedLayers, setExpandedLayers] = useState({
+    FOUNDATION: true,
+    GROWTH: true,
+    UPSIDE: true,
+  });
 
   // Optimization: Only run countdown timer if there are active protections
   // Since we show days (not minutes), update every hour instead of every minute

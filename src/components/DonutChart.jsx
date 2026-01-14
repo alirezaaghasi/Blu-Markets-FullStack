@@ -3,16 +3,17 @@ import { LAYERS } from '../constants/index.js';
 
 /**
  * DonutChart - Allocation visualization component
- * Renders a donut/pie chart showing portfolio layer allocation
+ * Decision 19: Uses blue opacity system matching layer dots
  */
 function DonutChart({ layers, size = 160 }) {
   const total = (layers?.FOUNDATION || 0) + (layers?.GROWTH || 0) + (layers?.UPSIDE || 0);
   if (total === 0) return null;
 
+  // Decision 19: Blue with varying opacity (100%, 60%, 30%)
   const colors = {
-    FOUNDATION: '#34d399', // Green
-    GROWTH: '#60a5fa',     // Blue
-    UPSIDE: '#fbbf24',     // Orange
+    FOUNDATION: '#3B82F6',              // Blue 100%
+    GROWTH: 'rgba(59, 130, 246, 0.6)',  // Blue 60%
+    UPSIDE: 'rgba(59, 130, 246, 0.3)',  // Blue 30%
   };
 
   const radius = 50;

@@ -28,34 +28,43 @@ function ActionLogPane({ actionLog }) {
     );
   }
 
-  const renderLogEntry = (entry) => {
-    const time = formatTime(entry.timestamp);
-    // Add boundary dot indicator for DRIFT/STRUCTURAL
-    const boundaryDot = entry.boundary && entry.boundary !== 'SAFE' ? (
-      <span className={`logBoundaryDot ${entry.boundary.toLowerCase()}`}></span>
-    ) : null;
-
-    // Issue 7: Verb-based action log format
+  // Decision 15: Format activity message with verb-first plain language
+  const formatActivityMessage = (entry) => {
     switch (entry.type) {
       case 'PORTFOLIO_CREATED':
-        return <span>{time}  Started with {formatIRRShort(entry.amountIRR)}</span>;
+        return `Started with ${formatIRRShort(entry.amountIRR)}`;
       case 'ADD_FUNDS':
-        return <span>{boundaryDot}{time}  Added funds ({formatIRRShort(entry.amountIRR)})</span>;
+        return `Added ${formatIRRShort(entry.amountIRR)} cash`;
       case 'TRADE':
-        return <span>{boundaryDot}{time}  {entry.side === 'BUY' ? 'Bought' : 'Sold'} {getAssetDisplayName(entry.assetId)} ({formatIRRShort(entry.amountIRR)})</span>;
+        return entry.side === 'BUY'
+          ? `Bought ${getAssetDisplayName(entry.assetId)} (${formatIRRShort(entry.amountIRR)})`
+          : `Sold ${getAssetDisplayName(entry.assetId)} (${formatIRRShort(entry.amountIRR)})`;
       case 'BORROW':
-        return <span>{boundaryDot}{time}  Borrowed {formatIRRShort(entry.amountIRR)} ({getAssetDisplayName(entry.assetId)} collateral)</span>;
+        return `Borrowed ${formatIRRShort(entry.amountIRR)} against ${getAssetDisplayName(entry.assetId)}`;
       case 'REPAY':
-        return <span>{boundaryDot}{time}  Repaid loan ({formatIRRShort(entry.amountIRR)})</span>;
+        return `Repaid ${formatIRRShort(entry.amountIRR)} loan`;
       case 'PROTECT':
-        return <span>{boundaryDot}{time}  Protected {getAssetDisplayName(entry.assetId)} ({entry.months}mo)</span>;
+        return `Protected ${getAssetDisplayName(entry.assetId)} for ${entry.months}mo`;
       case 'REBALANCE':
-        return <span>{boundaryDot}{time}  Rebalanced portfolio</span>;
+        return `Rebalanced portfolio`;
       case 'CANCEL_PROTECTION':
-        return <span>{boundaryDot}{time}  Cancelled protection ({getAssetDisplayName(entry.assetId)})</span>;
+        return `Cancelled ${getAssetDisplayName(entry.assetId)} protection`;
       default:
-        return <span>{boundaryDot}{time}  {entry.type}</span>;
+        return entry.type;
     }
+  };
+
+  const renderLogEntry = (entry) => {
+    const time = formatTime(entry.timestamp);
+    const message = formatActivityMessage(entry);
+
+    return (
+      <div className="activityItem">
+        <span className="activityDot">●</span>
+        <span className="activityTime">{time}</span>
+        <span className="activityMessage">{message}</span>
+      </div>
+    );
   };
 
   const getBoundaryClass = (entry) => {

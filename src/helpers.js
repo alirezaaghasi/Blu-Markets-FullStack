@@ -70,9 +70,9 @@ export function nowISO() {
 }
 
 // Hoisted to module scope to avoid per-call allocation
-// Issue 4: Full asset names with tickers
+// Decision 10: Renamed "Iranian Bonds" to "Fixed Income Fund (IRR)"
 const ASSET_DISPLAY_NAMES = {
-  'IRR_FIXED_INCOME': 'Iranian Bonds',
+  'IRR_FIXED_INCOME': 'Fixed Income Fund (IRR)',
   'USDT': 'Tether (USDT)',
   'GOLD': 'Gold',
   'BTC': 'Bitcoin (BTC)',
