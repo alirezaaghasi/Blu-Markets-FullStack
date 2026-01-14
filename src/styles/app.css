@@ -987,6 +987,7 @@ body {
 
 .rebalanceAddFundsSuggestion {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   padding: 12px;
@@ -1005,6 +1006,14 @@ body {
   flex: 1;
   font-size: 13px;
   color: #4ade80;
+  min-width: 150px;
+}
+
+.suggestionTip {
+  width: 100%;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 4px;
 }
 
 .btn.small {

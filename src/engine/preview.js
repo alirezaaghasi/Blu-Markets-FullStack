@@ -107,60 +107,89 @@ export function calculateRebalanceGap(state, prices = DEFAULT_PRICES, fxRate = D
   }
 
   // Calculate how much cash would achieve perfect balance
-  // If a layer is X% overweight due to frozen assets, adding capital to other layers
-  // dilutes that layer's percentage
+  // Key insight: Cash is deployed to UNDERWEIGHT layers, which dilutes OVERWEIGHT layers.
   //
-  // Math: If frozen layer has value F and is at P% but should be T%,
-  // we need total portfolio value V where F/V = T%
-  // V = F / (T/100)
-  // Cash needed = V - currentTotal
+  // For an overweight layer with value V that can't be reduced (frozen/sold out):
+  // After deploying cash D to other layers, total becomes (holdingsTotal + D)
+  // For this layer to hit target T%: V / (holdingsTotal + D) = T%
+  // Solving: D = V/T% - holdingsTotal
+  //
+  // The constraining factor is the layer needing the most dilution.
 
   let cashNeededForPerfectBalance = 0;
 
-  if (hasFrozenAssets && remainingGapPct > 0) {
-    // Find the layer with frozen assets that's overweight
-    for (const layer of LAYERS) {
-      if (frozenByLayer[layer] > 0) {
-        const targetPct = state.targetLayerPct[layer] / 100;
-        const frozenValue = frozenByLayer[layer];
-        // This frozen amount should be targetPct of total
-        // frozenValue = targetPct * requiredTotal
-        // requiredTotal = frozenValue / targetPct
-        const requiredTotal = frozenValue / targetPct;
-        const additionalNeeded = requiredTotal - holdingsTotal;
-        if (additionalNeeded > cashNeededForPerfectBalance) {
-          cashNeededForPerfectBalance = additionalNeeded;
-        }
+  // Only calculate for layers that are STILL OVERWEIGHT after HOLDINGS_ONLY
+  for (const layer of LAYERS) {
+    const layerValue = achievableIRR[layer];
+    const targetPct = state.targetLayerPct[layer] / 100;
+    const targetValue = targetPct * holdingsTotal;
+
+    // Only if this layer is overweight after HOLDINGS_ONLY
+    if (layerValue > targetValue + 1) { // +1 to avoid floating point noise
+      // To make this layer exactly targetPct, we need total portfolio of:
+      const requiredTotal = layerValue / targetPct;
+      const additionalNeeded = requiredTotal - holdingsTotal;
+      if (additionalNeeded > cashNeededForPerfectBalance) {
+        cashNeededForPerfectBalance = additionalNeeded;
       }
     }
   }
 
   // Round up to avoid floating point issues
-  cashNeededForPerfectBalance = Math.ceil(cashNeededForPerfectBalance);
+  cashNeededForPerfectBalance = Math.ceil(Math.max(0, cashNeededForPerfectBalance));
 
   // Check if current cash is sufficient
   const currentCash = state.cashIRR;
   const cashSufficient = currentCash >= cashNeededForPerfectBalance;
   const cashShortfall = Math.max(0, cashNeededForPerfectBalance - currentCash);
 
-  // Determine if using available cash would help (even if not perfect)
+  // Determine if using available cash would help
+  // Simulate proper cash deployment to underweight layers
   let cashWouldHelp = false;
   let partialCashBenefit = 0;
 
   if (currentCash > 0 && remainingGapPct > 0) {
-    // Simulate adding current cash - would it reduce the gap?
-    const newTotal = holdingsTotal + currentCash;
+    // Calculate deficits in underweight layers
+    const deficits = {};
+    let totalDeficit = 0;
+    for (const layer of LAYERS) {
+      const targetValue = (state.targetLayerPct[layer] / 100) * (holdingsTotal + currentCash);
+      const deficit = Math.max(0, targetValue - achievableIRR[layer]);
+      deficits[layer] = deficit;
+      totalDeficit += deficit;
+    }
+
+    // Simulate deploying cash proportionally to underweight layers
+    const newLayerValues = { ...achievableIRR };
+    if (totalDeficit > 0) {
+      const cashToDeploy = Math.min(currentCash, totalDeficit);
+      for (const layer of LAYERS) {
+        if (deficits[layer] > 0) {
+          const portion = (deficits[layer] / totalDeficit) * cashToDeploy;
+          newLayerValues[layer] += portion;
+        }
+      }
+    }
+
+    // Calculate new gap after cash deployment
+    const newTotal = holdingsTotal + Math.min(currentCash, totalDeficit);
     let newGapPct = 0;
     for (const layer of LAYERS) {
-      const newLayerPct = (achievableIRR[layer] / newTotal) * 100;
-      // Cash goes to underweight layers, so they get closer to target
+      const newLayerPct = (newLayerValues[layer] / newTotal) * 100;
       newGapPct += Math.abs(newLayerPct - state.targetLayerPct[layer]);
     }
+
     if (newGapPct < remainingGapPct) {
       cashWouldHelp = true;
       partialCashBenefit = remainingGapPct - newGapPct;
     }
   }
+
+  // Determine if perfect balance is achievable
+  // - With HOLDINGS_ONLY: remainingGapPct < 1
+  // - With cash: cashSufficient (has enough cash to deploy)
+  const canAchieveWithHoldingsOnly = remainingGapPct < 1;
+  const canAchieveWithCash = cashSufficient || cashNeededForPerfectBalance === 0;
 
   return {
     // Current state
@@ -174,7 +203,8 @@ export function calculateRebalanceGap(state, prices = DEFAULT_PRICES, fxRate = D
     gapByLayer,
 
     // Perfect balance requirements
-    canAchievePerfectBalance: remainingGapPct < 1,
+    canAchievePerfectBalance: canAchieveWithHoldingsOnly,
+    canAchieveWithCash,
     cashNeededForPerfectBalance,
 
     // Current cash analysis

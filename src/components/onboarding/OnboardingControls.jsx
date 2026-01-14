@@ -624,7 +624,13 @@ function OnboardingControls({ state, dispatch, questionnaire, prices, fxRate }) 
           <div className="rebalanceAddFundsSuggestion">
             <div className="suggestionIcon">💡</div>
             <div className="suggestionText">
-              Still {formatIRR(gap.cashShortfall)} short of perfect balance.
+              {gap.cashWouldHelp && gap.partialCashBenefit > 0
+                ? `Using cash reduces gap by ${gap.partialCashBenefit}%. Still ${formatIRR(gap.cashShortfall)} short of perfect balance.`
+                : `Still ${formatIRR(gap.cashShortfall)} short of perfect balance.`
+              }
+            </div>
+            <div className="suggestionTip">
+              Tip: Repay loans to unfreeze collateral for more flexibility.
             </div>
             <button
               className="btn small"

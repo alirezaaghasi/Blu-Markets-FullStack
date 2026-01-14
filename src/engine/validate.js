@@ -145,6 +145,6 @@ export function validateRepay({ loanId, amountIRR }, state) {
 }
 
 export function validateRebalance({ mode }) {
-  if (!["HOLDINGS_ONLY", "HOLDINGS_PLUS_CASH"].includes(mode)) return fail("INVALID_MODE");
+  if (!["HOLDINGS_ONLY", "HOLDINGS_PLUS_CASH", "SMART"].includes(mode)) return fail("INVALID_MODE");
   return ok();
 }
