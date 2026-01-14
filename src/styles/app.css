@@ -169,6 +169,11 @@ body {
 .fixedIncomeBreakdown .accrued { color: var(--success); font-weight: 500; }
 .fixedIncomeBreakdown .daysHeld { color: var(--text-muted); }
 
+/* v9.9: Quantity and price display */
+.holdingQuantityPrice { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 11px; }
+.holdingQty { color: var(--text-secondary); font-weight: 500; }
+.holdingPrice { color: var(--accent); font-weight: 500; }
+
 /* Footer actions */
 .footerActions { display: flex; flex-direction: column; gap: 10px; }
 .footerRowPrimary { display: flex; gap: 8px; flex-wrap: wrap; }

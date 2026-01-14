@@ -21,28 +21,28 @@ const DEFAULT_FX_RATE = 1456000;
  * @param {Object} holding - Holding object
  * @param {Object} prices - Current prices in USD
  * @param {number} fxRate - USD/IRR exchange rate
- * @returns {Object} { valueIRR, breakdown }
+ * @returns {Object} { valueIRR, priceUSD, breakdown }
  */
 function computeHoldingValue(holding, prices, fxRate) {
   // Legacy support: if valueIRR exists and quantity doesn't, use valueIRR directly
   if (holding.valueIRR !== undefined && holding.quantity === undefined) {
-    return { valueIRR: holding.valueIRR, breakdown: null };
+    return { valueIRR: holding.valueIRR, priceUSD: null, breakdown: null };
   }
 
   // Quantity-based calculation (v9.9+)
   const quantity = holding.quantity || 0;
 
   if (holding.assetId === 'IRR_FIXED_INCOME') {
-    // Special handling for fixed income
+    // Special handling for fixed income - price is unit price in IRR
     const breakdown = calculateFixedIncomeValue(quantity, holding.purchasedAt);
-    return { valueIRR: breakdown.total, breakdown };
+    return { valueIRR: breakdown.total, priceUSD: null, breakdown };
   }
 
   // Standard: quantity × priceUSD × fxRate
   const priceUSD = prices[holding.assetId] || DEFAULT_PRICES[holding.assetId] || 0;
   const valueIRR = Math.round(quantity * priceUSD * fxRate);
 
-  return { valueIRR, breakdown: null };
+  return { valueIRR, priceUSD, breakdown: null };
 }
 
 /**
@@ -62,7 +62,7 @@ export function computeSnapshot(holdings, cashIRR, prices = DEFAULT_PRICES, fxRa
 
   // Single loop: compute values, build asset map, totals, and layer allocations
   for (const h of holdings) {
-    const { valueIRR, breakdown } = computeHoldingValue(h, prices, fxRate);
+    const { valueIRR, priceUSD, breakdown } = computeHoldingValue(h, prices, fxRate);
     const layer = ASSET_LAYER[h.assetId];
 
     holdingsIRRByAsset[h.assetId] = valueIRR;
@@ -73,6 +73,7 @@ export function computeSnapshot(holdings, cashIRR, prices = DEFAULT_PRICES, fxRa
       assetId: h.assetId,
       quantity: h.quantity,
       valueIRR,
+      priceUSD,
       breakdown,
       layer,
       frozen: h.frozen,

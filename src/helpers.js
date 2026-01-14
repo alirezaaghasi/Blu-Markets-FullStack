@@ -1,4 +1,4 @@
-// Utility functions for Blu Markets v9.8
+// Utility functions for Blu Markets v9.9
 
 export function formatIRR(n) {
   return Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' IRR';
@@ -10,6 +10,29 @@ export function formatIRRShort(n) {
   if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M';
   if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
   return num.toString();
+}
+
+// v9.9: Format USD price
+export function formatUSD(n) {
+  const num = Number(n) || 0;
+  if (num >= 1000) {
+    return '$' + num.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  }
+  if (num >= 1) {
+    return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+}
+
+// v9.9: Format quantity with appropriate decimals
+export function formatQuantity(qty, assetId) {
+  const num = Number(qty) || 0;
+  // More decimals for crypto with small quantities
+  if (assetId === 'BTC' && num < 1) return num.toFixed(6);
+  if (['ETH', 'SOL', 'TON'].includes(assetId) && num < 10) return num.toFixed(4);
+  if (num < 1) return num.toFixed(4);
+  if (num < 100) return num.toFixed(2);
+  return num.toFixed(0);
 }
 
 export function formatTime(ts) {

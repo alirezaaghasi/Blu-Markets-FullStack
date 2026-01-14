@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { formatIRR, getAssetDisplayName } from '../helpers.js';
+import { formatIRR, formatUSD, formatQuantity, getAssetDisplayName } from '../helpers.js';
 
 /**
  * HoldingRow - Single asset holding with buy/sell/overflow menu
@@ -14,6 +14,8 @@ function HoldingRow({ holding, holdingValue, layerInfo, layer, protDays, onStart
   const isEmpty = valueIRR === 0;
   const isFixedIncome = holding.assetId === 'IRR_FIXED_INCOME';
   const breakdown = holdingValue?.breakdown;
+  const quantity = holdingValue?.quantity ?? holding.quantity;
+  const priceUSD = holdingValue?.priceUSD;
 
   // Close overflow when clicking outside
   useEffect(() => {
@@ -34,6 +36,14 @@ function HoldingRow({ holding, holdingValue, layerInfo, layer, protDays, onStart
           {protDays !== null ? ` · ☂️ Protected (${protDays}d)` : ''}
           {holding.frozen ? ` · 🔒 Locked` : ''}
         </div>
+
+        {/* v9.9: Show quantity and price for non-fixed-income assets */}
+        {!isFixedIncome && quantity > 0 && (
+          <div className="holdingQuantityPrice">
+            <span className="holdingQty">{formatQuantity(quantity, holding.assetId)} units</span>
+            {priceUSD && <span className="holdingPrice">@ {formatUSD(priceUSD)}</span>}
+          </div>
+        )}
 
         {/* v9.9: Special display for Fixed Income: Principal + Accrued */}
         {isFixedIncome && breakdown && !isEmpty && (
