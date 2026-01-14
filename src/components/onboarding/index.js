@@ -1,3 +1,3 @@
 export { default as PhoneForm } from './PhoneForm.jsx';
-export { default as OnboardingRightPanel } from './OnboardingRightPanel.jsx';
+// OnboardingRightPanel is lazy-loaded directly by App.jsx - not exported here
 export { default as OnboardingControls } from './OnboardingControls.jsx';

@@ -12,22 +12,23 @@ export default defineConfig({
       output: {
         // Manual chunk splitting for better caching and smaller initial load
         manualChunks: {
-          // Vendor chunks
+          // Vendor chunks (always needed)
           'react-vendor': ['react', 'react-dom'],
 
-          // Feature chunks (lazy-loaded tabs)
+          // Feature chunks (lazy-loaded tabs) - let Vite handle dynamic imports
+          'portfolio': ['./src/components/PortfolioHome.jsx'],
           'history': ['./src/components/HistoryPane.jsx'],
           'protection': ['./src/components/Protection.jsx'],
           'loans': ['./src/components/Loans.jsx'],
 
-          // Engine/pricing logic
-          'pricing': [
-            './src/services/priceService.js',
-            './src/hooks/usePrices.js',
-            './src/engine/pricing.js',
+          // Modals (rarely used, defer loading)
+          'modals': [
+            './src/components/ResetConfirmModal.jsx',
+            './src/components/ExecutionSummary.jsx',
+            './src/components/ConfirmModal.jsx',
           ],
 
-          // Risk profiling (v10)
+          // Risk profiling data (loaded during onboarding)
           'risk-profiling': [
             './src/engine/riskScoring.js',
             './src/data/questionnaire.v2.fa.json',

@@ -28,21 +28,26 @@ import { formatIRR, formatIRRShort } from './helpers.js';
 // Reducer imports
 import { reducer, initialState } from './reducers/appReducer.js';
 
-// Component imports (core - always loaded)
+// Component imports (core - minimal for initial render)
 import {
   ActionLogPane,
-  ExecutionSummary,
   Tabs,
-  ResetConfirmModal,
-  PortfolioHome,
-  OnboardingRightPanel,
   OnboardingControls,
 } from './components/index.js';
 
-// Lazy-loaded tab panels (code-split for better initial load)
+// Lazy-loaded components (code-split for smaller initial bundle)
+// Tab panels
 const HistoryPane = lazy(() => import('./components/HistoryPane.jsx'));
 const Protection = lazy(() => import('./components/Protection.jsx'));
 const Loans = lazy(() => import('./components/Loans.jsx'));
+const PortfolioHome = lazy(() => import('./components/PortfolioHome.jsx'));
+
+// Stage-specific components (only load what's needed)
+const OnboardingRightPanel = lazy(() => import('./components/onboarding/OnboardingRightPanel.jsx'));
+
+// Modals (rarely used, defer loading)
+const ResetConfirmModal = lazy(() => import('./components/ResetConfirmModal.jsx'));
+const ExecutionSummary = lazy(() => import('./components/ExecutionSummary.jsx'));
 
 // Loading fallback for lazy components
 const TabLoadingFallback = () => (
@@ -50,6 +55,9 @@ const TabLoadingFallback = () => (
     Loading...
   </div>
 );
+
+// Minimal fallback for modals (invisible)
+const ModalFallback = () => null;
 
 // ====== HEADER CONTENT HELPER ======
 // Memoized via useMemo in component to avoid repeated computation
@@ -159,34 +167,38 @@ export default function App() {
 
   // Memoize onboarding content separately (only depends on onboarding state)
   const onboardingContent = useMemo(() => (
-    <OnboardingRightPanel
-      stage={state.stage}
-      questionIndex={state.questionnaire.index}
-      targetLayers={state.targetLayerPct}
-      investAmount={state.investAmountIRR}
-      dispatch={dispatch}
-      questionnaireLength={questionnaire.questions.length}
-    />
+    <Suspense fallback={<TabLoadingFallback />}>
+      <OnboardingRightPanel
+        stage={state.stage}
+        questionIndex={state.questionnaire.index}
+        targetLayers={state.targetLayerPct}
+        investAmount={state.investAmountIRR}
+        dispatch={dispatch}
+        questionnaireLength={questionnaire.questions.length}
+      />
+    </Suspense>
   ), [state.stage, state.questionnaire.index, state.targetLayerPct, state.investAmountIRR]);
 
   // Memoize portfolio tab content (most frequently used)
   const portfolioContent = useMemo(() => (
-    <PortfolioHome
-      holdings={state.holdings}
-      cashIRR={state.cashIRR}
-      targetLayerPct={state.targetLayerPct}
-      protections={state.protections}
-      loans={state.loans}
-      snapshot={snapshot}
-      portfolioStatus={portfolioStatus}
-      onStartTrade={onStartTrade}
-      onStartProtect={onStartProtect}
-      onStartBorrow={onStartBorrow}
-      onStartRebalance={onStartRebalance}
-      pricesLoading={pricesLoading}
-      pricesUpdatedAt={pricesUpdatedAt}
-      pricesError={pricesError}
-    />
+    <Suspense fallback={<TabLoadingFallback />}>
+      <PortfolioHome
+        holdings={state.holdings}
+        cashIRR={state.cashIRR}
+        targetLayerPct={state.targetLayerPct}
+        protections={state.protections}
+        loans={state.loans}
+        snapshot={snapshot}
+        portfolioStatus={portfolioStatus}
+        onStartTrade={onStartTrade}
+        onStartProtect={onStartProtect}
+        onStartBorrow={onStartBorrow}
+        onStartRebalance={onStartRebalance}
+        pricesLoading={pricesLoading}
+        pricesUpdatedAt={pricesUpdatedAt}
+        pricesError={pricesError}
+      />
+    </Suspense>
   ), [state.holdings, state.cashIRR, state.targetLayerPct, state.protections, state.loans, snapshot, portfolioStatus, pricesLoading, pricesUpdatedAt, pricesError, onStartTrade, onStartProtect, onStartBorrow, onStartRebalance]);
 
   // Memoize history content separately (only depends on ledger)
@@ -296,17 +308,23 @@ export default function App() {
         </div>
       </div>
 
-      {/* Modals */}
+      {/* Modals (lazy-loaded) */}
       {state.showResetConfirm && (
-        <ResetConfirmModal
-          onConfirm={() => dispatch({ type: 'RESET' })}
-          onCancel={() => dispatch({ type: 'HIDE_RESET_CONFIRM' })}
-        />
+        <Suspense fallback={<ModalFallback />}>
+          <ResetConfirmModal
+            onConfirm={() => dispatch({ type: 'RESET' })}
+            onCancel={() => dispatch({ type: 'HIDE_RESET_CONFIRM' })}
+          />
+        </Suspense>
       )}
 
-      {/* Toast notifications */}
+      {/* Toast notifications (lazy-loaded) */}
       <div className="toastContainer">
-        {state.lastAction && <ExecutionSummary lastAction={state.lastAction} dispatch={dispatch} />}
+        {state.lastAction && (
+          <Suspense fallback={<ModalFallback />}>
+            <ExecutionSummary lastAction={state.lastAction} dispatch={dispatch} />
+          </Suspense>
+        )}
       </div>
     </>
   );
