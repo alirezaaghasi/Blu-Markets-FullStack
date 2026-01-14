@@ -32,10 +32,10 @@ function Loans({ loans, holdings, prices, fxRate, dispatch }) {
     const usedPercent = (loan.amountIRR / loan.liquidationIRR) * 100;
     // All bars use blue - percentage tells the story
     const color = '#3B82F6';
-    if (usedPercent >= 75) return { level: 'critical', color, message: `If ${getAssetDisplayName(loan.collateralAssetId)} drops ${Math.round(100 - usedPercent)}%, this loan will auto-close.` };
-    if (usedPercent >= 65) return { level: 'warning', color, message: 'Close to limit. Consider repaying soon.' };
-    if (usedPercent >= 50) return { level: 'caution', color, message: null };
-    return { level: 'healthy', color, message: null };
+    if (usedPercent >= 75) return { level: 'critical', color };
+    if (usedPercent >= 65) return { level: 'warning', color };
+    if (usedPercent >= 50) return { level: 'caution', color };
+    return { level: 'healthy', color };
   };
 
   // Decision 11: Calculate liquidation price in IRR for each loan
@@ -92,7 +92,7 @@ function Loans({ loans, holdings, prices, fxRate, dispatch }) {
                 </div>
               </div>
 
-              {/* Decision 11: Liquidation price with explanation */}
+              {/* Liquidation price display */}
               {(() => {
                 const liquidationPrice = getLiquidationPriceIRR(loan);
                 if (!liquidationPrice) return null;
@@ -102,20 +102,10 @@ function Loans({ loans, holdings, prices, fxRate, dispatch }) {
                       <span className="liquidationLabel">Liquidation price:</span>
                       <span className="liquidationPrice">{formatIRR(liquidationPrice)}</span>
                     </div>
-                    <p className="liquidationExplain">
-                      If {getAssetDisplayName(loan.collateralAssetId)} drops below this price, your collateral will be sold.
-                    </p>
                   </div>
                 );
               })()}
 
-              {/* Warning message if applicable */}
-              {health.message && (
-                <div className={`loanWarning ${health.level}`}>
-                  <span className="warningIcon">{health.level === 'critical' ? '⛔' : '⚠'}</span>
-                  <span className="warningText">{health.message}</span>
-                </div>
-              )}
 
               <button
                 className="btn primary"
