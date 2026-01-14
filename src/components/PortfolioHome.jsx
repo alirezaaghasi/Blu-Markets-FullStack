@@ -16,13 +16,15 @@ function PortfolioHome({ holdings, cashIRR, targetLayerPct, protections, loans, 
   // Issue 3: Track expanded layers (default all collapsed)
   const [expandedLayers, setExpandedLayers] = useState({});
 
-  // Timer tick for updating time-based calculations (protection countdown)
-  // Updates every minute since we show days remaining
+  // Optimization: Only run countdown timer if there are active protections
+  // Since we show days (not minutes), update every hour instead of every minute
+  const hasProtections = protections && protections.length > 0;
   const [clockTick, setClockTick] = useState(0);
   useEffect(() => {
-    const interval = setInterval(() => setClockTick(t => t + 1), 60000);
+    if (!hasProtections) return;
+    const interval = setInterval(() => setClockTick(t => t + 1), 3600000); // 1 hour
     return () => clearInterval(interval);
-  }, []);
+  }, [hasProtections]);
 
   const toggleLayer = (layer) => {
     setExpandedLayers(prev => ({ ...prev, [layer]: !prev[layer] }));

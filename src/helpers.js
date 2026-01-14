@@ -1,9 +1,16 @@
 // Utility functions for Blu Markets v9.9
+// Optimization: Cached Intl.NumberFormat instances to avoid repeated allocations
 
 import { THRESHOLDS, RISK_ALLOCATIONS } from './constants/index.js';
 
+// Cached formatters - created once at module load
+const irrFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+const usdFormatterWhole = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+const usdFormatter2 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const usdFormatter4 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+
 export function formatIRR(n) {
-  return Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' IRR';
+  return irrFormatter.format(Math.round(Number(n) || 0)) + ' IRR';
 }
 
 export function formatIRRShort(n) {
@@ -14,16 +21,16 @@ export function formatIRRShort(n) {
   return num.toString();
 }
 
-// v9.9: Format USD price
+// v9.9: Format USD price (using cached formatters)
 export function formatUSD(n) {
   const num = Number(n) || 0;
   if (num >= 1000) {
-    return '$' + num.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    return '$' + usdFormatterWhole.format(num);
   }
   if (num >= 1) {
-    return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return '$' + usdFormatter2.format(num);
   }
-  return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+  return '$' + usdFormatter4.format(num);
 }
 
 // v9.9: Format quantity with appropriate decimals
@@ -37,16 +44,21 @@ export function formatQuantity(qty, assetId) {
   return num.toFixed(0);
 }
 
+// Cached time formatters
+const timeFormatter24h = new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+const timestampFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+const timeFormatter12h = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+
 export function formatTime(ts) {
-  return new Date(ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return timeFormatter24h.format(new Date(ts));
 }
 
 export function formatTimestamp(ts) {
-  return new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return timestampFormatter.format(new Date(ts));
 }
 
 export function formatTimeOnly(ts) {
-  return new Date(ts).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  return timeFormatter12h.format(new Date(ts));
 }
 
 export function uid() {

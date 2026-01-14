@@ -16,8 +16,8 @@ import { computePortfolioStatus } from './engine/portfolioStatus.js';
 // Hook imports
 import { usePrices } from './hooks/usePrices.js';
 
-// Data imports
-import questionnaire from './data/questionnaire.fa.json';
+// Data imports (consolidated to single v2 questionnaire)
+import questionnaire from './data/questionnaire.v2.fa.json';
 
 // Constants imports
 import { STAGES } from './constants/index.js';

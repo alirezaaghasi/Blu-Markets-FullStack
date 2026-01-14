@@ -136,44 +136,66 @@ function OnboardingControls({ state, dispatch, questionnaire, prices, fxRate }) 
   const [showingProfile, setShowingProfile] = useState(true); // v10: Show profile before consent
   const isConsentMatch = consentText === questionnaireV2.consent_exact;
 
-  // Memoize protect draft calculations (v9.9: compute value from quantity)
+  // Optimization: Memoized holdingsById map for O(1) lookups instead of O(n) find()
+  const holdingsById = useMemo(() => {
+    const map = new Map();
+    for (const h of state.holdings) {
+      map.set(h.assetId, h);
+    }
+    return map;
+  }, [state.holdings]);
+
+  // Optimization: Pre-filter holdings lists once
+  const { activeHoldings, borrowableHoldings } = useMemo(() => {
+    const active = [];
+    const borrowable = [];
+    for (const h of state.holdings) {
+      if (h.quantity > 0) {
+        active.push(h);
+        if (!h.frozen) borrowable.push(h);
+      }
+    }
+    return { activeHoldings: active, borrowableHoldings: borrowable };
+  }, [state.holdings]);
+
+  // Memoize protect draft calculations using holdingsById for O(1) lookup
   const protectData = useMemo(() => {
     if (!state.protectDraft) return null;
-    const h = state.holdings.find(x => x.assetId === state.protectDraft.assetId);
+    const h = holdingsById.get(state.protectDraft.assetId);
     const notionalIRR = getHoldingValueIRR(h, prices, fxRate);
     const premium = h ? calcPremiumIRR({ assetId: h.assetId, notionalIRR, months: state.protectDraft.months }) : 0;
     return { holding: h, notionalIRR, premium };
-  }, [state.protectDraft, state.holdings, prices, fxRate]);
+  }, [state.protectDraft, holdingsById, prices, fxRate]);
 
-  // Memoize borrow draft calculations (v9.9: compute value from quantity)
+  // Memoize borrow draft calculations using holdingsById for O(1) lookup
   const borrowData = useMemo(() => {
     if (!state.borrowDraft) return null;
-    const h = state.holdings.find(x => x.assetId === state.borrowDraft.assetId);
+    const h = holdingsById.get(state.borrowDraft.assetId);
     const layer = h ? ASSET_LAYER[h.assetId] : 'UPSIDE';
     const layerLtv = COLLATERAL_LTV_BY_LAYER[layer] || 0.3;
     const holdingValueIRR = getHoldingValueIRR(h, prices, fxRate);
     const maxBorrow = h ? Math.floor(holdingValueIRR * layerLtv) : 0;
     const layerInfo = LAYER_EXPLANATIONS[layer];
     return { holding: h, layer, layerLtv, maxBorrow, layerInfo, holdingValueIRR };
-  }, [state.borrowDraft, state.holdings, prices, fxRate]);
+  }, [state.borrowDraft, holdingsById, prices, fxRate]);
 
-  // Memoize select options for protect/borrow (v9.9: filter by quantity > 0)
+  // Memoize select options using pre-filtered lists
   const protectOptions = useMemo(() => {
-    return state.holdings.filter(h => h.quantity > 0).map(h => {
+    return activeHoldings.map(h => {
       const layer = ASSET_LAYER[h.assetId];
       const info = LAYER_EXPLANATIONS[layer];
       return { assetId: h.assetId, label: `${info.icon} ${getAssetDisplayName(h.assetId)}` };
     });
-  }, [state.holdings]);
+  }, [activeHoldings]);
 
   const borrowOptions = useMemo(() => {
-    return state.holdings.filter(h => !h.frozen && h.quantity > 0).map(h => {
+    return borrowableHoldings.map(h => {
       const layer = ASSET_LAYER[h.assetId];
       const info = LAYER_EXPLANATIONS[layer];
       const ltv = COLLATERAL_LTV_BY_LAYER[layer] || 0.3;
       return { assetId: h.assetId, label: `${info.icon} ${getAssetDisplayName(h.assetId)} (${Math.round(ltv * 100)}% LTV)` };
     });
-  }, [state.holdings]);
+  }, [borrowableHoldings]);
 
   // Issue 11: Determine current onboarding step
   const getOnboardingStep = () => {

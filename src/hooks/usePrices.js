@@ -9,8 +9,10 @@ import { DEFAULT_PRICES, DEFAULT_FX_RATE } from '../constants/index.js';
  * - Page Visibility API: Pauses polling when page is hidden
  * - setTimeout-based polling: Avoids overlapping requests on slow networks
  * - AbortController: Cancels in-flight requests on unmount
+ * - Exponential backoff on errors (with jitter)
+ * - navigator.onLine gating + online/offline event listeners
  *
- * @param {number} interval - Polling interval in ms (default 30000)
+ * @param {number} interval - Base polling interval in ms (default 30000)
  * @returns {Object} { prices, fxRate, loading, error, lastUpdated, refresh }
  */
 export function usePrices(interval = 30000) {
@@ -24,10 +26,26 @@ export function usePrices(interval = 30000) {
   const abortControllerRef = useRef(null);
   const isMountedRef = useRef(true);
   const isVisibleRef = useRef(true);
+  const isOnlineRef = useRef(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const consecutiveErrorsRef = useRef(0);
+  const maxBackoffRef = useRef(5 * 60 * 1000); // Max 5 minutes
+
+  // Calculate backoff with jitter
+  const getBackoffDelay = useCallback(() => {
+    if (consecutiveErrorsRef.current === 0) return interval;
+    // Exponential backoff: interval * 2^errors, capped at max
+    const backoff = Math.min(
+      interval * Math.pow(2, consecutiveErrorsRef.current),
+      maxBackoffRef.current
+    );
+    // Add jitter (±20%)
+    const jitter = backoff * 0.2 * (Math.random() - 0.5);
+    return Math.round(backoff + jitter);
+  }, [interval]);
 
   const refresh = useCallback(async () => {
-    // Skip if page is hidden
-    if (!isVisibleRef.current) return;
+    // Skip if page is hidden or offline
+    if (!isVisibleRef.current || !isOnlineRef.current) return;
 
     // Cancel any existing request
     if (abortControllerRef.current) {
@@ -55,6 +73,7 @@ export function usePrices(interval = 30000) {
 
       setLastUpdated(result.updatedAt);
       setError(null);
+      consecutiveErrorsRef.current = 0; // Reset on success
     } catch (err) {
       // Ignore abort errors
       if (err.name === 'AbortError') return;
@@ -64,6 +83,7 @@ export function usePrices(interval = 30000) {
 
       console.error('Price refresh error:', err);
       setError(err.message);
+      consecutiveErrorsRef.current++; // Increment for backoff
     } finally {
       // Guard against setting state after unmount
       if (isMountedRef.current) {
@@ -72,24 +92,27 @@ export function usePrices(interval = 30000) {
     }
   }, []);
 
-  // Schedule next poll using setTimeout (avoids overlapping requests)
+  // Schedule next poll using setTimeout (with backoff on errors)
   const scheduleNextPoll = useCallback(() => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
 
-    if (isVisibleRef.current && isMountedRef.current) {
+    if (isVisibleRef.current && isMountedRef.current && isOnlineRef.current) {
+      const delay = getBackoffDelay();
       timeoutRef.current = setTimeout(async () => {
         await refresh();
         scheduleNextPoll();
-      }, interval);
+      }, delay);
     }
-  }, [refresh, interval]);
+  }, [refresh, getBackoffDelay]);
 
   // Initial fetch
   useEffect(() => {
     isMountedRef.current = true;
-    refresh().then(scheduleNextPoll);
+    if (isOnlineRef.current) {
+      refresh().then(scheduleNextPoll);
+    }
 
     return () => {
       isMountedRef.current = false;
@@ -108,8 +131,9 @@ export function usePrices(interval = 30000) {
       const isVisible = document.visibilityState === 'visible';
       isVisibleRef.current = isVisible;
 
-      if (isVisible) {
+      if (isVisible && isOnlineRef.current) {
         // Resume polling when page becomes visible
+        consecutiveErrorsRef.current = 0; // Reset backoff on visibility
         refresh().then(scheduleNextPoll);
       } else {
         // Clear pending timeout when page is hidden
@@ -124,6 +148,34 @@ export function usePrices(interval = 30000) {
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [refresh, scheduleNextPoll]);
+
+  // Online/Offline event listeners
+  useEffect(() => {
+    const handleOnline = () => {
+      isOnlineRef.current = true;
+      consecutiveErrorsRef.current = 0; // Reset backoff when coming online
+      if (isVisibleRef.current) {
+        refresh().then(scheduleNextPoll);
+      }
+    };
+
+    const handleOffline = () => {
+      isOnlineRef.current = false;
+      // Clear pending timeout when going offline
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
   }, [refresh, scheduleNextPoll]);
 
