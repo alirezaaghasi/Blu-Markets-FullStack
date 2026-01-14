@@ -32,23 +32,24 @@ function ActionLogPane({ actionLog }) {
       <span className={`logBoundaryDot ${entry.boundary.toLowerCase()}`}></span>
     ) : null;
 
-    if (entry.type === 'REBALANCE') {
-      return <span>{boundaryDot}{time}  ⚖️ Rebalanced</span>;
-    }
-
+    // Issue 7: Verb-based action log format
     switch (entry.type) {
       case 'PORTFOLIO_CREATED':
         return <span>{time}  Started with {formatIRRShort(entry.amountIRR)}</span>;
       case 'ADD_FUNDS':
-        return <span>{boundaryDot}{time}  +{formatIRRShort(entry.amountIRR)} cash</span>;
+        return <span>{boundaryDot}{time}  Added funds ({formatIRRShort(entry.amountIRR)})</span>;
       case 'TRADE':
-        return <span>{boundaryDot}{time}  {entry.side === 'BUY' ? '+' : '-'}{getAssetDisplayName(entry.assetId)} {formatIRRShort(entry.amountIRR)}</span>;
+        return <span>{boundaryDot}{time}  {entry.side === 'BUY' ? 'Bought' : 'Sold'} {getAssetDisplayName(entry.assetId)} ({formatIRRShort(entry.amountIRR)})</span>;
       case 'BORROW':
-        return <span>{boundaryDot}{time}  💰 Borrowed {formatIRRShort(entry.amountIRR)} against {getAssetDisplayName(entry.assetId)}</span>;
+        return <span>{boundaryDot}{time}  Borrowed {formatIRRShort(entry.amountIRR)} ({getAssetDisplayName(entry.assetId)} collateral)</span>;
       case 'REPAY':
-        return <span>{boundaryDot}{time}  ✓ Repaid {formatIRRShort(entry.amountIRR)}</span>;
+        return <span>{boundaryDot}{time}  Repaid loan ({formatIRRShort(entry.amountIRR)})</span>;
       case 'PROTECT':
-        return <span>{boundaryDot}{time}  ☂️ {getAssetDisplayName(entry.assetId)} protected {entry.months}mo</span>;
+        return <span>{boundaryDot}{time}  Protected {getAssetDisplayName(entry.assetId)} ({entry.months}mo)</span>;
+      case 'REBALANCE':
+        return <span>{boundaryDot}{time}  Rebalanced portfolio</span>;
+      case 'CANCEL_PROTECTION':
+        return <span>{boundaryDot}{time}  Cancelled protection ({getAssetDisplayName(entry.assetId)})</span>;
       default:
         return <span>{boundaryDot}{time}  {entry.type}</span>;
     }

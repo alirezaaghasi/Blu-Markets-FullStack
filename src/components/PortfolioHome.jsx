@@ -1,5 +1,5 @@
-import React from 'react';
-import { formatIRR } from '../helpers.js';
+import React, { useState } from 'react';
+import { formatIRR, formatIRRShort } from '../helpers.js';
 import { ASSET_LAYER } from '../state/domain.js';
 import { LAYER_EXPLANATIONS } from '../constants/index.js';
 import { computePortfolioStatus } from '../engine/portfolioStatus.js';
@@ -9,8 +9,16 @@ import HoldingRow from './HoldingRow.jsx';
 /**
  * PortfolioHome - Main portfolio dashboard
  * Shows portfolio value, allocation, holdings grouped by layer
+ * Issue 3: Collapsible holdings by layer (default collapsed)
  */
 function PortfolioHome({ state, snapshot, onStartTrade, onStartProtect, onStartBorrow, onStartRebalance }) {
+  // Issue 3: Track expanded layers (default all collapsed)
+  const [expandedLayers, setExpandedLayers] = useState({});
+
+  const toggleLayer = (layer) => {
+    setExpandedLayers(prev => ({ ...prev, [layer]: !prev[layer] }));
+  };
+
   if (snapshot.holdingsIRR === 0 && state.cashIRR === 0) {
     return (
       <div className="card">
@@ -124,37 +132,57 @@ function PortfolioHome({ state, snapshot, onStartTrade, onStartProtect, onStartB
         </div>
       </div>
 
+      {/* Issue 3: Collapsible holdings by layer */}
       <div className="card">
         <h3>HOLDINGS</h3>
-        {/* Group holdings by layer with section headers */}
         {['FOUNDATION', 'GROWTH', 'UPSIDE'].map(layer => {
           const layerHoldings = state.holdings.filter(h => ASSET_LAYER[h.assetId] === layer);
           if (layerHoldings.length === 0) return null;
           const layerInfo = LAYER_EXPLANATIONS[layer];
+          const layerTotal = layerHoldings.reduce((sum, h) => sum + h.valueIRR, 0);
+          const isExpanded = expandedLayers[layer];
+          const currentPct = snapshot.layerPct[layer];
+          const targetPct = state.targetLayerPct[layer];
+          const isOnTarget = Math.abs(currentPct - targetPct) < 3;
+
           return (
-            <div key={layer} className="layerSection">
-              <div className="layerSectionHeader">
+            <div key={layer} className={`layerSection ${isExpanded ? 'expanded' : ''}`}>
+              <div
+                className="layerSectionHeader collapsible"
+                onClick={() => toggleLayer(layer)}
+              >
                 <span className={`layerDot ${layer.toLowerCase()}`}></span>
-                <span className="layerSectionTitle">{layerInfo.name} Assets</span>
-                <span className="layerSectionCount">{layerHoldings.length}</span>
+                <div className="layerHeaderContent">
+                  <span className="layerSectionTitle">{layerInfo.name}</span>
+                  <span className="layerHeaderValue">{formatIRRShort(layerTotal)}</span>
+                </div>
+                <div className="layerHeaderMeta">
+                  <span className="layerAssetCount">{layerHoldings.length} asset{layerHoldings.length > 1 ? 's' : ''}</span>
+                  <span className={`layerStatus ${isOnTarget ? 'on-target' : 'off-target'}`}>
+                    {isOnTarget ? '✓ On target' : '○ ' + Math.round(currentPct) + '%'}
+                  </span>
+                </div>
+                <span className="expandIcon">{isExpanded ? '▲' : '▼'}</span>
               </div>
-              <div className="holdingsList">
-                {layerHoldings.map((h) => {
-                  const protDays = getProtectionDays(h.assetId);
-                  return (
-                    <HoldingRow
-                      key={h.assetId}
-                      holding={h}
-                      layerInfo={layerInfo}
-                      layer={layer}
-                      protDays={protDays}
-                      onStartTrade={onStartTrade}
-                      onStartProtect={onStartProtect}
-                      onStartBorrow={onStartBorrow}
-                    />
-                  );
-                })}
-              </div>
+              {isExpanded && (
+                <div className="holdingsList">
+                  {layerHoldings.map((h) => {
+                    const protDays = getProtectionDays(h.assetId);
+                    return (
+                      <HoldingRow
+                        key={h.assetId}
+                        holding={h}
+                        layerInfo={layerInfo}
+                        layer={layer}
+                        protDays={protDays}
+                        onStartTrade={onStartTrade}
+                        onStartProtect={onStartProtect}
+                        onStartBorrow={onStartBorrow}
+                      />
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })}

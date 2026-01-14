@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { STAGES, LAYER_EXPLANATIONS, THRESHOLDS, COLLATERAL_LTV_BY_LAYER } from '../../constants/index.js';
+import { STAGES, LAYER_EXPLANATIONS, THRESHOLDS, COLLATERAL_LTV_BY_LAYER, ONBOARDING_STEPS } from '../../constants/index.js';
 import { formatIRR, getAssetDisplayName } from '../../helpers.js';
 import { calcPremiumIRR } from '../../engine/pricing.js';
 import { ASSET_LAYER } from '../../state/domain.js';
@@ -19,23 +19,98 @@ function ActionCard({ title, children }) {
 }
 
 /**
+ * Issue 11: OnboardingProgress - Shows step progress during onboarding
+ */
+function OnboardingProgress({ currentStep }) {
+  return (
+    <div className="onboardingProgress">
+      <div className="progressSteps">
+        {ONBOARDING_STEPS.map((step, idx) => {
+          const stepNum = idx + 1;
+          let status = 'upcoming';
+          if (stepNum < currentStep) status = 'completed';
+          if (stepNum === currentStep) status = 'current';
+
+          return (
+            <div key={step.id} className={`progressStep ${status}`}>
+              <div className="stepNumber">{stepNum}</div>
+              <div className="stepLabel">{step.label}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Issue 8: MoreMenu - Dropdown menu for secondary actions
+ */
+function MoreMenu({ isOpen, onToggle, onProtect, onBorrow }) {
+  if (!isOpen) {
+    return (
+      <button className="btn" onClick={onToggle}>
+        More ▼
+      </button>
+    );
+  }
+
+  return (
+    <div className="moreMenuContainer">
+      <button className="btn" onClick={onToggle}>
+        More ▲
+      </button>
+      <div className="moreMenuDropdown">
+        <button className="moreMenuItem" onClick={() => { onProtect(); onToggle(); }}>
+          ☂️ Protect Asset
+        </button>
+        <button className="moreMenuItem" onClick={() => { onBorrow(); onToggle(); }}>
+          💰 Borrow Funds
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
  * OnboardingControls - Left panel controls during onboarding and active stage
  * Handles questionnaire, consent flow, investment amount, and action forms
  */
 function OnboardingControls({ state, dispatch, questionnaire }) {
   const [consentText, setConsentText] = useState('');
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const isConsentMatch = consentText === questionnaire.consent_exact;
+
+  // Issue 11: Determine current onboarding step
+  const getOnboardingStep = () => {
+    switch (state.stage) {
+      case STAGES.WELCOME: return 1;
+      case STAGES.ONBOARDING_PHONE: return 1;
+      case STAGES.ONBOARDING_QUESTIONNAIRE: return 2;
+      case STAGES.ONBOARDING_RESULT: return 3;
+      case STAGES.AMOUNT_REQUIRED: return 4;
+      default: return 0;
+    }
+  };
 
   if (state.stage === STAGES.WELCOME) {
     return (
-      <div className="muted" style={{ textAlign: 'center', padding: 8 }}>
-        Begin your mindful journey
+      <div>
+        <OnboardingProgress currentStep={1} />
+        <div className="muted" style={{ textAlign: 'center', padding: 8, marginTop: 16 }}>
+          Begin your mindful journey
+        </div>
       </div>
     );
   }
 
   if (state.stage === STAGES.ONBOARDING_PHONE) {
-    return <PhoneForm state={state} dispatch={dispatch} />;
+    return (
+      <div>
+        <OnboardingProgress currentStep={1} />
+        <PhoneForm state={state} dispatch={dispatch} />
+      </div>
+    );
   }
 
   if (state.stage === STAGES.ONBOARDING_QUESTIONNAIRE) {
@@ -45,7 +120,8 @@ function OnboardingControls({ state, dispatch, questionnaire }) {
 
     return (
       <div>
-        <div className="questionnaireHeader">
+        <OnboardingProgress currentStep={2} />
+        <div className="questionnaireHeader" style={{ marginTop: 16 }}>
           <span className="muted">{idx + 1}/{questionnaire.questions.length}</span>
         </div>
         <div className="q-card">
@@ -134,8 +210,10 @@ function OnboardingControls({ state, dispatch, questionnaire }) {
     };
 
     return (
-      <div className="consentFlow">
-        <div className="chatMessages">
+      <div>
+        <OnboardingProgress currentStep={3} />
+        <div className="consentFlow" style={{ marginTop: 16 }}>
+          <div className="chatMessages">
           {state.consentMessages.map((msg, i) => renderStoredMessage(msg, i))}
           {step && !isConsentStep && (
             <div className="chatMessage bot">
@@ -183,6 +261,7 @@ function OnboardingControls({ state, dispatch, questionnaire }) {
             </div>
           )}
         </div>
+        </div>
       </div>
     );
   }
@@ -200,10 +279,13 @@ function OnboardingControls({ state, dispatch, questionnaire }) {
 
     return (
       <div>
-        <div className="investHeader">
+        <OnboardingProgress currentStep={4} />
+        <div className="investHeader" style={{ marginTop: 16 }}>
           <h3>Let's bring your portfolio to life.</h3>
           <p className="muted">How much would you like to start with?</p>
         </div>
+        {/* Issue 20: Currency label above quick amounts */}
+        <div className="quickAmountsLabel">Quick amounts (IRR):</div>
         <div className="quickAmounts">
           {presetAmounts.map(preset => (
             <button
@@ -228,6 +310,8 @@ function OnboardingControls({ state, dispatch, questionnaire }) {
             }}
           />
         </div>
+        {/* Issue 12: Show minimum amount upfront */}
+        <div className="investMinimum">Minimum: {formatIRR(THRESHOLDS.MIN_AMOUNT_IRR)}</div>
         <p className="investReassurance">You can add more anytime. No lock-in.</p>
         <button
           className={`btn primary ${isValid ? '' : 'disabled'}`}
@@ -397,18 +481,19 @@ function OnboardingControls({ state, dispatch, questionnaire }) {
     );
   }
 
-  // Main action buttons
+  // Issue 8: Main action buttons - Two primary + menu
   return (
     <div>
       <div className="footerActions">
         <div className="footerRowPrimary">
           <button className="btn primary" onClick={() => dispatch({ type: 'START_ADD_FUNDS' })}>Add Funds</button>
           <button className="btn" onClick={() => dispatch({ type: 'START_REBALANCE' })}>Rebalance</button>
-          <button className="btn" onClick={() => dispatch({ type: 'START_PROTECT' })}>☂️ Protect</button>
-          <button className="btn" onClick={() => dispatch({ type: 'START_BORROW' })}>💰 Borrow</button>
-        </div>
-        <div className="footerRowSecondary">
-          <button className="btn resetBtn" onClick={() => dispatch({ type: 'SHOW_RESET_CONFIRM' })}>↺ Reset</button>
+          <MoreMenu
+            isOpen={moreMenuOpen}
+            onToggle={() => setMoreMenuOpen(!moreMenuOpen)}
+            onProtect={() => dispatch({ type: 'START_PROTECT' })}
+            onBorrow={() => dispatch({ type: 'START_BORROW' })}
+          />
         </div>
       </div>
     </div>

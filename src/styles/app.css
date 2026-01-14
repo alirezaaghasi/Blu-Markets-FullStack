@@ -157,6 +157,13 @@ body {
 .resetBtn { color: var(--text-muted); opacity: 0.6; }
 .resetBtn:hover { color: var(--danger); border-color: var(--danger); background: rgba(248, 81, 73, 0.08); opacity: 1; }
 
+/* Issue 8: More menu dropdown */
+.moreMenuContainer { position: relative; }
+.moreMenuDropdown { position: absolute; bottom: 100%; left: 0; margin-bottom: 4px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow-md); min-width: 160px; z-index: 100; overflow: hidden; }
+.moreMenuItem { display: flex; align-items: center; gap: 8px; width: 100%; padding: 12px 16px; border: none; background: none; color: var(--text-primary); font-size: 13px; cursor: pointer; text-align: left; transition: background 0.15s; }
+.moreMenuItem:hover { background: var(--bg-tertiary); }
+.moreMenuItem:first-child { border-bottom: 1px solid var(--border); }
+
 /* Toast */
 .toastContainer { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 900; pointer-events: none; }
 .toast { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; padding: 14px 24px; font-size: 14px; font-weight: 500; color: var(--text-primary); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); animation: toastIn 0.3s ease, toastOut 0.3s ease 3.7s forwards; pointer-events: auto; }
@@ -256,6 +263,16 @@ body {
 .emptyText { font-size: 14px; color: var(--text-secondary); margin-bottom: 4px; }
 .emptySubtext { font-size: 12px; color: var(--text-muted); }
 
+/* Issue 18: Empty states with CTAs */
+.emptyState { text-align: center; padding: 32px 20px; }
+.emptyState .emptyIcon { font-size: 40px; margin-bottom: 16px; opacity: 0.6; }
+.emptyState .emptyTitle { font-size: 16px; font-weight: 500; color: var(--text-primary); margin-bottom: 8px; }
+.emptyState .emptyDescription { font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.5; max-width: 280px; margin-left: auto; margin-right: auto; }
+.emptyState .btn { margin-top: 8px; }
+
+/* Issue 17: Loan header summary */
+.loanHeaderSummary { font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+
 /* History */
 .historyList { display: flex; flex-direction: column; gap: 0; }
 .historyGroup { margin-bottom: 24px; }
@@ -298,6 +315,31 @@ body {
 .loanHealthText.warning { color: var(--warning); }
 .loanHealthText.critical { color: var(--danger); }
 
+/* Issue 5: Redesigned loan cards with health bar */
+.loanCards { display: flex; flex-direction: column; gap: 12px; }
+.loanCard { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.loanCard.critical { border-color: rgba(239, 68, 68, 0.4); }
+.loanCard.warning { border-color: rgba(249, 115, 22, 0.4); }
+.loanCard.caution { border-color: rgba(251, 191, 36, 0.3); }
+.loanCardHeader { margin-bottom: 12px; }
+.loanCardTitle { display: flex; flex-direction: column; gap: 2px; }
+.loanLabel { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+.loanCollateral { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+.loanCardAmount { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.loanCardAmount .amountLabel { font-size: 13px; color: var(--text-secondary); }
+.loanCardAmount .amountValue { font-size: 20px; font-weight: 600; color: var(--text-primary); }
+.loanHealthSection { margin-bottom: 12px; }
+.healthBarTrack { height: 8px; background: var(--bg-primary); border-radius: 4px; overflow: hidden; }
+.healthBarFill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
+.healthLabelRow { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+.healthPercent { font-size: 12px; font-weight: 600; }
+.healthLimit { font-size: 11px; color: var(--text-muted); }
+.loanWarning { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border-radius: 8px; margin-top: 12px; }
+.loanWarning.critical { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); }
+.loanWarning.warning { background: rgba(249, 115, 22, 0.1); border: 1px solid rgba(249, 115, 22, 0.2); }
+.loanWarning .warningIcon { font-size: 14px; flex-shrink: 0; }
+.loanWarning .warningText { font-size: 12px; color: var(--text-primary); line-height: 1.4; }
+
 /* Repay */
 .repayDetails { background: var(--bg-primary); border-radius: 10px; padding: 12px; border: 1px solid var(--border); }
 .repayRow { display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; }
@@ -312,6 +354,17 @@ body {
 
 /* Onboarding */
 .onboardingPanel { height: 100%; display: flex; flex-direction: column; gap: 12px; }
+
+/* Issue 11: Onboarding progress steps */
+.onboardingProgress { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.progressSteps { display: flex; justify-content: space-between; }
+.progressStep { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; }
+.progressStep .stepNumber { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; background: var(--bg-primary); color: var(--text-muted); border: 2px solid var(--border); transition: all 0.2s; }
+.progressStep .stepLabel { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.progressStep.current .stepNumber { background: var(--accent); border-color: var(--accent); color: white; }
+.progressStep.current .stepLabel { color: var(--text-primary); font-weight: 500; }
+.progressStep.completed .stepNumber { background: var(--success); border-color: var(--success); color: white; }
+.progressStep.completed .stepLabel { color: var(--text-secondary); }
 .welcomeCard { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 14px; padding: 24px; text-align: center; }
 .welcomeIcon { font-size: 48px; margin-bottom: 14px; }
 .welcomeCard h2 { margin: 0 0 8px 0; font-weight: 600; font-size: 18px; color: var(--text-primary); }
@@ -380,6 +433,8 @@ body {
 .investPlaceholder { padding: 30px; text-align: center; }
 .investWarning { font-size: 12px; color: var(--warning); margin-top: 6px; }
 .investMinHint { font-size: 11px; color: var(--text-muted); margin-top: 8px; }
+.investMinimum { font-size: 12px; color: var(--text-secondary); margin-top: 8px; margin-bottom: 4px; }
+.quickAmountsLabel { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
 .placeholderTotal { text-align: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
 .placeholderValue { font-size: 24px; font-weight: 600; color: var(--text-muted); letter-spacing: 2px; }
 .placeholderLabel { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
@@ -424,12 +479,23 @@ body {
 .driftBanner .driftText strong { font-weight: 600; }
 .driftBanner .driftAction { font-size: 12px; padding: 6px 12px; }
 
-/* Layer sections */
-.layerSection { margin-bottom: 16px; }
+/* Issue 3: Collapsible layer sections */
+.layerSection { margin-bottom: 12px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
 .layerSection:last-child { margin-bottom: 0; }
-.layerSectionHeader { display: flex; align-items: center; gap: 8px; padding: 8px 0; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
-.layerSectionTitle { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
-.layerSectionCount { font-size: 10px; color: var(--text-muted); background: var(--bg-primary); padding: 2px 6px; border-radius: 4px; }
+.layerSection.expanded { border-color: var(--accent-border); }
+.layerSectionHeader { display: flex; align-items: center; gap: 10px; padding: 14px 16px; cursor: default; }
+.layerSectionHeader.collapsible { cursor: pointer; transition: background 0.15s; }
+.layerSectionHeader.collapsible:hover { background: var(--bg-tertiary); }
+.layerHeaderContent { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.layerSectionTitle { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.layerHeaderValue { font-size: 12px; color: var(--text-secondary); }
+.layerHeaderMeta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; margin-right: 8px; }
+.layerAssetCount { font-size: 11px; color: var(--text-muted); }
+.layerStatus { font-size: 11px; font-weight: 500; }
+.layerStatus.on-target { color: var(--success); }
+.layerStatus.off-target { color: var(--text-muted); }
+.expandIcon { font-size: 10px; color: var(--text-muted); width: 16px; text-align: center; }
+.layerSection .holdingsList { padding: 0 12px 12px 12px; border-top: 1px solid var(--border); margin-top: 0; padding-top: 12px; }
 
 /* Overflow menu */
 .overflowContainer { position: relative; }
@@ -446,6 +512,9 @@ body {
 .protectionProgressBar { height: 4px; background: var(--bg-primary); border-radius: 2px; overflow: hidden; }
 .protectionProgressFill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s; }
 .protectionProgressText { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+
+/* Issue 14: Protection header context */
+.protectionHeaderContext { font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
 
 /* Protection cancel confirmation */
 .cancelConfirm { display: flex; align-items: center; gap: 6px; }
@@ -468,7 +537,15 @@ body {
 .warningMessage:first-child { font-weight: 500; }
 .rebalanceTradesCard { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-top: 12px; }
 .rebalanceTradesHeader { font-size: 11px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 10px; }
-.rebalanceTradesList { display: flex; flex-direction: column; gap: 8px; }
+.rebalanceTradesList { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+
+/* Issue 9: Collapsible rebalance summary */
+.rebalanceSummary { display: flex; flex-direction: column; gap: 4px; }
+.rebalanceSummary .summaryLine { font-size: 13px; font-weight: 500; }
+.rebalanceSummary .summaryLine.sell { color: var(--danger); }
+.rebalanceSummary .summaryLine.buy { color: var(--success); }
+.expandTradesBtn { margin-top: 10px; padding: 8px 0; border: none; background: none; color: var(--accent); font-size: 12px; cursor: pointer; text-align: center; width: 100%; transition: color 0.15s; }
+.expandTradesBtn:hover { color: #5a93ff; }
 .rebalanceTradeRow { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .tradeName { flex: 1; color: var(--text-primary); }
 .tradeAmount { font-weight: 500; }

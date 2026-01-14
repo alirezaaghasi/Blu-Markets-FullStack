@@ -190,15 +190,6 @@ export default function App() {
                       <span>{loansSummary.total}</span>
                     </div>
                   )}
-
-                  {/* Stress mode toggle */}
-                  <button
-                    className={`stressModeToggle ${state.stressMode ? 'active' : ''}`}
-                    onClick={() => dispatch({ type: 'SET_STRESS_MODE', payload: { on: !state.stressMode } })}
-                    title={state.stressMode ? 'Click to disable stress mode' : 'Click to enable stress mode (adds extra confirmation for actions)'}
-                  >
-                    {state.stressMode ? '🔴 Stress' : '⚪ Stress'}
-                  </button>
                 </>
               )}
             </div>

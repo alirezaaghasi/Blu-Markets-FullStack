@@ -104,12 +104,28 @@ function Protection({ protections, dispatch }) {
     );
   };
 
+  // Issue 18: Empty state with explanation and CTA
+  // Issue 14: Protection tab context header
   return (
     <div className="card">
-      <h3>Active Protections</h3>
+      <h3>Your Protections</h3>
+      <div className="protectionHeaderContext">
+        If prices drop sharply, you get paid.
+      </div>
 
       {activeProtections.length === 0 && expiredProtections.length === 0 ? (
-        <div className="muted">No assets protected.</div>
+        <div className="emptyState">
+          <div className="emptyIcon">☂️</div>
+          <div className="emptyTitle">No protections yet</div>
+          <div className="emptyDescription">
+            Protection pays you if an asset's price drops significantly — like insurance for your investments.
+          </div>
+          {dispatch && (
+            <button className="btn primary" onClick={() => dispatch({ type: 'START_PROTECT' })}>
+              Protect an Asset
+            </button>
+          )}
+        </div>
       ) : (
         <>
           {/* Active protections */}

@@ -35,29 +35,33 @@ export function classifyActionBoundary({ kind, validation, before, after, stress
 
 /**
  * Returns friction copy based on boundary and action context.
+ * Issue 15: Plain language constraint messages
  * Rebalance gets special messaging when constrained.
  */
 export function frictionCopyForBoundary(boundary, kind = null, meta = {}) {
   // Rebalance-specific messaging when constrained
   if (kind === "REBALANCE" && boundary === "STRUCTURAL") {
-    const messages = ["Target allocation not fully reachable with current constraints."];
+    const messages = ["We couldn't fully rebalance your portfolio."];
 
     if (meta.hasLockedCollateral) {
-      messages.push("Some assets are locked as loan collateral and cannot be sold.");
+      messages.push("Some assets are locked for your loans.");
     }
     if (meta.insufficientCash) {
-      messages.push("Insufficient cash to fully rebalance into underweight layers.");
+      messages.push("Not enough cash to fully balance all layers.");
     }
-    if (meta.residualDrift && meta.residualDrift > 0) {
-      messages.push(`Residual drift remains: ${meta.residualDrift.toFixed(1)}% from target.`);
+    // Issue 15: Hide zero drift, show success message otherwise
+    if (meta.residualDrift && meta.residualDrift > 0.1) {
+      messages.push(`Small drift remains: ${meta.residualDrift.toFixed(1)}% from target.`);
+    } else if (!meta.hasLockedCollateral && !meta.insufficientCash) {
+      return ["Your portfolio is now on target."];
     }
 
     return messages;
   }
 
-  // Default friction copy
+  // Default friction copy - plain language
   if (boundary === "SAFE") return [];
-  if (boundary === "DRIFT") return ["This moves you away from your target allocation. You can proceed or rebalance later."];
-  if (boundary === "STRUCTURAL") return ["This crosses a structural boundary. You can proceed, but you must acknowledge it."];
-  return ["Stress mode: you're making a high-pressure decision. Confirm only if you understand the consequences."];
+  if (boundary === "DRIFT") return ["This moves you slightly away from your target. You can rebalance later."];
+  if (boundary === "STRUCTURAL") return ["This is a bigger move from your target. Please review before confirming."];
+  return ["This is a significant change. Please confirm you understand the impact."];
 }

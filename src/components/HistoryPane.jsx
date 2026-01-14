@@ -192,11 +192,11 @@ function HistoryPane({ ledger }) {
                           <div className="layerChange">
                             <div className="changeRow">
                               <span className="changeLabel">Before:</span>
-                              <span>🛡️{Math.round(entry.details.before.layerPct.FOUNDATION)}% 📈{Math.round(entry.details.before.layerPct.GROWTH)}% 🚀{Math.round(entry.details.before.layerPct.UPSIDE)}%</span>
+                              <span><span className="layerDot foundation"></span> {Math.round(entry.details.before.layerPct.FOUNDATION)}% · <span className="layerDot growth"></span> {Math.round(entry.details.before.layerPct.GROWTH)}% · <span className="layerDot upside"></span> {Math.round(entry.details.before.layerPct.UPSIDE)}%</span>
                             </div>
                             <div className="changeRow">
                               <span className="changeLabel">After:</span>
-                              <span>🛡️{Math.round(entry.details.after.layerPct.FOUNDATION)}% 📈{Math.round(entry.details.after.layerPct.GROWTH)}% 🚀{Math.round(entry.details.after.layerPct.UPSIDE)}%</span>
+                              <span><span className="layerDot foundation"></span> {Math.round(entry.details.after.layerPct.FOUNDATION)}% · <span className="layerDot growth"></span> {Math.round(entry.details.after.layerPct.GROWTH)}% · <span className="layerDot upside"></span> {Math.round(entry.details.after.layerPct.UPSIDE)}%</span>
                             </div>
                           </div>
                           {/* Show constraint notes for rebalance entries */}
@@ -209,7 +209,6 @@ function HistoryPane({ ledger }) {
                           )}
                         </div>
                       )}
-                      <div className="ledgerId">ID: {entry.id}</div>
                     </div>
                   )}
                 </div>

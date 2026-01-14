@@ -33,15 +33,16 @@ export function nowISO() {
 }
 
 // Hoisted to module scope to avoid per-call allocation
+// Issue 4: Full asset names with tickers
 const ASSET_DISPLAY_NAMES = {
-  'IRR_FIXED_INCOME': 'Fixed Income (IRR)',
-  'USDT': 'USDT',
+  'IRR_FIXED_INCOME': 'Iranian Bonds',
+  'USDT': 'Tether (USDT)',
   'GOLD': 'Gold',
-  'BTC': 'Bitcoin',
-  'ETH': 'Ethereum',
-  'QQQ': 'QQQ',
-  'SOL': 'Solana',
-  'TON': 'Toncoin',
+  'BTC': 'Bitcoin (BTC)',
+  'ETH': 'Ethereum (ETH)',
+  'QQQ': 'Nasdaq 100 (QQQ)',
+  'SOL': 'Solana (SOL)',
+  'TON': 'Toncoin (TON)',
 };
 
 export function getAssetDisplayName(assetId) {

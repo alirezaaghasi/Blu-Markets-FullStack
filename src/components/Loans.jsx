@@ -8,64 +8,88 @@ import { formatIRR, getAssetDisplayName } from '../helpers.js';
 function Loans({ loans, dispatch }) {
   const loanList = loans || [];
 
+  // Issue 18: Empty state with explanation and CTA
   if (loanList.length === 0) {
     return (
       <div className="card">
-        <h3>Active Loans</h3>
-        <div className="muted">No active loans.</div>
+        <h3>Your Loans</h3>
+        <div className="emptyState">
+          <div className="emptyIcon">💰</div>
+          <div className="emptyTitle">No active loans</div>
+          <div className="emptyDescription">
+            Borrow against your assets without selling them. Keep your investments while accessing cash.
+          </div>
+          <button className="btn primary" onClick={() => dispatch({ type: 'START_BORROW' })}>
+            Borrow Funds
+          </button>
+        </div>
       </div>
     );
   }
 
-  const getLoanStatus = (loan) => {
-    const ltvPercent = (loan.amountIRR / loan.liquidationIRR) * 100;
-    if (ltvPercent > 75) return { level: 'critical', message: '🔴 Liquidation risk — repay or add collateral' };
-    if (ltvPercent > 60) return { level: 'warning', message: '⚠️ Monitor collateral' };
-    return null;
+  // Issue 5: Enhanced loan status with health bar colors
+  const getLoanHealth = (loan) => {
+    const usedPercent = (loan.amountIRR / loan.liquidationIRR) * 100;
+    if (usedPercent >= 75) return { level: 'critical', color: '#ef4444', message: `If ${getAssetDisplayName(loan.collateralAssetId)} drops ${Math.round(100 - usedPercent)}%, this loan will auto-close.` };
+    if (usedPercent >= 65) return { level: 'warning', color: '#f97316', message: 'Close to limit. Consider repaying soon.' };
+    if (usedPercent >= 50) return { level: 'caution', color: '#fbbf24', message: null };
+    return { level: 'healthy', color: '#34d399', message: null };
   };
 
   const totalLoanAmount = loanList.reduce((sum, l) => sum + l.amountIRR, 0);
 
+  // Issue 17: Consolidate loan header - just show title, total in subtitle
   return (
     <div className="card">
-      <h3>Active Loans ({loanList.length})</h3>
-      {loanList.length > 1 && (
-        <div style={{ marginBottom: 12, padding: '8px 12px', background: 'var(--bg-tertiary)', borderRadius: 8 }}>
-          <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Total borrowed: </span>
-          <span style={{ fontWeight: 600 }}>{formatIRR(totalLoanAmount)}</span>
-        </div>
-      )}
-      <div className="list">
+      <h3>Your Loans</h3>
+      <div className="loanHeaderSummary">
+        Total borrowed: <strong>{formatIRR(totalLoanAmount)}</strong>
+      </div>
+      {/* Issue 5: Redesigned loan cards with health bar */}
+      <div className="loanCards">
         {loanList.map((loan) => {
-          const status = getLoanStatus(loan);
+          const health = getLoanHealth(loan);
+          const usedPercent = (loan.amountIRR / loan.liquidationIRR) * 100;
+
           return (
-            <div
-              key={loan.id}
-              className="item loanItem"
-              style={{ marginBottom: 12, padding: '12px', borderRadius: 8, background: 'var(--bg-secondary)' }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <div style={{ flex: 1 }}>
-                  <div className="loanAmount">{formatIRR(loan.amountIRR)}</div>
-                  <div className="loanDetails">Collateral: {getAssetDisplayName(loan.collateralAssetId)}</div>
-                  <div className="loanUsage">LTV: {Math.round(loan.ltv * 100)}%</div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div className="liquidationValue">{formatIRR(loan.liquidationIRR)}</div>
-                  <div className="muted">Liquidation</div>
+            <div key={loan.id} className={`loanCard ${health.level}`}>
+              <div className="loanCardHeader">
+                <div className="loanCardTitle">
+                  <span className="loanLabel">LOAN</span>
+                  <span className="loanCollateral">{getAssetDisplayName(loan.collateralAssetId)} Collateral</span>
                 </div>
               </div>
-              {status && (
-                <div
-                  className={`loanStatus loanStatus${status.level.charAt(0).toUpperCase() + status.level.slice(1)}`}
-                  style={{ marginBottom: 8 }}
-                >
-                  {status.message}
+
+              <div className="loanCardAmount">
+                <span className="amountLabel">Borrowed:</span>
+                <span className="amountValue">{formatIRR(loan.amountIRR)}</span>
+              </div>
+
+              {/* Health bar */}
+              <div className="loanHealthSection">
+                <div className="healthBarTrack">
+                  <div
+                    className="healthBarFill"
+                    style={{ width: `${Math.min(100, usedPercent)}%`, background: health.color }}
+                  />
+                </div>
+                <div className="healthLabelRow">
+                  <span className="healthPercent" style={{ color: health.color }}>{Math.round(usedPercent)}% used</span>
+                  <span className="healthLimit">Limit: {formatIRR(loan.liquidationIRR)}</span>
+                </div>
+              </div>
+
+              {/* Warning message if applicable */}
+              {health.message && (
+                <div className={`loanWarning ${health.level}`}>
+                  <span className="warningIcon">{health.level === 'critical' ? '⛔' : '⚠'}</span>
+                  <span className="warningText">{health.message}</span>
                 </div>
               )}
+
               <button
                 className="btn primary"
-                style={{ width: '100%' }}
+                style={{ width: '100%', marginTop: 12 }}
                 onClick={() => dispatch({ type: 'START_REPAY', loanId: loan.id })}
               >
                 Repay

@@ -1,6 +1,59 @@
-import React from 'react';
-import { formatIRR, getAssetDisplayName } from '../helpers.js';
+import React, { useState } from 'react';
+import { formatIRR, formatIRRShort, getAssetDisplayName } from '../helpers.js';
 import { ERROR_MESSAGES, BOUNDARY_LABELS } from '../constants/index.js';
+
+/**
+ * Issue 9: Collapsible rebalance trades section with summary
+ */
+function RebalanceTradesSection({ trades, cashDeployed }) {
+  const [expanded, setExpanded] = useState(false);
+
+  // Calculate summary stats
+  const sells = trades.filter(t => t.side === 'SELL');
+  const buys = trades.filter(t => t.side === 'BUY');
+  const sellTotal = sells.reduce((sum, t) => sum + Math.abs(t.amountIRR), 0);
+  const buyTotal = buys.reduce((sum, t) => sum + Math.abs(t.amountIRR), 0);
+
+  return (
+    <div className="rebalanceTradesCard">
+      {/* Summary always visible */}
+      <div className="rebalanceSummary">
+        {sells.length > 0 && (
+          <div className="summaryLine sell">Selling {sells.length} asset{sells.length > 1 ? 's' : ''} ({formatIRRShort(sellTotal)})</div>
+        )}
+        {buys.length > 0 && (
+          <div className="summaryLine buy">Buying {buys.length} asset{buys.length > 1 ? 's' : ''} ({formatIRRShort(buyTotal)})</div>
+        )}
+      </div>
+
+      {/* Expand/collapse toggle */}
+      <button className="expandTradesBtn" onClick={() => setExpanded(!expanded)}>
+        {expanded ? 'Hide trades ▲' : 'See all trades ▼'}
+      </button>
+
+      {/* Detailed trades list when expanded */}
+      {expanded && (
+        <div className="rebalanceTradesList">
+          {trades.map((trade, i) => (
+            <div key={i} className="rebalanceTradeRow">
+              <span className={`layerDot ${trade.layer.toLowerCase()}`}></span>
+              <span className="tradeName">{getAssetDisplayName(trade.assetId)}</span>
+              <span className={`tradeAmount ${trade.side === 'SELL' ? 'sell' : 'buy'}`}>
+                {trade.side === 'SELL' ? '-' : '+'}{formatIRR(Math.floor(Math.abs(trade.amountIRR)))}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {cashDeployed > 0 && (
+        <div className="rebalanceCashSummary">
+          Cash deployed: {formatIRR(Math.floor(cashDeployed))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /**
  * PendingActionModal - Preview and confirm modal for pending actions
@@ -128,14 +181,14 @@ function PendingActionModal({ pendingAction, dispatch }) {
                 <div className="previewColumn">
                   <div className="previewLabel">Before</div>
                   <div className="previewLayers">
-                    🛡️{Math.round(before.layerPct.FOUNDATION)}% 📈{Math.round(before.layerPct.GROWTH)}% 🚀{Math.round(before.layerPct.UPSIDE)}%
+                    <span className="layerDot foundation"></span> {Math.round(before.layerPct.FOUNDATION)}% · <span className="layerDot growth"></span> {Math.round(before.layerPct.GROWTH)}% · <span className="layerDot upside"></span> {Math.round(before.layerPct.UPSIDE)}%
                   </div>
                   <div className="previewTotal">{formatIRR(before.totalIRR)}</div>
                 </div>
                 <div className="previewColumn">
                   <div className="previewLabel">After</div>
                   <div className="previewLayers">
-                    🛡️{Math.round(after.layerPct.FOUNDATION)}% 📈{Math.round(after.layerPct.GROWTH)}% 🚀{Math.round(after.layerPct.UPSIDE)}%
+                    <span className="layerDot foundation"></span> {Math.round(after.layerPct.FOUNDATION)}% · <span className="layerDot growth"></span> {Math.round(after.layerPct.GROWTH)}% · <span className="layerDot upside"></span> {Math.round(after.layerPct.UPSIDE)}%
                   </div>
                   <div className="previewTotal">{formatIRR(after.totalIRR)}</div>
                 </div>
@@ -147,27 +200,9 @@ function PendingActionModal({ pendingAction, dispatch }) {
             </div>
           )}
 
-          {/* Show executed trades for rebalance */}
+          {/* Issue 9: Collapsible rebalance trade preview with summary */}
           {kind === 'REBALANCE' && rebalanceMeta && rebalanceMeta.trades && rebalanceMeta.trades.length > 0 && (
-            <div className="rebalanceTradesCard">
-              <div className="rebalanceTradesHeader">Executed Trades</div>
-              <div className="rebalanceTradesList">
-                {rebalanceMeta.trades.map((trade, i) => (
-                  <div key={i} className="rebalanceTradeRow">
-                    <span className={`layerDot ${trade.layer.toLowerCase()}`}></span>
-                    <span className="tradeName">{getAssetDisplayName(trade.assetId)}</span>
-                    <span className={`tradeAmount ${trade.side === 'SELL' ? 'sell' : 'buy'}`}>
-                      {trade.side === 'SELL' ? '-' : '+'}{formatIRR(Math.floor(Math.abs(trade.amountIRR)))}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              {rebalanceMeta.cashDeployed > 0 && (
-                <div className="rebalanceCashSummary">
-                  Cash deployed: {formatIRR(Math.floor(rebalanceMeta.cashDeployed))}
-                </div>
-              )}
-            </div>
+            <RebalanceTradesSection trades={rebalanceMeta.trades} cashDeployed={rebalanceMeta.cashDeployed} />
           )}
 
           {/* Styled rebalance no trades empty state */}

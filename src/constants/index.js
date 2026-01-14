@@ -9,13 +9,15 @@ export const STAGES = {
   ACTIVE: 'ACTIVE',
 };
 
+// Issue 13: Two-line layer descriptions with tagline + explanation
 export const LAYER_EXPLANATIONS = {
   FOUNDATION: {
     name: 'Foundation',
     nameFa: 'پایه',
     icon: '🛡️',
     assets: ['USDT', 'Fixed Income'],
-    description: 'Stable assets. Your safety net.',
+    tagline: 'Your safety net',
+    description: 'Stable assets that protect you during market drops',
     descriptionFa: 'دارایی‌های پایدار. پشتوانه‌ی امنت.',
   },
   GROWTH: {
@@ -23,7 +25,8 @@ export const LAYER_EXPLANATIONS = {
     nameFa: 'رشد',
     icon: '📈',
     assets: ['Gold', 'BTC', 'QQQ'],
-    description: 'Balanced assets for steady growth.',
+    tagline: 'Steady wealth building',
+    description: 'Balanced assets that grow over time',
     descriptionFa: 'دارایی‌های متعادل برای رشد تدریجی.',
   },
   UPSIDE: {
@@ -31,10 +34,19 @@ export const LAYER_EXPLANATIONS = {
     nameFa: 'رشد بالا',
     icon: '🚀',
     assets: ['ETH', 'SOL', 'TON'],
-    description: 'Higher potential, more ups and downs.',
+    tagline: 'Higher potential returns',
+    description: 'Riskier assets for bigger gains',
     descriptionFa: 'پتانسیل بالاتر، بالا و پایین بیشتر.',
   },
 };
+
+// Issue 11: Onboarding step labels
+export const ONBOARDING_STEPS = [
+  { id: 'welcome', label: 'Welcome' },
+  { id: 'profile', label: 'Profile' },
+  { id: 'amount', label: 'Amount' },
+  { id: 'confirm', label: 'Confirm' },
+];
 
 export const THRESHOLDS = {
   MIN_AMOUNT_IRR: 1_000_000,
@@ -84,11 +96,12 @@ export const PORTFOLIO_STATUS_LABELS = {
   ATTENTION_REQUIRED: 'Attention Required',
 };
 
+// Issue 2: Updated boundary terminology with status style
 export const BOUNDARY_LABELS = {
-  SAFE: 'Safe',
-  DRIFT: 'Drift',
-  STRUCTURAL: 'Structural',
-  STRESS: 'Stress',
+  SAFE: '✓ Looks good',
+  DRIFT: '⚠ Minor drift',
+  STRUCTURAL: '⚠ Needs review',
+  STRESS: '⛔ High risk',
 };
 
 // User-friendly error messages for validation errors
