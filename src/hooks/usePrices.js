@@ -2,22 +2,95 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchAllPrices } from '../services/priceService.js';
 import { DEFAULT_PRICES, DEFAULT_FX_RATE } from '../constants/index.js';
 
+// LocalStorage keys for price caching
+const PRICE_CACHE_KEY = 'blu_prices_cache';
+const FX_CACHE_KEY = 'blu_fx_cache';
+
+/**
+ * Shallow compare two price objects
+ * Returns true if they are equal
+ */
+function shallowEqualPrices(a, b) {
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  for (const key of keysA) {
+    if (a[key] !== b[key]) return false;
+  }
+  return true;
+}
+
+/**
+ * Load cached prices from localStorage
+ */
+function loadCachedPrices() {
+  try {
+    const cached = localStorage.getItem(PRICE_CACHE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      // Validate structure - must have at least some expected keys
+      if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+        return { ...DEFAULT_PRICES, ...parsed };
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to load cached prices:', e);
+  }
+  return DEFAULT_PRICES;
+}
+
+/**
+ * Load cached FX rate from localStorage
+ */
+function loadCachedFxRate() {
+  try {
+    const cached = localStorage.getItem(FX_CACHE_KEY);
+    if (cached) {
+      const parsed = parseFloat(cached);
+      if (!isNaN(parsed) && parsed > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to load cached FX rate:', e);
+  }
+  return DEFAULT_FX_RATE;
+}
+
+/**
+ * Save prices to localStorage cache
+ */
+function cachePrices(prices, fxRate) {
+  try {
+    localStorage.setItem(PRICE_CACHE_KEY, JSON.stringify(prices));
+    localStorage.setItem(FX_CACHE_KEY, String(fxRate));
+  } catch (e) {
+    // Ignore storage errors (quota exceeded, etc.)
+  }
+}
+
 /**
  * usePrices - Hook for live price feeds
  *
  * Optimizations:
+ * - Shallow comparison: Only updates state when prices actually change
+ * - LocalStorage seeding: Loads cached prices on mount for instant display
+ * - Enabled flag: Skips polling when disabled (e.g., during onboarding)
  * - Page Visibility API: Pauses polling when page is hidden
  * - setTimeout-based polling: Avoids overlapping requests on slow networks
  * - AbortController: Cancels in-flight requests on unmount
  * - Exponential backoff on errors (with jitter)
  * - navigator.onLine gating + online/offline event listeners
+ * - Per-service error tracking for smarter backoff
  *
  * @param {number} interval - Base polling interval in ms (default 30000)
+ * @param {boolean} enabled - Whether to enable price polling (default true)
  * @returns {Object} { prices, fxRate, loading, error, lastUpdated, refresh }
  */
-export function usePrices(interval = 30000) {
-  const [prices, setPrices] = useState(DEFAULT_PRICES);
-  const [fxRate, setFxRate] = useState(DEFAULT_FX_RATE);
+export function usePrices(interval = 30000, enabled = true) {
+  // Initialize from localStorage cache for instant display
+  const [prices, setPrices] = useState(loadCachedPrices);
+  const [fxRate, setFxRate] = useState(loadCachedFxRate);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -27,15 +100,20 @@ export function usePrices(interval = 30000) {
   const isMountedRef = useRef(true);
   const isVisibleRef = useRef(true);
   const isOnlineRef = useRef(typeof navigator !== 'undefined' ? navigator.onLine : true);
-  const consecutiveErrorsRef = useRef(0);
+
+  // Per-service error counters for smarter backoff
+  const serviceErrorsRef = useRef({ crypto: 0, stock: 0, fx: 0 });
   const maxBackoffRef = useRef(5 * 60 * 1000); // Max 5 minutes
 
-  // Calculate backoff with jitter
+  // Calculate backoff based on worst-performing service
   const getBackoffDelay = useCallback(() => {
-    if (consecutiveErrorsRef.current === 0) return interval;
+    const errors = serviceErrorsRef.current;
+    const maxErrors = Math.max(errors.crypto, errors.stock, errors.fx);
+    if (maxErrors === 0) return interval;
+
     // Exponential backoff: interval * 2^errors, capped at max
     const backoff = Math.min(
-      interval * Math.pow(2, consecutiveErrorsRef.current),
+      interval * Math.pow(2, maxErrors),
       maxBackoffRef.current
     );
     // Add jitter (±20%)
@@ -44,8 +122,8 @@ export function usePrices(interval = 30000) {
   }, [interval]);
 
   const refresh = useCallback(async () => {
-    // Skip if page is hidden or offline
-    if (!isVisibleRef.current || !isOnlineRef.current) return;
+    // Skip if disabled, page is hidden, or offline
+    if (!enabled || !isVisibleRef.current || !isOnlineRef.current) return;
 
     // Cancel any existing request
     if (abortControllerRef.current) {
@@ -61,19 +139,31 @@ export function usePrices(interval = 30000) {
       // Guard against setting state after unmount
       if (!isMountedRef.current) return;
 
-      // Merge with existing prices (don't lose data if one API fails)
-      setPrices(prev => ({
-        ...prev,
-        ...result.prices,
-      }));
+      // Update per-service error counters
+      const errors = serviceErrorsRef.current;
+      errors.crypto = result.errors.crypto ? errors.crypto + 1 : 0;
+      errors.stock = result.errors.stock ? errors.stock + 1 : 0;
+      errors.fx = result.errors.fx ? errors.fx + 1 : 0;
 
-      if (result.fxRate) {
+      // Shallow compare before updating prices to avoid unnecessary re-renders
+      const newPrices = { ...prices, ...result.prices };
+      setPrices(prev => {
+        if (shallowEqualPrices(prev, newPrices)) {
+          return prev; // Return same reference to avoid re-render
+        }
+        return newPrices;
+      });
+
+      // Only update fxRate if it changed
+      if (result.fxRate && result.fxRate !== fxRate) {
         setFxRate(result.fxRate);
       }
 
+      // Cache successful prices to localStorage
+      cachePrices(newPrices, result.fxRate || fxRate);
+
       setLastUpdated(result.updatedAt);
       setError(null);
-      consecutiveErrorsRef.current = 0; // Reset on success
     } catch (err) {
       // Ignore abort errors
       if (err.name === 'AbortError') return;
@@ -83,14 +173,19 @@ export function usePrices(interval = 30000) {
 
       console.error('Price refresh error:', err);
       setError(err.message);
-      consecutiveErrorsRef.current++; // Increment for backoff
+
+      // Increment all service errors on total failure
+      const errors = serviceErrorsRef.current;
+      errors.crypto++;
+      errors.stock++;
+      errors.fx++;
     } finally {
       // Guard against setting state after unmount
       if (isMountedRef.current) {
         setLoading(false);
       }
     }
-  }, []);
+  }, [enabled, prices, fxRate]);
 
   // Schedule next poll using setTimeout (with backoff on errors)
   const scheduleNextPoll = useCallback(() => {
@@ -98,20 +193,24 @@ export function usePrices(interval = 30000) {
       clearTimeout(timeoutRef.current);
     }
 
-    if (isVisibleRef.current && isMountedRef.current && isOnlineRef.current) {
+    if (enabled && isVisibleRef.current && isMountedRef.current && isOnlineRef.current) {
       const delay = getBackoffDelay();
       timeoutRef.current = setTimeout(async () => {
         await refresh();
         scheduleNextPoll();
       }, delay);
     }
-  }, [refresh, getBackoffDelay]);
+  }, [enabled, refresh, getBackoffDelay]);
 
-  // Initial fetch
+  // Initial fetch (only when enabled)
   useEffect(() => {
     isMountedRef.current = true;
-    if (isOnlineRef.current) {
+
+    if (enabled && isOnlineRef.current) {
       refresh().then(scheduleNextPoll);
+    } else {
+      // Mark as not loading if disabled
+      setLoading(false);
     }
 
     return () => {
@@ -123,7 +222,7 @@ export function usePrices(interval = 30000) {
         abortControllerRef.current.abort();
       }
     };
-  }, [refresh, scheduleNextPoll]);
+  }, [enabled, refresh, scheduleNextPoll]);
 
   // Page Visibility API: Pause polling when page is hidden
   useEffect(() => {
@@ -131,9 +230,9 @@ export function usePrices(interval = 30000) {
       const isVisible = document.visibilityState === 'visible';
       isVisibleRef.current = isVisible;
 
-      if (isVisible && isOnlineRef.current) {
+      if (isVisible && enabled && isOnlineRef.current) {
         // Resume polling when page becomes visible
-        consecutiveErrorsRef.current = 0; // Reset backoff on visibility
+        serviceErrorsRef.current = { crypto: 0, stock: 0, fx: 0 }; // Reset backoff
         refresh().then(scheduleNextPoll);
       } else {
         // Clear pending timeout when page is hidden
@@ -149,14 +248,14 @@ export function usePrices(interval = 30000) {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [refresh, scheduleNextPoll]);
+  }, [enabled, refresh, scheduleNextPoll]);
 
   // Online/Offline event listeners
   useEffect(() => {
     const handleOnline = () => {
       isOnlineRef.current = true;
-      consecutiveErrorsRef.current = 0; // Reset backoff when coming online
-      if (isVisibleRef.current) {
+      serviceErrorsRef.current = { crypto: 0, stock: 0, fx: 0 }; // Reset backoff
+      if (enabled && isVisibleRef.current) {
         refresh().then(scheduleNextPoll);
       }
     };
@@ -177,7 +276,7 @@ export function usePrices(interval = 30000) {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [refresh, scheduleNextPoll]);
+  }, [enabled, refresh, scheduleNextPoll]);
 
   return {
     prices,

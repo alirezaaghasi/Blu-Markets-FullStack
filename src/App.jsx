@@ -1,4 +1,4 @@
-import React, { useMemo, useReducer, useCallback, Suspense, lazy } from 'react';
+import React, { useMemo, useReducer, useCallback, Suspense, lazy, useEffect } from 'react';
 
 // ====== BLU MARKETS v10 ======
 // Architecture: Single reducer + deterministic engine
@@ -98,7 +98,21 @@ export default function App() {
   const [state, dispatch] = useReducer(reducer, null, initialState);
 
   // v10: Live price feeds for quantity-based holdings
-  const { prices, fxRate, loading: pricesLoading, lastUpdated: pricesUpdatedAt, error: pricesError } = usePrices(30000);
+  // Optimization: Disable polling during onboarding to reduce API calls and re-renders
+  const isPricePollingEnabled = state.stage === STAGES.ACTIVE;
+  const { prices, fxRate, loading: pricesLoading, lastUpdated: pricesUpdatedAt, error: pricesError } = usePrices(30000, isPricePollingEnabled);
+
+  // Prefetch likely next tabs after mount to reduce latency on tab switch
+  useEffect(() => {
+    if (state.stage === STAGES.ACTIVE) {
+      // Prefetch Protection and Loans tabs after a short delay
+      const timer = setTimeout(() => {
+        import('./components/Protection.jsx');
+        import('./components/Loans.jsx');
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [state.stage]);
 
   // Memoize snapshot computation - uses live prices for quantity-based holdings
   const snapshot = useMemo(
@@ -143,80 +157,71 @@ export default function App() {
     []
   );
 
-  // Memoize right panel content - pass only specific state slices to avoid
-  // stale UI when unrelated state fields (actionLog, pendingAction, drafts) change
-  // Uses Suspense for code-split tab panels
+  // Memoize onboarding content separately (only depends on onboarding state)
+  const onboardingContent = useMemo(() => (
+    <OnboardingRightPanel
+      stage={state.stage}
+      questionIndex={state.questionnaire.index}
+      targetLayers={state.targetLayerPct}
+      investAmount={state.investAmountIRR}
+      dispatch={dispatch}
+      questionnaireLength={questionnaire.questions.length}
+    />
+  ), [state.stage, state.questionnaire.index, state.targetLayerPct, state.investAmountIRR]);
+
+  // Memoize portfolio tab content (most frequently used)
+  const portfolioContent = useMemo(() => (
+    <PortfolioHome
+      holdings={state.holdings}
+      cashIRR={state.cashIRR}
+      targetLayerPct={state.targetLayerPct}
+      protections={state.protections}
+      loans={state.loans}
+      snapshot={snapshot}
+      portfolioStatus={portfolioStatus}
+      onStartTrade={onStartTrade}
+      onStartProtect={onStartProtect}
+      onStartBorrow={onStartBorrow}
+      onStartRebalance={onStartRebalance}
+      pricesLoading={pricesLoading}
+      pricesUpdatedAt={pricesUpdatedAt}
+      pricesError={pricesError}
+    />
+  ), [state.holdings, state.cashIRR, state.targetLayerPct, state.protections, state.loans, snapshot, portfolioStatus, pricesLoading, pricesUpdatedAt, pricesError, onStartTrade, onStartProtect, onStartBorrow, onStartRebalance]);
+
+  // Memoize history content separately (only depends on ledger)
+  const historyContent = useMemo(() => (
+    <Suspense fallback={<TabLoadingFallback />}>
+      <HistoryPane ledger={state.ledger} />
+    </Suspense>
+  ), [state.ledger]);
+
+  // Select right panel content based on stage and tab
+  // Optimization: Each tab's content is memoized separately to avoid
+  // unnecessary recalculations when unrelated state changes
   const rightContent = useMemo(() => {
     if (state.stage !== STAGES.ACTIVE) {
-      return (
-        <OnboardingRightPanel
-          stage={state.stage}
-          questionIndex={state.questionnaire.index}
-          targetLayers={state.targetLayerPct}
-          investAmount={state.investAmountIRR}
-          dispatch={dispatch}
-          questionnaireLength={questionnaire.questions.length}
-        />
-      );
+      return onboardingContent;
     }
-    // Lazy-loaded tab panels wrapped in Suspense
-    if (state.tab === 'PROTECTION') {
-      return (
-        <Suspense fallback={<TabLoadingFallback />}>
-          <Protection protections={state.protections} dispatch={dispatch} />
-        </Suspense>
-      );
+    switch (state.tab) {
+      case 'PROTECTION':
+        return (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <Protection protections={state.protections} dispatch={dispatch} />
+          </Suspense>
+        );
+      case 'LOANS':
+        return (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <Loans loans={state.loans} holdings={state.holdings} prices={prices} fxRate={fxRate} dispatch={dispatch} />
+          </Suspense>
+        );
+      case 'HISTORY':
+        return historyContent;
+      default:
+        return portfolioContent;
     }
-    if (state.tab === 'LOANS') {
-      return (
-        <Suspense fallback={<TabLoadingFallback />}>
-          <Loans loans={state.loans} holdings={state.holdings} prices={prices} fxRate={fxRate} dispatch={dispatch} />
-        </Suspense>
-      );
-    }
-    if (state.tab === 'HISTORY') {
-      return (
-        <Suspense fallback={<TabLoadingFallback />}>
-          <HistoryPane ledger={state.ledger} />
-        </Suspense>
-      );
-    }
-    // Pass only specific state slices PortfolioHome needs (not whole state object)
-    return (
-      <PortfolioHome
-        holdings={state.holdings}
-        cashIRR={state.cashIRR}
-        targetLayerPct={state.targetLayerPct}
-        protections={state.protections}
-        loans={state.loans}
-        snapshot={snapshot}
-        portfolioStatus={portfolioStatus}
-        onStartTrade={onStartTrade}
-        onStartProtect={onStartProtect}
-        onStartBorrow={onStartBorrow}
-        onStartRebalance={onStartRebalance}
-        pricesLoading={pricesLoading}
-        pricesUpdatedAt={pricesUpdatedAt}
-        pricesError={pricesError}
-      />
-    );
-  }, [
-    state.stage,
-    state.tab,
-    state.questionnaire,
-    state.targetLayerPct,
-    state.investAmountIRR,
-    state.protections,
-    state.loans,
-    state.ledger,
-    state.holdings,
-    state.cashIRR,
-    snapshot,
-    portfolioStatus,
-    pricesLoading,
-    pricesUpdatedAt,
-    pricesError,
-  ]);
+  }, [state.stage, state.tab, state.protections, state.loans, state.holdings, prices, fxRate, onboardingContent, portfolioContent, historyContent]);
 
   // Compute loan summary for header (only when loans exist and not on loans tab)
   const showLoansIndicator = state.stage === STAGES.ACTIVE && (state.loans || []).length > 0 && state.tab !== 'LOANS';
