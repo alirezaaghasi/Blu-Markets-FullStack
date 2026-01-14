@@ -211,6 +211,13 @@ body {
 .projectedLabel { font-size: 11px; color: var(--text-muted); }
 .previewPlaceholder { opacity: 0.5; }
 
+/* Simple summary for non-allocation actions */
+.simpleSummary { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+.summaryRow { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.summaryRow:last-child { border-bottom: none; }
+.summaryLabel { font-size: 13px; color: var(--text-secondary); }
+.summaryValue { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+
 /* Validation */
 .validationDisplay { margin-top: 10px; }
 .validationError { padding: 10px 12px; border-radius: 8px; background: rgba(248, 81, 73, .08); border: 1px solid rgba(248, 81, 73, .2); color: var(--danger); font-size: 12px; margin-bottom: 6px; }

@@ -4,13 +4,18 @@ import { ERROR_MESSAGES, BOUNDARY_LABELS } from '../constants/index.js';
 
 /**
  * PendingActionModal - Preview and confirm modal for pending actions
- * Shows before/after comparison, boundary classification, friction copy
+ *
+ * Simple confirmation for: ADD_FUNDS, PROTECT, BORROW, REPAY
+ * Full before/after preview for: TRADE, REBALANCE
  */
 function PendingActionModal({ pendingAction, dispatch }) {
   if (!pendingAction) return null;
 
   const { kind, payload, before, after, validation, boundary, frictionCopy, rebalanceMeta } = pendingAction;
   const isValid = validation.ok;
+
+  // Only TRADE and REBALANCE affect allocation — show full preview for these
+  const showFullPreview = kind === 'TRADE' || kind === 'REBALANCE';
 
   const getTitle = () => {
     switch (kind) {
@@ -21,6 +26,79 @@ function PendingActionModal({ pendingAction, dispatch }) {
       case 'REPAY': return 'Repay Loan';
       case 'REBALANCE': return 'Rebalance Portfolio';
       default: return kind;
+    }
+  };
+
+  // Simple summary for non-allocation-changing actions
+  const renderSimpleSummary = () => {
+    switch (kind) {
+      case 'ADD_FUNDS':
+        return (
+          <div className="simpleSummary">
+            <div className="summaryRow">
+              <span className="summaryLabel">Amount</span>
+              <span className="summaryValue">{formatIRR(payload.amountIRR)}</span>
+            </div>
+            <div className="summaryRow">
+              <span className="summaryLabel">New cash balance</span>
+              <span className="summaryValue">{formatIRR(after.cashIRR)}</span>
+            </div>
+          </div>
+        );
+
+      case 'PROTECT':
+        const premiumPaid = before.cashIRR - after.cashIRR;
+        return (
+          <div className="simpleSummary">
+            <div className="summaryRow">
+              <span className="summaryLabel">Asset</span>
+              <span className="summaryValue">{getAssetDisplayName(payload.assetId)}</span>
+            </div>
+            <div className="summaryRow">
+              <span className="summaryLabel">Duration</span>
+              <span className="summaryValue">{payload.months} month{payload.months > 1 ? 's' : ''}</span>
+            </div>
+            <div className="summaryRow">
+              <span className="summaryLabel">Premium</span>
+              <span className="summaryValue">{formatIRR(premiumPaid)}</span>
+            </div>
+          </div>
+        );
+
+      case 'BORROW':
+        return (
+          <div className="simpleSummary">
+            <div className="summaryRow">
+              <span className="summaryLabel">Loan amount</span>
+              <span className="summaryValue">{formatIRR(payload.amountIRR)}</span>
+            </div>
+            <div className="summaryRow">
+              <span className="summaryLabel">Collateral</span>
+              <span className="summaryValue">{getAssetDisplayName(payload.assetId)} 🔒</span>
+            </div>
+            <div className="summaryRow">
+              <span className="summaryLabel">New cash balance</span>
+              <span className="summaryValue">{formatIRR(after.cashIRR)}</span>
+            </div>
+          </div>
+        );
+
+      case 'REPAY':
+        return (
+          <div className="simpleSummary">
+            <div className="summaryRow">
+              <span className="summaryLabel">Repay amount</span>
+              <span className="summaryValue">{formatIRR(payload.amountIRR)}</span>
+            </div>
+            <div className="summaryRow">
+              <span className="summaryLabel">Remaining cash</span>
+              <span className="summaryValue">{formatIRR(after.cashIRR)}</span>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
     }
   };
 
@@ -40,28 +118,34 @@ function PendingActionModal({ pendingAction, dispatch }) {
 
       {isValid && (
         <>
-          <div className="previewCard">
-            <div className="previewGrid">
-              <div className="previewColumn">
-                <div className="previewLabel">Before</div>
-                <div className="previewLayers">
-                  🛡️{Math.round(before.layerPct.FOUNDATION)}% 📈{Math.round(before.layerPct.GROWTH)}% 🚀{Math.round(before.layerPct.UPSIDE)}%
+          {/* Simple summary for ADD_FUNDS, PROTECT, BORROW, REPAY */}
+          {!showFullPreview && renderSimpleSummary()}
+
+          {/* Full before/after preview for TRADE and REBALANCE */}
+          {showFullPreview && (
+            <div className="previewCard">
+              <div className="previewGrid">
+                <div className="previewColumn">
+                  <div className="previewLabel">Before</div>
+                  <div className="previewLayers">
+                    🛡️{Math.round(before.layerPct.FOUNDATION)}% 📈{Math.round(before.layerPct.GROWTH)}% 🚀{Math.round(before.layerPct.UPSIDE)}%
+                  </div>
+                  <div className="previewTotal">{formatIRR(before.totalIRR)}</div>
                 </div>
-                <div className="previewTotal">{formatIRR(before.totalIRR)}</div>
+                <div className="previewColumn">
+                  <div className="previewLabel">After</div>
+                  <div className="previewLayers">
+                    🛡️{Math.round(after.layerPct.FOUNDATION)}% 📈{Math.round(after.layerPct.GROWTH)}% 🚀{Math.round(after.layerPct.UPSIDE)}%
+                  </div>
+                  <div className="previewTotal">{formatIRR(after.totalIRR)}</div>
+                </div>
               </div>
-              <div className="previewColumn">
-                <div className="previewLabel">After</div>
-                <div className="previewLayers">
-                  🛡️{Math.round(after.layerPct.FOUNDATION)}% 📈{Math.round(after.layerPct.GROWTH)}% 🚀{Math.round(after.layerPct.UPSIDE)}%
-                </div>
-                <div className="previewTotal">{formatIRR(after.totalIRR)}</div>
+              <div className="projectedBoundary">
+                <span className="projectedLabel">Boundary:</span>
+                <span className={`healthPill ${boundary.toLowerCase()}`}>{BOUNDARY_LABELS[boundary]}</span>
               </div>
             </div>
-            <div className="projectedBoundary">
-              <span className="projectedLabel">Boundary:</span>
-              <span className={`healthPill ${boundary.toLowerCase()}`}>{BOUNDARY_LABELS[boundary]}</span>
-            </div>
-          </div>
+          )}
 
           {/* Show executed trades for rebalance */}
           {kind === 'REBALANCE' && rebalanceMeta && rebalanceMeta.trades && rebalanceMeta.trades.length > 0 && (
@@ -107,8 +191,8 @@ function PendingActionModal({ pendingAction, dispatch }) {
             </div>
           )}
 
-          {/* Standard friction copy for non-rebalance actions */}
-          {!(kind === 'REBALANCE' && boundary === 'STRUCTURAL') && frictionCopy.length > 0 && (
+          {/* Friction copy only for TRADE (not rebalance which has its own) */}
+          {kind === 'TRADE' && frictionCopy.length > 0 && (
             <div className="validationDisplay">
               {frictionCopy.map((msg, i) => <div key={i} className="validationWarning">{msg}</div>)}
             </div>
