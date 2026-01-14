@@ -8,11 +8,13 @@
  * - Consistency checking with penalties
  */
 
-// Question IDs by dimension (v10.1: reduced to 9 questions per guidelines)
-const CAPACITY_QUESTIONS = ['q_income', 'q_buffer', 'q_proportion'];
-const WILLINGNESS_QUESTIONS = ['q_crash_20', 'q_tradeoff', 'q_past_behavior', 'q_max_loss'];
+// Question IDs by dimension (v10.2: 12 questions)
+const CAPACITY_QUESTIONS = ['q_life_stage', 'q_income', 'q_buffer', 'q_proportion'];
+const WILLINGNESS_QUESTIONS = ['q_crash_20', 'q_tradeoff', 'q_past_behavior', 'q_max_loss', 'q_sleep_test'];
 const HORIZON_QUESTION = 'q_horizon';
 const GOAL_QUESTION = 'q_goal';
+const CRASH_QUESTION = 'q_crash_20';
+const CONSISTENCY_QUESTION = 'q_double_check';
 
 /**
  * Calculate weighted average score for a set of questions
@@ -72,18 +74,36 @@ export function calculateSubScores(answers, questionnaire) {
 
 /**
  * Check for inconsistencies between answers
- * v10.1: Simplified - removed double-check question per guidelines
- * Now uses internal consistency of willingness answers
+ * v10.2: Compares crash scenario (q_crash_20) with double-check (q_double_check)
  */
 export function checkConsistency(answers) {
   const penalties = [];
 
-  // Check if crash response and max loss tolerance are consistent
-  const crashAnswer = answers['q_crash_20'];
-  const maxLossAnswer = answers['q_max_loss'];
+  // Q7 (crash) vs Q12 (double check) — should be similar
+  const crashAnswer = answers[CRASH_QUESTION];
+  const doubleCheckAnswer = answers[CONSISTENCY_QUESTION];
 
+  if (crashAnswer && doubleCheckAnswer) {
+    const drift = Math.abs(crashAnswer.score - doubleCheckAnswer.score);
+
+    if (drift > 5) {
+      penalties.push({
+        type: 'inconsistent_panic',
+        amount: -2,
+        message: 'Inconsistent responses to crash scenarios'
+      });
+    } else if (drift > 3) {
+      penalties.push({
+        type: 'mild_inconsistency',
+        amount: -1,
+        message: 'Slightly inconsistent crash responses'
+      });
+    }
+  }
+
+  // Also check crash vs max loss tolerance
+  const maxLossAnswer = answers['q_max_loss'];
   if (crashAnswer && maxLossAnswer) {
-    // If someone says they'd sell everything at -20% but claims to tolerate 30%+ loss
     if (crashAnswer.score <= 2 && maxLossAnswer.score >= 7) {
       penalties.push({
         type: 'inconsistent_loss_tolerance',
