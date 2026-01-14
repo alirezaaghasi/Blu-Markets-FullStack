@@ -208,7 +208,6 @@ function PortfolioHome({ holdings, cashIRR, targetLayerPct, protections, loans, 
                 className="layerSectionHeader collapsible"
                 onClick={() => toggleLayer(layer)}
               >
-                <span className={`layerDot ${layer.toLowerCase()}`}></span>
                 <div className="layerHeaderContent">
                   <span className="layerSectionTitle">{layerInfo.name}</span>
                   <span className="layerHeaderValue">{formatIRRShort(layerTotal)}</span>

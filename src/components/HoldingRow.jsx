@@ -31,10 +31,9 @@ function HoldingRow({ holding, holdingValue, layerInfo, layer, protDays, onStart
       <div className="holdingInfo">
         <div className="holdingName">{getAssetDisplayName(holding.assetId)}</div>
         <div className="holdingLayer">
-          <span className={`layerDot ${layer.toLowerCase()}`}></span>
           {layerInfo.name}
-          {protDays !== null ? ` · ☂️ Protected (${protDays}d)` : ''}
-          {holding.frozen ? ` · 🔒 Locked` : ''}
+          {protDays !== null ? ' · ☂️ Protected (' + protDays + 'd)' : ''}
+          {holding.frozen ? ' · 🔒 Locked' : ''}
         </div>
 
         {/* v10: Show quantity and price for non-fixed-income assets */}

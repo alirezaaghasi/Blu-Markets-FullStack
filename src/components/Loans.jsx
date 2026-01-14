@@ -27,14 +27,15 @@ function Loans({ loans, holdings, prices, fxRate, dispatch }) {
     );
   }
 
-  // Issue 5: Enhanced loan status with health bar colors
-  // v9.10: Color palette compliance - using semantic colors
+  // Issue 5: Enhanced loan status - monochrome health bar
   const getLoanHealth = (loan) => {
     const usedPercent = (loan.amountIRR / loan.liquidationIRR) * 100;
-    if (usedPercent >= 75) return { level: 'critical', color: '#ef4444', message: `If ${getAssetDisplayName(loan.collateralAssetId)} drops ${Math.round(100 - usedPercent)}%, this loan will auto-close.` };
-    if (usedPercent >= 65) return { level: 'warning', color: '#f59e0b', message: 'Close to limit. Consider repaying soon.' };
-    if (usedPercent >= 50) return { level: 'caution', color: '#f59e0b', message: null };
-    return { level: 'healthy', color: '#3b82f6', message: null };
+    // All bars use blue - percentage tells the story
+    const color = '#3B82F6';
+    if (usedPercent >= 75) return { level: 'critical', color, message: `If ${getAssetDisplayName(loan.collateralAssetId)} drops ${Math.round(100 - usedPercent)}%, this loan will auto-close.` };
+    if (usedPercent >= 65) return { level: 'warning', color, message: 'Close to limit. Consider repaying soon.' };
+    if (usedPercent >= 50) return { level: 'caution', color, message: null };
+    return { level: 'healthy', color, message: null };
   };
 
   // Decision 11: Calculate liquidation price in USD for each loan
@@ -86,7 +87,7 @@ function Loans({ loans, holdings, prices, fxRate, dispatch }) {
                   />
                 </div>
                 <div className="healthLabelRow">
-                  <span className="healthPercent" style={{ color: health.color }}>{Math.round(usedPercent)}% used</span>
+                  <span className="healthPercent">{Math.round(usedPercent)}% used</span>
                   <span className="healthLimit">Limit: {formatIRR(loan.liquidationIRR)}</span>
                 </div>
               </div>

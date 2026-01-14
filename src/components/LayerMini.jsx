@@ -11,7 +11,6 @@ function LayerMini({ layer, pct, target }) {
   return (
     <div className="mini">
       <div className="layerHeader">
-        <span className={`layerDot ${layer.toLowerCase()}`}></span>
         <span className="tag">{info.name}</span>
       </div>
       <div className="big" style={{ fontSize: 20 }}>{Math.round(pct)}%</div>

@@ -41,10 +41,8 @@
   --info-bg: rgba(255, 255, 255, 0.05);
   --info-border: rgba(255, 255, 255, 0.1);
 
-  /* === LAYER DOTS (blue opacity scale) === */
-  --layer-foundation: var(--color-primary);
-  --layer-growth: var(--color-primary-muted);
-  --layer-upside: var(--color-primary-faint);
+  /* === LAYER COLORS REMOVED === */
+  /* Layers are now differentiated by position and labels only */
 
   /* === SHADOWS & FONTS === */
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
@@ -150,13 +148,8 @@ body {
 .healthPill.structural { background: rgba(210, 153, 34, .2); color: var(--warning); border: 1px solid rgba(210, 153, 34, .3); }
 .healthPill.stress { background: rgba(248, 81, 73, .12); color: var(--danger); border: 1px solid rgba(248, 81, 73, .2); }
 
-/* Layer dots */
+/* Layer headers - no colored dots */
 .layerHeader { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
-.layerDot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
-.layerDot.foundation { background: var(--layer-foundation); }
-.layerDot.growth { background: var(--layer-growth); }
-.layerDot.upside { background: var(--layer-upside); }
-.layerDot.faded { opacity: 0.4; }
 
 /* Action log */
 .actionLog { display: flex; flex-direction: column; gap: 0; font-size: 13px; line-height: 1.5; }
@@ -169,11 +162,9 @@ body {
 .activityMessage { color: var(--text-secondary); flex: 1; }
 .logEntry { padding: 6px 0; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
 .logEntry:last-child { border-bottom: none; }
-.logEntry.drift { border-left: 2px solid var(--warning); padding-left: 8px; margin-left: -2px; }
-.logEntry.structural { border-left: 2px solid var(--danger); padding-left: 8px; margin-left: -2px; }
-.logBoundaryDot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 6px; }
-.logBoundaryDot.drift { background: var(--warning); }
-.logBoundaryDot.structural { background: var(--danger); }
+/* Removed colored border indicators - all entries look the same */
+.logEntry.drift { }
+.logEntry.structural { }
 
 /* Portfolio value card */
 .portfolioValueCard { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 16px; padding: 24px; margin-bottom: 12px; }
@@ -187,15 +178,13 @@ body {
 .sectionTitle { font-size: 12px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.05em; margin-bottom: 12px; }
 .portfolioValue { font-size: 28px; font-weight: 600; color: var(--text-primary); }
 
-/* v10: Price indicator */
+/* v10: Price indicator - monochrome */
 .priceIndicator { display: flex; align-items: center; gap: 6px; margin-bottom: 16px; padding: 6px 0; }
-.priceIndicatorDot { width: 6px; height: 6px; border-radius: 50%; animation: pulse 2s infinite; }
-.priceIndicator.live .priceIndicatorDot { background: var(--success); }
-.priceIndicator.loading .priceIndicatorDot { background: var(--warning); animation: blink 1s infinite; }
-.priceIndicator.error .priceIndicatorDot { background: var(--text-muted); animation: none; }
+.priceIndicatorDot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); }
+.priceIndicator.live .priceIndicatorDot { background: var(--text-secondary); animation: pulse 2s infinite; }
+.priceIndicator.loading .priceIndicatorDot { animation: blink 1s infinite; }
+.priceIndicator.error .priceIndicatorDot { opacity: 0.5; }
 .priceIndicatorText { font-size: 11px; color: var(--text-secondary); font-weight: 500; }
-.priceIndicator.live .priceIndicatorText { color: var(--success); }
-.priceIndicator.error .priceIndicatorText { color: var(--text-muted); }
 .priceIndicatorTime { font-size: 10px; color: var(--text-muted); margin-left: 4px; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
@@ -203,7 +192,7 @@ body {
 /* v10: Fixed income breakdown */
 .fixedIncomeBreakdown { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 11px; flex-wrap: wrap; }
 .fixedIncomeBreakdown .principal { color: var(--text-secondary); }
-.fixedIncomeBreakdown .accrued { color: var(--success); font-weight: 500; }
+.fixedIncomeBreakdown .accrued { color: var(--text-primary); font-weight: 500; }
 .fixedIncomeBreakdown .daysHeld { color: var(--text-muted); }
 
 /* v10: Quantity and price display */
@@ -323,8 +312,9 @@ body {
 .ledgerList { display: flex; flex-direction: column; gap: 8px; }
 .ledgerEntry { border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: var(--bg-secondary); transition: border-color 0.15s; }
 .ledgerEntry:hover { border-color: var(--border-hover); }
-.ledgerEntry.structural { border-left: 3px solid var(--warning); }
-.ledgerEntry.stress { border-left: 3px solid var(--danger); }
+/* Removed colored borders for ledger entries */
+.ledgerEntry.structural { }
+.ledgerEntry.stress { }
 .ledgerHeader { display: flex; align-items: center; gap: 8px; }
 .ledgerIcon { font-size: 12px; width: 20px; font-weight: 700; color: var(--text-muted); }
 /* v10: All activity dots are gray - monochrome design */
@@ -402,14 +392,15 @@ body {
 .loanStatusCritical { background: rgba(239, 68, 68, 0.15); color: #f87171; }
 .loanHealthIndicator { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
 .loanHealthBar { flex: 1; height: 6px; background: var(--bg-primary); border-radius: 3px; overflow: hidden; }
-.loanHealthFill { height: 100%; border-radius: 3px; transition: width 0.3s, background 0.3s; }
-.loanHealthFill.healthy { background: var(--success); }
-.loanHealthFill.warning { background: var(--warning); }
-.loanHealthFill.critical { background: var(--danger); }
-.loanHealthText { font-size: 11px; font-weight: 500; min-width: 40px; text-align: right; }
-.loanHealthText.healthy { color: var(--success); }
-.loanHealthText.warning { color: var(--warning); }
-.loanHealthText.critical { color: var(--danger); }
+.loanHealthFill { height: 100%; border-radius: 3px; transition: width 0.3s; background: var(--color-primary); }
+/* All health states use same blue bar - percentage tells the story */
+.loanHealthFill.healthy { background: var(--color-primary); }
+.loanHealthFill.warning { background: var(--color-primary); }
+.loanHealthFill.critical { background: var(--color-primary); }
+.loanHealthText { font-size: 11px; font-weight: 500; min-width: 40px; text-align: right; color: var(--text-secondary); }
+.loanHealthText.healthy { color: var(--text-secondary); }
+.loanHealthText.warning { color: var(--text-secondary); }
+.loanHealthText.critical { color: var(--text-secondary); }
 
 /* Issue 5: Redesigned loan cards with health bar */
 .loanCards { display: flex; flex-direction: column; gap: 12px; }
@@ -478,7 +469,7 @@ body {
 .progressStep .stepLabel { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
 .progressStep.current .stepNumber { background: var(--accent); border-color: var(--accent); color: white; }
 .progressStep.current .stepLabel { color: var(--text-primary); font-weight: 500; }
-.progressStep.completed .stepNumber { background: var(--success); border-color: var(--success); color: white; }
+.progressStep.completed .stepNumber { background: var(--color-primary-muted); border-color: var(--color-primary-muted); color: white; }
 .progressStep.completed .stepLabel { color: var(--text-secondary); }
 .welcomeCard { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 14px; padding: 24px; text-align: center; }
 .welcomeIcon { font-size: 48px; margin-bottom: 14px; }
@@ -517,9 +508,10 @@ body {
 .allocationPreviewCard h3 { margin: 0 0 14px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); font-weight: 500; }
 .allocationViz { display: flex; gap: 2px; height: 40px; margin-bottom: 16px; border-radius: 6px; overflow: hidden; }
 .allocationBar { display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.allocationBar.foundation { background: var(--layer-foundation); }
-.allocationBar.growth { background: var(--layer-growth); }
-.allocationBar.upside { background: var(--layer-upside); }
+/* All allocation bars use blue with varying opacity */
+.allocationBar.foundation { background: var(--color-primary); }
+.allocationBar.growth { background: var(--color-primary-muted); }
+.allocationBar.upside { background: var(--color-primary-faint); }
 .barIcon { font-size: 14px; }
 .barPct { font-size: 11px; font-weight: 500; }
 .allocationDetails { display: flex; flex-direction: column; gap: 10px; }
@@ -569,10 +561,11 @@ body {
 
 /* Holdings */
 .holdingsList { display: flex; flex-direction: column; gap: 8px; }
-.holdingRow { display: flex; align-items: center; padding: 14px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 0; border-left-width: 3px; border-left-style: solid; gap: 12px; }
-.holdingRow.layer-foundation { border-left-color: #34d399; }
-.holdingRow.layer-growth { border-left-color: #60a5fa; }
-.holdingRow.layer-upside { border-left-color: #fbbf24; }
+.holdingRow { display: flex; align-items: center; padding: 14px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 0; gap: 12px; }
+/* Removed colored left borders - layers distinguished by grouping only */
+.holdingRow.layer-foundation { }
+.holdingRow.layer-growth { }
+.holdingRow.layer-upside { }
 .holdingRow.assetEmpty { opacity: 0.5; background: repeating-linear-gradient(45deg, var(--bg-secondary), var(--bg-secondary) 10px, rgba(255, 255, 255, 0.02) 10px, rgba(255, 255, 255, 0.02) 20px); }
 .holdingRow.assetEmpty .holdingName { color: var(--text-muted); }
 .holdingRow.assetEmpty .holdingValue { color: var(--text-muted); }
@@ -608,7 +601,7 @@ body {
 .layerHeaderMeta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; margin-right: 8px; }
 .layerAssetCount { font-size: 11px; color: var(--text-muted); }
 .layerStatus { font-size: 11px; font-weight: 500; }
-.layerStatus.on-target { color: var(--success); }
+.layerStatus.on-target { color: var(--text-secondary); }
 .layerStatus.off-target { color: var(--text-muted); }
 .expandIcon { font-size: 10px; color: var(--text-muted); width: 16px; text-align: center; }
 .layerSection .holdingsList { padding: 0 12px 12px 12px; border-top: 1px solid var(--border); margin-top: 0; padding-top: 12px; }
@@ -806,9 +799,10 @@ body {
   border-radius: 50%;
 }
 
-.layer-dot.foundation { background: var(--layer-foundation); }
-.layer-dot.growth { background: var(--layer-growth); }
-.layer-dot.upside { background: var(--layer-upside); }
+/* Layer dots use blue opacity scale */
+.layer-dot.foundation { background: var(--color-primary); }
+.layer-dot.growth { background: var(--color-primary-muted); }
+.layer-dot.upside { background: var(--color-primary-faint); }
 
 .layer-name {
   font-size: 13px;
@@ -835,22 +829,23 @@ body {
   transition: width 0.5s ease;
 }
 
-.layer-fill.foundation { background: var(--layer-foundation); }
-.layer-fill.growth { background: var(--layer-growth); }
-.layer-fill.upside { background: var(--layer-upside); }
+/* All layer fills use blue scale */
+.layer-fill.foundation { background: var(--color-primary); }
+.layer-fill.growth { background: var(--color-primary-muted); }
+.layer-fill.upside { background: var(--color-primary-faint); }
 
 /* Limiting Factor */
 .limiting-factor {
   text-align: center;
   padding: 12px;
-  background: rgba(74, 222, 128, 0.1);
+  background: var(--bg-tertiary);
   border-radius: 8px;
-  border: 1px solid rgba(74, 222, 128, 0.2);
+  border: 1px solid var(--border);
 }
 
 .limiting-factor .factor-label {
   font-size: 13px;
-  color: rgba(74, 222, 128, 0.9);
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -883,8 +878,8 @@ body {
 .profile-result .continue-btn {
   width: 100%;
   padding: 16px;
-  background: #4ade80;
-  color: #000;
+  background: var(--color-primary);
+  color: white;
   font-size: 16px;
   font-weight: 600;
   border: none;
@@ -894,7 +889,7 @@ body {
 }
 
 .profile-result .continue-btn:hover {
-  background: var(--accent-hover);
+  background: var(--color-primary-hover);
 }
 
 /* =============================================
@@ -924,7 +919,7 @@ body {
 
 .progress-bar-fill {
   height: 100%;
-  background: #4ade80;
+  background: var(--color-primary);
   border-radius: 2px;
   transition: width 0.3s ease;
 }
