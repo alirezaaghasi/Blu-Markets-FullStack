@@ -582,9 +582,59 @@ function OnboardingControls({ state, dispatch, questionnaire, prices, fxRate }) 
   }
 
   if (state.rebalanceDraft) {
+    const gap = state.rebalanceDraft.gapAnalysis;
+    const showCashOption = gap && gap.hasFrozenAssets && gap.remainingGapPct > 0 && gap.currentCash > 0;
+    const showAddFundsSuggestion = gap && gap.hasFrozenAssets && gap.remainingGapPct > 0 && !gap.cashSufficient && gap.cashShortfall > 0;
+
     return (
       <ActionCard title="Rebalance">
-        <div className="muted">Reallocate assets to target. Cash will be deployed to underweight layers.</div>
+        <div className="muted">Reallocate assets to match your target allocation.</div>
+
+        {/* Show constraint warning if locked assets prevent full rebalance */}
+        {gap && gap.hasFrozenAssets && gap.remainingGapPct > 0 && (
+          <div className="rebalanceGapWarning">
+            <div className="gapWarningIcon">🔒</div>
+            <div className="gapWarningText">
+              Locked collateral limits this rebalance. Best achievable: {gap.remainingGapPct}% from target.
+            </div>
+          </div>
+        )}
+
+        {/* Cash option checkbox */}
+        {showCashOption && (
+          <div className="rebalanceCashOption">
+            <label className="cashOptionLabel">
+              <input
+                type="checkbox"
+                checked={state.rebalanceDraft.useCash || false}
+                onChange={(e) => dispatch({ type: 'SET_REBALANCE_USE_CASH', useCash: e.target.checked })}
+              />
+              <span className="cashOptionText">
+                {gap.cashSufficient
+                  ? `Use ${formatIRR(gap.cashNeededForPerfectBalance)} cash for perfect balance`
+                  : `Use ${formatIRR(gap.currentCash)} cash to get closer`
+                }
+              </span>
+            </label>
+          </div>
+        )}
+
+        {/* Add funds suggestion */}
+        {showAddFundsSuggestion && !state.rebalanceDraft.useCash && (
+          <div className="rebalanceAddFundsSuggestion">
+            <div className="suggestionIcon">💡</div>
+            <div className="suggestionText">
+              Add {formatIRR(gap.cashShortfall)} to reach perfect balance.
+            </div>
+            <button
+              className="btn small"
+              onClick={() => dispatch({ type: 'START_ADD_FUNDS' })}
+            >
+              Add Funds
+            </button>
+          </div>
+        )}
+
         <div className="row" style={{ marginTop: 10 }}>
           <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_REBALANCE', prices, fxRate })}>Preview</button>
           <button className="btn" onClick={() => dispatch({ type: 'CANCEL_PENDING' })}>Cancel</button>
@@ -599,7 +649,7 @@ function OnboardingControls({ state, dispatch, questionnaire, prices, fxRate }) 
       <div className="footerActions">
         <div className="footerRowPrimary">
           <button className="btn primary" onClick={() => dispatch({ type: 'START_ADD_FUNDS' })}>Add Funds</button>
-          <button className="btn" onClick={() => dispatch({ type: 'START_REBALANCE' })}>Rebalance</button>
+          <button className="btn" onClick={() => dispatch({ type: 'START_REBALANCE', prices, fxRate })}>Rebalance</button>
           <MoreMenu
             isOpen={moreMenuOpen}
             onToggle={() => setMoreMenuOpen(!moreMenuOpen)}

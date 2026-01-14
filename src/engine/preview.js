@@ -1,8 +1,195 @@
 import { computeSnapshot } from "./snapshot.js";
 import { calcPremiumIRR, calcLiquidationIRR } from "./pricing.js";
 import { ASSET_LAYER } from "../state/domain.js";
-import { COLLATERAL_LTV_BY_LAYER, LAYERS, DEFAULT_PRICES, DEFAULT_FX_RATE } from "../constants/index.js";
+import { COLLATERAL_LTV_BY_LAYER, LAYERS, DEFAULT_PRICES, DEFAULT_FX_RATE, WEIGHTS } from "../constants/index.js";
 import { irrToFixedIncomeUnits } from "./fixedIncome.js";
+
+/**
+ * Calculate rebalance gap - determines if locked collateral prevents full rebalancing
+ * and how much additional capital could close the gap.
+ *
+ * @param {Object} state - Current state
+ * @param {Object} prices - Current asset prices
+ * @param {number} fxRate - USD/IRR exchange rate
+ * @returns {Object} Gap analysis with cash requirements
+ */
+export function calculateRebalanceGap(state, prices = DEFAULT_PRICES, fxRate = DEFAULT_FX_RATE) {
+  const snap = computeSnapshot(state.holdings, state.cashIRR, prices, fxRate);
+  const holdingsTotal = snap.holdingsIRR || 1;
+  const assetIRRMap = snap.holdingsIRRByAsset || {};
+
+  // Find frozen (locked) assets and their values
+  const frozenByLayer = { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
+  const unfrozenByLayer = { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
+  let hasFrozenAssets = false;
+
+  for (const h of state.holdings) {
+    const layer = ASSET_LAYER[h.assetId];
+    const holdingIRR = assetIRRMap[h.assetId] || 0;
+    if (layer && holdingIRR > 0) {
+      if (h.frozen) {
+        frozenByLayer[layer] += holdingIRR;
+        hasFrozenAssets = true;
+      } else {
+        unfrozenByLayer[layer] += holdingIRR;
+      }
+    }
+  }
+
+  // Current layer values
+  const currentIRR = { ...snap.layerIRR };
+
+  // Target values for current holdings total
+  const targetIRR = {};
+  for (const layer of LAYERS) {
+    targetIRR[layer] = (state.targetLayerPct[layer] / 100) * holdingsTotal;
+  }
+
+  // Simulate what HOLDINGS_ONLY rebalance can achieve
+  // Constraint: Cannot sell frozen assets
+  const achievableIRR = { ...currentIRR };
+
+  // Calculate how much we can actually move from overweight layers
+  let totalMovable = 0;
+  const movableFromLayer = {};
+
+  for (const layer of LAYERS) {
+    const surplus = Math.max(0, currentIRR[layer] - targetIRR[layer]);
+    // Can only sell unfrozen portion of surplus
+    const movable = Math.min(surplus, unfrozenByLayer[layer]);
+    movableFromLayer[layer] = movable;
+    totalMovable += movable;
+  }
+
+  // Calculate deficits
+  let totalDeficit = 0;
+  const deficitByLayer = {};
+  for (const layer of LAYERS) {
+    const deficit = Math.max(0, targetIRR[layer] - currentIRR[layer]);
+    deficitByLayer[layer] = deficit;
+    totalDeficit += deficit;
+  }
+
+  // Amount that can actually be rebalanced
+  const actuallyMovable = Math.min(totalMovable, totalDeficit);
+
+  // Apply the moves to get achievable allocation
+  if (actuallyMovable > 0 && totalMovable > 0 && totalDeficit > 0) {
+    // Subtract from overweight (proportionally)
+    for (const layer of LAYERS) {
+      if (movableFromLayer[layer] > 0) {
+        const proportion = movableFromLayer[layer] / totalMovable;
+        achievableIRR[layer] -= actuallyMovable * proportion;
+      }
+    }
+    // Add to underweight (proportionally)
+    for (const layer of LAYERS) {
+      if (deficitByLayer[layer] > 0) {
+        const proportion = deficitByLayer[layer] / totalDeficit;
+        achievableIRR[layer] += actuallyMovable * proportion;
+      }
+    }
+  }
+
+  // Convert achievable to percentages
+  const achievablePct = {};
+  for (const layer of LAYERS) {
+    achievablePct[layer] = Math.round((achievableIRR[layer] / holdingsTotal) * 100);
+  }
+
+  // Calculate remaining gap after HOLDINGS_ONLY rebalance
+  let remainingGapPct = 0;
+  const gapByLayer = {};
+  for (const layer of LAYERS) {
+    const gap = Math.abs(achievablePct[layer] - state.targetLayerPct[layer]);
+    gapByLayer[layer] = gap;
+    remainingGapPct += gap;
+  }
+
+  // Calculate how much cash would achieve perfect balance
+  // If a layer is X% overweight due to frozen assets, adding capital to other layers
+  // dilutes that layer's percentage
+  //
+  // Math: If frozen layer has value F and is at P% but should be T%,
+  // we need total portfolio value V where F/V = T%
+  // V = F / (T/100)
+  // Cash needed = V - currentTotal
+
+  let cashNeededForPerfectBalance = 0;
+
+  if (hasFrozenAssets && remainingGapPct > 0) {
+    // Find the layer with frozen assets that's overweight
+    for (const layer of LAYERS) {
+      if (frozenByLayer[layer] > 0) {
+        const targetPct = state.targetLayerPct[layer] / 100;
+        const frozenValue = frozenByLayer[layer];
+        // This frozen amount should be targetPct of total
+        // frozenValue = targetPct * requiredTotal
+        // requiredTotal = frozenValue / targetPct
+        const requiredTotal = frozenValue / targetPct;
+        const additionalNeeded = requiredTotal - holdingsTotal;
+        if (additionalNeeded > cashNeededForPerfectBalance) {
+          cashNeededForPerfectBalance = additionalNeeded;
+        }
+      }
+    }
+  }
+
+  // Round up to avoid floating point issues
+  cashNeededForPerfectBalance = Math.ceil(cashNeededForPerfectBalance);
+
+  // Check if current cash is sufficient
+  const currentCash = state.cashIRR;
+  const cashSufficient = currentCash >= cashNeededForPerfectBalance;
+  const cashShortfall = Math.max(0, cashNeededForPerfectBalance - currentCash);
+
+  // Determine if using available cash would help (even if not perfect)
+  let cashWouldHelp = false;
+  let partialCashBenefit = 0;
+
+  if (currentCash > 0 && remainingGapPct > 0) {
+    // Simulate adding current cash - would it reduce the gap?
+    const newTotal = holdingsTotal + currentCash;
+    let newGapPct = 0;
+    for (const layer of LAYERS) {
+      const newLayerPct = (achievableIRR[layer] / newTotal) * 100;
+      // Cash goes to underweight layers, so they get closer to target
+      newGapPct += Math.abs(newLayerPct - state.targetLayerPct[layer]);
+    }
+    if (newGapPct < remainingGapPct) {
+      cashWouldHelp = true;
+      partialCashBenefit = remainingGapPct - newGapPct;
+    }
+  }
+
+  return {
+    // Current state
+    hasFrozenAssets,
+    frozenByLayer,
+    currentPct: snap.layerPct,
+
+    // After HOLDINGS_ONLY rebalance
+    achievablePct,
+    remainingGapPct: Math.round(remainingGapPct),
+    gapByLayer,
+
+    // Perfect balance requirements
+    canAchievePerfectBalance: remainingGapPct < 1,
+    cashNeededForPerfectBalance,
+
+    // Current cash analysis
+    currentCash,
+    cashSufficient,
+    cashShortfall: Math.ceil(cashShortfall),
+
+    // Partial cash usage
+    cashWouldHelp,
+    partialCashBenefit: Math.round(partialCashBenefit),
+
+    // For UI display
+    targetPct: state.targetLayerPct,
+  };
+}
 
 export function cloneState(state) {
   return {
@@ -126,19 +313,22 @@ export function previewRepay(state, { loanId, amountIRR }) {
 /**
  * Deterministic rebalance for prototype:
  * - HOLDINGS_ONLY mode: Sell from overweight layers, buy into underweight layers. Cash untouched.
- * - HOLDINGS_PLUS_CASH mode: Also deploy cash into underweight layers.
+ * - HOLDINGS_PLUS_CASH mode: Also deploy cash into underweight layers (legacy).
+ * - SMART mode: First do HOLDINGS_ONLY, then use specified cash amount to fill remaining gaps.
  * - Never sells frozen collateral.
  * - Leaves residual drift if constrained.
  * Returns state with _rebalanceMeta for constraint messaging.
  * v10: Updated to use quantity-based holdings with prices
+ * v10.2: Added SMART mode with useCashAmount for constrained rebalancing
  *
  * @param {Object} state - Current state
  * @param {Object} params - Rebalance parameters
- * @param {string} params.mode - 'HOLDINGS_ONLY' or 'HOLDINGS_PLUS_CASH'
+ * @param {string} params.mode - 'HOLDINGS_ONLY', 'HOLDINGS_PLUS_CASH', or 'SMART'
+ * @param {number} params.useCashAmount - For SMART mode: specific amount of cash to deploy (optional)
  * @param {Object} params.prices - Current asset prices in USD (optional)
  * @param {number} params.fxRate - USD/IRR exchange rate (optional)
  */
-export function previewRebalance(state, { mode, prices = DEFAULT_PRICES, fxRate = DEFAULT_FX_RATE }) {
+export function previewRebalance(state, { mode, useCashAmount = 0, prices = DEFAULT_PRICES, fxRate = DEFAULT_FX_RATE }) {
   const next = cloneState(state);
   const snap = computeSnapshot(next.holdings, next.cashIRR, prices, fxRate);
   const holdingsTotal = snap.holdingsIRR || 1;
@@ -282,6 +472,161 @@ export function previewRebalance(state, { mode, prices = DEFAULT_PRICES, fxRate 
             side: 'BUY',
           });
         }
+      }
+    }
+  }
+
+  // SMART mode: First do HOLDINGS_ONLY, then deploy specified cash to fill remaining gaps
+  // This is used when locked collateral prevents full rebalancing
+  if (mode === "SMART") {
+    // Step 1: Execute HOLDINGS_ONLY logic (same as above)
+    const surpluses = {};
+    const deficits = {};
+
+    for (const layer of LAYERS) {
+      const diff = curIRR[layer] - targetIRR[layer];
+      if (diff > 0) {
+        surpluses[layer] = diff;
+      } else if (diff < 0) {
+        deficits[layer] = Math.abs(diff);
+      }
+    }
+
+    const totalSurplus = Object.values(surpluses).reduce((a, b) => a + b, 0);
+    const totalDeficit = Object.values(deficits).reduce((a, b) => a + b, 0);
+    const amountToMove = Math.min(totalSurplus, totalDeficit);
+
+    if (amountToMove > 0) {
+      // SELL from overweight (excluding frozen)
+      const sellByLayer = {};
+      for (const layer of Object.keys(surpluses)) {
+        const layerSell = Math.min(surpluses[layer], (surpluses[layer] / totalSurplus) * amountToMove);
+        sellByLayer[layer] = layerSell;
+      }
+
+      for (const layer of Object.keys(sellByLayer)) {
+        let toSell = sellByLayer[layer];
+        if (toSell <= 0) continue;
+
+        const assets = sellableByLayer[layer];
+        if (!assets.length) continue;
+
+        const layerTotal = assets.reduce((sum, h) => sum + (h._computedIRR || 0), 0);
+        for (const h of assets) {
+          const holdingIRR = h._computedIRR || 0;
+          const proportion = holdingIRR / layerTotal;
+          const sellAmountIRR = Math.min(toSell * proportion, holdingIRR);
+          if (sellAmountIRR > 0) {
+            if (h.assetId === 'IRR_FIXED_INCOME') {
+              h.quantity -= irrToFixedIncomeUnits(sellAmountIRR);
+            } else {
+              const priceUSD = prices[h.assetId] || DEFAULT_PRICES[h.assetId] || 1;
+              h.quantity -= sellAmountIRR / (priceUSD * fxRate);
+            }
+            h.quantity = Math.max(0, h.quantity);
+            meta.trades.push({ layer, assetId: h.assetId, amountIRR: -sellAmountIRR, side: 'SELL' });
+          }
+        }
+      }
+
+      // BUY into underweight
+      for (const layer of Object.keys(deficits)) {
+        const layerBuy = (deficits[layer] / totalDeficit) * amountToMove;
+        if (layerBuy <= 0) continue;
+
+        const assets = holdingsByLayer[layer];
+        if (!assets.length) continue;
+
+        const perAssetIRR = layerBuy / assets.length;
+        for (const h of assets) {
+          if (h.assetId === 'IRR_FIXED_INCOME') {
+            h.quantity += irrToFixedIncomeUnits(perAssetIRR);
+          } else {
+            const priceUSD = prices[h.assetId] || DEFAULT_PRICES[h.assetId] || 1;
+            h.quantity += perAssetIRR / (priceUSD * fxRate);
+          }
+          meta.trades.push({ layer, assetId: h.assetId, amountIRR: perAssetIRR, side: 'BUY' });
+        }
+      }
+    }
+
+    // Step 2: If useCashAmount > 0, deploy that cash to fill remaining gaps
+    if (useCashAmount > 0 && next.cashIRR >= useCashAmount) {
+      // Recompute holdings total after step 1
+      const midSnap = computeSnapshot(next.holdings, next.cashIRR, prices, fxRate);
+      const midHoldingsTotal = midSnap.holdingsIRR || 1;
+      const midLayerIRR = midSnap.layerIRR;
+
+      // Calculate new total with cash added
+      const newTotal = midHoldingsTotal + useCashAmount;
+
+      // New target IRR values based on expanded total
+      const newTargetIRR = {
+        FOUNDATION: (state.targetLayerPct.FOUNDATION / 100) * newTotal,
+        GROWTH: (state.targetLayerPct.GROWTH / 100) * newTotal,
+        UPSIDE: (state.targetLayerPct.UPSIDE / 100) * newTotal,
+      };
+
+      // Calculate how much each layer needs to reach new target
+      const cashDeficits = {};
+      let totalCashDeficit = 0;
+
+      for (const layer of LAYERS) {
+        const deficit = Math.max(0, newTargetIRR[layer] - midLayerIRR[layer]);
+        cashDeficits[layer] = deficit;
+        totalCashDeficit += deficit;
+      }
+
+      // Distribute cash proportionally to underweight layers
+      if (totalCashDeficit > 0) {
+        const actualSpend = Math.min(useCashAmount, totalCashDeficit, next.cashIRR);
+
+        for (const layer of LAYERS) {
+          if (cashDeficits[layer] <= 0) continue;
+
+          const portion = actualSpend * (cashDeficits[layer] / totalCashDeficit);
+          if (portion <= 0) continue;
+
+          const assets = holdingsByLayer[layer];
+          if (!assets.length) continue;
+
+          // Distribute according to layer weights
+          const layerWeights = WEIGHTS[layer] || {};
+          const weightedAssets = assets.filter(h => layerWeights[h.assetId]);
+
+          if (weightedAssets.length > 0) {
+            // Use weights
+            const totalWeight = Object.values(layerWeights).reduce((a, b) => a + b, 0);
+            for (const h of weightedAssets) {
+              const assetWeight = layerWeights[h.assetId] || 0;
+              const assetPortion = portion * (assetWeight / totalWeight);
+              if (assetPortion > 0) {
+                if (h.assetId === 'IRR_FIXED_INCOME') {
+                  h.quantity += irrToFixedIncomeUnits(assetPortion);
+                } else {
+                  const priceUSD = prices[h.assetId] || DEFAULT_PRICES[h.assetId] || 1;
+                  h.quantity += assetPortion / (priceUSD * fxRate);
+                }
+                meta.trades.push({ layer, assetId: h.assetId, amountIRR: assetPortion, side: 'BUY' });
+              }
+            }
+          } else {
+            // Fallback: distribute evenly
+            const perAssetIRR = portion / assets.length;
+            for (const h of assets) {
+              if (h.assetId === 'IRR_FIXED_INCOME') {
+                h.quantity += irrToFixedIncomeUnits(perAssetIRR);
+              } else {
+                const priceUSD = prices[h.assetId] || DEFAULT_PRICES[h.assetId] || 1;
+                h.quantity += perAssetIRR / (priceUSD * fxRate);
+              }
+              meta.trades.push({ layer, assetId: h.assetId, amountIRR: perAssetIRR, side: 'BUY' });
+            }
+          }
+        }
+
+        meta.cashDeployed = actualSpend;
+        next.cashIRR -= actualSpend;
       }
     }
   }

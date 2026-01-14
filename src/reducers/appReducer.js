@@ -23,6 +23,7 @@ import {
   previewBorrow,
   previewRepay,
   previewRebalance,
+  calculateRebalanceGap,
 } from '../engine/preview.js';
 
 import { ASSETS } from '../state/domain.js';
@@ -452,10 +453,47 @@ export function reducer(state, action) {
     // ====== REBALANCE ======
     case 'START_REBALANCE': {
       if (state.stage !== STAGES.ACTIVE) return state;
+      // Calculate rebalance gap to determine if locked assets prevent full rebalancing
+      const prices = action.prices || DEFAULT_PRICES;
+      const fxRate = action.fxRate || DEFAULT_FX_RATE;
+      const gapAnalysis = calculateRebalanceGap(state, prices, fxRate);
+
       return {
         ...state,
-        rebalanceDraft: { mode: 'HOLDINGS_ONLY' },  // Fixed: Don't use cash wallet
+        rebalanceDraft: {
+          mode: 'HOLDINGS_ONLY',
+          useCash: false,  // User opt-in for using cash
+          useCashAmount: 0,
+          gapAnalysis,  // Store gap analysis for UI display
+        },
         pendingAction: null,
+      };
+    }
+
+    case 'SET_REBALANCE_USE_CASH': {
+      if (!state.rebalanceDraft) return state;
+      const useCash = Boolean(action.useCash);
+      const gapAnalysis = state.rebalanceDraft.gapAnalysis;
+
+      // Calculate how much cash to use
+      let useCashAmount = 0;
+      if (useCash && gapAnalysis) {
+        if (gapAnalysis.cashSufficient) {
+          // Use exactly what's needed for perfect balance
+          useCashAmount = gapAnalysis.cashNeededForPerfectBalance;
+        } else {
+          // Use all available cash to get as close as possible
+          useCashAmount = gapAnalysis.currentCash;
+        }
+      }
+
+      return {
+        ...state,
+        rebalanceDraft: {
+          ...state.rebalanceDraft,
+          useCash,
+          useCashAmount,
+        },
       };
     }
 
@@ -464,7 +502,18 @@ export function reducer(state, action) {
       // v10: Include prices and fxRate for quantity-based rebalance execution
       const prices = action.prices || DEFAULT_PRICES;
       const fxRate = action.fxRate || DEFAULT_FX_RATE;
-      const payload = { mode: state.rebalanceDraft?.mode || 'HOLDINGS_ONLY', prices, fxRate };
+
+      // Determine mode and cash usage based on user selection
+      const draft = state.rebalanceDraft || {};
+      const useCash = draft.useCash && draft.useCashAmount > 0;
+
+      const payload = {
+        mode: useCash ? 'SMART' : 'HOLDINGS_ONLY',
+        prices,
+        fxRate,
+        useCashAmount: useCash ? draft.useCashAmount : 0,
+      };
+
       const validation = validateRebalance(payload);
       const afterState = validation.ok ? previewRebalance(state, payload) : cloneState(state);
       return { ...state, pendingAction: buildPending(state, 'REBALANCE', payload, validation, afterState) };
