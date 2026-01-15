@@ -8,10 +8,47 @@
  *
  * Optimizations:
  * - AbortController support for cancellable requests
+ * - Request timeouts to prevent long-hanging requests
  */
 
 import { ASSET_META } from '../state/domain.js';
 import { DEFAULT_FX_RATE } from '../constants/index.js';
+
+// Default timeout for API requests (8 seconds)
+const DEFAULT_TIMEOUT_MS = 8000;
+
+/**
+ * Fetch with timeout support
+ * Creates a race between the fetch and a timeout abort
+ * @param {string} url - URL to fetch
+ * @param {AbortSignal} signal - External abort signal (optional)
+ * @param {number} timeoutMs - Timeout in milliseconds
+ * @returns {Promise<Response>}
+ */
+async function fetchWithTimeout(url, signal, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  // Create combined signal if external signal provided
+  const combinedSignal = signal
+    ? AbortSignal.any
+      ? AbortSignal.any([signal, controller.signal])
+      : controller.signal // Fallback for older browsers
+    : controller.signal;
+
+  try {
+    const response = await fetch(url, { signal: combinedSignal });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    // Distinguish between external abort and timeout
+    if (error.name === 'AbortError' && !signal?.aborted) {
+      throw new Error(`Request timeout after ${timeoutMs}ms`);
+    }
+    throw error;
+  }
+}
 
 // Build CoinGecko IDs map from ASSET_META (single source of truth)
 const COINGECKO_IDS = Object.fromEntries(
@@ -38,7 +75,7 @@ export async function fetchCryptoPrices(signal) {
   const url = `https://api.coingecko.com/api/v3/simple/price?ids=${COINGECKO_IDS_STRING}&vs_currencies=usd`;
 
   try {
-    const response = await fetch(url, { signal });
+    const response = await fetchWithTimeout(url, signal);
     if (!response.ok) throw new Error(`CoinGecko error: ${response.status}`);
 
     const data = await response.json();
@@ -80,7 +117,7 @@ export async function fetchStockPrice(symbol = 'QQQ', signal) {
   const url = `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`;
 
   try {
-    const response = await fetch(url, { signal });
+    const response = await fetchWithTimeout(url, signal);
     if (!response.ok) throw new Error(`Finnhub error: ${response.status}`);
 
     const data = await response.json();
@@ -111,7 +148,7 @@ export async function fetchStockPrice(symbol = 'QQQ', signal) {
 export async function fetchUsdIrrRate(signal) {
   try {
     // Community scraper API
-    const response = await fetch('https://bonbast.amirhn.com/latest', { signal });
+    const response = await fetchWithTimeout('https://bonbast.amirhn.com/latest', signal);
 
     if (!response.ok) {
       console.warn('Bonbast API unavailable, using fallback rate');

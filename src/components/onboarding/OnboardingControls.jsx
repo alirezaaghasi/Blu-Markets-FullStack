@@ -114,7 +114,7 @@ function QuestionnaireProgress({ currentQuestion, totalQuestions }) {
  * Handles questionnaire, consent flow, investment amount, and action forms
  * v10: Updated for new 12-question questionnaire with ProfileResult screen
  */
-function OnboardingControls({ state, dispatch, questionnaire, prices, fxRate }) {
+function OnboardingControls({ state, dispatch, prices, fxRate }) {
   const [consentText, setConsentText] = useState('');
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [showingProfile, setShowingProfile] = useState(true); // v10: Show profile before consent

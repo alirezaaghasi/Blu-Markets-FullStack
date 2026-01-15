@@ -2,6 +2,44 @@ import React, { useRef, useEffect, useMemo } from 'react';
 import { formatTime, formatIRRShort, getAssetDisplayName } from '../helpers.js';
 
 /**
+ * Format activity message with verb-first plain language
+ * Moved outside component to prevent recreation on each render
+ */
+function formatActivityMessage(entry) {
+  switch (entry.type) {
+    case 'PORTFOLIO_CREATED':
+      return `Started with ${formatIRRShort(entry.amountIRR)}`;
+    case 'ADD_FUNDS':
+      return `Added ${formatIRRShort(entry.amountIRR)} cash`;
+    case 'TRADE':
+      return entry.side === 'BUY'
+        ? `Bought ${getAssetDisplayName(entry.assetId)} (${formatIRRShort(entry.amountIRR)})`
+        : `Sold ${getAssetDisplayName(entry.assetId)} (${formatIRRShort(entry.amountIRR)})`;
+    case 'BORROW':
+      return `Borrowed ${formatIRRShort(entry.amountIRR)} against ${getAssetDisplayName(entry.assetId)}`;
+    case 'REPAY':
+      return `Repaid ${formatIRRShort(entry.amountIRR)} loan`;
+    case 'PROTECT':
+      return `Protected ${getAssetDisplayName(entry.assetId)} for ${entry.months}mo`;
+    case 'REBALANCE':
+      return `Rebalanced portfolio`;
+    case 'CANCEL_PROTECTION':
+      return `Cancelled ${getAssetDisplayName(entry.assetId)} protection`;
+    default:
+      return entry.type;
+  }
+}
+
+/**
+ * Get CSS class for boundary indicator
+ * Moved outside component to prevent recreation on each render
+ */
+function getBoundaryClass(entry) {
+  if (!entry.boundary || entry.boundary === 'SAFE') return '';
+  return entry.boundary.toLowerCase();
+}
+
+/**
  * ActionLogPane - Displays recent actions in a scrollable log
  * Shows last 10 actions with boundary indicators
  */
@@ -28,55 +66,15 @@ function ActionLogPane({ actionLog }) {
     );
   }
 
-  // Decision 15: Format activity message with verb-first plain language
-  const formatActivityMessage = (entry) => {
-    switch (entry.type) {
-      case 'PORTFOLIO_CREATED':
-        return `Started with ${formatIRRShort(entry.amountIRR)}`;
-      case 'ADD_FUNDS':
-        return `Added ${formatIRRShort(entry.amountIRR)} cash`;
-      case 'TRADE':
-        return entry.side === 'BUY'
-          ? `Bought ${getAssetDisplayName(entry.assetId)} (${formatIRRShort(entry.amountIRR)})`
-          : `Sold ${getAssetDisplayName(entry.assetId)} (${formatIRRShort(entry.amountIRR)})`;
-      case 'BORROW':
-        return `Borrowed ${formatIRRShort(entry.amountIRR)} against ${getAssetDisplayName(entry.assetId)}`;
-      case 'REPAY':
-        return `Repaid ${formatIRRShort(entry.amountIRR)} loan`;
-      case 'PROTECT':
-        return `Protected ${getAssetDisplayName(entry.assetId)} for ${entry.months}mo`;
-      case 'REBALANCE':
-        return `Rebalanced portfolio`;
-      case 'CANCEL_PROTECTION':
-        return `Cancelled ${getAssetDisplayName(entry.assetId)} protection`;
-      default:
-        return entry.type;
-    }
-  };
-
-  const renderLogEntry = (entry) => {
-    const time = formatTime(entry.timestamp);
-    const message = formatActivityMessage(entry);
-
-    return (
-      <div className="activityItem">
-        <span className="activityDot">●</span>
-        <span className="activityTime">{time}</span>
-        <span className="activityMessage">{message}</span>
-      </div>
-    );
-  };
-
-  const getBoundaryClass = (entry) => {
-    if (!entry.boundary || entry.boundary === 'SAFE') return '';
-    return entry.boundary.toLowerCase();
-  };
-
   return (
     <div className="actionLog" ref={logRef}>
       {recentActions.map((entry) => (
         <div key={entry.id} className={`logEntry ${getBoundaryClass(entry)}`}>
-          {renderLogEntry(entry)}
+          <div className="activityItem">
+            <span className="activityDot">●</span>
+            <span className="activityTime">{formatTime(entry.timestamp)}</span>
+            <span className="activityMessage">{formatActivityMessage(entry)}</span>
+          </div>
         </div>
       ))}
     </div>

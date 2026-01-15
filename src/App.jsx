@@ -35,9 +35,9 @@ import { formatIRR, formatIRRShort } from './helpers.js';
 // Reducer imports
 import { reducer, initialState } from './reducers/appReducer.js';
 
-// Data imports (questionnaire for onboarding)
-// Note: OnboardingControls also imports this directly, so we keep static import for prop passing
-import questionnaire from './data/questionnaire.v2.fa.json';
+// Questionnaire metadata only - full questionnaire is loaded lazily in onboarding components
+// This avoids bundling the full JSON for users who skip onboarding
+import { QUESTIONNAIRE_LENGTH } from './data/questionnaireMetadata.js';
 
 // Component imports (core - minimal for initial render)
 import {
@@ -188,7 +188,7 @@ export default function App() {
         targetLayers={state.targetLayerPct}
         investAmount={state.investAmountIRR}
         dispatch={dispatch}
-        questionnaireLength={questionnaire.questions.length}
+        questionnaireLength={QUESTIONNAIRE_LENGTH}
       />
     </Suspense>
   ), [state.stage, state.questionnaire.index, state.targetLayerPct, state.investAmountIRR]);
@@ -275,7 +275,7 @@ export default function App() {
             <ActionLogPane actionLog={state.actionLog} />
           </div>
           <div className="footer">
-            <OnboardingControls state={state} dispatch={dispatch} questionnaire={questionnaire} prices={prices} fxRate={fxRate} />
+            <OnboardingControls state={state} dispatch={dispatch} prices={prices} fxRate={fxRate} />
           </div>
         </div>
 

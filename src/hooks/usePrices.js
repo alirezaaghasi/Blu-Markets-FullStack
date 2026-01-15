@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchAllPrices } from '../services/priceService.js';
 import { DEFAULT_PRICES, DEFAULT_FX_RATE } from '../constants/index.js';
+import { createTabCoordinator } from '../utils/tabCoordinator.js';
 
 // LocalStorage keys for price caching
 const PRICE_CACHE_KEY = 'blu_prices_cache';
@@ -82,6 +83,7 @@ function cachePrices(prices, fxRate) {
  * - Exponential backoff on errors (with jitter)
  * - navigator.onLine gating + online/offline event listeners
  * - Per-service error tracking for smarter backoff
+ * - Multi-tab coordination: Only one tab polls, others receive broadcasts
  *
  * @param {number} interval - Base polling interval in ms (default 30000)
  * @param {boolean} enabled - Whether to enable price polling (default true)
@@ -100,6 +102,7 @@ export function usePrices(interval = 30000, enabled = true) {
   const isMountedRef = useRef(true);
   const isVisibleRef = useRef(true);
   const isOnlineRef = useRef(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const coordinatorRef = useRef(null);
 
   // Per-service error counters for smarter backoff
   const serviceErrorsRef = useRef({ crypto: 0, stock: 0, fx: 0 });
@@ -152,27 +155,36 @@ export function usePrices(interval = 30000, enabled = true) {
       errors.stock = result.errors.stock ? errors.stock + 1 : 0;
       errors.fx = result.errors.fx ? errors.fx + 1 : 0;
 
+      // Compute new values upfront so we can cache them correctly
+      // (refs still hold old values until next render)
+      const computedPrices = { ...pricesRef.current, ...result.prices };
+      const computedFxRate = result.fxRate || fxRateRef.current;
+
       // Use functional update with shallow compare to avoid unnecessary re-renders
       let pricesChanged = false;
       setPrices(prev => {
-        const newPrices = { ...prev, ...result.prices };
-        if (shallowEqualPrices(prev, newPrices)) {
+        if (shallowEqualPrices(prev, computedPrices)) {
           return prev; // Return same reference to avoid re-render
         }
         pricesChanged = true;
-        return newPrices;
+        return computedPrices;
       });
 
       // Only update fxRate if it changed
       let fxChanged = false;
       if (result.fxRate && result.fxRate !== fxRateRef.current) {
-        setFxRate(result.fxRate);
+        setFxRate(computedFxRate);
         fxChanged = true;
       }
 
-      // Only cache when prices or fxRate actually changed
+      // Cache using computed values (not stale refs)
       if (pricesChanged || fxChanged) {
-        cachePrices(pricesRef.current, result.fxRate || fxRateRef.current);
+        cachePrices(computedPrices, computedFxRate);
+
+        // Broadcast to other tabs if we're the leader
+        if (coordinatorRef.current?.isLeader) {
+          coordinatorRef.current.broadcastPrices(computedPrices, computedFxRate, result.updatedAt);
+        }
       }
 
       setLastUpdated(result.updatedAt);
@@ -216,11 +228,41 @@ export function usePrices(interval = 30000, enabled = true) {
   }, [enabled, refresh, getBackoffDelay]);
 
   // Initial fetch (only when enabled)
+  // Multi-tab coordination: only leader tab polls, followers receive broadcasts
   useEffect(() => {
     isMountedRef.current = true;
 
+    // Create tab coordinator for multi-tab price sync
+    coordinatorRef.current = createTabCoordinator();
+
+    // Set up callback to receive prices from leader tab
+    coordinatorRef.current.onPricesReceived((newPrices, newFxRate, updatedAt) => {
+      if (!isMountedRef.current) return;
+
+      // Update state with broadcast prices
+      setPrices(prev => {
+        const merged = { ...prev, ...newPrices };
+        if (shallowEqualPrices(prev, merged)) return prev;
+        return merged;
+      });
+
+      if (newFxRate && newFxRate !== fxRateRef.current) {
+        setFxRate(newFxRate);
+      }
+
+      setLastUpdated(updatedAt);
+      setLoading(false);
+      setError(null);
+    });
+
     if (enabled && isOnlineRef.current) {
-      refresh().then(scheduleNextPoll);
+      // Only poll if we're the leader tab
+      if (coordinatorRef.current.isLeader) {
+        refresh().then(scheduleNextPoll);
+      } else {
+        // Follower tab: just mark as not loading (will receive broadcasts)
+        setLoading(false);
+      }
     } else {
       // Mark as not loading if disabled
       setLoading(false);
@@ -234,6 +276,11 @@ export function usePrices(interval = 30000, enabled = true) {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
+      // Clean up coordinator
+      if (coordinatorRef.current) {
+        coordinatorRef.current.cleanup();
+        coordinatorRef.current = null;
+      }
     };
   }, [enabled, refresh, scheduleNextPoll]);
 
@@ -244,9 +291,17 @@ export function usePrices(interval = 30000, enabled = true) {
       isVisibleRef.current = isVisible;
 
       if (isVisible && enabled && isOnlineRef.current) {
-        // Resume polling when page becomes visible
-        serviceErrorsRef.current = { crypto: 0, stock: 0, fx: 0 }; // Reset backoff
-        refresh().then(scheduleNextPoll);
+        // Only resume polling if we're the leader
+        if (coordinatorRef.current?.isLeader) {
+          serviceErrorsRef.current = { crypto: 0, stock: 0, fx: 0 }; // Reset backoff
+          refresh().then(scheduleNextPoll);
+        } else if (coordinatorRef.current) {
+          // Try to become leader in case previous leader closed
+          if (coordinatorRef.current.tryBecomeLeader()) {
+            serviceErrorsRef.current = { crypto: 0, stock: 0, fx: 0 };
+            refresh().then(scheduleNextPoll);
+          }
+        }
       } else {
         // Clear pending timeout when page is hidden
         if (timeoutRef.current) {
@@ -268,7 +323,9 @@ export function usePrices(interval = 30000, enabled = true) {
     const handleOnline = () => {
       isOnlineRef.current = true;
       serviceErrorsRef.current = { crypto: 0, stock: 0, fx: 0 }; // Reset backoff
-      if (enabled && isVisibleRef.current) {
+
+      // Only poll if we're the leader
+      if (enabled && isVisibleRef.current && coordinatorRef.current?.isLeader) {
         refresh().then(scheduleNextPoll);
       }
     };

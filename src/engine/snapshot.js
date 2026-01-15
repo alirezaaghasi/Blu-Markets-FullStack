@@ -37,12 +37,30 @@ function computeHoldingValue(holding, prices, fxRate) {
  * Compute portfolio snapshot from holdings and cash.
  * Supports live prices for quantity-based holdings.
  *
+ * Performance notes:
+ * - This function is memoized in App.jsx via useMemo
+ * - Caller should gate calls (e.g., skip during onboarding with empty holdings)
+ * - Single O(n) loop where n = holdings count (typically 6-8 assets)
+ *
  * @param {Array} holdings - Array of { assetId, quantity, frozen, purchasedAt? }
  * @param {number} cashIRR - Cash balance in IRR
  * @param {Object} prices - Current asset prices in USD (optional)
  * @param {number} fxRate - USD/IRR exchange rate (optional)
  */
 export function computeSnapshot(holdings, cashIRR, prices = DEFAULT_PRICES, fxRate = DEFAULT_FX_RATE) {
+  // Early return for empty holdings (no computation needed)
+  if (!holdings || holdings.length === 0) {
+    return {
+      totalIRR: cashIRR,
+      holdingsIRR: 0,
+      cashIRR,
+      holdingsIRRByAsset: {},
+      holdingValues: [],
+      layerPct: { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
+      layerIRR: { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
+    };
+  }
+
   const holdingsIRRByAsset = {};
   const holdingValues = [];
   let holdingsTotal = 0;
