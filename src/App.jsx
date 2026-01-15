@@ -16,17 +16,28 @@ import { computePortfolioStatus } from './engine/portfolioStatus.js';
 // Hook imports
 import { usePrices } from './hooks/usePrices.js';
 
-// Data imports (consolidated to single v2 questionnaire)
-import questionnaire from './data/questionnaire.v2.fa.json';
-
 // Constants imports
 import { STAGES } from './constants/index.js';
+
+// Empty snapshot for onboarding stage (avoid computation when not needed)
+const EMPTY_SNAPSHOT = {
+  holdingsIRR: 0,
+  cashIRR: 0,
+  totalIRR: 0,
+  layerIRR: { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
+  layerPct: { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
+  holdingsIRRByAsset: {},
+};
 
 // Utility imports
 import { formatIRR, formatIRRShort } from './helpers.js';
 
 // Reducer imports
 import { reducer, initialState } from './reducers/appReducer.js';
+
+// Data imports (questionnaire for onboarding)
+// Note: OnboardingControls also imports this directly, so we keep static import for prop passing
+import questionnaire from './data/questionnaire.v2.fa.json';
 
 // Component imports (core - minimal for initial render)
 import {
@@ -123,10 +134,13 @@ export default function App() {
   }, [state.stage]);
 
   // Memoize snapshot computation - uses live prices for quantity-based holdings
-  const snapshot = useMemo(
-    () => computeSnapshot(state.holdings, state.cashIRR, prices, fxRate),
-    [state.holdings, state.cashIRR, prices, fxRate]
-  );
+  // Optimization: Skip computation during onboarding when holdings are empty
+  const snapshot = useMemo(() => {
+    if (state.stage !== STAGES.ACTIVE && state.holdings.length === 0) {
+      return EMPTY_SNAPSHOT;
+    }
+    return computeSnapshot(state.holdings, state.cashIRR, prices, fxRate);
+  }, [state.stage, state.holdings, state.cashIRR, prices, fxRate]);
 
   // Memoize portfolio status - reused by header and PortfolioHome
   const portfolioStatus = useMemo(

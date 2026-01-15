@@ -88,6 +88,31 @@ export function getAssetDisplayName(assetId) {
 }
 
 /**
+ * Get asset price in USD with fallback to defaults
+ * Centralized helper to eliminate repeated fallback pattern across codebase
+ * @param {string} assetId - Asset identifier
+ * @param {Object} prices - Current prices in USD (optional)
+ * @returns {number} Price in USD
+ */
+export function getAssetPriceUSD(assetId, prices = DEFAULT_PRICES) {
+  return prices[assetId] ?? DEFAULT_PRICES[assetId] ?? 0;
+}
+
+/**
+ * Build a holdings lookup map for O(1) access by assetId
+ * Use this instead of repeated .find() calls in hot paths
+ * @param {Array} holdings - Array of holdings
+ * @returns {Object} Map of assetId -> holding
+ */
+export function buildHoldingsMap(holdings) {
+  const map = {};
+  for (const h of holdings) {
+    map[h.assetId] = h;
+  }
+  return map;
+}
+
+/**
  * Compute holding value in IRR from quantity (v10)
  * Centralized helper used by validate.js and OnboardingControls.jsx
  * @param {Object} holding - Holding with quantity
@@ -101,6 +126,6 @@ export function getHoldingValueIRR(holding, prices = DEFAULT_PRICES, fxRate = DE
     const breakdown = calculateFixedIncomeValue(holding.quantity, holding.purchasedAt);
     return breakdown.total;
   }
-  const priceUSD = prices[holding.assetId] || DEFAULT_PRICES[holding.assetId] || 0;
+  const priceUSD = getAssetPriceUSD(holding.assetId, prices);
   return Math.round(holding.quantity * priceUSD * fxRate);
 }

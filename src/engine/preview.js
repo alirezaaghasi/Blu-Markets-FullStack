@@ -3,6 +3,7 @@ import { calcPremiumIRR, calcLiquidationIRR } from "./pricing.js";
 import { ASSET_LAYER } from "../state/domain.js";
 import { COLLATERAL_LTV_BY_LAYER, LAYERS, DEFAULT_PRICES, DEFAULT_FX_RATE, WEIGHTS } from "../constants/index.js";
 import { irrToFixedIncomeUnits } from "./fixedIncome.js";
+import { getAssetPriceUSD } from "../helpers.js";
 
 /**
  * Calculate rebalance gap - determines if locked collateral prevents full rebalancing
@@ -39,36 +40,32 @@ export function calculateRebalanceGap(state, prices = DEFAULT_PRICES, fxRate = D
   // Current layer values
   const currentIRR = { ...snap.layerIRR };
 
-  // Target values for current holdings total
+  // Consolidated single-pass calculation of targets, movables, and deficits
   const targetIRR = {};
+  const movableFromLayer = {};
+  const deficitByLayer = {};
+  let totalMovable = 0;
+  let totalDeficit = 0;
+
   for (const layer of LAYERS) {
+    // Target values for current holdings total
     targetIRR[layer] = (state.targetLayerPct[layer] / 100) * holdingsTotal;
+
+    // Calculate surplus and movable amount (can only sell unfrozen portion)
+    const surplus = Math.max(0, currentIRR[layer] - targetIRR[layer]);
+    const movable = Math.min(surplus, unfrozenByLayer[layer]);
+    movableFromLayer[layer] = movable;
+    totalMovable += movable;
+
+    // Calculate deficit
+    const deficit = Math.max(0, targetIRR[layer] - currentIRR[layer]);
+    deficitByLayer[layer] = deficit;
+    totalDeficit += deficit;
   }
 
   // Simulate what HOLDINGS_ONLY rebalance can achieve
   // Constraint: Cannot sell frozen assets
   const achievableIRR = { ...currentIRR };
-
-  // Calculate how much we can actually move from overweight layers
-  let totalMovable = 0;
-  const movableFromLayer = {};
-
-  for (const layer of LAYERS) {
-    const surplus = Math.max(0, currentIRR[layer] - targetIRR[layer]);
-    // Can only sell unfrozen portion of surplus
-    const movable = Math.min(surplus, unfrozenByLayer[layer]);
-    movableFromLayer[layer] = movable;
-    totalMovable += movable;
-  }
-
-  // Calculate deficits
-  let totalDeficit = 0;
-  const deficitByLayer = {};
-  for (const layer of LAYERS) {
-    const deficit = Math.max(0, targetIRR[layer] - currentIRR[layer]);
-    deficitByLayer[layer] = deficit;
-    totalDeficit += deficit;
-  }
 
   // Amount that can actually be rebalanced
   const actuallyMovable = Math.min(totalMovable, totalDeficit);
@@ -262,7 +259,7 @@ export function previewTrade(state, { side, assetId, amountIRR, prices = DEFAULT
     quantityChange = irrToFixedIncomeUnits(amountIRR);
   } else {
     // Regular assets: quantity = amountIRR / (priceUSD × fxRate)
-    const priceUSD = prices[assetId] || DEFAULT_PRICES[assetId] || 1;
+    const priceUSD = getAssetPriceUSD(assetId, prices) || 1;
     quantityChange = amountIRR / (priceUSD * fxRate);
   }
 
@@ -366,7 +363,7 @@ function executeSells(surpluses, totalSurplus, amountToMove, sellableByLayer, pr
         if (h.assetId === 'IRR_FIXED_INCOME') {
           h.quantity -= irrToFixedIncomeUnits(sellAmountIRR);
         } else {
-          const priceUSD = prices[h.assetId] || DEFAULT_PRICES[h.assetId] || 1;
+          const priceUSD = getAssetPriceUSD(h.assetId, prices) || 1;
           h.quantity -= sellAmountIRR / (priceUSD * fxRate);
         }
         h.quantity = Math.max(0, h.quantity);
@@ -400,7 +397,7 @@ function executeBuys(deficits, totalDeficit, amountToAllocate, holdingsByLayer, 
           if (h.assetId === 'IRR_FIXED_INCOME') {
             h.quantity += irrToFixedIncomeUnits(assetPortionIRR);
           } else {
-            const priceUSD = prices[h.assetId] || DEFAULT_PRICES[h.assetId] || 1;
+            const priceUSD = getAssetPriceUSD(h.assetId, prices) || 1;
             h.quantity += assetPortionIRR / (priceUSD * fxRate);
           }
           meta.trades.push({ layer, assetId: h.assetId, amountIRR: assetPortionIRR, side: 'BUY' });
@@ -412,7 +409,7 @@ function executeBuys(deficits, totalDeficit, amountToAllocate, holdingsByLayer, 
         if (h.assetId === 'IRR_FIXED_INCOME') {
           h.quantity += irrToFixedIncomeUnits(perAssetIRR);
         } else {
-          const priceUSD = prices[h.assetId] || DEFAULT_PRICES[h.assetId] || 1;
+          const priceUSD = getAssetPriceUSD(h.assetId, prices) || 1;
           h.quantity += perAssetIRR / (priceUSD * fxRate);
         }
         meta.trades.push({ layer, assetId: h.assetId, amountIRR: perAssetIRR, side: 'BUY' });

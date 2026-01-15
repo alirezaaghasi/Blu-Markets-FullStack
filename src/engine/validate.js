@@ -18,9 +18,9 @@ export function validateAddFunds({ amountIRR }) {
 
 export function validateTrade({ side, assetId, amountIRR, prices, fxRate }, state) {
   if (!["BUY", "SELL"].includes(side)) return fail("INVALID_SIDE");
-  if (!state.holdings.some((h) => h.assetId === assetId)) return fail("INVALID_ASSET");
   if (!Number.isFinite(amountIRR) || amountIRR <= 0) return fail("INVALID_AMOUNT");
 
+  // Single lookup instead of .some() + .find()
   const h = state.holdings.find((x) => x.assetId === assetId);
   if (!h) return fail("INVALID_ASSET");
 
@@ -41,10 +41,9 @@ export function validateTrade({ side, assetId, amountIRR, prices, fxRate }, stat
 }
 
 export function validateProtect({ assetId, months, prices, fxRate }, state) {
-  // Asset validation
-  if (!state.holdings.some((h) => h.assetId === assetId)) {
-    return fail("INVALID_ASSET");
-  }
+  // Single lookup instead of .some() + .find()
+  const h = state.holdings.find((x) => x.assetId === assetId);
+  if (!h) return fail("INVALID_ASSET");
 
   // Eligibility validation (must have liquid derivative markets)
   if (!PROTECTION_ELIGIBLE_ASSETS.includes(assetId)) {
@@ -57,9 +56,8 @@ export function validateProtect({ assetId, months, prices, fxRate }, state) {
   }
 
   // Notional validation - v10: compute value from quantity
-  const h = state.holdings.find((x) => x.assetId === assetId);
   const holdingValueIRR = getHoldingValueIRR(h, prices, fxRate);
-  if (!h || holdingValueIRR <= 0) {
+  if (holdingValueIRR <= 0) {
     return fail("NO_NOTIONAL");
   }
 
@@ -92,9 +90,9 @@ export function validateProtect({ assetId, months, prices, fxRate }, state) {
 }
 
 export function validateBorrow({ assetId, amountIRR, prices, fxRate }, state) {
-  if (!state.holdings.some((h) => h.assetId === assetId)) return fail("INVALID_ASSET");
   if (!Number.isFinite(amountIRR) || amountIRR <= 0) return fail("INVALID_AMOUNT");
 
+  // Single lookup instead of .some() + .find()
   const h = state.holdings.find((x) => x.assetId === assetId);
   if (!h) return fail("INVALID_ASSET");
   if (h.frozen) return fail("ASSET_ALREADY_FROZEN");
