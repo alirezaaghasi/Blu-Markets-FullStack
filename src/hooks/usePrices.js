@@ -105,6 +105,12 @@ export function usePrices(interval = 30000, enabled = true) {
   const serviceErrorsRef = useRef({ crypto: 0, stock: 0, fx: 0 });
   const maxBackoffRef = useRef(5 * 60 * 1000); // Max 5 minutes
 
+  // Store current prices/fxRate in refs to avoid refresh callback dependency churn
+  const pricesRef = useRef(prices);
+  const fxRateRef = useRef(fxRate);
+  pricesRef.current = prices;
+  fxRateRef.current = fxRate;
+
   // Calculate backoff based on worst-performing service
   const getBackoffDelay = useCallback(() => {
     const errors = serviceErrorsRef.current;
@@ -121,6 +127,7 @@ export function usePrices(interval = 30000, enabled = true) {
     return Math.round(backoff + jitter);
   }, [interval]);
 
+  // Stabilized refresh callback - uses refs to avoid dependency on prices/fxRate
   const refresh = useCallback(async () => {
     // Skip if disabled, page is hidden, or offline
     if (!enabled || !isVisibleRef.current || !isOnlineRef.current) return;
@@ -145,22 +152,28 @@ export function usePrices(interval = 30000, enabled = true) {
       errors.stock = result.errors.stock ? errors.stock + 1 : 0;
       errors.fx = result.errors.fx ? errors.fx + 1 : 0;
 
-      // Shallow compare before updating prices to avoid unnecessary re-renders
-      const newPrices = { ...prices, ...result.prices };
+      // Use functional update with shallow compare to avoid unnecessary re-renders
+      let pricesChanged = false;
       setPrices(prev => {
+        const newPrices = { ...prev, ...result.prices };
         if (shallowEqualPrices(prev, newPrices)) {
           return prev; // Return same reference to avoid re-render
         }
+        pricesChanged = true;
         return newPrices;
       });
 
       // Only update fxRate if it changed
-      if (result.fxRate && result.fxRate !== fxRate) {
+      let fxChanged = false;
+      if (result.fxRate && result.fxRate !== fxRateRef.current) {
         setFxRate(result.fxRate);
+        fxChanged = true;
       }
 
-      // Cache successful prices to localStorage
-      cachePrices(newPrices, result.fxRate || fxRate);
+      // Only cache when prices or fxRate actually changed
+      if (pricesChanged || fxChanged) {
+        cachePrices(pricesRef.current, result.fxRate || fxRateRef.current);
+      }
 
       setLastUpdated(result.updatedAt);
       setError(null);
@@ -185,7 +198,7 @@ export function usePrices(interval = 30000, enabled = true) {
         setLoading(false);
       }
     }
-  }, [enabled, prices, fxRate]);
+  }, [enabled]); // Removed prices/fxRate dependencies - using refs instead
 
   // Schedule next poll using setTimeout (with backoff on errors)
   const scheduleNextPoll = useCallback(() => {

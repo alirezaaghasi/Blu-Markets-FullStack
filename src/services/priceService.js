@@ -20,6 +20,9 @@ const COINGECKO_IDS = Object.fromEntries(
     .map(([assetId, meta]) => [assetId, meta.coingeckoId])
 );
 
+// Precompute CoinGecko IDs string once at module load (optimization)
+const COINGECKO_IDS_STRING = Object.values(COINGECKO_IDS).join(',');
+
 // Finnhub API key from environment
 const FINNHUB_API_KEY = import.meta.env.VITE_FINNHUB_API_KEY || '';
 
@@ -32,8 +35,7 @@ const FALLBACK_RATE = parseInt(import.meta.env.VITE_FALLBACK_USD_IRR) || DEFAULT
  * @param {AbortSignal} signal - Optional AbortController signal
  */
 export async function fetchCryptoPrices(signal) {
-  const ids = Object.values(COINGECKO_IDS).join(',');
-  const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`;
+  const url = `https://api.coingecko.com/api/v3/simple/price?ids=${COINGECKO_IDS_STRING}&vs_currencies=usd`;
 
   try {
     const response = await fetch(url, { signal });
@@ -156,11 +158,23 @@ export async function fetchUsdIrrRate(signal) {
  * @param {AbortSignal} signal - Optional AbortController signal
  */
 export async function fetchAllPrices(signal) {
-  const [cryptoResult, stockResult, fxResult] = await Promise.all([
+  // Build array of fetches - skip Finnhub if no API key to avoid repeated warnings
+  const fetches = [
     fetchCryptoPrices(signal),
-    fetchStockPrice('QQQ', signal),
     fetchUsdIrrRate(signal),
-  ]);
+  ];
+
+  // Only fetch stock price if API key is configured
+  const hasStockKey = Boolean(FINNHUB_API_KEY);
+  if (hasStockKey) {
+    fetches.push(fetchStockPrice('QQQ', signal));
+  }
+
+  const results = await Promise.all(fetches);
+
+  const cryptoResult = results[0];
+  const fxResult = results[1];
+  const stockResult = hasStockKey ? results[2] : { ok: false, error: 'API key not configured' };
 
   const prices = {
     ...(cryptoResult.ok ? cryptoResult.prices : {}),

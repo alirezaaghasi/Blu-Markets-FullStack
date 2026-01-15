@@ -60,13 +60,3 @@ export function irrToFixedIncomeUnits(amountIRR) {
   return amountIRR / FIXED_INCOME_UNIT_PRICE;
 }
 
-/**
- * Convert fixed income units to IRR (principal only)
- * Used for display and calculations
- *
- * @param {number} units - Number of units
- * @returns {number} Principal value in IRR
- */
-export function fixedIncomeUnitsToIRR(units) {
-  return units * FIXED_INCOME_UNIT_PRICE;
-}

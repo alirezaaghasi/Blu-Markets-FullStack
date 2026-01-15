@@ -1,28 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { STAGES, LAYER_EXPLANATIONS, THRESHOLDS, COLLATERAL_LTV_BY_LAYER, ONBOARDING_STEPS, DEFAULT_PRICES, DEFAULT_FX_RATE } from '../../constants/index.js';
-import { formatIRR, getAssetDisplayName } from '../../helpers.js';
+import { STAGES, LAYER_EXPLANATIONS, THRESHOLDS, COLLATERAL_LTV_BY_LAYER, ONBOARDING_STEPS } from '../../constants/index.js';
+import { formatIRR, getAssetDisplayName, getHoldingValueIRR } from '../../helpers.js';
 import { calcPremiumIRR } from '../../engine/pricing.js';
-import { ASSET_LAYER, ASSET_META } from '../../state/domain.js';
-import { calculateFixedIncomeValue } from '../../engine/fixedIncome.js';
+import { ASSET_LAYER } from '../../state/domain.js';
 import PhoneForm from './PhoneForm.jsx';
 import PendingActionModal from '../PendingActionModal.jsx';
 import ProfileResult from '../ProfileResult.jsx';
 import questionnaireV2 from '../../data/questionnaire.v2.fa.json';
-
-/**
- * Compute holding value in IRR from quantity (v10)
- * @param {Object} holding - Holding with quantity
- * @param {Object} prices - Current prices in USD
- * @param {number} fxRate - USD/IRR exchange rate
- */
-function getHoldingValueIRR(holding, prices, fxRate) {
-  if (!holding || holding.quantity <= 0) return 0;
-  if (holding.assetId === 'IRR_FIXED_INCOME') {
-    return calculateFixedIncomeValue(holding.quantity, holding.purchasedAt);
-  }
-  const priceUSD = prices[holding.assetId] || DEFAULT_PRICES[holding.assetId] || 0;
-  return Math.round(holding.quantity * priceUSD * fxRate);
-}
 
 /**
  * ActionCard - Simple card wrapper for action forms

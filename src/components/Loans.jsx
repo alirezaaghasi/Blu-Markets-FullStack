@@ -5,7 +5,7 @@ import { formatIRR, getAssetDisplayName } from '../helpers.js';
  * Loans - Active loans list with LTV health indicators
  * Decision 11: Shows liquidation price in IRR with explanation
  */
-function Loans({ loans, holdings, prices, fxRate, dispatch }) {
+function Loans({ loans, holdings, dispatch }) {
   const loanList = loans || [];
 
   // Issue 18: Empty state with explanation and CTA

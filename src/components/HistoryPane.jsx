@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { formatIRR, formatIRRShort, getAssetDisplayName } from '../helpers.js';
+import { formatIRR, formatIRRShort, getAssetDisplayName, formatTimeOnly } from '../helpers.js';
 
 /**
  * Helper to group entries by date
@@ -29,17 +29,6 @@ function groupByDate(entries) {
   });
 
   return groups;
-}
-
-/**
- * Format time only (since date is in header)
- */
-function formatTimeOnly(timestamp) {
-  return new Date(timestamp).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true
-  });
 }
 
 /**

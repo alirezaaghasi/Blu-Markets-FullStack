@@ -225,7 +225,7 @@ export default function App() {
       case 'LOANS':
         return (
           <Suspense fallback={<TabLoadingFallback />}>
-            <Loans loans={state.loans} holdings={state.holdings} prices={prices} fxRate={fxRate} dispatch={dispatch} />
+            <Loans loans={state.loans} holdings={state.holdings} dispatch={dispatch} />
           </Suspense>
         );
       case 'HISTORY':
@@ -233,7 +233,7 @@ export default function App() {
       default:
         return portfolioContent;
     }
-  }, [state.stage, state.tab, state.protections, state.loans, state.holdings, prices, fxRate, onboardingContent, portfolioContent, historyContent]);
+  }, [state.stage, state.tab, state.protections, state.loans, state.holdings, onboardingContent, portfolioContent, historyContent]);
 
   // Compute loan summary for header (only when loans exist and not on loans tab)
   const showLoansIndicator = state.stage === STAGES.ACTIVE && (state.loans || []).length > 0 && state.tab !== 'LOANS';

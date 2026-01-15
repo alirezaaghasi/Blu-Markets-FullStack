@@ -1,7 +1,7 @@
 import { calcPremiumIRR } from "./pricing.js";
-import { THRESHOLDS, PROTECTION_ELIGIBLE_ASSETS, COLLATERAL_LTV_BY_LAYER, DEFAULT_PRICES, DEFAULT_FX_RATE } from "../constants/index.js";
+import { THRESHOLDS, PROTECTION_ELIGIBLE_ASSETS, COLLATERAL_LTV_BY_LAYER } from "../constants/index.js";
 import { ASSET_LAYER } from "../state/domain.js";
-import { calculateFixedIncomeValue } from "./fixedIncome.js";
+import { getHoldingValueIRR } from "../helpers.js";
 
 export function ok(meta = {}) {
   return { ok: true, errors: [], meta };
@@ -9,26 +9,6 @@ export function ok(meta = {}) {
 
 export function fail(errors, meta = {}) {
   return { ok: false, errors: Array.isArray(errors) ? errors : [String(errors)], meta };
-}
-
-/**
- * Compute holding value in IRR from quantity (v10)
- * @param {Object} holding - Holding with quantity
- * @param {Object} prices - Current prices in USD
- * @param {number} fxRate - USD/IRR exchange rate
- */
-function getHoldingValueIRR(holding, prices = DEFAULT_PRICES, fxRate = DEFAULT_FX_RATE) {
-  if (!holding) return 0;
-  // Legacy support: if valueIRR exists and quantity doesn't, use valueIRR
-  if (holding.valueIRR !== undefined && holding.quantity === undefined) {
-    return holding.valueIRR;
-  }
-  if (!holding.quantity || holding.quantity <= 0) return 0;
-  if (holding.assetId === 'IRR_FIXED_INCOME') {
-    return calculateFixedIncomeValue(holding.quantity, holding.purchasedAt);
-  }
-  const priceUSD = prices[holding.assetId] || DEFAULT_PRICES[holding.assetId] || 0;
-  return Math.round(holding.quantity * priceUSD * fxRate);
 }
 
 export function validateAddFunds({ amountIRR }) {

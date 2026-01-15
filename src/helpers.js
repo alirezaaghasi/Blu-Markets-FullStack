@@ -1,7 +1,8 @@
 // Utility functions for Blu Markets v10
 // Optimization: Cached Intl.NumberFormat instances to avoid repeated allocations
 
-import { THRESHOLDS, RISK_ALLOCATIONS } from './constants/index.js';
+import { THRESHOLDS, RISK_ALLOCATIONS, DEFAULT_PRICES, DEFAULT_FX_RATE } from './constants/index.js';
+import { calculateFixedIncomeValue } from './engine/fixedIncome.js';
 
 // Cached formatters - created once at module load
 const irrFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
@@ -86,14 +87,20 @@ export function getAssetDisplayName(assetId) {
   return ASSET_DISPLAY_NAMES[assetId] || assetId;
 }
 
-export function computeTargetLayersFromAnswers(questionnaire, answers) {
-  let risk = 0;
-  for (const q of questionnaire.questions) {
-    const opt = q.options.find(o => o.id === answers[q.id]);
-    risk += (opt?.risk ?? 0);
+/**
+ * Compute holding value in IRR from quantity (v10)
+ * Centralized helper used by validate.js and OnboardingControls.jsx
+ * @param {Object} holding - Holding with quantity
+ * @param {Object} prices - Current prices in USD
+ * @param {number} fxRate - USD/IRR exchange rate
+ */
+export function getHoldingValueIRR(holding, prices = DEFAULT_PRICES, fxRate = DEFAULT_FX_RATE) {
+  if (!holding) return 0;
+  if (!holding.quantity || holding.quantity <= 0) return 0;
+  if (holding.assetId === 'IRR_FIXED_INCOME') {
+    const breakdown = calculateFixedIncomeValue(holding.quantity, holding.purchasedAt);
+    return breakdown.total;
   }
-  // Use centralized thresholds and allocations from constants
-  if (risk <= THRESHOLDS.RISK_LOW_THRESHOLD) return { ...RISK_ALLOCATIONS.LOW };
-  if (risk <= THRESHOLDS.RISK_MED_THRESHOLD) return { ...RISK_ALLOCATIONS.MEDIUM };
-  return { ...RISK_ALLOCATIONS.HIGH };
+  const priceUSD = prices[holding.assetId] || DEFAULT_PRICES[holding.assetId] || 0;
+  return Math.round(holding.quantity * priceUSD * fxRate);
 }
