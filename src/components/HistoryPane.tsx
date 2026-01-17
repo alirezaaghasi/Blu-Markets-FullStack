@@ -12,14 +12,25 @@ interface GroupedEntries {
 // Cached formatter for legacy entries without precomputed labels
 const dateLabelFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
 
+// Cache today/yesterday strings (refresh on each groupByDate call but reuse within)
+let cachedToday = '';
+let cachedYesterday = '';
+let lastCacheTime = 0;
+
 /**
  * Helper to group entries by date
  * Uses precomputed tsDateLabel when available (O(1)), falls back to Date parsing for legacy entries
  */
 function groupByDate(entries: LedgerEntry[]): GroupedEntries {
   const groups: GroupedEntries = {};
-  const today = new Date().toDateString();
-  const yesterday = new Date(Date.now() - 86400000).toDateString();
+
+  // Refresh date cache every 60 seconds to handle day transitions
+  const now = Date.now();
+  if (now - lastCacheTime > 60000) {
+    cachedToday = new Date().toDateString();
+    cachedYesterday = new Date(now - 86400000).toDateString();
+    lastCacheTime = now;
+  }
 
   for (const entry of entries) {
     // Use precomputed label if available (fast path)
@@ -28,9 +39,9 @@ function groupByDate(entries: LedgerEntry[]): GroupedEntries {
     // Fallback for legacy entries without precomputed label
     if (!label) {
       const date = new Date(entry.tsISO).toDateString();
-      if (date === today) {
+      if (date === cachedToday) {
         label = 'Today';
-      } else if (date === yesterday) {
+      } else if (date === cachedYesterday) {
         label = 'Yesterday';
       } else {
         label = dateLabelFormatter.format(new Date(entry.tsISO));
