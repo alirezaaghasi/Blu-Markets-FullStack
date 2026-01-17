@@ -44,7 +44,9 @@ const ACTION_ICONS = {
   'REBALANCE': '⚖️',
   'PROTECT': '☂️',
   'BORROW': '💰',
-  'REPAY': '✓'
+  'REPAY': '✓',
+  'CANCEL_PROTECTION': '✕',
+  'PROTECTION_CANCELLED': '✕'
 };
 
 const ICON_CLASSES = {
@@ -53,7 +55,9 @@ const ICON_CLASSES = {
   'REBALANCE': 'action-rebalance',
   'PROTECT': 'action-protect',
   'BORROW': 'action-loan',
-  'REPAY': 'action-success'
+  'REPAY': 'action-success',
+  'CANCEL_PROTECTION': 'action-cancel',
+  'PROTECTION_CANCELLED': 'action-cancel'
 };
 
 function getActionIcon(entry) {
@@ -79,6 +83,8 @@ function formatLedgerAction(entry) {
     case 'PROTECT': return `Protected ${getAssetDisplayName(payload?.assetId)} (${payload?.months}mo)`;
     case 'BORROW': return `Borrowed ${formatIRRShort(payload?.amountIRR)} IRR against ${getAssetDisplayName(payload?.assetId)}`;
     case 'REPAY': return 'Loan Repaid';
+    case 'CANCEL_PROTECTION':
+    case 'PROTECTION_CANCELLED': return `Cancelled ${getAssetDisplayName(payload?.assetId)} protection`;
     default: return type;
   }
 }

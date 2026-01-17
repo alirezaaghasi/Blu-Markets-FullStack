@@ -29,6 +29,9 @@ function ExecutionSummary({ lastAction, dispatch }) {
         return '✓ Loan repaid';
       case 'PROTECT':
         return `✓ ${getAssetDisplayName(lastAction.assetId)} protected`;
+      case 'CANCEL_PROTECTION':
+      case 'PROTECTION_CANCELLED':
+        return `✓ Cancelled ${getAssetDisplayName(lastAction.assetId)} protection`;
       case 'REBALANCE': {
         // Show accurate message based on constraints
         const meta = lastAction.rebalanceMeta;

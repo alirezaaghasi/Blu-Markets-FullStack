@@ -24,6 +24,7 @@ function formatActivityMessage(entry) {
     case 'REBALANCE':
       return `Rebalanced portfolio`;
     case 'CANCEL_PROTECTION':
+    case 'PROTECTION_CANCELLED':
       return `Cancelled ${getAssetDisplayName(entry.assetId)} protection`;
     default:
       return entry.type;

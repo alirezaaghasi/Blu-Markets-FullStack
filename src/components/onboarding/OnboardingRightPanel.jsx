@@ -40,7 +40,9 @@ function OnboardingRightPanel({ stage, questionIndex, targetLayers, investAmount
 
   if (stage === STAGES.ONBOARDING_QUESTIONNAIRE) {
     const totalQuestions = questionnaireLength || 5;
-    const progress = (questionIndex / totalQuestions) * 100;
+    // Use 1-based question number, clamped to totalQuestions
+    const currentQuestionNumber = Math.min(questionIndex + 1, totalQuestions);
+    const progress = (currentQuestionNumber / totalQuestions) * 100;
 
     return (
       <div className="onboardingPanel">
@@ -61,7 +63,7 @@ function OnboardingRightPanel({ stage, questionIndex, targetLayers, investAmount
                 transform="rotate(-90 50 50)"
               />
             </svg>
-            <div className="progressText">{questionIndex}/{totalQuestions}</div>
+            <div className="progressText">{currentQuestionNumber}/{totalQuestions}</div>
           </div>
         </div>
         <div className="layerPreviewCard">

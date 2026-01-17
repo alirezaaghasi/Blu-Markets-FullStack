@@ -86,7 +86,10 @@ function computeHeaderContent(activeTab, protections, loans, loansTotal, portfol
       };
     }
     case 'PROTECTION': {
-      const protectedCount = protections?.length || 0;
+      // Filter to only count active protections (endISO >= now or missing endISO)
+      const now = new Date().toISOString();
+      const activeProtections = (protections || []).filter(p => !p.endISO || p.endISO >= now);
+      const protectedCount = activeProtections.length;
       return {
         title: 'Your Protections',
         badge: protectedCount > 0
