@@ -115,7 +115,8 @@ export class MarketDataProvider {
   calculateVolatility(asset: string, days: number = BALANCER_CONFIG.VOLATILITY_WINDOW): number {
     const history = this.getPriceHistory(asset, days + 1);
     if (history.length < 2) {
-      return ASSET_META[asset]?.baseVolatility || 0.5;
+      const meta = ASSET_META[asset] as { baseVolatility?: number } | undefined;
+      return meta?.baseVolatility || 0.5;
     }
 
     const returns: number[] = [];
@@ -245,7 +246,7 @@ export class IntraLayerBalancer {
       weights: cappedWeights,
       factors: factors,
       metadata: {
-        layer,
+        layer: layer as Layer,
         assetCount: layerAssets.length,
         calculatedAt: new Date().toISOString(),
       },
@@ -295,7 +296,7 @@ export class IntraLayerBalancer {
    * Get liquidity factor from ASSET_META
    */
   private _getLiquidityFactor(asset: string, config: BalancerConfig): number {
-    const meta = ASSET_META[asset];
+    const meta = ASSET_META[asset] as { liquidityScore?: number } | undefined;
     if (!meta) return 1;
 
     const baseScore = meta.liquidityScore || 0.80;

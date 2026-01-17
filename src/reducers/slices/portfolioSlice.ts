@@ -1,4 +1,3 @@
-// @ts-check
 /**
  * Portfolio Slice - Handles portfolio action state transitions
  *
@@ -35,9 +34,9 @@ import {
 import { STAGES, DEFAULT_PRICES, DEFAULT_FX_RATE } from '../../constants/index';
 import { uid, nowISO } from '../../helpers';
 import { addLogEntry } from '../initialState';
+import type { AppState, AppAction, ActionKind, ValidationResult, PendingAction, Holding, LedgerEntry, RebalanceMeta, RebalanceMode, LedgerEntryType, AssetId } from '../../types';
 
-/** @type {string[]} */
-export const PORTFOLIO_ACTIONS = [
+export const PORTFOLIO_ACTIONS: string[] = [
   // Add Funds
   'START_ADD_FUNDS',
   'SET_ADD_FUNDS_AMOUNT',
@@ -68,16 +67,20 @@ export const PORTFOLIO_ACTIONS = [
   'CANCEL_PROTECTION',
 ];
 
+interface AfterStateWithMeta extends AppState {
+  _rebalanceMeta?: RebalanceMeta;
+}
+
 /**
  * Build pending action with boundary classification
- * @param {import('../../types').AppState} state
- * @param {string} kind
- * @param {Object} payload
- * @param {Object} validation
- * @param {import('../../types').AppState} afterState
- * @returns {Object}
  */
-function buildPending(state, kind, payload, validation, afterState) {
+function buildPending(
+  state: AppState,
+  kind: ActionKind,
+  payload: Record<string, unknown>,
+  validation: ValidationResult,
+  afterState: AfterStateWithMeta
+): PendingAction {
   const before = computeSnapshot(state.holdings, state.cashIRR);
   const after = computeSnapshot(afterState.holdings, afterState.cashIRR);
   const boundary = classifyActionBoundary({
@@ -90,7 +93,7 @@ function buildPending(state, kind, payload, validation, afterState) {
   });
 
   // Extract rebalance meta if present for constraint messaging
-  const meta = afterState._rebalanceMeta || {};
+  const meta = afterState._rebalanceMeta || null;
 
   return {
     kind,
@@ -99,19 +102,16 @@ function buildPending(state, kind, payload, validation, afterState) {
     after,
     validation,
     boundary,
-    frictionCopy: frictionCopyForBoundary(boundary, kind, meta),
+    frictionCopy: frictionCopyForBoundary(boundary, kind, meta || {}),
     // R-1: Include rebalance meta for trade details display
     rebalanceMeta: kind === 'REBALANCE' ? meta : null,
-  };
+  } as PendingAction;
 }
 
 /**
  * Portfolio slice reducer
- * @param {import('../../types').AppState} state
- * @param {{ type: string, [key: string]: any }} action
- * @returns {import('../../types').AppState}
  */
-export function portfolioReducer(state, action) {
+export function portfolioReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     // ====== ADD FUNDS ======
     case 'START_ADD_FUNDS': {
@@ -174,7 +174,8 @@ export function portfolioReducer(state, action) {
     case 'START_PROTECT': {
       if (state.stage !== STAGES.ACTIVE) return state;
       // v10: Check quantity instead of valueIRR
-      const assetId = action.assetId || state.holdings.find(h => h.quantity > 0)?.assetId;
+      const startProtectAction = action as { type: 'START_PROTECT'; assetId?: string };
+      const assetId = startProtectAction.assetId || state.holdings.find((h: Holding) => h.quantity > 0)?.assetId;
       if (!assetId) return state;
       return {
         ...state,
@@ -213,7 +214,7 @@ export function portfolioReducer(state, action) {
     case 'START_BORROW': {
       if (state.stage !== STAGES.ACTIVE) return state;
       // v10: Check quantity instead of valueIRR
-      const available = state.holdings.filter(h => !h.frozen && h.quantity > 0);
+      const available = state.holdings.filter((h: Holding) => !h.frozen && h.quantity > 0);
       if (available.length === 0) return state;
       const assetId = action.assetId || available[0].assetId;
       return {
@@ -255,8 +256,9 @@ export function portfolioReducer(state, action) {
       const loans = state.loans || [];
       if (loans.length === 0) return state;
       // Select the loan to repay (passed via action or default to first loan)
-      const loanId = action.loanId || loans[0].id;
-      const loan = loans.find((l) => l.id === loanId);
+      const startRepayAction = action as { type: 'START_REPAY'; loanId?: string };
+      const loanId = startRepayAction.loanId || loans[0].id;
+      const loan = loans.find((l: { id: string }) => l.id === loanId);
       if (!loan) return state;
       return {
         ...state,
@@ -327,14 +329,14 @@ export function portfolioReducer(state, action) {
       const fxRate = action.fxRate || DEFAULT_FX_RATE;
 
       // Determine mode and cash usage based on user selection
-      const draft = state.rebalanceDraft || {};
-      const useCash = draft.useCash && draft.useCashAmount > 0;
+      const draft = state.rebalanceDraft || { mode: 'HOLDINGS_ONLY' as RebalanceMode };
+      const useCash = draft.useCash && (draft.useCashAmount || 0) > 0;
 
       const payload = {
-        mode: useCash ? 'SMART' : 'HOLDINGS_ONLY',
+        mode: (useCash ? 'SMART' : 'HOLDINGS_ONLY') as RebalanceMode,
         prices,
         fxRate,
-        useCashAmount: useCash ? draft.useCashAmount : 0,
+        useCashAmount: useCash ? (draft.useCashAmount || 0) : 0,
       };
 
       const validation = validateRebalance(payload);

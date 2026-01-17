@@ -70,7 +70,7 @@ export type Boundary = 'SAFE' | 'DRIFT' | 'STRUCTURAL' | 'STRESS';
 export type PortfolioStatus = 'BALANCED' | 'SLIGHTLY_OFF' | 'ATTENTION_REQUIRED';
 
 /** Rebalance execution mode */
-export type RebalanceMode = 'HOLDINGS_ONLY' | 'HOLDINGS_PLUS_CASH';
+export type RebalanceMode = 'HOLDINGS_ONLY' | 'HOLDINGS_PLUS_CASH' | 'SMART';
 
 /** Intra-layer balancing strategy presets */
 export type StrategyPreset =
@@ -82,8 +82,8 @@ export type StrategyPreset =
   | 'CONSERVATIVE'
   | 'AGGRESSIVE';
 
-/** User profile for strategy mapping */
-export type UserProfile =
+/** User profile type for strategy mapping */
+export type UserProfileType =
   | 'ANXIOUS_NOVICE'
   | 'STEADY_BUILDER'
   | 'AGGRESSIVE_ACCUMULATOR'
@@ -163,6 +163,8 @@ export interface Protection {
   endISO: string;          // End date (YYYY-MM-DD)
   durationMonths?: number; // Original duration in months
   floorPrice?: number;     // Strike price for protection (mock)
+  startTimeMs?: number;    // Pre-computed timestamp for O(1) comparisons
+  endTimeMs?: number;      // Pre-computed timestamp for O(1) comparisons
 }
 
 // ============================================================================
@@ -193,14 +195,15 @@ export type LedgerEntryType =
   | 'PROTECT_COMMIT'
   | 'BORROW_COMMIT'
   | 'REPAY_COMMIT'
-  | 'REBALANCE_COMMIT';
+  | 'REBALANCE_COMMIT'
+  | 'PROTECTION_CANCELLED_COMMIT';
 
 /** Snapshot of portfolio at a point in time */
 export interface PortfolioSnapshot {
   totalIRR: number;                          // Holdings + Cash
   holdingsIRR: number;                       // Holdings only
   cashIRR: number;                           // Cash balance
-  holdingsIRRByAsset: Record<AssetId, number>;
+  holdingsIRRByAsset: Partial<Record<AssetId, number>>;
   layerPct: TargetLayerPct;                  // Actual percentages
   layerIRR: Record<Layer, number>;           // Actual values by layer
 }
@@ -314,7 +317,7 @@ export interface HRAMFactors {
 export interface IntraLayerWeightResult {
   weights: Record<string, number>;
   factors: Record<string, HRAMFactors>;
-  metadata: {
+  metadata?: {
     layer: Layer;
     assetCount: number;
     calculatedAt: string;
@@ -342,7 +345,7 @@ export interface RebalanceMeta {
 
 export interface PendingAction {
   kind: ActionKind;
-  payload: ActionPayload;
+  payload: ActionPayload | Record<string, unknown>;
   before: PortfolioSnapshot;
   after: PortfolioSnapshot;
   validation: ValidationResult;
@@ -380,8 +383,22 @@ export interface AddFundsDraft {
   amountIRR: number | null;
 }
 
+export interface GapAnalysis {
+  hasFrozenAssets: boolean;
+  remainingGapPct: number;
+  currentCash: number;
+  cashSufficient: boolean;
+  cashNeededForPerfectBalance: number;
+  cashShortfall: number;
+  cashWouldHelp: boolean;
+  partialCashBenefit: number;
+}
+
 export interface RebalanceDraft {
   mode: RebalanceMode;
+  useCash?: boolean;
+  useCashAmount?: number;
+  gapAnalysis?: GapAnalysis;
 }
 
 // ============================================================================
@@ -426,7 +443,7 @@ export interface AppState {
 
   // === UI State ===
   questionnaire: QuestionnaireState;
-  profileResult: RiskTier | null;  // v10: Risk profile result from questionnaire
+  profileResult: unknown;  // v10: Risk profile result from questionnaire (complex object)
   consentStep: number;
   consentMessages: string[];
   investAmountIRR: number | null;
@@ -463,35 +480,37 @@ export type AppAction =
   | { type: 'ANSWER_QUESTION'; qId: string; optionId: string }
   | { type: 'ADVANCE_CONSENT'; message: string }
   | { type: 'SUBMIT_CONSENT'; text: string }
-  | { type: 'SET_INVEST_AMOUNT'; amountIRR: number }
-  | { type: 'EXECUTE_PORTFOLIO' }
+  | { type: 'SET_INVEST_AMOUNT'; amountIRR: number | null }
+  | { type: 'EXECUTE_PORTFOLIO'; prices?: Record<string, number>; fxRate?: number }
   // Cancel
   | { type: 'CANCEL_PENDING' }
+  | { type: 'CANCEL_PROTECTION'; protectionId: string }
   // Add Funds
   | { type: 'START_ADD_FUNDS' }
-  | { type: 'SET_ADD_FUNDS_AMOUNT'; amountIRR: number }
+  | { type: 'SET_ADD_FUNDS_AMOUNT'; amountIRR: string | number }
   | { type: 'PREVIEW_ADD_FUNDS'; payload?: AddFundsPayload }
   // Trade
   | { type: 'START_TRADE'; assetId: AssetId; side?: TradeSide }
   | { type: 'SET_TRADE_SIDE'; side: TradeSide }
-  | { type: 'SET_TRADE_AMOUNT'; amountIRR: number }
-  | { type: 'PREVIEW_TRADE' }
+  | { type: 'SET_TRADE_AMOUNT'; amountIRR: string | number }
+  | { type: 'PREVIEW_TRADE'; prices?: Record<string, number>; fxRate?: number }
   // Protect
   | { type: 'START_PROTECT'; assetId?: AssetId }
-  | { type: 'SET_PROTECT_ASSET'; assetId: AssetId }
+  | { type: 'SET_PROTECT_ASSET'; assetId: string }
   | { type: 'SET_PROTECT_MONTHS'; months: number }
-  | { type: 'PREVIEW_PROTECT' }
+  | { type: 'PREVIEW_PROTECT'; prices?: Record<string, number>; fxRate?: number }
   // Borrow
   | { type: 'START_BORROW'; assetId?: AssetId }
-  | { type: 'SET_BORROW_ASSET'; assetId: AssetId }
-  | { type: 'SET_BORROW_AMOUNT'; amountIRR: number }
-  | { type: 'PREVIEW_BORROW' }
+  | { type: 'SET_BORROW_ASSET'; assetId: string }
+  | { type: 'SET_BORROW_AMOUNT'; amountIRR: string | number }
+  | { type: 'PREVIEW_BORROW'; prices?: Record<string, number>; fxRate?: number }
   // Repay
   | { type: 'START_REPAY'; loanId?: string }
   | { type: 'PREVIEW_REPAY' }
   // Rebalance
-  | { type: 'START_REBALANCE' }
-  | { type: 'PREVIEW_REBALANCE' }
+  | { type: 'START_REBALANCE'; prices?: Record<string, number>; fxRate?: number }
+  | { type: 'PREVIEW_REBALANCE'; prices?: Record<string, number>; fxRate?: number }
+  | { type: 'SET_REBALANCE_USE_CASH'; useCash: boolean }
   // Confirm
   | { type: 'CONFIRM_PENDING' };
 

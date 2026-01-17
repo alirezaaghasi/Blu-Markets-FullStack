@@ -1,4 +1,3 @@
-// @ts-check
 /**
  * Onboarding Slice - Handles onboarding flow state transitions
  *
@@ -20,9 +19,9 @@ import { uid, nowISO } from '../../helpers';
 import { calculateFinalRisk, answersToRichFormat } from '../../engine/riskScoring';
 import questionnaire from '../../data/questionnaire.v2.fa.json';
 import { addLogEntry } from '../initialState';
+import type { AppState, AppAction, Holding, TargetLayerPct, Layer, LedgerEntry, LedgerEntryType, Stage } from '../../types';
 
-/** @type {string[]} */
-export const ONBOARDING_ACTIONS = [
+export const ONBOARDING_ACTIONS: string[] = [
   'START_ONBOARDING',
   'SET_PHONE',
   'SUBMIT_PHONE',
@@ -36,29 +35,28 @@ export const ONBOARDING_ACTIONS = [
 /**
  * Build initial portfolio holdings from investment amount and target allocation
  * v10: Holdings now store quantities instead of valueIRR
- *
- * @param {number} totalIRR - Total investment amount in IRR
- * @param {Object} targetLayerPct - Target layer percentages
- * @param {Object} prices - Current asset prices in USD
- * @param {number} fxRate - USD/IRR exchange rate
- * @param {string|null} createdAt - ISO timestamp for fixed income accrual
- * @returns {import('../../types').Holding[]}
  */
-export function buildInitialHoldings(totalIRR, targetLayerPct, prices = DEFAULT_PRICES, fxRate = DEFAULT_FX_RATE, createdAt = null) {
-  const holdings = ASSETS.map(assetId => ({
+export function buildInitialHoldings(
+  totalIRR: number,
+  targetLayerPct: TargetLayerPct,
+  prices: Record<string, number> = DEFAULT_PRICES,
+  fxRate: number = DEFAULT_FX_RATE,
+  createdAt: string | undefined = undefined
+): Holding[] {
+  const holdings: Holding[] = ASSETS.map(assetId => ({
     assetId,
     quantity: 0,
-    purchasedAt: assetId === 'IRR_FIXED_INCOME' ? createdAt : null,
+    purchasedAt: assetId === 'IRR_FIXED_INCOME' ? createdAt : undefined,
     frozen: false,
-  }));
+  } as Holding));
 
   // Build O(1) lookup map to avoid repeated O(n) find calls
-  const holdingsById = Object.fromEntries(holdings.map(h => [h.assetId, h]));
+  const holdingsById = Object.fromEntries(holdings.map(h => [h.assetId, h])) as Record<string, Holding>;
 
-  for (const layer of LAYERS) {
+  for (const layer of LAYERS as Layer[]) {
     const pct = (targetLayerPct[layer] ?? 0) / 100;
     const layerAmountIRR = Math.floor(totalIRR * pct);
-    const weights = WEIGHTS[layer] || {};
+    const weights = (WEIGHTS as Record<Layer, Record<string, number>>)[layer] || {};
     let layerAllocated = 0;
 
     for (const assetId of Object.keys(weights)) {
@@ -100,24 +98,21 @@ export function buildInitialHoldings(totalIRR, targetLayerPct, prices = DEFAULT_
 
 /**
  * Onboarding slice reducer
- * @param {import('../../types').AppState} state
- * @param {{ type: string, [key: string]: any }} action
- * @returns {import('../../types').AppState}
  */
-export function onboardingReducer(state, action) {
+export function onboardingReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'START_ONBOARDING':
-      return { ...state, stage: STAGES.ONBOARDING_PHONE };
+      return { ...state, stage: STAGES.ONBOARDING_PHONE as Stage };
 
     case 'SET_PHONE': {
-      const phone = String(action.phone || '').trim();
+      const phone = String((action as { type: 'SET_PHONE'; phone: string }).phone || '').trim();
       return { ...state, phone };
     }
 
     case 'SUBMIT_PHONE': {
       const phone = String(state.phone || '').trim();
       if (!phone.startsWith('+989') || phone.length !== 13) return state;
-      return { ...state, stage: STAGES.ONBOARDING_QUESTIONNAIRE };
+      return { ...state, stage: STAGES.ONBOARDING_QUESTIONNAIRE as Stage };
     }
 
     case 'ANSWER_QUESTION': {
@@ -134,7 +129,7 @@ export function onboardingReducer(state, action) {
         const richAnswers = answersToRichFormat(answers, questionnaire);
         const profileResult = calculateFinalRisk(richAnswers, questionnaire);
         const targetLayerPct = profileResult.allocation;
-        s = { ...s, targetLayerPct, profileResult, stage: STAGES.ONBOARDING_RESULT };
+        s = { ...s, targetLayerPct, profileResult, stage: STAGES.ONBOARDING_RESULT as Stage };
       }
       return s;
     }
@@ -149,7 +144,7 @@ export function onboardingReducer(state, action) {
     case 'SUBMIT_CONSENT': {
       if (state.stage !== STAGES.ONBOARDING_RESULT) return state;
       if (String(action.text || '') !== questionnaire.consent_exact) return state;
-      return { ...state, stage: STAGES.AMOUNT_REQUIRED };
+      return { ...state, stage: STAGES.AMOUNT_REQUIRED as Stage };
     }
 
     case 'SET_INVEST_AMOUNT': {
@@ -169,16 +164,16 @@ export function onboardingReducer(state, action) {
       const createdAt = nowISO();
 
       const holdings = buildInitialHoldings(n, state.targetLayerPct, prices, fxRate, createdAt);
-      let s = { ...state, holdings, cashIRR: 0, stage: STAGES.ACTIVE };
+      let s = { ...state, holdings, cashIRR: 0, stage: STAGES.ACTIVE as Stage };
 
       // Create ledger entry
-      const entry = {
+      const entry: LedgerEntry = {
         id: uid(),
         tsISO: createdAt,
-        type: 'PORTFOLIO_CREATED_COMMIT',
+        type: 'PORTFOLIO_CREATED_COMMIT' as LedgerEntryType,
         details: { amountIRR: n, targetLayerPct: state.targetLayerPct },
       };
-      s = { ...s, ledger: [entry], lastAction: { type: 'PORTFOLIO_CREATED', timestamp: Date.now() } };
+      s = { ...s, ledger: [entry], lastAction: { type: 'PORTFOLIO_CREATED', timestamp: Date.now() } } as AppState;
       s = addLogEntry(s, 'PORTFOLIO_CREATED', { amountIRR: n });
       return s;
     }

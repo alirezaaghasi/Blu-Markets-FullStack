@@ -1,4 +1,3 @@
-// @ts-check
 /**
  * Ledger Slice - Handles pending action confirmation and cancellation
  *
@@ -11,17 +10,14 @@ import { cloneState, previewAddFunds, previewTrade, previewBorrow, previewRepay,
 import { calcPremiumIRR } from '../../engine/pricing';
 import { uid, nowISO } from '../../helpers';
 import { addLogEntry } from '../initialState';
+import type { AppState, AppAction, LedgerEntry, LedgerEntryType, Protection } from '../../types';
 
-/** @type {string[]} */
-export const LEDGER_ACTIONS = ['CONFIRM_PENDING', 'CANCEL_PENDING'];
+export const LEDGER_ACTIONS: string[] = ['CONFIRM_PENDING', 'CANCEL_PENDING'];
 
 /**
  * Ledger slice reducer
- * @param {import('../../types').AppState} state
- * @param {{ type: string, [key: string]: any }} action
- * @returns {import('../../types').AppState}
  */
-export function ledgerReducer(state, action) {
+export function ledgerReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'CANCEL_PENDING':
       return {
@@ -42,14 +38,16 @@ export function ledgerReducer(state, action) {
       let next = cloneState(state);
 
       // Commit by replaying deterministic preview
-      if (p.kind === 'ADD_FUNDS') next = previewAddFunds(next, p.payload);
-      if (p.kind === 'TRADE') next = previewTrade(next, p.payload);
-      if (p.kind === 'BORROW') next = previewBorrow(next, p.payload);
-      if (p.kind === 'REPAY') next = previewRepay(next, p.payload);
-      if (p.kind === 'REBALANCE') next = previewRebalance(next, p.payload);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const payload = p.payload as any;
+      if (p.kind === 'ADD_FUNDS') next = previewAddFunds(next, payload);
+      if (p.kind === 'TRADE') next = previewTrade(next, payload);
+      if (p.kind === 'BORROW') next = previewBorrow(next, payload);
+      if (p.kind === 'REPAY') next = previewRepay(next, payload);
+      if (p.kind === 'REBALANCE') next = previewRebalance(next, payload);
 
       if (p.kind === 'PROTECT') {
-        const holding = next.holdings.find(h => h.assetId === p.payload.assetId);
+        const holding = next.holdings.find(h => h.assetId === payload.assetId);
         if (holding) {
           // v10: Get notionalIRR from computed snapshot, not holding directly
           const notionalIRR = p.after.holdingsIRRByAsset[holding.assetId] || 0;
@@ -57,13 +55,13 @@ export function ledgerReducer(state, action) {
           const premium = calcPremiumIRR({
             assetId: holding.assetId,
             notionalIRR,
-            months: p.payload.months,
+            months: payload.months,
           });
           next.cashIRR -= premium;
 
           const startISO = new Date().toISOString().slice(0, 10);
           const end = new Date();
-          end.setMonth(end.getMonth() + p.payload.months);
+          end.setMonth(end.getMonth() + payload.months);
           const endISO = end.toISOString().slice(0, 10);
 
           next.protections = [
@@ -73,7 +71,7 @@ export function ledgerReducer(state, action) {
               assetId: holding.assetId,
               notionalIRR,
               premiumIRR: premium,
-              durationMonths: p.payload.months,
+              durationMonths: payload.months,
               startISO,
               endISO,
               // Pre-computed timestamps for O(1) comparisons in UI (avoid repeated Date parsing)
@@ -86,10 +84,10 @@ export function ledgerReducer(state, action) {
 
       // Reuse after snapshot from preview instead of recomputing
       // (state is deterministic, so after snapshot is identical)
-      const entry = {
+      const entry: LedgerEntry = {
         id: uid(),
         tsISO: nowISO(),
-        type: `${p.kind}_COMMIT`,
+        type: `${p.kind}_COMMIT` as LedgerEntryType,
         details: {
           kind: p.kind,
           payload: p.payload,
@@ -109,7 +107,7 @@ export function ledgerReducer(state, action) {
       next.repayDraft = null;
       next.addFundsDraft = null;
       next.rebalanceDraft = null;
-      next.ledger = [...next.ledger, entry];
+      next.ledger = [...next.ledger, entry] as LedgerEntry[];
       next.lastAction = {
         type: p.kind,
         timestamp: Date.now(),

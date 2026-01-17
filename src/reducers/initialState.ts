@@ -5,9 +5,8 @@
  * Used by the orchestrator and can be imported for testing.
  */
 
-import type { AppState, Holding } from '../types';
+import type { AppState, Holding, Stage, AssetId } from '../types';
 import { ASSETS } from '../state/domain';
-import { STAGES } from '../constants/index';
 
 /**
  * Build the initial application state
@@ -15,16 +14,16 @@ import { STAGES } from '../constants/index';
 export function initialState(): AppState {
   return {
     // Core state from spec
-    stage: STAGES.WELCOME,
+    stage: 'WELCOME' as Stage,
     phone: null,
     cashIRR: 0,
     // v10: Holdings store quantities instead of valueIRR
-    holdings: ASSETS.map(a => ({
+    holdings: (ASSETS as AssetId[]).map((a: AssetId): Holding => ({
       assetId: a,
       quantity: 0,
-      purchasedAt: null,  // Used for IRR_FIXED_INCOME accrual
+      purchasedAt: undefined,  // Used for IRR_FIXED_INCOME accrual
       frozen: false,
-    } as Holding)),
+    })),
     targetLayerPct: { FOUNDATION: 50, GROWTH: 35, UPSIDE: 15 },
     protections: [],
     loans: [],
