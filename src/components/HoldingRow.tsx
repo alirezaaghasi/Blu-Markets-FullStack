@@ -78,7 +78,7 @@ function HoldingRow({ holding, holdingValue, layerInfo, layer, protDays, onStart
         {/* v10: Show quantity and price for non-fixed-income assets */}
         {!isFixedIncome && quantity > 0 && (
           <div className="holdingQuantityPrice">
-            <span className="holdingQty">{formatQuantity(quantity, holding.assetId)} units</span>
+            <span className="holdingQty">{formatQuantity(quantity, holding.assetId)} {holding.assetId}</span>
             {priceUSD && <span className="holdingPrice">@ {formatUSD(priceUSD)}</span>}
           </div>
         )}

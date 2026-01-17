@@ -51,8 +51,8 @@ export const ASSETS_CONFIG = {
 
   USDT: {
     id: 'USDT',
-    name: 'Tether USD',
-    displayName: 'USDT',
+    name: 'US Dollar',
+    displayName: 'US Dollar',
     layer: 'FOUNDATION',
     category: 'stablecoin',
     source: 'coingecko',
@@ -71,7 +71,7 @@ export const ASSETS_CONFIG = {
 
   PAXG: {
     id: 'PAXG',
-    name: 'Paxos Gold',
+    name: 'Gold',
     displayName: 'Gold',
     layer: 'FOUNDATION',
     category: 'gold',
@@ -118,7 +118,7 @@ export const ASSETS_CONFIG = {
 
   BTC: {
     id: 'BTC',
-    name: 'Bitcoin',
+    name: 'BITCOIN',
     displayName: 'BTC',
     layer: 'GROWTH',
     category: 'crypto_large',
@@ -138,7 +138,7 @@ export const ASSETS_CONFIG = {
 
   ETH: {
     id: 'ETH',
-    name: 'Ethereum',
+    name: 'ETHEREUM',
     displayName: 'ETH',
     layer: 'GROWTH',
     category: 'crypto_large',
@@ -158,8 +158,8 @@ export const ASSETS_CONFIG = {
 
   BNB: {
     id: 'BNB',
-    name: 'BNB',
-    displayName: 'BNB',
+    name: 'BINANCE COIN',
+    displayName: 'BINANCE COIN',
     layer: 'GROWTH',
     category: 'crypto_large',
     source: 'coingecko',
@@ -178,8 +178,8 @@ export const ASSETS_CONFIG = {
 
   XRP: {
     id: 'XRP',
-    name: 'XRP',
-    displayName: 'XRP',
+    name: 'RIPPLE',
+    displayName: 'RIPPLE',
     layer: 'GROWTH',
     category: 'crypto_large',
     source: 'coingecko',
@@ -198,8 +198,8 @@ export const ASSETS_CONFIG = {
 
   KAG: {
     id: 'KAG',
-    name: 'Kinesis Silver',
-    displayName: 'Silver',
+    name: 'SILVER',
+    displayName: 'SILVER',
     layer: 'GROWTH',
     category: 'silver',
     source: 'coingecko',
@@ -219,8 +219,8 @@ export const ASSETS_CONFIG = {
 
   QQQ: {
     id: 'QQQ',
-    name: 'Nasdaq 100',
-    displayName: 'QQQ',
+    name: 'NASDAQ 100',
+    displayName: 'NASDAQ 100',
     layer: 'GROWTH',
     category: 'equity_etf',
     source: 'finnhub',
@@ -244,8 +244,8 @@ export const ASSETS_CONFIG = {
 
   SOL: {
     id: 'SOL',
-    name: 'Solana',
-    displayName: 'SOL',
+    name: 'SOLANA',
+    displayName: 'SOLANA',
     layer: 'UPSIDE',
     category: 'alt_l1',
     source: 'coingecko',
@@ -264,8 +264,8 @@ export const ASSETS_CONFIG = {
 
   TON: {
     id: 'TON',
-    name: 'Toncoin',
-    displayName: 'TON',
+    name: 'TON COIN',
+    displayName: 'TON COIN',
     layer: 'UPSIDE',
     category: 'alt_l1',
     source: 'coingecko',
@@ -284,8 +284,8 @@ export const ASSETS_CONFIG = {
 
   LINK: {
     id: 'LINK',
-    name: 'Chainlink',
-    displayName: 'LINK',
+    name: 'CHAINLINK',
+    displayName: 'CHAINLINK',
     layer: 'UPSIDE',
     category: 'infrastructure',
     source: 'coingecko',
@@ -304,8 +304,8 @@ export const ASSETS_CONFIG = {
 
   AVAX: {
     id: 'AVAX',
-    name: 'Avalanche',
-    displayName: 'AVAX',
+    name: 'AVALANCHE',
+    displayName: 'AVALANCHE',
     layer: 'UPSIDE',
     category: 'alt_l1',
     source: 'coingecko',
@@ -324,8 +324,8 @@ export const ASSETS_CONFIG = {
 
   MATIC: {
     id: 'MATIC',
-    name: 'Polygon',
-    displayName: 'MATIC',
+    name: 'POLYGON',
+    displayName: 'POLYGON',
     layer: 'UPSIDE',
     category: 'l2',
     source: 'coingecko',
@@ -344,8 +344,8 @@ export const ASSETS_CONFIG = {
 
   ARB: {
     id: 'ARB',
-    name: 'Arbitrum',
-    displayName: 'ARB',
+    name: 'ARBITRUM',
+    displayName: 'ARBITRUM',
     layer: 'UPSIDE',
     category: 'l2',
     source: 'coingecko',

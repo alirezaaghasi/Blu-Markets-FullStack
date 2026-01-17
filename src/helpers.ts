@@ -93,23 +93,23 @@ export function nowISO(): string {
 // 15-asset universe display names
 const ASSET_DISPLAY_NAMES: Record<string, string> = {
   // Foundation
-  'USDT': 'Tether (USDT)',
-  'PAXG': 'Paxos Gold (PAXG)',
+  'USDT': 'US Dollar',
+  'PAXG': 'Gold',
   'IRR_FIXED_INCOME': 'Fixed Income Fund (IRR)',
   // Growth
-  'BTC': 'Bitcoin (BTC)',
-  'ETH': 'Ethereum (ETH)',
-  'BNB': 'BNB',
-  'XRP': 'XRP',
-  'KAG': 'Kinesis Silver (KAG)',
-  'QQQ': 'Nasdaq 100 (QQQ)',
+  'BTC': 'BITCOIN',
+  'ETH': 'ETHEREUM',
+  'BNB': 'BINANCE COIN',
+  'XRP': 'RIPPLE',
+  'KAG': 'SILVER',
+  'QQQ': 'NASDAQ 100',
   // Upside
-  'SOL': 'Solana (SOL)',
-  'TON': 'Toncoin (TON)',
-  'LINK': 'Chainlink (LINK)',
-  'AVAX': 'Avalanche (AVAX)',
-  'MATIC': 'Polygon (MATIC)',
-  'ARB': 'Arbitrum (ARB)',
+  'SOL': 'SOLANA',
+  'TON': 'TON COIN',
+  'LINK': 'CHAINLINK',
+  'AVAX': 'AVALANCHE',
+  'MATIC': 'POLYGON',
+  'ARB': 'ARBITRUM',
   // Legacy (for backward compatibility)
   'GOLD': 'Gold',
 };
