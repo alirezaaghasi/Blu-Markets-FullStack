@@ -3,6 +3,12 @@ import { ASSET_LAYER } from '../state/domain';
 import { calculateFixedIncomeValue, FixedIncomeBreakdown } from './fixedIncome';
 import { DEFAULT_PRICES, DEFAULT_FX_RATE } from '../constants/index';
 
+// Per-holding value cache for incremental updates
+// Key format: "assetId:quantity:price" -> cached result
+// This avoids recomputation when only some holdings change
+const holdingValueCache = new Map<string, HoldingValueResult>();
+const CACHE_MAX_SIZE = 100; // Prevent unbounded growth
+
 interface HoldingValueResult {
   valueIRR: number;
   priceUSD: number | null;
@@ -35,7 +41,25 @@ interface HoldingWithLegacy extends Holding {
 }
 
 /**
- * Compute holding value in IRR
+ * Generate cache key for holding value
+ * For fixed income, includes purchasedAt since accrual depends on time
+ */
+function getHoldingCacheKey(
+  assetId: string,
+  quantity: number,
+  priceUSD: number,
+  purchasedAt?: string
+): string {
+  if (assetId === 'IRR_FIXED_INCOME') {
+    // Include day portion of purchasedAt for accrual calculation caching
+    const dateKey = purchasedAt ? purchasedAt.slice(0, 10) : 'none';
+    return `${assetId}:${quantity}:${dateKey}`;
+  }
+  return `${assetId}:${quantity}:${priceUSD}`;
+}
+
+/**
+ * Compute holding value in IRR with caching
  * Supports both quantity-based (v10+) and legacy valueIRR holdings
  */
 function computeHoldingValue(
@@ -50,18 +74,36 @@ function computeHoldingValue(
 
   // Quantity-based calculation (v10+)
   const quantity = holding.quantity || 0;
+  const priceUSD = prices[holding.assetId] || DEFAULT_PRICES[holding.assetId] || 0;
+
+  // Check cache first
+  const cacheKey = getHoldingCacheKey(holding.assetId, quantity, priceUSD, holding.purchasedAt);
+  const cached = holdingValueCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  let result: HoldingValueResult;
 
   if (holding.assetId === 'IRR_FIXED_INCOME') {
     // Special handling for fixed income - price is unit price in IRR
     const breakdown = calculateFixedIncomeValue(quantity, holding.purchasedAt);
-    return { valueIRR: breakdown.total, priceUSD: null, breakdown };
+    result = { valueIRR: breakdown.total, priceUSD: null, breakdown };
+  } else {
+    // Standard: quantity × priceUSD × fxRate
+    const valueIRR = Math.round(quantity * priceUSD * fxRate);
+    result = { valueIRR, priceUSD, breakdown: null };
   }
 
-  // Standard: quantity × priceUSD × fxRate
-  const priceUSD = prices[holding.assetId] || DEFAULT_PRICES[holding.assetId] || 0;
-  const valueIRR = Math.round(quantity * priceUSD * fxRate);
+  // Store in cache (with size limit)
+  if (holdingValueCache.size >= CACHE_MAX_SIZE) {
+    // Clear oldest entries (simple FIFO via iterator)
+    const firstKey = holdingValueCache.keys().next().value;
+    if (firstKey) holdingValueCache.delete(firstKey);
+  }
+  holdingValueCache.set(cacheKey, result);
 
-  return { valueIRR, priceUSD, breakdown: null };
+  return result;
 }
 
 /**

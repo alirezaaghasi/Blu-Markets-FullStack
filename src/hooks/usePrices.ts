@@ -12,7 +12,7 @@
  * - Online/offline handling
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { fetchAllPrices } from '../services/priceService';
 import { loadCachedPrices, loadCachedFxRate, cachePrices } from '../services/priceCache';
 import { shallowEqualPrices, createServiceErrors, updateServiceErrors, incrementAllErrors, calculateBackoffDelay } from '../services/pricePolling';
@@ -57,12 +57,16 @@ export function usePrices(interval: number = 30000, enabled: boolean = true): Us
   pricesRef.current = prices;
   fxRateRef.current = fxRate;
 
-  const config: PollingConfig = { ...DEFAULT_CONFIG, interval };
+  // Stabilize config object to avoid recreation on every render
+  const config = useMemo<PollingConfig>(
+    () => ({ ...DEFAULT_CONFIG, interval }),
+    [interval]
+  );
 
   // Calculate backoff based on service errors
   const getBackoffDelay = useCallback((): number => {
     return calculateBackoffDelay(serviceErrorsRef.current, config);
-  }, [config.interval]);
+  }, [config]);
 
   // Stabilized refresh callback
   const refresh = useCallback(async (): Promise<void> => {
@@ -82,14 +86,18 @@ export function usePrices(interval: number = 30000, enabled: boolean = true): Us
       // Update service errors
       serviceErrorsRef.current = updateServiceErrors(serviceErrorsRef.current, result.errors);
 
-      // Compute new values
-      const computedPrices = { ...pricesRef.current, ...result.prices };
+      // Short-circuit: skip merge if no new prices (reduces allocations)
+      const hasNewPrices = result.prices && Object.keys(result.prices).length > 0;
+      const computedPrices = hasNewPrices
+        ? { ...pricesRef.current, ...result.prices }
+        : pricesRef.current;
       const computedFxRate = result.fxRate || fxRateRef.current;
 
       // Update state with shallow comparison
       let pricesChanged = false;
       setPrices(prev => {
-        if (shallowEqualPrices(prev, computedPrices)) return prev;
+        // Skip update entirely if no new prices
+        if (!hasNewPrices || shallowEqualPrices(prev, computedPrices)) return prev;
         pricesChanged = true;
         return computedPrices;
       });

@@ -1063,3 +1063,23 @@ body {
   padding: 6px 12px;
   font-size: 12px;
 }
+
+/* ===== OPTIMIZATION: Inline style replacements ===== */
+
+/* Tab loading fallback - replaces inline style */
+.tabLoadingFallback {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* Header flex grow container */
+.headerFlexGrow {
+  flex: 1;
+}
+
+/* Loans pill with orange accent */
+.pill-loans {
+  color: #fb923c;
+  border-color: rgba(249, 115, 22, 0.3);
+}

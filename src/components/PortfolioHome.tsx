@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { formatIRR, formatIRRShort } from '../helpers';
 import { LAYER_EXPLANATIONS, LAYERS } from '../constants/index';
 import LayerMini from './LayerMini';
@@ -100,6 +100,12 @@ function PortfolioHome({ holdings, cashIRR, targetLayerPct, protections, loans, 
     [holdings, snapshot.holdingValues]
   );
 
+  // Memoize formatted time to avoid Date parsing on every render
+  const formattedUpdateTime = useMemo(() => {
+    if (!pricesUpdatedAt) return null;
+    return new Date(pricesUpdatedAt).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
+  }, [pricesUpdatedAt]);
+
   return (
     <div className="stack">
       {/* Drift warning banner - shows when portfolio is off target */}
@@ -131,9 +137,9 @@ function PortfolioHome({ holdings, cashIRR, targetLayerPct, protections, loans, 
           <span className="priceIndicatorText">
             {pricesError ? 'Offline prices' : pricesLoading ? 'Updating...' : 'Live prices'}
           </span>
-          {pricesUpdatedAt && !pricesLoading && (
+          {formattedUpdateTime && !pricesLoading && (
             <span className="priceIndicatorTime">
-              {new Date(pricesUpdatedAt).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })}
+              {formattedUpdateTime}
             </span>
           )}
         </div>

@@ -61,11 +61,9 @@ const OnboardingRightPanel = lazy(() => import('./components/onboarding/Onboardi
 const ResetConfirmModal = lazy(() => import('./components/ResetConfirmModal'));
 const ExecutionSummary = lazy(() => import('./components/ExecutionSummary'));
 
-// Loading fallback for lazy components
+// Loading fallback for lazy components (uses CSS class to avoid inline style allocation)
 const TabLoadingFallback = () => (
-  <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)' }}>
-    Loading...
-  </div>
+  <div className="tabLoadingFallback">Loading...</div>
 );
 
 // Minimal fallback for modals (invisible)
@@ -239,32 +237,38 @@ export default function App() {
     </Suspense>
   ), [state.ledger]);
 
+  // Memoize protection tab content separately (only depends on protections)
+  const protectionContent = useMemo(() => (
+    <Suspense fallback={<TabLoadingFallback />}>
+      <Protection protections={state.protections} dispatch={dispatch} />
+    </Suspense>
+  ), [state.protections]);
+
+  // Memoize loans tab content separately (only depends on loans and holdings)
+  const loansContent = useMemo(() => (
+    <Suspense fallback={<TabLoadingFallback />}>
+      <Loans loans={state.loans} holdings={state.holdings} dispatch={dispatch} />
+    </Suspense>
+  ), [state.loans, state.holdings]);
+
   // Select right panel content based on stage and tab
-  // Optimization: Each tab's content is memoized separately to avoid
-  // unnecessary recalculations when unrelated state changes
+  // Optimization: Each tab's content is memoized separately with minimal deps
+  // The switch only depends on stage and tab - content memos handle their own deps
   const rightContent = useMemo(() => {
     if (state.stage !== STAGES.ACTIVE) {
       return onboardingContent;
     }
     switch (state.tab) {
       case 'PROTECTION':
-        return (
-          <Suspense fallback={<TabLoadingFallback />}>
-            <Protection protections={state.protections} dispatch={dispatch} />
-          </Suspense>
-        );
+        return protectionContent;
       case 'LOANS':
-        return (
-          <Suspense fallback={<TabLoadingFallback />}>
-            <Loans loans={state.loans} holdings={state.holdings} dispatch={dispatch} />
-          </Suspense>
-        );
+        return loansContent;
       case 'HISTORY':
         return historyContent;
       default:
         return portfolioContent;
     }
-  }, [state.stage, state.tab, state.protections, state.loans, state.holdings, onboardingContent, portfolioContent, historyContent]);
+  }, [state.stage, state.tab, onboardingContent, portfolioContent, historyContent, protectionContent, loansContent]);
 
   // Compute loan summary for header (only when loans exist and not on loans tab)
   const showLoansIndicator = state.stage === STAGES.ACTIVE && (state.loans || []).length > 0 && state.tab !== 'LOANS';
@@ -280,7 +284,7 @@ export default function App() {
         <div className="panel">
           <div className="header">
             <div className="logo">B</div>
-            <div style={{ flex: 1 }}>
+            <div className="headerFlexGrow">
               <div className="h-title">Blu Markets</div>
               <div className="h-motto">Markets, but mindful</div>
             </div>
@@ -299,7 +303,7 @@ export default function App() {
         {/* Right Panel - Content */}
         <div className="panel">
           <div className="header">
-            <div style={{ flex: 1 }}>
+            <div className="headerFlexGrow">
               {state.stage === STAGES.ACTIVE ? (
                 <div className="h-title">{headerContent.title}</div>
               ) : (
@@ -321,7 +325,7 @@ export default function App() {
 
                   {/* Loans indicator (when not on loans tab) */}
                   {loansSummary && (
-                    <div className="pill" style={{ color: '#fb923c', borderColor: 'rgba(249,115,22,.3)' }}>
+                    <div className="pill pill-loans">
                       <span>Loans ({loansSummary.count})</span>
                       <span>{loansSummary.total}</span>
                     </div>
