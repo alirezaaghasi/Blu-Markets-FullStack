@@ -99,7 +99,7 @@ export type LoanStatus = 'ACTIVE' | 'REPAID' | 'LIQUIDATED';
 
 /** Questionnaire answer record */
 export interface QuestionnaireAnswers {
-  [questionId: string]: string; // questionId -> optionId
+  [questionId: string]: string | number; // questionId -> optionId or optionIndex
 }
 
 /** User profile from onboarding */
@@ -222,6 +222,9 @@ export interface LedgerEntryDetails {
   targetLayerPct?: TargetLayerPct;
   // Rebalance specific
   rebalanceMeta?: RebalanceMeta;
+  // Protection cancellation specific
+  protectionId?: string;
+  assetId?: AssetId;
 }
 
 /** Immutable ledger entry (audit trail record) */

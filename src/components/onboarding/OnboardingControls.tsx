@@ -271,7 +271,7 @@ function OnboardingControls({ state, dispatch, prices, fxRate }: OnboardingContr
         <div>
           <OnboardingProgress currentStep={3} />
           <ProfileResult
-            result={state.profileResult as unknown as { score: number; profile: string; profile_fa: string; allocation: { FOUNDATION: number; GROWTH: number; UPSIDE: number }; capacity: number; willingness: number; limitingFactor: string; warnings: { severity: string; message: string }[] }}
+            result={state.profileResult as unknown as { score: number; profile: string; profile_fa: string; allocation: { FOUNDATION: number; GROWTH: number; UPSIDE: number }; capacity: number; willingness: number; limitingFactor: 'capacity' | 'willingness'; warnings: { severity: 'high' | 'medium' | 'low'; message: string }[] }}
             onContinue={() => setShowingProfile(false)}
           />
         </div>

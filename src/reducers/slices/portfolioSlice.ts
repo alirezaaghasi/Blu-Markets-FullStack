@@ -121,7 +121,8 @@ export function portfolioReducer(state: AppState, action: AppAction): AppState {
 
     case 'SET_ADD_FUNDS_AMOUNT': {
       if (!state.addFundsDraft) return state;
-      return { ...state, addFundsDraft: { ...state.addFundsDraft, amountIRR: action.amountIRR } };
+      const amountIRR = typeof action.amountIRR === 'string' ? parseFloat(action.amountIRR) || null : action.amountIRR;
+      return { ...state, addFundsDraft: { ...state.addFundsDraft, amountIRR } };
     }
 
     case 'PREVIEW_ADD_FUNDS': {
@@ -150,7 +151,8 @@ export function portfolioReducer(state: AppState, action: AppAction): AppState {
 
     case 'SET_TRADE_AMOUNT': {
       if (!state.tradeDraft) return state;
-      return { ...state, tradeDraft: { ...state.tradeDraft, amountIRR: action.amountIRR } };
+      const amountIRR = typeof action.amountIRR === 'string' ? parseFloat(action.amountIRR) || null : action.amountIRR;
+      return { ...state, tradeDraft: { ...state.tradeDraft, amountIRR } };
     }
 
     case 'PREVIEW_TRADE': {
@@ -175,7 +177,7 @@ export function portfolioReducer(state: AppState, action: AppAction): AppState {
       if (state.stage !== STAGES.ACTIVE) return state;
       // v10: Check quantity instead of valueIRR
       const startProtectAction = action as { type: 'START_PROTECT'; assetId?: string };
-      const assetId = startProtectAction.assetId || state.holdings.find((h: Holding) => h.quantity > 0)?.assetId;
+      const assetId = (startProtectAction.assetId || state.holdings.find((h: Holding) => h.quantity > 0)?.assetId) as AssetId | undefined;
       if (!assetId) return state;
       return {
         ...state,
@@ -186,7 +188,7 @@ export function portfolioReducer(state: AppState, action: AppAction): AppState {
 
     case 'SET_PROTECT_ASSET': {
       if (!state.protectDraft) return state;
-      return { ...state, protectDraft: { ...state.protectDraft, assetId: action.assetId } };
+      return { ...state, protectDraft: { ...state.protectDraft, assetId: action.assetId as AssetId } };
     }
 
     case 'SET_PROTECT_MONTHS': {
@@ -226,12 +228,13 @@ export function portfolioReducer(state: AppState, action: AppAction): AppState {
 
     case 'SET_BORROW_ASSET': {
       if (!state.borrowDraft) return state;
-      return { ...state, borrowDraft: { ...state.borrowDraft, assetId: action.assetId } };
+      return { ...state, borrowDraft: { ...state.borrowDraft, assetId: action.assetId as AssetId } };
     }
 
     case 'SET_BORROW_AMOUNT': {
       if (!state.borrowDraft) return state;
-      return { ...state, borrowDraft: { ...state.borrowDraft, amountIRR: action.amountIRR } };
+      const amountIRR = typeof action.amountIRR === 'string' ? parseFloat(action.amountIRR) || null : action.amountIRR;
+      return { ...state, borrowDraft: { ...state.borrowDraft, amountIRR } };
     }
 
     case 'PREVIEW_BORROW': {
@@ -355,17 +358,17 @@ export function portfolioReducer(state: AppState, action: AppAction): AppState {
       const newProtections = state.protections.filter(p => p.id !== protectionId);
 
       // Create ledger entry
-      const entry = {
+      const entry: LedgerEntry = {
         id: uid(),
         tsISO: nowISO(),
-        type: 'PROTECTION_CANCELLED_COMMIT',
+        type: 'PROTECTION_CANCELLED_COMMIT' as LedgerEntryType,
         details: {
           protectionId,
           assetId: protection.assetId,
         },
       };
 
-      let next = {
+      let next: AppState = {
         ...state,
         protections: newProtections,
         ledger: [...state.ledger, entry],

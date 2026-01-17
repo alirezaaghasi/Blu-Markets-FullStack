@@ -10,7 +10,7 @@ import { cloneState, previewAddFunds, previewTrade, previewBorrow, previewRepay,
 import { calcPremiumIRR } from '../../engine/pricing';
 import { uid, nowISO } from '../../helpers';
 import { addLogEntry } from '../initialState';
-import type { AppState, AppAction, LedgerEntry, LedgerEntryType, Protection } from '../../types';
+import type { AppState, AppAction, LedgerEntry, LedgerEntryType, Protection, ActionPayload } from '../../types';
 
 export const LEDGER_ACTIONS: string[] = ['CONFIRM_PENDING', 'CANCEL_PENDING'];
 
@@ -90,7 +90,7 @@ export function ledgerReducer(state: AppState, action: AppAction): AppState {
         type: `${p.kind}_COMMIT` as LedgerEntryType,
         details: {
           kind: p.kind,
-          payload: p.payload,
+          payload: p.payload as ActionPayload,
           boundary: p.boundary,
           validation: p.validation,
           before: p.before,

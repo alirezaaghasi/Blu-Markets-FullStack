@@ -10,6 +10,7 @@ import {
   selectProtectionDaysMap,
 } from '../selectors/index';
 import type { Holding, Protection, Loan, TargetLayerPct, PortfolioSnapshot, PortfolioStatus, AssetId, TradeSide, Layer } from '../types';
+import type { HoldingValue } from '../engine/snapshot';
 
 interface HoldingWithValue {
   holding: Holding;
@@ -26,7 +27,7 @@ interface PortfolioHomeProps {
   targetLayerPct: TargetLayerPct;
   protections: Protection[];
   loans: Loan[];
-  snapshot: PortfolioSnapshot & { holdingValues?: unknown };
+  snapshot: PortfolioSnapshot & { holdingValues?: HoldingValue[] };
   portfolioStatus: PortfolioStatus;
   onStartTrade: (assetId: AssetId, side?: TradeSide) => void;
   onStartProtect: (assetId: AssetId) => void;
@@ -95,7 +96,7 @@ function PortfolioHome({ holdings, cashIRR, targetLayerPct, protections, loans, 
 
   // v10: Precompute holdings grouped by layer - use selector
   const holdingsByLayer = useMemo(
-    () => selectHoldingsByLayer(holdings, snapshot.holdingValues),
+    () => selectHoldingsByLayer(holdings, snapshot.holdingValues || []),
     [holdings, snapshot.holdingValues]
   );
 

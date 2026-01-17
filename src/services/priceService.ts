@@ -285,8 +285,8 @@ export async function fetchAllPrices(signal?: AbortSignal): Promise<AllPricesRes
     fxSource: fxResult.source || 'fallback',
     updatedAt: new Date().toISOString(),
     errors: {
-      crypto: cryptoResult.ok ? null : cryptoResult.error,
-      stock: stockResult.ok ? null : stockResult.error,
+      crypto: cryptoResult.ok ? null : (cryptoResult as CryptoPricesError).error,
+      stock: stockResult.ok ? null : (stockResult as StockPriceError).error,
       fx: fxResult.ok ? null : (fxResult as FxRateError).error || null,
     },
   };
