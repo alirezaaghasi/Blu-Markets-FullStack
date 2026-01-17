@@ -1086,3 +1086,129 @@ body {
   color: #fb923c;
   border-color: rgba(249, 115, 22, 0.3);
 }
+
+/* ===== LIQUIDATION RISK SECTION (Borrow Confirmation) ===== */
+
+.liquidationRiskSection {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.liquidationHeader {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.liquidationRiskSection .summaryRow {
+  margin-bottom: 8px;
+}
+
+.liquidationRiskSection .summaryValue.warning {
+  color: #f59e0b;
+}
+
+.liquidationWarning {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 6px;
+  font-size: 12px;
+  color: #fbbf24;
+  line-height: 1.4;
+}
+
+/* ===== PROTECTION CONTRACT SECTION ===== */
+
+.protectionContractHeader {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: center;
+  padding: 8px 0 16px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.protectionExplanation {
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 6px;
+  font-size: 12px;
+  color: #a78bfa;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* ===== LOAN CAPACITY SECTION (Borrow Form) ===== */
+
+.loanCapacitySection {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.loanCapacityHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.loanCapacityLabel {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.loanCapacityValue {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.loanCapacityBarContainer {
+  height: 6px;
+  background: var(--bg-secondary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.loanCapacityBar {
+  height: 100%;
+  background: #4ade80;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.loanCapacityBar.caution {
+  background: #fbbf24;
+}
+
+.loanCapacityBar.warning {
+  background: #f97316;
+}
+
+.loanCapacityHint {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.borrowHintNote {
+  color: #fbbf24;
+  font-size: 11px;
+}

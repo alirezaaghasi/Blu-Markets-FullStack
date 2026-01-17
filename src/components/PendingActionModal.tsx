@@ -1,9 +1,10 @@
 import React, { useState, useMemo, Dispatch } from 'react';
 import { formatIRR, formatIRRShort, getAssetDisplayName } from '../helpers';
-import { ERROR_MESSAGES, SPREAD_BY_LAYER } from '../constants/index';
+import { ERROR_MESSAGES, SPREAD_BY_LAYER, DEFAULT_PRICES, DEFAULT_FX_RATE } from '../constants/index';
 import { LAYERS, LAYER_EXPLANATIONS } from '../constants/index';
 import { ASSET_LAYER } from '../state/domain';
-import type { Layer, PendingAction, TargetLayerPct, PortfolioSnapshot, RebalanceTrade, AppAction } from '../types';
+import { calcLiquidationIRR } from '../engine/pricing';
+import type { Layer, PendingAction, TargetLayerPct, PortfolioSnapshot, RebalanceTrade, AppAction, AssetId } from '../types';
 
 /**
  * Get spread percentage for an asset based on its layer
@@ -221,29 +222,86 @@ function PendingActionModal({ pendingAction, targetLayerPct, dispatch }: Pending
 
       case 'PROTECT':
         const premiumPaid = before.cashIRR - after.cashIRR;
+        const protectMeta = validation.meta || {};
+        const coverageIRR = protectMeta.notionalIRR as number || 0;
+        const protectMonths = payloadAny.months as number;
+        const protectAssetId = payloadAny.assetId as AssetId;
+
+        // Calculate dates
+        const startDate = new Date();
+        const endDate = new Date();
+        endDate.setMonth(endDate.getMonth() + protectMonths);
+        const durationDays = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
+        // Get strike price in USD (from default prices)
+        const strikePriceUSD = (DEFAULT_PRICES as Record<string, number>)[protectAssetId] || 0;
+
+        // Premium as percentage of coverage
+        const premiumPct = coverageIRR > 0 ? (premiumPaid / coverageIRR * 100) : 0;
+
+        // Format dates
+        const formatDate = (d: Date) => d.toLocaleDateString('en-US', {
+          month: 'short', day: 'numeric', year: 'numeric'
+        });
+
         return (
           <div className="simpleSummary">
+            <div className="protectionContractHeader">Protection Contract</div>
+
             <div className="summaryRow">
               <span className="summaryLabel">Asset</span>
-              <span className="summaryValue">{getAssetDisplayName(payloadAny.assetId as string)}</span>
+              <span className="summaryValue">{getAssetDisplayName(protectAssetId)}</span>
             </div>
             <div className="summaryRow">
+              <span className="summaryLabel">Coverage</span>
+              <span className="summaryValue">{formatIRR(coverageIRR)}</span>
+            </div>
+            {strikePriceUSD > 0 && (
+              <div className="summaryRow">
+                <span className="summaryLabel">Strike price</span>
+                <span className="summaryValue">${strikePriceUSD.toLocaleString()} / {protectAssetId}</span>
+              </div>
+            )}
+            <div className="summaryRow">
               <span className="summaryLabel">Duration</span>
-              <span className="summaryValue">{payloadAny.months as number} month{(payloadAny.months as number) > 1 ? 's' : ''}</span>
+              <span className="summaryValue">{durationDays} days</span>
+            </div>
+            <div className="summaryRow">
+              <span className="summaryLabel">Start</span>
+              <span className="summaryValue">{formatDate(startDate)}</span>
+            </div>
+            <div className="summaryRow">
+              <span className="summaryLabel">Expires</span>
+              <span className="summaryValue">{formatDate(endDate)}</span>
             </div>
             <div className="summaryRow">
               <span className="summaryLabel">Premium</span>
-              <span className="summaryValue">{formatIRR(premiumPaid)}</span>
+              <span className="summaryValue">{formatIRR(premiumPaid)} ({premiumPct.toFixed(1)}%)</span>
+            </div>
+
+            <div className="protectionExplanation">
+              If {getAssetDisplayName(protectAssetId)} falls below the strike price during
+              coverage, you receive the difference up to the coverage amount.
             </div>
           </div>
         );
 
       case 'BORROW':
+        // Calculate liquidation details from validation meta
+        const borrowMeta = validation.meta || {};
+        const holdingValueIRR = borrowMeta.holdingValueIRR as number || 0;
+        const maxLtv = borrowMeta.maxLtv as number || 0.3;
+        const loanAmount = payloadAny.amountIRR as number;
+        const liquidationThreshold = calcLiquidationIRR({ amountIRR: loanAmount, ltv: maxLtv });
+        const bufferPct = holdingValueIRR > 0
+          ? ((holdingValueIRR - liquidationThreshold) / holdingValueIRR * 100)
+          : 0;
+
         return (
           <div className="simpleSummary">
             <div className="summaryRow">
               <span className="summaryLabel">Loan amount</span>
-              <span className="summaryValue">{formatIRR(payloadAny.amountIRR as number)}</span>
+              <span className="summaryValue">{formatIRR(loanAmount)}</span>
             </div>
             <div className="summaryRow">
               <span className="summaryLabel">Collateral</span>
@@ -252,6 +310,29 @@ function PendingActionModal({ pendingAction, targetLayerPct, dispatch }: Pending
             <div className="summaryRow">
               <span className="summaryLabel">New cash balance</span>
               <span className="summaryValue">{formatIRR(after.cashIRR)}</span>
+            </div>
+
+            {/* Liquidation Risk Section */}
+            <div className="liquidationRiskSection">
+              <div className="liquidationHeader">Liquidation Risk</div>
+              <div className="summaryRow">
+                <span className="summaryLabel">Liquidation threshold</span>
+                <span className="summaryValue">{formatIRR(liquidationThreshold)}</span>
+              </div>
+              <div className="summaryRow">
+                <span className="summaryLabel">Current collateral value</span>
+                <span className="summaryValue">{formatIRR(holdingValueIRR)}</span>
+              </div>
+              <div className="summaryRow">
+                <span className="summaryLabel">Buffer</span>
+                <span className={`summaryValue ${bufferPct < 20 ? 'warning' : ''}`}>
+                  {bufferPct.toFixed(1)}% below current
+                </span>
+              </div>
+              <div className="liquidationWarning">
+                If collateral value falls below the liquidation threshold,
+                your asset may be sold to repay the loan.
+              </div>
             </div>
           </div>
         );

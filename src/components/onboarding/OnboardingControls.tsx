@@ -1,5 +1,5 @@
 import React, { useState, useMemo, Dispatch, ReactNode } from 'react';
-import { STAGES, LAYER_EXPLANATIONS, THRESHOLDS, COLLATERAL_LTV_BY_LAYER, ONBOARDING_STEPS } from '../../constants/index';
+import { STAGES, LAYER_EXPLANATIONS, THRESHOLDS, COLLATERAL_LTV_BY_LAYER, ONBOARDING_STEPS, MAX_TOTAL_LOAN_PCT } from '../../constants/index';
 import { formatIRR, getAssetDisplayName, getHoldingValueIRR } from '../../helpers';
 import { calcPremiumIRR } from '../../engine/pricing';
 import { ASSET_LAYER } from '../../state/domain';
@@ -234,6 +234,31 @@ function OnboardingControls({ state, dispatch, prices, fxRate }: OnboardingContr
     const layerInfo = LAYER_EXPLANATIONS[layer];
     return { holding: h, layer, layerLtv, maxBorrow, layerInfo, holdingValueIRR };
   }, [state.borrowDraft, holdingsById, prices, fxRate]);
+
+  // Calculate global loan capacity (25% of total portfolio)
+  const loanCapacity = useMemo(() => {
+    // Calculate total portfolio value
+    const totalHoldingsIRR = state.holdings.reduce((sum, h) => {
+      return sum + getHoldingValueIRR(h, prices, fxRate);
+    }, 0);
+    const totalPortfolioIRR = (state.cashIRR || 0) + totalHoldingsIRR;
+
+    // Calculate existing loans total
+    const existingLoansIRR = (state.loans || []).reduce((sum, loan) => sum + loan.amountIRR, 0);
+
+    // Calculate capacity
+    const maxTotalLoans = Math.floor(totalPortfolioIRR * MAX_TOTAL_LOAN_PCT);
+    const remainingCapacity = Math.max(0, maxTotalLoans - existingLoansIRR);
+    const usedPct = maxTotalLoans > 0 ? (existingLoansIRR / maxTotalLoans * 100) : 0;
+
+    return {
+      totalPortfolioIRR,
+      maxTotalLoans,
+      existingLoansIRR,
+      remainingCapacity,
+      usedPct
+    };
+  }, [state.holdings, state.cashIRR, state.loans, prices, fxRate]);
 
   // Memoize select options using pre-filtered lists
   const protectOptions = useMemo(() => {
@@ -547,8 +572,32 @@ function OnboardingControls({ state, dispatch, prices, fxRate }: OnboardingContr
   }
 
   if (state.borrowDraft && borrowData) {
+    // Effective max is the minimum of asset LTV limit and remaining global capacity
+    const effectiveMax = Math.min(borrowData.maxBorrow, loanCapacity.remainingCapacity);
+
     return (
       <ActionCard title="💰 Borrow">
+        {/* Global Loan Capacity Display */}
+        <div className="loanCapacitySection">
+          <div className="loanCapacityHeader">
+            <span className="loanCapacityLabel">Portfolio Loan Capacity</span>
+            <span className="loanCapacityValue">
+              {formatIRR(loanCapacity.existingLoansIRR)} / {formatIRR(loanCapacity.maxTotalLoans)}
+            </span>
+          </div>
+          <div className="loanCapacityBarContainer">
+            <div
+              className={`loanCapacityBar ${loanCapacity.usedPct >= 80 ? 'warning' : loanCapacity.usedPct >= 60 ? 'caution' : ''}`}
+              style={{ width: `${Math.min(100, loanCapacity.usedPct)}%` }}
+            />
+          </div>
+          <div className="loanCapacityHint">
+            {loanCapacity.remainingCapacity > 0
+              ? `${formatIRR(loanCapacity.remainingCapacity)} available (25% of portfolio)`
+              : 'Portfolio loan limit reached'}
+          </div>
+        </div>
+
         <select
           className="input"
           value={state.borrowDraft.assetId || ''}
@@ -570,7 +619,12 @@ function OnboardingControls({ state, dispatch, prices, fxRate }: OnboardingContr
           value={state.borrowDraft.amountIRR ?? ''}
           onChange={(e) => dispatch({ type: 'SET_BORROW_AMOUNT', amountIRR: e.target.value })}
         />
-        <div className="borrowHint">Max: {formatIRR(borrowData.maxBorrow)}</div>
+        <div className="borrowHint">
+          Max: {formatIRR(effectiveMax)}
+          {effectiveMax < borrowData.maxBorrow && (
+            <span className="borrowHintNote"> (limited by portfolio cap)</span>
+          )}
+        </div>
         <div className="row" style={{ marginTop: 10 }}>
           <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_BORROW', prices, fxRate })} disabled={!state.borrowDraft.amountIRR}>Preview</button>
           <button className="btn" onClick={() => dispatch({ type: 'CANCEL_PENDING' })}>Cancel</button>

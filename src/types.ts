@@ -293,6 +293,9 @@ export interface ValidationMeta {
   existingLoans?: number;
   remainingCapacity?: number;
   requested?: number;
+  // Protection and borrow validation
+  notionalIRR?: number;
+  holdingValueIRR?: number;
 }
 
 export interface ValidationResult {
