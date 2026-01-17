@@ -20,10 +20,11 @@ const TAB_IDS: TabId[] = ['PORTFOLIO', 'PROTECTION', 'LOANS', 'HISTORY'];
 
 // Preload functions for lazy-loaded tab components
 // Called on hover to eliminate network delay on click
-const preloadFunctions: Partial<Record<TabId, () => void>> = {
-  HISTORY: () => import('./HistoryPane'),
+const preloadFunctions: Record<TabId, () => void> = {
+  PORTFOLIO: () => import('./PortfolioHome'),
   PROTECTION: () => import('./Protection'),
   LOANS: () => import('./Loans'),
+  HISTORY: () => import('./HistoryPane'),
 };
 
 // Track which tabs have been preloaded to avoid duplicate imports
@@ -32,9 +33,9 @@ const preloadedTabs = new Set<TabId>();
 function Tabs({ tab, dispatch }: TabsProps): React.ReactElement {
   // Preload chunk on hover (only once per tab)
   const handleMouseEnter = useCallback((tabId: TabId) => {
-    if (!preloadedTabs.has(tabId) && preloadFunctions[tabId]) {
+    if (!preloadedTabs.has(tabId)) {
       preloadedTabs.add(tabId);
-      preloadFunctions[tabId]!();
+      preloadFunctions[tabId]();
     }
   }, []);
 
