@@ -38,9 +38,16 @@ function computeHoldingValue(holding, prices, fxRate) {
  * Supports live prices for quantity-based holdings.
  *
  * Performance notes:
- * - This function is memoized in App.jsx via useMemo
+ * - This function is memoized in App.jsx via useMemo (recomputes only when
+ *   holdings/cash/prices/fxRate change)
  * - Caller should gate calls (e.g., skip during onboarding with empty holdings)
- * - Single O(n) loop where n = holdings count (typically 6-8 assets)
+ * - Single O(n) loop where n = holdings count (typically 6-15 assets)
+ * - For current portfolio sizes, full recomputation is ~0.1ms which is negligible
+ *
+ * Incremental update consideration:
+ * - If portfolio grows to 50+ assets or polling frequency increases to <5s,
+ *   consider caching per-holding values with price-keyed invalidation
+ * - Current approach is optimal for the expected use case (15 assets, 30s polls)
  *
  * @param {Array} holdings - Array of { assetId, quantity, frozen, purchasedAt? }
  * @param {number} cashIRR - Cash balance in IRR

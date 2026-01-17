@@ -1,12 +1,122 @@
 import React, { useMemo } from 'react';
 import { formatIRR, getAssetDisplayName } from '../helpers.js';
 
+// ============================================================================
+// HELPER FUNCTIONS (moved outside component to avoid re-creation per render)
+// ============================================================================
+
+/**
+ * Calculate loan health status based on LTV percentage
+ * @param {number} usedPercent - Percentage of limit used (0-100+)
+ * @returns {{ level: string, color: string }}
+ */
+function getLoanHealth(usedPercent) {
+  // All bars use blue - percentage tells the story
+  const color = '#3B82F6';
+  if (usedPercent >= 75) return { level: 'critical', color };
+  if (usedPercent >= 65) return { level: 'warning', color };
+  if (usedPercent >= 50) return { level: 'caution', color };
+  return { level: 'healthy', color };
+}
+
+/**
+ * Calculate liquidation price in IRR for a loan
+ * @param {Object} loan - Loan object with liquidationIRR and collateralAssetId
+ * @param {number} quantity - Quantity of collateral asset
+ * @returns {number|null} Liquidation price per unit in IRR
+ */
+function getLiquidationPriceIRR(loan, quantity) {
+  if (!quantity || quantity <= 0) return null;
+  return loan.liquidationIRR / quantity;
+}
+
+// ============================================================================
+// LOAN CARD COMPONENT (memoized for performance)
+// ============================================================================
+
+const LoanCard = React.memo(function LoanCard({ loan, holdingQuantity, dispatch }) {
+  const usedPercent = (loan.amountIRR / loan.liquidationIRR) * 100;
+  const health = getLoanHealth(usedPercent);
+  const liquidationPrice = getLiquidationPriceIRR(loan, holdingQuantity);
+
+  return (
+    <div className={`loanCard ${health.level}`}>
+      <div className="loanCardHeader">
+        <div className="loanCardTitle">
+          <span className="loanLabel">LOAN</span>
+          <span className="loanCollateral">{getAssetDisplayName(loan.collateralAssetId)} Collateral</span>
+        </div>
+      </div>
+
+      <div className="loanCardAmount">
+        <span className="amountLabel">Borrowed:</span>
+        <span className="amountValue">{formatIRR(loan.amountIRR)}</span>
+      </div>
+
+      {/* Health bar */}
+      <div className="loanHealthSection">
+        <div className="healthBarTrack">
+          <div
+            className="healthBarFill"
+            style={{ width: `${Math.min(100, usedPercent)}%`, background: health.color }}
+          />
+        </div>
+        <div className="healthLabelRow">
+          <span className="healthPercent">{Math.round(usedPercent)}% used</span>
+          <span className="healthLimit">Limit: {formatIRR(loan.liquidationIRR)}</span>
+        </div>
+      </div>
+
+      {/* Liquidation price display */}
+      {liquidationPrice && (
+        <div className="loanLiquidation">
+          <div className="liquidationRow">
+            <span className="liquidationLabel">Liquidation price:</span>
+            <span className="liquidationPrice">{formatIRR(liquidationPrice)}</span>
+          </div>
+        </div>
+      )}
+
+      <button
+        className="btn primary"
+        style={{ width: '100%', marginTop: 12 }}
+        onClick={() => dispatch({ type: 'START_REPAY', loanId: loan.id })}
+      >
+        Repay
+      </button>
+    </div>
+  );
+});
+
 /**
  * Loans - Active loans list with LTV health indicators
  * Decision 11: Shows liquidation price in IRR with explanation
+ *
+ * Optimizations:
+ * - Holdings lookup map (O(1) instead of O(n) per loan)
+ * - Loan health calculations moved outside component
+ * - Memoized loan data and total
+ * - LoanCard component memoized
  */
 function Loans({ loans, holdings, dispatch }) {
   const loanList = loans || [];
+
+  // Precompute holdings map for O(1) lookup (instead of O(n) find per loan)
+  const holdingsMap = useMemo(() => {
+    const map = new Map();
+    if (holdings) {
+      for (const h of holdings) {
+        map.set(h.assetId, h);
+      }
+    }
+    return map;
+  }, [holdings]);
+
+  // Memoize total loan amount
+  const totalLoanAmount = useMemo(
+    () => loanList.reduce((sum, l) => sum + l.amountIRR, 0),
+    [loanList]
+  );
 
   // Issue 18: Empty state with explanation and CTA
   if (loanList.length === 0) {
@@ -27,30 +137,6 @@ function Loans({ loans, holdings, dispatch }) {
     );
   }
 
-  // Issue 5: Enhanced loan status - monochrome health bar
-  const getLoanHealth = (loan) => {
-    const usedPercent = (loan.amountIRR / loan.liquidationIRR) * 100;
-    // All bars use blue - percentage tells the story
-    const color = '#3B82F6';
-    if (usedPercent >= 75) return { level: 'critical', color };
-    if (usedPercent >= 65) return { level: 'warning', color };
-    if (usedPercent >= 50) return { level: 'caution', color };
-    return { level: 'healthy', color };
-  };
-
-  // Decision 11: Calculate liquidation price in IRR for each loan
-  const getLiquidationPriceIRR = (loan) => {
-    const holding = holdings?.find(h => h.assetId === loan.collateralAssetId);
-    if (!holding || holding.quantity <= 0) return null;
-    // Liquidation price per unit in IRR = liquidationIRR / quantity
-    return loan.liquidationIRR / holding.quantity;
-  };
-
-  const totalLoanAmount = useMemo(
-    () => loanList.reduce((sum, l) => sum + l.amountIRR, 0),
-    [loanList]
-  );
-
   // Issue 17: Consolidate loan header - just show title, total in subtitle
   return (
     <div className="card">
@@ -61,60 +147,14 @@ function Loans({ loans, holdings, dispatch }) {
       {/* Issue 5: Redesigned loan cards with health bar */}
       <div className="loanCards">
         {loanList.map((loan) => {
-          const health = getLoanHealth(loan);
-          const usedPercent = (loan.amountIRR / loan.liquidationIRR) * 100;
-
+          const holding = holdingsMap.get(loan.collateralAssetId);
           return (
-            <div key={loan.id} className={`loanCard ${health.level}`}>
-              <div className="loanCardHeader">
-                <div className="loanCardTitle">
-                  <span className="loanLabel">LOAN</span>
-                  <span className="loanCollateral">{getAssetDisplayName(loan.collateralAssetId)} Collateral</span>
-                </div>
-              </div>
-
-              <div className="loanCardAmount">
-                <span className="amountLabel">Borrowed:</span>
-                <span className="amountValue">{formatIRR(loan.amountIRR)}</span>
-              </div>
-
-              {/* Health bar */}
-              <div className="loanHealthSection">
-                <div className="healthBarTrack">
-                  <div
-                    className="healthBarFill"
-                    style={{ width: `${Math.min(100, usedPercent)}%`, background: health.color }}
-                  />
-                </div>
-                <div className="healthLabelRow">
-                  <span className="healthPercent">{Math.round(usedPercent)}% used</span>
-                  <span className="healthLimit">Limit: {formatIRR(loan.liquidationIRR)}</span>
-                </div>
-              </div>
-
-              {/* Liquidation price display */}
-              {(() => {
-                const liquidationPrice = getLiquidationPriceIRR(loan);
-                if (!liquidationPrice) return null;
-                return (
-                  <div className="loanLiquidation">
-                    <div className="liquidationRow">
-                      <span className="liquidationLabel">Liquidation price:</span>
-                      <span className="liquidationPrice">{formatIRR(liquidationPrice)}</span>
-                    </div>
-                  </div>
-                );
-              })()}
-
-
-              <button
-                className="btn primary"
-                style={{ width: '100%', marginTop: 12 }}
-                onClick={() => dispatch({ type: 'START_REPAY', loanId: loan.id })}
-              >
-                Repay
-              </button>
-            </div>
+            <LoanCard
+              key={loan.id}
+              loan={loan}
+              holdingQuantity={holding?.quantity}
+              dispatch={dispatch}
+            />
           );
         })}
       </div>

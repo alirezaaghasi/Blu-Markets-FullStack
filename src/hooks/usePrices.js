@@ -84,16 +84,46 @@ function loadCachedFxRate() {
   return DEFAULT_FX_RATE;
 }
 
+// Debounce timer for localStorage writes
+let cacheWriteTimer = null;
+let pendingCacheData = null;
+
 /**
- * Save prices to localStorage cache (with timestamp for TTL)
+ * Save prices to localStorage cache (debounced to reduce main thread blocking)
+ * Uses requestIdleCallback when available, falls back to setTimeout
  */
 function cachePrices(prices, fxRate) {
-  try {
-    localStorage.setItem(PRICE_CACHE_KEY, JSON.stringify(prices));
-    localStorage.setItem(FX_CACHE_KEY, String(fxRate));
-    localStorage.setItem(CACHE_TIMESTAMP_KEY, String(Date.now()));
-  } catch (e) {
-    // Ignore storage errors (quota exceeded, etc.)
+  // Store pending data
+  pendingCacheData = { prices, fxRate };
+
+  // Cancel any pending write
+  if (cacheWriteTimer) {
+    if (typeof cancelIdleCallback !== 'undefined') {
+      cancelIdleCallback(cacheWriteTimer);
+    } else {
+      clearTimeout(cacheWriteTimer);
+    }
+  }
+
+  // Schedule write during idle time (or after 1s timeout)
+  const writeToStorage = () => {
+    if (!pendingCacheData) return;
+    try {
+      localStorage.setItem(PRICE_CACHE_KEY, JSON.stringify(pendingCacheData.prices));
+      localStorage.setItem(FX_CACHE_KEY, String(pendingCacheData.fxRate));
+      localStorage.setItem(CACHE_TIMESTAMP_KEY, String(Date.now()));
+    } catch (e) {
+      // Ignore storage errors (quota exceeded, etc.)
+    }
+    pendingCacheData = null;
+    cacheWriteTimer = null;
+  };
+
+  if (typeof requestIdleCallback !== 'undefined') {
+    cacheWriteTimer = requestIdleCallback(writeToStorage, { timeout: 1000 });
+  } else {
+    // Fallback for browsers without requestIdleCallback
+    cacheWriteTimer = setTimeout(writeToStorage, 100);
   }
 }
 
