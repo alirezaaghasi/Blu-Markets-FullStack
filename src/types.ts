@@ -288,6 +288,11 @@ export interface ValidationMeta {
   maxBorrow?: number;
   maxLtv?: number;
   loan?: Loan;
+  // Loan cap validation (v10.2.7)
+  maxTotalLoans?: number;
+  existingLoans?: number;
+  remainingCapacity?: number;
+  requested?: number;
 }
 
 export interface ValidationResult {

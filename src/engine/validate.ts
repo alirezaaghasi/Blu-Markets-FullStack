@@ -44,6 +44,7 @@ interface ValidationMetaWithLoan extends ValidationMeta {
   loan?: Loan;
   notionalIRR?: number;
   holdingValueIRR?: number;
+  remainingLoanCapacity?: number;
 }
 
 /**
