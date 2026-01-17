@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
-import { formatIRR, getAssetDisplayName } from '../helpers.js';
-import { selectHoldingsById, selectLoanSummary, selectLoanHealth } from '../selectors/index.js';
+import { formatIRR, getAssetDisplayName } from '../helpers';
+import { selectHoldingsById, selectLoanSummary, selectLoanHealth } from '../selectors/index';
 
 /**
  * Calculate liquidation price in IRR for a loan

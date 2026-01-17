@@ -1,7 +1,5 @@
 /**
- * ═══════════════════════════════════════════════════════════════════════════════
  * BLU MARKETS v10 — INTRA-LAYER BALANCING ENGINE
- * ═══════════════════════════════════════════════════════════════════════════════
  *
  * Dynamic allocation using Hybrid Risk-Adjusted Momentum (HRAM):
  *   1. Risk Parity (inverse volatility)
@@ -13,12 +11,68 @@
  *   Weight[i] = normalize(
  *     RiskParityWeight × MomentumFactor × CorrelationFactor × LiquidityFactor
  *   )
- *
- * ═══════════════════════════════════════════════════════════════════════════════
  */
 
-import { LAYER_ASSETS, ASSET_META } from '../state/domain.js';
-import { BALANCER_CONFIG, STRATEGY_PRESETS, DEFAULT_PRICES } from '../constants/index.js';
+import type { Layer, AssetId, TradeSide, StrategyPreset, IntraLayerWeightResult } from '../types';
+import { LAYER_ASSETS, ASSET_META } from '../state/domain';
+import { BALANCER_CONFIG, STRATEGY_PRESETS, DEFAULT_PRICES } from '../constants/index';
+
+interface PricePoint {
+  price: number;
+  [key: string]: unknown;
+}
+
+interface PriceHistory {
+  [assetId: string]: PricePoint[];
+}
+
+interface BalancerConfig {
+  VOLATILITY_WINDOW?: number;
+  MOMENTUM_WINDOW?: number;
+  CORRELATION_WINDOW?: number;
+  MOMENTUM_STRENGTH?: number;
+  CORRELATION_PENALTY?: number;
+  LIQUIDITY_BONUS?: number;
+  MAX_WEIGHT?: number;
+  MIN_WEIGHT?: number;
+  DRIFT_THRESHOLD?: number;
+  EMERGENCY_DRIFT_THRESHOLD?: number;
+  MIN_REBALANCE_INTERVAL_DAYS?: number;
+  MIN_TRADE_VALUE_IRR?: number;
+}
+
+interface AssetFactors {
+  volatility: number;
+  riskParityWeight: number;
+  momentum: number;
+  momentumFactor: number;
+  avgCorrelation: number;
+  correlationFactor: number;
+  liquidityFactor: number;
+}
+
+interface RebalanceDecision {
+  shouldRebalance: boolean;
+  reason: 'EMERGENCY' | 'NORMAL' | null;
+  maxDrift: number;
+  driftByAsset: Record<string, number>;
+  daysSinceLastRebalance: number;
+}
+
+interface TradeOrder {
+  asset: string;
+  layer: string;
+  side: TradeSide;
+  quantity: number;
+  valueIRR: number;
+  currentWeight: number;
+  targetWeight: number;
+}
+
+interface HoldingData {
+  quantity?: number;
+  [key: string]: unknown;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MARKET DATA PROVIDER
@@ -29,14 +83,16 @@ import { BALANCER_CONFIG, STRATEGY_PRESETS, DEFAULT_PRICES } from '../constants/
  * Can use historical price data or fall back to base volatility from ASSET_META
  */
 export class MarketDataProvider {
-  constructor(priceHistory = {}) {
+  private priceHistory: PriceHistory;
+
+  constructor(priceHistory: PriceHistory = {}) {
     this.priceHistory = priceHistory;
   }
 
   /**
    * Get current price for an asset
    */
-  getCurrentPrice(asset) {
+  getCurrentPrice(asset: string): number | null {
     const history = this.priceHistory[asset];
     if (history && history.length > 0) {
       return history[history.length - 1].price;
@@ -47,7 +103,7 @@ export class MarketDataProvider {
   /**
    * Get price history for an asset
    */
-  getPriceHistory(asset, days) {
+  getPriceHistory(asset: string, days: number): PricePoint[] {
     const history = this.priceHistory[asset] || [];
     return history.slice(-days);
   }
@@ -56,13 +112,13 @@ export class MarketDataProvider {
    * Calculate realized volatility from price history
    * Falls back to base volatility from ASSET_META if insufficient data
    */
-  calculateVolatility(asset, days = BALANCER_CONFIG.VOLATILITY_WINDOW) {
+  calculateVolatility(asset: string, days: number = BALANCER_CONFIG.VOLATILITY_WINDOW): number {
     const history = this.getPriceHistory(asset, days + 1);
     if (history.length < 2) {
       return ASSET_META[asset]?.baseVolatility || 0.5;
     }
 
-    const returns = [];
+    const returns: number[] = [];
     for (let i = 1; i < history.length; i++) {
       const dailyReturn = (history[i].price - history[i - 1].price) / history[i - 1].price;
       returns.push(dailyReturn);
@@ -80,7 +136,7 @@ export class MarketDataProvider {
    * Calculate momentum (price vs SMA)
    * Returns value between -1 and 1
    */
-  calculateMomentum(asset, days = BALANCER_CONFIG.MOMENTUM_WINDOW) {
+  calculateMomentum(asset: string, days: number = BALANCER_CONFIG.MOMENTUM_WINDOW): number {
     const history = this.getPriceHistory(asset, days);
     if (history.length < days * 0.5) return 0;
 
@@ -94,7 +150,7 @@ export class MarketDataProvider {
   /**
    * Calculate correlation between two assets
    */
-  calculateCorrelation(asset1, asset2, days = BALANCER_CONFIG.CORRELATION_WINDOW) {
+  calculateCorrelation(asset1: string, asset2: string, days: number = BALANCER_CONFIG.CORRELATION_WINDOW): number {
     const history1 = this.getPriceHistory(asset1, days + 1);
     const history2 = this.getPriceHistory(asset2, days + 1);
 
@@ -102,8 +158,8 @@ export class MarketDataProvider {
 
     const minLen = Math.min(history1.length, history2.length);
 
-    const returns1 = [];
-    const returns2 = [];
+    const returns1: number[] = [];
+    const returns2: number[] = [];
     for (let i = 1; i < minLen; i++) {
       returns1.push((history1[i].price - history1[i - 1].price) / history1[i - 1].price);
       returns2.push((history2[i].price - history2[i - 1].price) / history2[i - 1].price);
@@ -143,27 +199,26 @@ export class MarketDataProvider {
  * using the HRAM (Hybrid Risk-Adjusted Momentum) algorithm
  */
 export class IntraLayerBalancer {
-  constructor(marketData, config = {}) {
+  private marketData: MarketDataProvider;
+  private config: BalancerConfig;
+
+  constructor(marketData: MarketDataProvider, config: BalancerConfig = {}) {
     this.marketData = marketData;
     this.config = { ...BALANCER_CONFIG, ...config };
   }
 
   /**
    * Calculate optimal weights for assets within a layer
-   * @param {string} layer - Layer name (FOUNDATION, GROWTH, UPSIDE)
-   * @param {string[]} assets - Optional array of assets (defaults to LAYER_ASSETS[layer])
-   * @param {object} options - Optional config overrides
-   * @returns {object} { weights, factors, metadata }
    */
-  calculateWeights(layer, assets = null, options = {}) {
-    const layerAssets = assets || LAYER_ASSETS[layer] || [];
+  calculateWeights(layer: string, assets: string[] | null = null, options: BalancerConfig = {}): IntraLayerWeightResult {
+    const layerAssets = assets || LAYER_ASSETS[layer as Layer] || [];
     if (layerAssets.length === 0) {
       return { weights: {}, factors: {} };
     }
 
     const config = { ...this.config, ...options };
-    const factors = {};
-    const rawWeights = {};
+    const factors: Record<string, AssetFactors> = {};
+    const rawWeights: Record<string, number> = {};
 
     // Calculate factors for each asset
     for (const asset of layerAssets) {
@@ -178,7 +233,7 @@ export class IntraLayerBalancer {
 
     // Normalize weights
     const totalRaw = Object.values(rawWeights).reduce((a, b) => a + b, 0);
-    const normalizedWeights = {};
+    const normalizedWeights: Record<string, number> = {};
     for (const asset of layerAssets) {
       normalizedWeights[asset] = totalRaw > 0 ? rawWeights[asset] / totalRaw : 1 / layerAssets.length;
     }
@@ -200,14 +255,14 @@ export class IntraLayerBalancer {
   /**
    * Calculate all four HRAM factors for an asset
    */
-  _calculateFactors(asset, allAssets, config) {
+  private _calculateFactors(asset: string, allAssets: string[], config: BalancerConfig): AssetFactors {
     // 1. Risk Parity (inverse volatility)
     const volatility = this.marketData.calculateVolatility(asset);
     const riskParityWeight = 1 / Math.max(volatility, 0.01);
 
     // 2. Momentum Factor
     const momentum = this.marketData.calculateMomentum(asset);
-    const momentumFactor = 1 + (momentum * config.MOMENTUM_STRENGTH);
+    const momentumFactor = 1 + (momentum * (config.MOMENTUM_STRENGTH || 0.3));
 
     // 3. Correlation Factor
     let totalCorrelation = 0;
@@ -220,7 +275,7 @@ export class IntraLayerBalancer {
       }
     }
     const avgCorrelation = correlationCount > 0 ? totalCorrelation / correlationCount : 0;
-    const correlationFactor = 1 - (avgCorrelation * config.CORRELATION_PENALTY);
+    const correlationFactor = 1 - (avgCorrelation * (config.CORRELATION_PENALTY || 0.2));
 
     // 4. Liquidity Factor
     const liquidityFactor = this._getLiquidityFactor(asset, config);
@@ -239,20 +294,22 @@ export class IntraLayerBalancer {
   /**
    * Get liquidity factor from ASSET_META
    */
-  _getLiquidityFactor(asset, config) {
+  private _getLiquidityFactor(asset: string, config: BalancerConfig): number {
     const meta = ASSET_META[asset];
     if (!meta) return 1;
 
     const baseScore = meta.liquidityScore || 0.80;
-    return 1 + (baseScore - 0.80) * config.LIQUIDITY_BONUS;
+    return 1 + (baseScore - 0.80) * (config.LIQUIDITY_BONUS || 0.5);
   }
 
   /**
    * Apply min/max caps and renormalize
    */
-  _applyCaps(weights, config) {
+  private _applyCaps(weights: Record<string, number>, config: BalancerConfig): Record<string, number> {
     const assets = Object.keys(weights);
     const capped = { ...weights };
+    const maxWeight = config.MAX_WEIGHT || 0.40;
+    const minWeight = config.MIN_WEIGHT || 0.05;
 
     for (let iteration = 0; iteration < 10; iteration++) {
       let needsRenormalize = false;
@@ -260,13 +317,13 @@ export class IntraLayerBalancer {
       let uncappedCount = 0;
 
       for (const asset of assets) {
-        if (capped[asset] > config.MAX_WEIGHT) {
-          surplus += capped[asset] - config.MAX_WEIGHT;
-          capped[asset] = config.MAX_WEIGHT;
+        if (capped[asset] > maxWeight) {
+          surplus += capped[asset] - maxWeight;
+          capped[asset] = maxWeight;
           needsRenormalize = true;
-        } else if (capped[asset] < config.MIN_WEIGHT) {
-          surplus -= config.MIN_WEIGHT - capped[asset];
-          capped[asset] = config.MIN_WEIGHT;
+        } else if (capped[asset] < minWeight) {
+          surplus -= minWeight - capped[asset];
+          capped[asset] = minWeight;
           needsRenormalize = true;
         } else {
           uncappedCount++;
@@ -277,7 +334,7 @@ export class IntraLayerBalancer {
 
       const surplusPerAsset = surplus / uncappedCount;
       for (const asset of assets) {
-        if (capped[asset] > config.MIN_WEIGHT && capped[asset] < config.MAX_WEIGHT) {
+        if (capped[asset] > minWeight && capped[asset] < maxWeight) {
           capped[asset] += surplusPerAsset;
         }
       }
@@ -294,22 +351,16 @@ export class IntraLayerBalancer {
 
   /**
    * Check if rebalance is needed based on drift threshold and time
-   *
-   * Decision logic:
-   * - EMERGENCY: >10% drift → Rebalance immediately (ignores time limit)
-   * - NORMAL: >5% drift AND ≥1 day since last rebalance
-   * - WAIT: <5% drift OR (5-10% drift with <1 day since last rebalance)
-   *
-   * @param {string} layer - Layer name
-   * @param {object} currentWeights - Current weights by asset
-   * @param {object} targetWeights - Target weights by asset
-   * @param {Date|string|null} lastRebalanceTime - When layer was last rebalanced
-   * @returns {object} { shouldRebalance, reason, maxDrift, driftByAsset, daysSinceLastRebalance }
    */
-  needsRebalance(layer, currentWeights, targetWeights, lastRebalanceTime = null) {
+  needsRebalance(
+    layer: string,
+    currentWeights: Record<string, number>,
+    targetWeights: Record<string, number>,
+    lastRebalanceTime: Date | string | null = null
+  ): RebalanceDecision {
     const assets = Object.keys(targetWeights);
     let maxDrift = 0;
-    const driftByAsset = {};
+    const driftByAsset: Record<string, number> = {};
 
     for (const asset of assets) {
       const current = currentWeights[asset] || 0;
@@ -322,30 +373,28 @@ export class IntraLayerBalancer {
     // Calculate days since last rebalance
     const now = new Date();
     const daysSinceLastRebalance = lastRebalanceTime
-      ? (now - new Date(lastRebalanceTime)) / (1000 * 60 * 60 * 24)
-      : Infinity; // If no last rebalance, treat as long time ago
+      ? (now.getTime() - new Date(lastRebalanceTime).getTime()) / (1000 * 60 * 60 * 24)
+      : Infinity;
 
     // Decision logic
     let shouldRebalance = false;
-    let reason = null;
+    let reason: 'EMERGENCY' | 'NORMAL' | null = null;
 
     const emergencyThreshold = this.config.EMERGENCY_DRIFT_THRESHOLD || 0.10;
     const normalThreshold = this.config.DRIFT_THRESHOLD || 0.05;
     const minIntervalDays = this.config.MIN_REBALANCE_INTERVAL_DAYS || 1;
 
     if (maxDrift > emergencyThreshold) {
-      // EMERGENCY: Drift > 10% → Rebalance immediately, ignore time limit
       shouldRebalance = true;
       reason = 'EMERGENCY';
     } else if (maxDrift > normalThreshold && daysSinceLastRebalance >= minIntervalDays) {
-      // NORMAL: Drift > 5% AND at least 1 day since last rebalance
       shouldRebalance = true;
       reason = 'NORMAL';
     }
 
     return {
       shouldRebalance,
-      reason,           // 'EMERGENCY' | 'NORMAL' | null
+      reason,
       maxDrift,
       driftByAsset,
       daysSinceLastRebalance,
@@ -353,28 +402,33 @@ export class IntraLayerBalancer {
   }
 
   /**
-   * Alias for needsRebalance for API consistency with reference implementation
+   * Alias for needsRebalance for API consistency
    */
-  shouldRebalance(layer, currentWeights, targetWeights, lastRebalanceTime = null) {
+  shouldRebalance(
+    layer: string,
+    currentWeights: Record<string, number>,
+    targetWeights: Record<string, number>,
+    lastRebalanceTime: Date | string | null = null
+  ): RebalanceDecision {
     return this.needsRebalance(layer, currentWeights, targetWeights, lastRebalanceTime);
   }
 
   /**
    * Generate trades needed to rebalance from current to target weights
-   * @param {string} layer - Layer name
-   * @param {object} currentHoldings - Map of assetId -> { quantity }
-   * @param {object} targetWeights - Map of assetId -> weight (0-1)
-   * @param {number} layerValue - Total value of the layer in IRR
-   * @param {number} fxRate - USD to IRR exchange rate
-   * @returns {array} Array of trade objects
    */
-  generateRebalanceTrades(layer, currentHoldings, targetWeights, layerValue, fxRate) {
-    const trades = [];
-    const currentWeights = {};
+  generateRebalanceTrades(
+    layer: string,
+    currentHoldings: Record<string, HoldingData>,
+    targetWeights: Record<string, number>,
+    layerValue: number,
+    fxRate: number
+  ): TradeOrder[] {
+    const trades: TradeOrder[] = [];
+    const currentWeights: Record<string, number> = {};
 
     // Calculate current weights
     let totalValue = 0;
-    const holdingValues = {};
+    const holdingValues: Record<string, number> = {};
 
     for (const [asset, holding] of Object.entries(currentHoldings)) {
       const price = this.marketData.getCurrentPrice(asset) || 0;
@@ -402,7 +456,6 @@ export class IntraLayerBalancer {
       const weightDiff = targetWeight - currentWeight;
       const valueDiff = weightDiff * portfolioValue;
 
-      // Skip small trades (use config threshold or default 100,000 IRR)
       const minTradeValue = this.config.MIN_TRADE_VALUE_IRR || 100000;
       if (Math.abs(valueDiff) < minTradeValue) continue;
 
@@ -420,7 +473,7 @@ export class IntraLayerBalancer {
       });
     }
 
-    // Sort: SELL first (to free up cash), then by value descending
+    // Sort: SELL first, then by value descending
     trades.sort((a, b) => {
       if (a.side === 'SELL' && b.side === 'BUY') return -1;
       if (a.side === 'BUY' && b.side === 'SELL') return 1;
@@ -435,6 +488,12 @@ export class IntraLayerBalancer {
 // WEIGHT MODIFIER (USER PREFERENCES)
 // ─────────────────────────────────────────────────────────────────────────────
 
+interface UserPreferences {
+  favorites?: string[];
+  excluded?: string[];
+  boosts?: Record<string, number>;
+}
+
 /**
  * Applies user preferences to calculated weights
  */
@@ -442,7 +501,7 @@ export class WeightModifier {
   /**
    * Apply user preferences like favorites, exclusions, and boosts
    */
-  static applyPreferences(weights, preferences = {}) {
+  static applyPreferences(weights: Record<string, number>, preferences: UserPreferences = {}): Record<string, number> {
     const modified = { ...weights };
     const { favorites = [], excluded = [], boosts = {} } = preferences;
 
@@ -478,7 +537,11 @@ export class WeightModifier {
    * Adjust weights based on user risk tolerance
    * riskTolerance: 0 = conservative, 0.5 = neutral, 1 = aggressive
    */
-  static applyRiskTolerance(weights, factors, riskTolerance = 0.5) {
+  static applyRiskTolerance(
+    weights: Record<string, number>,
+    factors: Record<string, AssetFactors>,
+    riskTolerance: number = 0.5
+  ): Record<string, number> {
     const modified = { ...weights };
 
     for (const [asset, weight] of Object.entries(weights)) {
@@ -512,16 +575,22 @@ export class WeightModifier {
 /**
  * Create a balancer with a specific strategy preset
  */
-export function createBalancer(strategyName = 'BALANCED', priceHistory = {}) {
+export function createBalancer(strategyName: StrategyPreset = 'BALANCED', priceHistory: PriceHistory = {}): IntraLayerBalancer {
   const strategy = STRATEGY_PRESETS[strategyName] || STRATEGY_PRESETS.BALANCED;
   const marketData = new MarketDataProvider(priceHistory);
   return new IntraLayerBalancer(marketData, strategy);
 }
 
+interface LayerWeightsResult {
+  FOUNDATION: IntraLayerWeightResult;
+  GROWTH: IntraLayerWeightResult;
+  UPSIDE: IntraLayerWeightResult;
+}
+
 /**
  * Calculate weights for all layers
  */
-export function calculateAllLayerWeights(strategyName = 'BALANCED', priceHistory = {}) {
+export function calculateAllLayerWeights(strategyName: StrategyPreset = 'BALANCED', priceHistory: PriceHistory = {}): LayerWeightsResult {
   const balancer = createBalancer(strategyName, priceHistory);
 
   return {
@@ -535,6 +604,6 @@ export function calculateAllLayerWeights(strategyName = 'BALANCED', priceHistory
  * Get static weights (fallback when no price history available)
  * Uses base volatility from ASSET_META
  */
-export function getStaticWeights(strategyName = 'BALANCED') {
+export function getStaticWeights(strategyName: StrategyPreset = 'BALANCED'): LayerWeightsResult {
   return calculateAllLayerWeights(strategyName, {});
 }

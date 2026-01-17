@@ -12,8 +12,8 @@
  * - CANCEL_PROTECTION
  */
 
-import { computeSnapshot } from '../../engine/snapshot.js';
-import { classifyActionBoundary, frictionCopyForBoundary } from '../../engine/boundary.js';
+import { computeSnapshot } from '../../engine/snapshot';
+import { classifyActionBoundary, frictionCopyForBoundary } from '../../engine/boundary';
 import {
   validateAddFunds,
   validateTrade,
@@ -21,7 +21,7 @@ import {
   validateBorrow,
   validateRepay,
   validateRebalance,
-} from '../../engine/validate.js';
+} from '../../engine/validate';
 import {
   cloneState,
   previewAddFunds,
@@ -31,10 +31,10 @@ import {
   previewRepay,
   previewRebalance,
   calculateRebalanceGap,
-} from '../../engine/preview.js';
-import { STAGES, DEFAULT_PRICES, DEFAULT_FX_RATE } from '../../constants/index.js';
-import { uid, nowISO } from '../../helpers.js';
-import { addLogEntry } from '../initialState.js';
+} from '../../engine/preview';
+import { STAGES, DEFAULT_PRICES, DEFAULT_FX_RATE } from '../../constants/index';
+import { uid, nowISO } from '../../helpers';
+import { addLogEntry } from '../initialState';
 
 /** @type {string[]} */
 export const PORTFOLIO_ACTIONS = [

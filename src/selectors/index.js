@@ -20,21 +20,21 @@ export {
   selectHoldingsByLayer,
   selectAvailableCollateral,
   selectNonEmptyHoldings,
-} from './holdingSelectors.js';
+} from './holdingSelectors';
 
 // Loan selectors
 export {
   selectLoanSummary,
   selectLoanById,
   selectLoanHealth,
-} from './loanSelectors.js';
+} from './loanSelectors';
 
 // Portfolio selectors
 export {
   selectDrift,
   selectIsLayerOnTarget,
   selectPortfolioMetrics,
-} from './portfolioSelectors.js';
+} from './portfolioSelectors';
 
 // Protection selectors
 export {
@@ -42,4 +42,4 @@ export {
   selectProtectionDaysMap,
   selectHasActiveProtection,
   selectAssetProtection,
-} from './protectionSelectors.js';
+} from './protectionSelectors';

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { formatIRR, formatIRRShort } from '../helpers.js';
-import { LAYER_EXPLANATIONS, LAYERS } from '../constants/index.js';
+import { formatIRR, formatIRRShort } from '../helpers';
+import { LAYER_EXPLANATIONS, LAYERS } from '../constants/index';
 import LayerMini from './LayerMini.jsx';
 import HoldingRow from './HoldingRow.jsx';
 import {
@@ -8,7 +8,7 @@ import {
   selectLoanSummary,
   selectDrift,
   selectProtectionDaysMap,
-} from '../selectors/index.js';
+} from '../selectors/index';
 
 /**
  * PortfolioHome - Main portfolio dashboard

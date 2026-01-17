@@ -1,5 +1,5 @@
 import React from 'react';
-import { LAYER_EXPLANATIONS } from '../constants/index.js';
+import { LAYER_EXPLANATIONS } from '../constants/index';
 
 /**
  * LayerMini - Compact layer percentage card

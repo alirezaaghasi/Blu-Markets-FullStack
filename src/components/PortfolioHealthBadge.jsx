@@ -1,5 +1,5 @@
 import React from 'react';
-import { PORTFOLIO_STATUS_LABELS } from '../constants/index.js';
+import { PORTFOLIO_STATUS_LABELS } from '../constants/index';
 
 // Module-level constant to avoid recreation on every render
 const COLOR_MAP = {

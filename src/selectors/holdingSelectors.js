@@ -3,7 +3,7 @@
 /** @typedef {import('../types').Layer} Layer */
 /** @typedef {import('../types').AssetId} AssetId */
 
-import { ASSET_LAYER } from '../state/domain.js';
+import { ASSET_LAYER } from '../state/domain';
 
 /**
  * Create a Map of holdings by assetId for O(1) lookups

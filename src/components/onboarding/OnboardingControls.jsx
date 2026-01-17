@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { STAGES, LAYER_EXPLANATIONS, THRESHOLDS, COLLATERAL_LTV_BY_LAYER, ONBOARDING_STEPS } from '../../constants/index.js';
-import { formatIRR, getAssetDisplayName, getHoldingValueIRR } from '../../helpers.js';
-import { calcPremiumIRR } from '../../engine/pricing.js';
-import { ASSET_LAYER } from '../../state/domain.js';
+import { STAGES, LAYER_EXPLANATIONS, THRESHOLDS, COLLATERAL_LTV_BY_LAYER, ONBOARDING_STEPS } from '../../constants/index';
+import { formatIRR, getAssetDisplayName, getHoldingValueIRR } from '../../helpers';
+import { calcPremiumIRR } from '../../engine/pricing';
+import { ASSET_LAYER } from '../../state/domain';
 import PhoneForm from './PhoneForm.jsx';
 import PendingActionModal from '../PendingActionModal.jsx';
 import ProfileResult from '../ProfileResult.jsx';

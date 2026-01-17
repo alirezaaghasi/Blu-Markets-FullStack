@@ -4,7 +4,7 @@
 // are now derived from src/registry/assetRegistry.js and re-exported here for compatibility.
 
 // Re-export asset-related constants from registry
-export { DEFAULT_PRICES, WEIGHTS, PROTECTION_ELIGIBLE_ASSETS } from '../registry/assetRegistry.js';
+export { DEFAULT_PRICES, WEIGHTS, PROTECTION_ELIGIBLE_ASSETS } from '../registry/assetRegistry';
 
 // Centralized default FX rate (single source of truth)
 // 1 USD = 1,456,000 IRR

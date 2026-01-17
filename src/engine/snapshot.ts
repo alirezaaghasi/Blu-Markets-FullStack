@@ -1,30 +1,48 @@
-// @ts-check
-/** @typedef {import('../types').Holding} Holding */
-/** @typedef {import('../types').PortfolioSnapshot} PortfolioSnapshot */
-/** @typedef {import('../types').Layer} Layer */
-/** @typedef {import('../types').AssetId} AssetId */
+import type { Holding, Layer, AssetId, TargetLayerPct } from '../types';
+import { ASSET_LAYER } from '../state/domain';
+import { calculateFixedIncomeValue, FixedIncomeBreakdown } from './fixedIncome';
+import { DEFAULT_PRICES, DEFAULT_FX_RATE } from '../constants/index';
 
-import { ASSET_LAYER } from "../state/domain.js";
-import { calculateFixedIncomeValue } from "./fixedIncome.js";
-import { DEFAULT_PRICES, DEFAULT_FX_RATE } from "../constants/index.js";
+interface HoldingValueResult {
+  valueIRR: number;
+  priceUSD: number | null;
+  breakdown: FixedIncomeBreakdown | null;
+}
 
-/**
- * @typedef {Object} HoldingValueResult
- * @property {number} valueIRR - Value in IRR
- * @property {number|null} priceUSD - Price in USD (null for internal assets)
- * @property {Object|null} breakdown - Breakdown details for fixed income
- */
+export interface HoldingValue {
+  assetId: AssetId;
+  quantity: number;
+  valueIRR: number;
+  priceUSD: number | null;
+  breakdown: FixedIncomeBreakdown | null;
+  layer: Layer;
+  frozen: boolean;
+}
+
+export interface ComputedSnapshot {
+  totalIRR: number;
+  holdingsIRR: number;
+  cashIRR: number;
+  holdingsIRRByAsset: Record<AssetId, number>;
+  holdingValues: HoldingValue[];
+  layerPct: TargetLayerPct;
+  layerIRR: Record<Layer, number>;
+}
+
+// Extended holding type for legacy support
+interface HoldingWithLegacy extends Holding {
+  valueIRR?: number;
+}
 
 /**
  * Compute holding value in IRR
  * Supports both quantity-based (v10+) and legacy valueIRR holdings
- *
- * @param {Holding} holding - Holding object
- * @param {Record<string, number>} prices - Current prices in USD
- * @param {number} fxRate - USD/IRR exchange rate
- * @returns {HoldingValueResult}
  */
-function computeHoldingValue(holding, prices, fxRate) {
+function computeHoldingValue(
+  holding: HoldingWithLegacy,
+  prices: Record<string, number>,
+  fxRate: number
+): HoldingValueResult {
   // Legacy support: if valueIRR exists and quantity doesn't, use valueIRR directly
   if (holding.valueIRR !== undefined && holding.quantity === undefined) {
     return { valueIRR: holding.valueIRR, priceUSD: null, breakdown: null };
@@ -47,28 +65,6 @@ function computeHoldingValue(holding, prices, fxRate) {
 }
 
 /**
- * @typedef {Object} HoldingValue
- * @property {AssetId} assetId - Asset identifier
- * @property {number} quantity - Quantity held
- * @property {number} valueIRR - Value in IRR
- * @property {number|null} priceUSD - Price in USD
- * @property {Object|null} breakdown - Fixed income breakdown
- * @property {Layer} layer - Asset layer
- * @property {boolean} frozen - Whether holding is frozen
- */
-
-/**
- * @typedef {Object} ComputedSnapshot
- * @property {number} totalIRR - Total portfolio value (holdings + cash)
- * @property {number} holdingsIRR - Holdings value only
- * @property {number} cashIRR - Cash balance
- * @property {Record<AssetId, number>} holdingsIRRByAsset - Value per asset
- * @property {HoldingValue[]} holdingValues - Computed holding values
- * @property {Record<Layer, number>} layerPct - Layer percentages
- * @property {Record<Layer, number>} layerIRR - Layer values in IRR
- */
-
-/**
  * Compute portfolio snapshot from holdings and cash.
  * Supports live prices for quantity-based holdings.
  *
@@ -83,36 +79,35 @@ function computeHoldingValue(holding, prices, fxRate) {
  * - If portfolio grows to 50+ assets or polling frequency increases to <5s,
  *   consider caching per-holding values with price-keyed invalidation
  * - Current approach is optimal for the expected use case (15 assets, 30s polls)
- *
- * @param {Holding[]} holdings - Array of holdings
- * @param {number} cashIRR - Cash balance in IRR
- * @param {Record<string, number>} [prices] - Current asset prices in USD
- * @param {number} [fxRate] - USD/IRR exchange rate
- * @returns {ComputedSnapshot}
  */
-export function computeSnapshot(holdings, cashIRR, prices = DEFAULT_PRICES, fxRate = DEFAULT_FX_RATE) {
+export function computeSnapshot(
+  holdings: Holding[],
+  cashIRR: number,
+  prices: Record<string, number> = DEFAULT_PRICES,
+  fxRate: number = DEFAULT_FX_RATE
+): ComputedSnapshot {
   // Early return for empty holdings (no computation needed)
   if (!holdings || holdings.length === 0) {
     return {
       totalIRR: cashIRR,
       holdingsIRR: 0,
       cashIRR,
-      holdingsIRRByAsset: {},
+      holdingsIRRByAsset: {} as Record<AssetId, number>,
       holdingValues: [],
       layerPct: { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
       layerIRR: { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
     };
   }
 
-  const holdingsIRRByAsset = {};
-  const holdingValues = [];
+  const holdingsIRRByAsset: Record<string, number> = {};
+  const holdingValues: HoldingValue[] = [];
   let holdingsTotal = 0;
-  const layerIRR = { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
+  const layerIRR: Record<Layer, number> = { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
 
   // Single loop: compute values, build asset map, totals, and layer allocations
   for (const h of holdings) {
     const { valueIRR, priceUSD, breakdown } = computeHoldingValue(h, prices, fxRate);
-    const layer = ASSET_LAYER[h.assetId];
+    const layer = ASSET_LAYER[h.assetId] as Layer;
 
     holdingsIRRByAsset[h.assetId] = valueIRR;
     holdingsTotal += valueIRR;
@@ -133,19 +128,19 @@ export function computeSnapshot(holdings, cashIRR, prices = DEFAULT_PRICES, fxRa
   const totalIRR = holdingsTotal + cashIRR;
 
   // Layer percentages based on holdings total (not total with cash)
-  const layerPct = {
+  const layerPct: TargetLayerPct = {
     FOUNDATION: holdingsTotal ? (layerIRR.FOUNDATION / holdingsTotal) * 100 : 0,
     GROWTH: holdingsTotal ? (layerIRR.GROWTH / holdingsTotal) * 100 : 0,
     UPSIDE: holdingsTotal ? (layerIRR.UPSIDE / holdingsTotal) * 100 : 0,
   };
 
   return {
-    totalIRR,                    // Holdings + Cash (total portfolio value)
-    holdingsIRR: holdingsTotal,  // Holdings only
-    cashIRR,                     // Cash separate
-    holdingsIRRByAsset,
-    holdingValues,               // Computed values with breakdowns
-    layerPct,                    // Based on holdings only
-    layerIRR,                    // Based on holdings only
+    totalIRR,                           // Holdings + Cash (total portfolio value)
+    holdingsIRR: holdingsTotal,         // Holdings only
+    cashIRR,                            // Cash separate
+    holdingsIRRByAsset: holdingsIRRByAsset as Record<AssetId, number>,
+    holdingValues,                      // Computed values with breakdowns
+    layerPct,                           // Based on holdings only
+    layerIRR,                           // Based on holdings only
   };
 }

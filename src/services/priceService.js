@@ -11,8 +11,8 @@
  * - Request timeouts to prevent long-hanging requests
  */
 
-import { getCoinGeckoIds } from '../registry/assetRegistry.js';
-import { DEFAULT_FX_RATE } from '../constants/index.js';
+import { getCoinGeckoIds } from '../registry/assetRegistry';
+import { DEFAULT_FX_RATE } from '../constants/index';
 
 // Default timeout for API requests (8 seconds)
 const DEFAULT_TIMEOUT_MS = 8000;

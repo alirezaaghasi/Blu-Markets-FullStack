@@ -11,7 +11,7 @@
  * - HIDE_RESET_CONFIRM: Hide reset confirmation modal
  */
 
-import { initialState } from '../initialState.js';
+import { initialState } from '../initialState';
 
 /** @type {string[]} */
 export const UI_ACTIONS = [

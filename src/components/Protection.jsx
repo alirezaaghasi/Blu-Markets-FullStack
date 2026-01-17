@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { formatIRR, getAssetDisplayName } from '../helpers.js';
-import { ASSET_LAYER } from '../state/domain.js';
-import { LAYER_EXPLANATIONS } from '../constants/index.js';
-import { selectActiveProtections } from '../selectors/index.js';
+import { formatIRR, getAssetDisplayName } from '../helpers';
+import { ASSET_LAYER } from '../state/domain';
+import { LAYER_EXPLANATIONS } from '../constants/index';
+import { selectActiveProtections } from '../selectors/index';
 
 /**
  * Protection - Active protections list with progress bars

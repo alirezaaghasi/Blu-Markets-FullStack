@@ -7,10 +7,10 @@
  * - CANCEL_PENDING: Cancel pending action and clear drafts
  */
 
-import { cloneState, previewAddFunds, previewTrade, previewBorrow, previewRepay, previewRebalance } from '../../engine/preview.js';
-import { calcPremiumIRR } from '../../engine/pricing.js';
-import { uid, nowISO } from '../../helpers.js';
-import { addLogEntry } from '../initialState.js';
+import { cloneState, previewAddFunds, previewTrade, previewBorrow, previewRepay, previewRebalance } from '../../engine/preview';
+import { calcPremiumIRR } from '../../engine/pricing';
+import { uid, nowISO } from '../../helpers';
+import { addLogEntry } from '../initialState';
 
 /** @type {string[]} */
 export const LEDGER_ACTIONS = ['CONFIRM_PENDING', 'CANCEL_PENDING'];

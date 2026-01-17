@@ -3,11 +3,11 @@
  * Tests portfolio calculations, volatility scenarios, user profiles, loans, and edge cases
  */
 
-import { computeSnapshot } from './snapshot.js';
-import { calculateRebalanceGap, previewRebalance, previewBorrow, previewRepay, previewTrade, previewProtect } from './preview.js';
-import { validateTrade, validateBorrow, validateProtect, validateRepay, validateAddFunds } from './validate.js';
-import { calculateFixedIncomeValue, irrToFixedIncomeUnits, FIXED_INCOME_UNIT_PRICE, FIXED_INCOME_ANNUAL_RATE } from './fixedIncome.js';
-import { DEFAULT_PRICES, DEFAULT_FX_RATE, COLLATERAL_LTV_BY_LAYER } from '../constants/index.js';
+import { computeSnapshot } from './snapshot';
+import { calculateRebalanceGap, previewRebalance, previewBorrow, previewRepay, previewTrade, previewProtect } from './preview';
+import { validateTrade, validateBorrow, validateProtect, validateRepay, validateAddFunds } from './validate';
+import { calculateFixedIncomeValue, irrToFixedIncomeUnits, FIXED_INCOME_UNIT_PRICE, FIXED_INCOME_ANNUAL_RATE } from './fixedIncome';
+import { DEFAULT_PRICES, DEFAULT_FX_RATE, COLLATERAL_LTV_BY_LAYER } from '../constants/index';
 
 // Test counters
 let passed = 0;

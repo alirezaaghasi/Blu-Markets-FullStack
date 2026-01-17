@@ -1,5 +1,5 @@
 import React from 'react';
-import { LAYERS } from '../constants/index.js';
+import { LAYERS } from '../constants/index';
 
 /**
  * DonutChart - Allocation visualization component

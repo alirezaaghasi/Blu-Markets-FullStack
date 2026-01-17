@@ -13,13 +13,13 @@
  * - EXECUTE_PORTFOLIO: Create initial portfolio
  */
 
-import { STAGES, THRESHOLDS, LAYERS, WEIGHTS, DEFAULT_PRICES, DEFAULT_FX_RATE } from '../../constants/index.js';
-import { ASSETS } from '../../state/domain.js';
-import { irrToFixedIncomeUnits } from '../../engine/fixedIncome.js';
-import { uid, nowISO } from '../../helpers.js';
-import { calculateFinalRisk, answersToRichFormat } from '../../engine/riskScoring.js';
+import { STAGES, THRESHOLDS, LAYERS, WEIGHTS, DEFAULT_PRICES, DEFAULT_FX_RATE } from '../../constants/index';
+import { ASSETS } from '../../state/domain';
+import { irrToFixedIncomeUnits } from '../../engine/fixedIncome';
+import { uid, nowISO } from '../../helpers';
+import { calculateFinalRisk, answersToRichFormat } from '../../engine/riskScoring';
 import questionnaire from '../../data/questionnaire.v2.fa.json';
-import { addLogEntry } from '../initialState.js';
+import { addLogEntry } from '../initialState';
 
 /** @type {string[]} */
 export const ONBOARDING_ACTIONS = [

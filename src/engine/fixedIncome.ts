@@ -10,14 +10,18 @@
 export const FIXED_INCOME_UNIT_PRICE = 500_000;  // IRR per unit
 export const FIXED_INCOME_ANNUAL_RATE = 0.30;    // 30% annual
 
+export interface FixedIncomeBreakdown {
+  principal: number;
+  accrued: number;
+  total: number;
+  daysHeld: number;
+  dailyRate: number;
+}
+
 /**
  * Calculate fixed income value breakdown
- *
- * @param {number} quantity - Number of units held
- * @param {string} purchasedAt - ISO timestamp of purchase
- * @returns {Object} { principal, accrued, total, daysHeld, dailyRate }
  */
-export function calculateFixedIncomeValue(quantity, purchasedAt) {
+export function calculateFixedIncomeValue(quantity: number, purchasedAt?: string): FixedIncomeBreakdown {
   const principal = quantity * FIXED_INCOME_UNIT_PRICE;
 
   if (!purchasedAt) {
@@ -52,11 +56,7 @@ export function calculateFixedIncomeValue(quantity, purchasedAt) {
 /**
  * Convert IRR amount to fixed income units
  * Used when buying fixed income
- *
- * @param {number} amountIRR - Amount in IRR to invest
- * @returns {number} Number of units (can be fractional)
  */
-export function irrToFixedIncomeUnits(amountIRR) {
+export function irrToFixedIncomeUnits(amountIRR: number): number {
   return amountIRR / FIXED_INCOME_UNIT_PRICE;
 }
-

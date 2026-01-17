@@ -3,7 +3,7 @@
  * Asset Registry - Public API
  *
  * Re-exports all registry data for backwards compatibility.
- * New code should import directly from './assetRegistry.js'
+ * New code should import directly from './assetRegistry'
  */
 
 export {
@@ -25,4 +25,4 @@ export {
 
   // Legacy (deprecated)
   ASSET_META,
-} from './assetRegistry.js';
+} from './assetRegistry';

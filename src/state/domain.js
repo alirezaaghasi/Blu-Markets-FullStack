@@ -10,7 +10,7 @@ export {
   ASSET_LAYER,
   LAYER_ASSETS,
   ASSET_META,
-} from '../registry/assetRegistry.js';
+} from '../registry/assetRegistry';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LAYER RANGES

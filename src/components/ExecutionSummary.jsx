@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { formatIRRShort, getAssetDisplayName } from '../helpers.js';
+import { formatIRRShort, getAssetDisplayName } from '../helpers';
 
 /**
  * ExecutionSummary - Toast notification for completed actions

@@ -3,7 +3,7 @@ export { default as ActionLogPane } from './ActionLogPane.jsx';
 export { default as Tabs } from './Tabs.jsx';
 
 // Onboarding Controls (statically imported by App.jsx)
-export { OnboardingControls } from './onboarding/index.js';
+export { OnboardingControls } from './onboarding/index';
 
 // Components below are lazy-loaded directly by App.jsx for code-splitting
 // Do NOT add them here as it creates static imports that prevent chunking:

@@ -10,14 +10,14 @@ import React, { useMemo, useReducer, useCallback, Suspense, lazy, useEffect } fr
 import './styles/app.css';
 
 // Engine imports
-import { computeSnapshot } from './engine/snapshot.js';
-import { computePortfolioStatus } from './engine/portfolioStatus.js';
+import { computeSnapshot } from './engine/snapshot';
+import { computePortfolioStatus } from './engine/portfolioStatus';
 
 // Hook imports
-import { usePrices } from './hooks/usePrices.js';
+import { usePrices } from './hooks/usePrices';
 
 // Constants imports
-import { STAGES } from './constants/index.js';
+import { STAGES } from './constants/index';
 
 // Empty snapshot for onboarding stage (avoid computation when not needed)
 const EMPTY_SNAPSHOT = {
@@ -30,21 +30,21 @@ const EMPTY_SNAPSHOT = {
 };
 
 // Utility imports
-import { formatIRR, formatIRRShort } from './helpers.js';
+import { formatIRR, formatIRRShort } from './helpers';
 
 // Reducer imports
-import { reducer, initialState } from './reducers/appReducer.js';
+import { reducer, initialState } from './reducers/appReducer';
 
 // Questionnaire metadata only - full questionnaire is loaded lazily in onboarding components
 // This avoids bundling the full JSON for users who skip onboarding
-import { QUESTIONNAIRE_LENGTH } from './data/questionnaireMetadata.js';
+import { QUESTIONNAIRE_LENGTH } from './data/questionnaireMetadata';
 
 // Component imports (core - minimal for initial render)
 import {
   ActionLogPane,
   Tabs,
   OnboardingControls,
-} from './components/index.js';
+} from './components/index';
 
 // Lazy-loaded components (code-split for smaller initial bundle)
 // Tab panels

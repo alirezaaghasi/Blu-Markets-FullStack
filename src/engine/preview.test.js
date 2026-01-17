@@ -3,8 +3,8 @@
  * 50+ test scenarios covering edge cases and various portfolio configurations
  */
 
-import { calculateRebalanceGap, previewRebalance } from './preview.js';
-import { computeSnapshot } from './snapshot.js';
+import { calculateRebalanceGap, previewRebalance } from './preview';
+import { computeSnapshot } from './snapshot';
 
 // Test counters
 let passed = 0;

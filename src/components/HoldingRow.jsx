@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { formatIRR, formatUSD, formatQuantity, getAssetDisplayName } from '../helpers.js';
+import { formatIRR, formatUSD, formatQuantity, getAssetDisplayName } from '../helpers';
 
 /**
  * HoldingRow - Single asset holding with buy/sell/overflow menu

@@ -426,6 +426,7 @@ export interface AppState {
 
   // === UI State ===
   questionnaire: QuestionnaireState;
+  profileResult: RiskTier | null;  // v10: Risk profile result from questionnaire
   consentStep: number;
   consentMessages: string[];
   investAmountIRR: number | null;
@@ -582,3 +583,10 @@ export type ErrorCode =
   | 'NO_ACTIVE_LOAN'
   | 'NO_CASH'
   | 'INVALID_MODE';
+
+// ============================================================================
+// REDUCER TYPES
+// ============================================================================
+
+/** Slice reducer function signature */
+export type SliceReducer = (state: AppState, action: AppAction) => AppState;

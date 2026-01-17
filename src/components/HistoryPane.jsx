@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { formatIRR, formatIRRShort, getAssetDisplayName, formatTimeOnly } from '../helpers.js';
+import { formatIRR, formatIRRShort, getAssetDisplayName, formatTimeOnly } from '../helpers';
 
 // Pagination config
 const ITEMS_PER_PAGE = 20;

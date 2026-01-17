@@ -1,6 +1,6 @@
 import React from 'react';
-import { STAGES, LAYER_EXPLANATIONS, THRESHOLDS, LAYERS } from '../../constants/index.js';
-import { formatIRR } from '../../helpers.js';
+import { STAGES, LAYER_EXPLANATIONS, THRESHOLDS, LAYERS } from '../../constants/index';
+import { formatIRR } from '../../helpers';
 import DonutChart from '../DonutChart.jsx';
 
 /**

@@ -14,10 +14,10 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { fetchAllPrices } from '../services/priceService.js';
-import { loadCachedPrices, loadCachedFxRate, cachePrices } from '../services/priceCache.js';
-import { shallowEqualPrices, createServiceErrors, updateServiceErrors, incrementAllErrors, calculateBackoffDelay } from '../services/pricePolling.js';
-import { createTabCoordinator } from '../services/priceCoordinator.js';
+import { fetchAllPrices } from '../services/priceService';
+import { loadCachedPrices, loadCachedFxRate, cachePrices } from '../services/priceCache';
+import { shallowEqualPrices, createServiceErrors, updateServiceErrors, incrementAllErrors, calculateBackoffDelay } from '../services/pricePolling';
+import { createTabCoordinator } from '../services/priceCoordinator';
 
 /** @type {import('../services/pricePolling.js').PollingConfig} */
 const DEFAULT_CONFIG = {

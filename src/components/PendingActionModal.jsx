@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { formatIRR, formatIRRShort, getAssetDisplayName } from '../helpers.js';
-import { ERROR_MESSAGES } from '../constants/index.js';
-import { LAYERS, LAYER_EXPLANATIONS } from '../constants/index.js';
+import { formatIRR, formatIRRShort, getAssetDisplayName } from '../helpers';
+import { ERROR_MESSAGES } from '../constants/index';
+import { LAYERS, LAYER_EXPLANATIONS } from '../constants/index';
 
 /**
  * Issue 9: Collapsible rebalance trades section with summary

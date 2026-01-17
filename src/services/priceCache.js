@@ -6,7 +6,7 @@
  * Uses requestIdleCallback for debounced writes to avoid blocking the main thread.
  */
 
-import { DEFAULT_PRICES, DEFAULT_FX_RATE } from '../constants/index.js';
+import { DEFAULT_PRICES, DEFAULT_FX_RATE } from '../constants/index';
 
 // LocalStorage keys for price caching
 const PRICE_CACHE_KEY = 'blu_prices_cache';

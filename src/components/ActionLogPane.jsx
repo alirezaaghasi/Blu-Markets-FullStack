@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useMemo } from 'react';
-import { formatTime, formatIRRShort, getAssetDisplayName } from '../helpers.js';
+import { formatTime, formatIRRShort, getAssetDisplayName } from '../helpers';
 
 /**
  * Format activity message with verb-first plain language

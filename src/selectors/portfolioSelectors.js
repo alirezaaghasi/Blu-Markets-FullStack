@@ -3,7 +3,7 @@
 /** @typedef {import('../types').TargetLayerPct} TargetLayerPct */
 /** @typedef {import('../types').PortfolioStatus} PortfolioStatus */
 
-import { LAYERS } from '../constants/index.js';
+import { LAYERS } from '../constants/index';
 
 /**
  * @typedef {Object} DriftResult
