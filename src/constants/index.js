@@ -1,28 +1,10 @@
 // Constants for Blu Markets v10 — 15-Asset Universe
+//
+// NOTE: Asset-related constants (DEFAULT_PRICES, WEIGHTS, PROTECTION_ELIGIBLE_ASSETS)
+// are now derived from src/registry/assetRegistry.js and re-exported here for compatibility.
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// DEFAULT PRICES (USD)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-export const DEFAULT_PRICES = {
-  // Foundation
-  USDT: 1.00,
-  PAXG: 2650,               // Gold price per oz
-  // Growth
-  BTC: 97500,
-  ETH: 3200,
-  BNB: 680,
-  XRP: 2.20,
-  KAG: 30,                  // Silver price per oz
-  QQQ: 521,
-  // Upside
-  SOL: 185,
-  TON: 5.20,
-  LINK: 22,
-  AVAX: 35,
-  MATIC: 0.45,
-  ARB: 0.80,
-};
+// Re-export asset-related constants from registry
+export { DEFAULT_PRICES, WEIGHTS, PROTECTION_ELIGIBLE_ASSETS } from '../registry/assetRegistry.js';
 
 // Centralized default FX rate (single source of truth)
 // 1 USD = 1,456,000 IRR
@@ -125,38 +107,7 @@ export const PREMIUM_RATES = {
   UPSIDE: 0.012,
 };
 
-// Assets eligible for protection (must have liquid derivative markets)
-export const PROTECTION_ELIGIBLE_ASSETS = [
-  'BTC', 'ETH', 'PAXG', 'QQQ', 'SOL', 'BNB', 'XRP', 'LINK', 'AVAX'
-];
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// INTRA-LAYER WEIGHTS (Static defaults, overridden by dynamic balancer)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-export const WEIGHTS = {
-  FOUNDATION: {
-    USDT: 0.40,
-    PAXG: 0.30,
-    IRR_FIXED_INCOME: 0.30,
-  },
-  GROWTH: {
-    BTC: 0.25,
-    ETH: 0.20,
-    BNB: 0.15,
-    XRP: 0.10,
-    KAG: 0.15,
-    QQQ: 0.15,
-  },
-  UPSIDE: {
-    SOL: 0.20,
-    TON: 0.18,
-    LINK: 0.18,
-    AVAX: 0.16,
-    MATIC: 0.14,
-    ARB: 0.14,
-  },
-};
+// WEIGHTS and PROTECTION_ELIGIBLE_ASSETS are now imported from registry (see top of file)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // INTRA-LAYER BALANCING CONFIG (HRAM)

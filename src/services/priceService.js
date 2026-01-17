@@ -11,7 +11,7 @@
  * - Request timeouts to prevent long-hanging requests
  */
 
-import { ASSET_META } from '../state/domain.js';
+import { getCoinGeckoIds } from '../registry/assetRegistry.js';
 import { DEFAULT_FX_RATE } from '../constants/index.js';
 
 // Default timeout for API requests (8 seconds)
@@ -50,12 +50,8 @@ async function fetchWithTimeout(url, signal, timeoutMs = DEFAULT_TIMEOUT_MS) {
   }
 }
 
-// Build CoinGecko IDs map from ASSET_META (single source of truth)
-const COINGECKO_IDS = Object.fromEntries(
-  Object.entries(ASSET_META)
-    .filter(([_, meta]) => meta.source === 'coingecko' && meta.coingeckoId)
-    .map(([assetId, meta]) => [assetId, meta.coingeckoId])
-);
+// Build CoinGecko IDs map from asset registry (single source of truth)
+const COINGECKO_IDS = getCoinGeckoIds();
 
 // Precompute CoinGecko IDs string once at module load (optimization)
 const COINGECKO_IDS_STRING = Object.values(COINGECKO_IDS).join(',');

@@ -1,9 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { formatIRR, formatIRRShort } from '../helpers.js';
-import { ASSET_LAYER } from '../state/domain.js';
 import { LAYER_EXPLANATIONS, LAYERS } from '../constants/index.js';
 import LayerMini from './LayerMini.jsx';
 import HoldingRow from './HoldingRow.jsx';
+import {
+  selectHoldingsByLayer,
+  selectLoanSummary,
+  selectDrift,
+  selectProtectionDaysMap,
+} from '../selectors/index.js';
 
 /**
  * PortfolioHome - Main portfolio dashboard
@@ -43,65 +48,29 @@ function PortfolioHome({ holdings, cashIRR, targetLayerPct, protections, loans, 
     );
   }
 
-  // Consolidated drift calculations - compute once and derive display flags
-  const { totalDrift, isOff, isAttention } = useMemo(() => {
-    const drift = LAYERS.reduce((sum, layer) => {
-      return sum + Math.abs(snapshot.layerPct[layer] - targetLayerPct[layer]);
-    }, 0);
-    return {
-      totalDrift: drift,
-      isOff: drift > 1,
-      isAttention: portfolioStatus === 'ATTENTION_REQUIRED' && drift > 1,
-    };
-  }, [snapshot.layerPct, targetLayerPct, portfolioStatus]);
+  // Consolidated drift calculations - use selector
+  const { totalDrift, isOff, isAttention } = useMemo(
+    () => selectDrift(snapshot.layerPct, targetLayerPct, portfolioStatus),
+    [snapshot.layerPct, targetLayerPct, portfolioStatus]
+  );
 
-  // Memoize protection days as a Map keyed by assetId for O(1) lookups
-  // Uses pre-computed endTimeMs to avoid repeated Date parsing
-  const protectionDaysMap = useMemo(() => {
-    const map = new Map();
-    const now = Date.now();
-    for (const p of protections || []) {
-      // Use pre-computed endTimeMs if available, fallback for legacy data
-      const until = p.endTimeMs ?? new Date(p.endISO).getTime();
-      map.set(p.assetId, Math.max(0, Math.ceil((until - now) / (1000 * 60 * 60 * 24))));
-    }
-    return map;
-  }, [protections, clockTick]);
+  // Memoize protection days as a Map keyed by assetId for O(1) lookups - use selector
+  const protectionDaysMap = useMemo(
+    () => selectProtectionDaysMap(protections),
+    [protections, clockTick]
+  );
 
-  // Consolidated loan summary - compute all loan metrics in single pass
-  const { loanList, totalLoanAmount, criticalRatio } = useMemo(() => {
-    const list = loans || [];
-    let total = 0;
-    let maxRatio = 0;
-    for (const loan of list) {
-      total += loan.amountIRR;
-      const ratio = loan.amountIRR / loan.liquidationIRR;
-      if (ratio > maxRatio) maxRatio = ratio;
-    }
-    return { loanList: list, totalLoanAmount: total, criticalRatio: maxRatio };
-  }, [loans]);
+  // Consolidated loan summary - use selector
+  const { loanList, totalLoanAmount, criticalRatio } = useMemo(
+    () => selectLoanSummary(loans),
+    [loans]
+  );
 
-  // v10: Precompute holdings grouped by layer using snapshot.holdingValues
-  // This ensures we use live-computed values (quantity × price × fxRate)
-  const holdingsByLayer = useMemo(() => {
-    const result = { FOUNDATION: [], GROWTH: [], UPSIDE: [] };
-    const totals = { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
-    // Build map of holdingValues by assetId for O(1) lookup
-    const holdingValueMap = new Map();
-    for (const hv of snapshot.holdingValues || []) {
-      holdingValueMap.set(hv.assetId, hv);
-    }
-    // Group holdings with their computed values
-    for (const h of holdings) {
-      const layer = ASSET_LAYER[h.assetId];
-      if (layer && result[layer]) {
-        const holdingValue = holdingValueMap.get(h.assetId);
-        result[layer].push({ holding: h, holdingValue });
-        totals[layer] += holdingValue?.valueIRR || 0;
-      }
-    }
-    return { holdings: result, totals };
-  }, [holdings, snapshot.holdingValues]);
+  // v10: Precompute holdings grouped by layer - use selector
+  const holdingsByLayer = useMemo(
+    () => selectHoldingsByLayer(holdings, snapshot.holdingValues),
+    [holdings, snapshot.holdingValues]
+  );
 
   return (
     <div className="stack">

@@ -2,8 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { formatIRR, getAssetDisplayName } from '../helpers.js';
 import { ASSET_LAYER } from '../state/domain.js';
 import { LAYER_EXPLANATIONS } from '../constants/index.js';
-
-const MS_PER_DAY = 1000 * 60 * 60 * 24;
+import { selectActiveProtections } from '../selectors/index.js';
 
 /**
  * Protection - Active protections list with progress bars
@@ -14,30 +13,11 @@ function Protection({ protections, dispatch }) {
   const [confirmCancel, setConfirmCancel] = useState(null);
   const list = protections || [];
 
-  // Memoize partitioned protections with precomputed date values in single pass
-  // Uses pre-computed endTimeMs/startTimeMs when available (avoid repeated Date parsing)
-  const { activeProtections, expiredProtections } = useMemo(() => {
-    const now = Date.now();
-    const active = [];
-    const expired = [];
-
-    for (const p of list) {
-      // Use pre-computed timestamps if available, fallback for legacy data
-      const endTime = p.endTimeMs ?? new Date(p.endISO).getTime();
-      if (endTime < now) {
-        expired.push(p);
-      } else {
-        // Use pre-computed startTimeMs if available
-        const startTime = p.startTimeMs ?? new Date(p.startISO || p.tsISO).getTime();
-        const totalDuration = endTime - startTime;
-        const elapsed = now - startTime;
-        const progressPct = Math.min(100, Math.max(0, 100 - (elapsed / totalDuration) * 100));
-        const daysLeft = Math.ceil((endTime - now) / MS_PER_DAY);
-        active.push({ ...p, _daysLeft: daysLeft, _progressPct: progressPct });
-      }
-    }
-    return { activeProtections: active, expiredProtections: expired };
-  }, [list]);
+  // Memoize partitioned protections - use selector
+  const { activeProtections, expiredProtections } = useMemo(
+    () => selectActiveProtections(list),
+    [list]
+  );
 
   const handleCancel = (protectionId) => {
     dispatch({ type: 'CANCEL_PROTECTION', protectionId });

@@ -1,15 +1,28 @@
+// @ts-check
+/** @typedef {import('../types').Holding} Holding */
+/** @typedef {import('../types').PortfolioSnapshot} PortfolioSnapshot */
+/** @typedef {import('../types').Layer} Layer */
+/** @typedef {import('../types').AssetId} AssetId */
+
 import { ASSET_LAYER } from "../state/domain.js";
 import { calculateFixedIncomeValue } from "./fixedIncome.js";
 import { DEFAULT_PRICES, DEFAULT_FX_RATE } from "../constants/index.js";
 
 /**
+ * @typedef {Object} HoldingValueResult
+ * @property {number} valueIRR - Value in IRR
+ * @property {number|null} priceUSD - Price in USD (null for internal assets)
+ * @property {Object|null} breakdown - Breakdown details for fixed income
+ */
+
+/**
  * Compute holding value in IRR
  * Supports both quantity-based (v10+) and legacy valueIRR holdings
  *
- * @param {Object} holding - Holding object
- * @param {Object} prices - Current prices in USD
+ * @param {Holding} holding - Holding object
+ * @param {Record<string, number>} prices - Current prices in USD
  * @param {number} fxRate - USD/IRR exchange rate
- * @returns {Object} { valueIRR, priceUSD, breakdown }
+ * @returns {HoldingValueResult}
  */
 function computeHoldingValue(holding, prices, fxRate) {
   // Legacy support: if valueIRR exists and quantity doesn't, use valueIRR directly
@@ -34,6 +47,28 @@ function computeHoldingValue(holding, prices, fxRate) {
 }
 
 /**
+ * @typedef {Object} HoldingValue
+ * @property {AssetId} assetId - Asset identifier
+ * @property {number} quantity - Quantity held
+ * @property {number} valueIRR - Value in IRR
+ * @property {number|null} priceUSD - Price in USD
+ * @property {Object|null} breakdown - Fixed income breakdown
+ * @property {Layer} layer - Asset layer
+ * @property {boolean} frozen - Whether holding is frozen
+ */
+
+/**
+ * @typedef {Object} ComputedSnapshot
+ * @property {number} totalIRR - Total portfolio value (holdings + cash)
+ * @property {number} holdingsIRR - Holdings value only
+ * @property {number} cashIRR - Cash balance
+ * @property {Record<AssetId, number>} holdingsIRRByAsset - Value per asset
+ * @property {HoldingValue[]} holdingValues - Computed holding values
+ * @property {Record<Layer, number>} layerPct - Layer percentages
+ * @property {Record<Layer, number>} layerIRR - Layer values in IRR
+ */
+
+/**
  * Compute portfolio snapshot from holdings and cash.
  * Supports live prices for quantity-based holdings.
  *
@@ -49,10 +84,11 @@ function computeHoldingValue(holding, prices, fxRate) {
  *   consider caching per-holding values with price-keyed invalidation
  * - Current approach is optimal for the expected use case (15 assets, 30s polls)
  *
- * @param {Array} holdings - Array of { assetId, quantity, frozen, purchasedAt? }
+ * @param {Holding[]} holdings - Array of holdings
  * @param {number} cashIRR - Cash balance in IRR
- * @param {Object} prices - Current asset prices in USD (optional)
- * @param {number} fxRate - USD/IRR exchange rate (optional)
+ * @param {Record<string, number>} [prices] - Current asset prices in USD
+ * @param {number} [fxRate] - USD/IRR exchange rate
+ * @returns {ComputedSnapshot}
  */
 export function computeSnapshot(holdings, cashIRR, prices = DEFAULT_PRICES, fxRate = DEFAULT_FX_RATE) {
   // Early return for empty holdings (no computation needed)

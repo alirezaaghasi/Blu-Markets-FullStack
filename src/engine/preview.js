@@ -1,3 +1,16 @@
+// @ts-check
+/** @typedef {import('../types').AppState} AppState */
+/** @typedef {import('../types').Holding} Holding */
+/** @typedef {import('../types').Loan} Loan */
+/** @typedef {import('../types').Protection} Protection */
+/** @typedef {import('../types').Layer} Layer */
+/** @typedef {import('../types').AssetId} AssetId */
+/** @typedef {import('../types').TradeSide} TradeSide */
+/** @typedef {import('../types').RebalanceMode} RebalanceMode */
+/** @typedef {import('../types').RebalanceMeta} RebalanceMeta */
+/** @typedef {import('../types').RebalanceTrade} RebalanceTrade */
+/** @typedef {import('../types').TargetLayerPct} TargetLayerPct */
+
 import { computeSnapshot } from "./snapshot.js";
 import { calcPremiumIRR, calcLiquidationIRR } from "./pricing.js";
 import { ASSET_LAYER, LAYER_ASSETS } from "../state/domain.js";
@@ -7,13 +20,32 @@ import { getAssetPriceUSD } from "../helpers.js";
 import { IntraLayerBalancer, MarketDataProvider } from "./intraLayerBalancer.js";
 
 /**
+ * @typedef {Object} GapAnalysis
+ * @property {boolean} hasFrozenAssets - Whether any assets are frozen
+ * @property {Record<Layer, number>} frozenByLayer - Frozen value per layer
+ * @property {Record<Layer, number>} currentPct - Current layer percentages
+ * @property {Record<Layer, number>} achievablePct - Achievable percentages after rebalance
+ * @property {number} remainingGapPct - Remaining gap percentage
+ * @property {Record<Layer, number>} gapByLayer - Gap per layer
+ * @property {boolean} canAchievePerfectBalance - Whether perfect balance is achievable
+ * @property {boolean} canAchieveWithCash - Whether perfect balance is achievable with cash
+ * @property {number} cashNeededForPerfectBalance - Cash needed for perfect balance
+ * @property {number} currentCash - Current cash balance
+ * @property {boolean} cashSufficient - Whether current cash is sufficient
+ * @property {number} cashShortfall - Cash shortfall amount
+ * @property {boolean} cashWouldHelp - Whether using cash would help
+ * @property {number} partialCashBenefit - Benefit from partial cash usage
+ * @property {TargetLayerPct} targetPct - Target layer percentages
+ */
+
+/**
  * Calculate rebalance gap - determines if locked collateral prevents full rebalancing
  * and how much additional capital could close the gap.
  *
- * @param {Object} state - Current state
- * @param {Object} prices - Current asset prices
- * @param {number} fxRate - USD/IRR exchange rate
- * @returns {Object} Gap analysis with cash requirements
+ * @param {AppState} state - Current state
+ * @param {Record<string, number>} [prices] - Current asset prices
+ * @param {number} [fxRate] - USD/IRR exchange rate
+ * @returns {GapAnalysis} Gap analysis with cash requirements
  */
 export function calculateRebalanceGap(state, prices = DEFAULT_PRICES, fxRate = DEFAULT_FX_RATE) {
   const snap = computeSnapshot(state.holdings, state.cashIRR, prices, fxRate);
@@ -219,6 +251,11 @@ export function calculateRebalanceGap(state, prices = DEFAULT_PRICES, fxRate = D
   };
 }
 
+/**
+ * Create a deep clone of state for preview mutations
+ * @param {AppState} state - Current state
+ * @returns {AppState} Cloned state
+ */
 export function cloneState(state) {
   return {
     ...state,
@@ -230,6 +267,12 @@ export function cloneState(state) {
   };
 }
 
+/**
+ * Preview adding funds to cash balance
+ * @param {AppState} state - Current state
+ * @param {{ amountIRR: number }} payload
+ * @returns {AppState}
+ */
 export function previewAddFunds(state, { amountIRR }) {
   const next = cloneState(state);
   next.cashIRR += amountIRR;
@@ -240,13 +283,9 @@ export function previewAddFunds(state, { amountIRR }) {
  * Preview a trade action (BUY or SELL)
  * v10: Updates quantity instead of valueIRR for quantity-based holdings
  *
- * @param {Object} state - Current state
- * @param {Object} params - Trade parameters
- * @param {string} params.side - 'BUY' or 'SELL'
- * @param {string} params.assetId - Asset to trade
- * @param {number} params.amountIRR - Trade amount in IRR
- * @param {Object} params.prices - Current asset prices in USD (optional)
- * @param {number} params.fxRate - USD/IRR exchange rate (optional)
+ * @param {AppState} state - Current state
+ * @param {{ side: TradeSide, assetId: AssetId, amountIRR: number, prices?: Record<string, number>, fxRate?: number }} params
+ * @returns {AppState}
  */
 export function previewTrade(state, { side, assetId, amountIRR, prices = DEFAULT_PRICES, fxRate = DEFAULT_FX_RATE }) {
   const next = cloneState(state);
@@ -278,6 +317,9 @@ export function previewTrade(state, { side, assetId, amountIRR, prices = DEFAULT
 /**
  * Preview a protect action
  * v10: Computes notionalIRR from quantity × price × fxRate
+ * @param {AppState} state - Current state
+ * @param {{ assetId: AssetId, months: number, prices?: Record<string, number>, fxRate?: number }} params
+ * @returns {AppState}
  */
 export function previewProtect(state, { assetId, months, prices = DEFAULT_PRICES, fxRate = DEFAULT_FX_RATE }) {
   const next = cloneState(state);
@@ -293,6 +335,12 @@ export function previewProtect(state, { assetId, months, prices = DEFAULT_PRICES
   return next;
 }
 
+/**
+ * Preview a borrow action
+ * @param {AppState} state - Current state
+ * @param {{ assetId: AssetId, amountIRR: number }} params
+ * @returns {AppState}
+ */
 export function previewBorrow(state, { assetId, amountIRR }) {
   const next = cloneState(state);
   const h = next.holdings.find((x) => x.assetId === assetId);
@@ -318,6 +366,12 @@ export function previewBorrow(state, { assetId, amountIRR }) {
   return next;
 }
 
+/**
+ * Preview a repay action
+ * @param {AppState} state - Current state
+ * @param {{ loanId: string, amountIRR: number }} params
+ * @returns {AppState}
+ */
 export function previewRepay(state, { loanId, amountIRR }) {
   const next = cloneState(state);
   const loanIndex = next.loans.findIndex((l) => l.id === loanId);

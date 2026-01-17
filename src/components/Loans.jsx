@@ -1,23 +1,6 @@
 import React, { useMemo } from 'react';
 import { formatIRR, getAssetDisplayName } from '../helpers.js';
-
-// ============================================================================
-// HELPER FUNCTIONS (moved outside component to avoid re-creation per render)
-// ============================================================================
-
-/**
- * Calculate loan health status based on LTV percentage
- * @param {number} usedPercent - Percentage of limit used (0-100+)
- * @returns {{ level: string, color: string }}
- */
-function getLoanHealth(usedPercent) {
-  // All bars use blue - percentage tells the story
-  const color = '#3B82F6';
-  if (usedPercent >= 75) return { level: 'critical', color };
-  if (usedPercent >= 65) return { level: 'warning', color };
-  if (usedPercent >= 50) return { level: 'caution', color };
-  return { level: 'healthy', color };
-}
+import { selectHoldingsById, selectLoanSummary, selectLoanHealth } from '../selectors/index.js';
 
 /**
  * Calculate liquidation price in IRR for a loan
@@ -36,7 +19,7 @@ function getLiquidationPriceIRR(loan, quantity) {
 
 const LoanCard = React.memo(function LoanCard({ loan, holdingQuantity, dispatch }) {
   const usedPercent = (loan.amountIRR / loan.liquidationIRR) * 100;
-  const health = getLoanHealth(usedPercent);
+  const health = selectLoanHealth(usedPercent);
   const liquidationPrice = getLiquidationPriceIRR(loan, holdingQuantity);
 
   return (
@@ -101,20 +84,15 @@ const LoanCard = React.memo(function LoanCard({ loan, holdingQuantity, dispatch 
 function Loans({ loans, holdings, dispatch }) {
   const loanList = loans || [];
 
-  // Precompute holdings map for O(1) lookup (instead of O(n) find per loan)
-  const holdingsMap = useMemo(() => {
-    const map = new Map();
-    if (holdings) {
-      for (const h of holdings) {
-        map.set(h.assetId, h);
-      }
-    }
-    return map;
-  }, [holdings]);
+  // Precompute holdings map for O(1) lookup - use selector
+  const holdingsMap = useMemo(
+    () => selectHoldingsById(holdings || []),
+    [holdings]
+  );
 
-  // Memoize total loan amount
-  const totalLoanAmount = useMemo(
-    () => loanList.reduce((sum, l) => sum + l.amountIRR, 0),
+  // Memoize loan summary - use selector
+  const { totalLoanAmount } = useMemo(
+    () => selectLoanSummary(loanList),
     [loanList]
   );
 
