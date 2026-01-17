@@ -143,9 +143,10 @@ export default function App() {
   }, [state.stage, state.holdings, state.cashIRR, prices, fxRate]);
 
   // Memoize portfolio status - reused by header and PortfolioHome
+  // Pass targetLayerPct to compare against user's actual target, not fixed ranges
   const portfolioStatus = useMemo(
-    () => computePortfolioStatus(snapshot.layerPct).status,
-    [snapshot.layerPct]
+    () => computePortfolioStatus(snapshot.layerPct, state.targetLayerPct).status,
+    [snapshot.layerPct, state.targetLayerPct]
   );
 
   // Memoize loan total to avoid duplicate reductions

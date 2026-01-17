@@ -106,6 +106,7 @@ function buildPending(state, kind, payload, validation, afterState) {
     before,
     after,
     stressMode: state.stressMode,
+    targetLayerPct: state.targetLayerPct,
   });
 
   // Extract rebalance meta if present for constraint messaging

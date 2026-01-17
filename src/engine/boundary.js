@@ -1,10 +1,10 @@
 import { computePortfolioStatus } from "./portfolioStatus.js";
 
-export function classifyActionBoundary({ kind, validation, before, after, stressMode }) {
+export function classifyActionBoundary({ kind, validation, before, after, stressMode, targetLayerPct }) {
   if (!validation.ok) return "SAFE";
 
-  const beforeStatus = computePortfolioStatus(before.layerPct);
-  const afterStatus = computePortfolioStatus(after.layerPct);
+  const beforeStatus = computePortfolioStatus(before.layerPct, targetLayerPct);
+  const afterStatus = computePortfolioStatus(after.layerPct, targetLayerPct);
 
   const escalate = (b) => {
     if (!stressMode) return b;
