@@ -39,7 +39,9 @@ export function formatQuantity(qty, assetId) {
   const num = Number(qty) || 0;
   // More decimals for crypto with small quantities
   if (assetId === 'BTC' && num < 1) return num.toFixed(6);
-  if (['ETH', 'SOL', 'TON'].includes(assetId) && num < 10) return num.toFixed(4);
+  if (['ETH', 'BNB', 'SOL', 'AVAX'].includes(assetId) && num < 10) return num.toFixed(4);
+  if (['XRP', 'TON', 'LINK', 'MATIC', 'ARB'].includes(assetId) && num < 100) return num.toFixed(2);
+  if (['PAXG', 'KAG'].includes(assetId)) return num.toFixed(4); // Precious metals
   if (num < 1) return num.toFixed(4);
   if (num < 100) return num.toFixed(2);
   return num.toFixed(0);
@@ -71,16 +73,28 @@ export function nowISO() {
 }
 
 // Hoisted to module scope to avoid per-call allocation
-// Decision 10: Renamed "Iranian Bonds" to "Fixed Income Fund (IRR)"
+// 15-asset universe display names
 const ASSET_DISPLAY_NAMES = {
-  'IRR_FIXED_INCOME': 'Fixed Income Fund (IRR)',
+  // Foundation
   'USDT': 'Tether (USDT)',
-  'GOLD': 'Gold',
+  'PAXG': 'Paxos Gold (PAXG)',
+  'IRR_FIXED_INCOME': 'Fixed Income Fund (IRR)',
+  // Growth
   'BTC': 'Bitcoin (BTC)',
   'ETH': 'Ethereum (ETH)',
+  'BNB': 'BNB',
+  'XRP': 'XRP',
+  'KAG': 'Kinesis Silver (KAG)',
   'QQQ': 'Nasdaq 100 (QQQ)',
+  // Upside
   'SOL': 'Solana (SOL)',
   'TON': 'Toncoin (TON)',
+  'LINK': 'Chainlink (LINK)',
+  'AVAX': 'Avalanche (AVAX)',
+  'MATIC': 'Polygon (MATIC)',
+  'ARB': 'Arbitrum (ARB)',
+  // Legacy (for backward compatibility)
+  'GOLD': 'Gold',
 };
 
 export function getAssetDisplayName(assetId) {
