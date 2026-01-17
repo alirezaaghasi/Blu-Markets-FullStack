@@ -1,20 +1,36 @@
-// Constants for Blu Markets v10
+// Constants for Blu Markets v10 — 15-Asset Universe
 
-// Centralized default prices (single source of truth)
-// Used by: appReducer, snapshot, preview, usePrices
+// ═══════════════════════════════════════════════════════════════════════════════
+// DEFAULT PRICES (USD)
+// ═══════════════════════════════════════════════════════════════════════════════
+
 export const DEFAULT_PRICES = {
+  // Foundation
+  USDT: 1.00,
+  PAXG: 2650,               // Gold price per oz
+  // Growth
   BTC: 97500,
   ETH: 3200,
+  BNB: 680,
+  XRP: 2.20,
+  KAG: 30,                  // Silver price per oz
+  QQQ: 521,
+  // Upside
   SOL: 185,
   TON: 5.20,
-  USDT: 1.0,
-  GOLD: 2650,
-  QQQ: 520,
+  LINK: 22,
+  AVAX: 35,
+  MATIC: 0.45,
+  ARB: 0.80,
 };
 
 // Centralized default FX rate (single source of truth)
 // 1 USD = 1,456,000 IRR
 export const DEFAULT_FX_RATE = 1456000;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// APPLICATION STAGES
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export const STAGES = {
   WELCOME: 'WELCOME',
@@ -28,13 +44,16 @@ export const STAGES = {
 // Centralized layer list - use this everywhere to avoid drift
 export const LAYERS = ['FOUNDATION', 'GROWTH', 'UPSIDE'];
 
-// Issue 13: Two-line layer descriptions with tagline + explanation
+// ═══════════════════════════════════════════════════════════════════════════════
+// LAYER EXPLANATIONS (UI)
+// ═══════════════════════════════════════════════════════════════════════════════
+
 export const LAYER_EXPLANATIONS = {
   FOUNDATION: {
     name: 'Foundation',
     nameFa: 'پایه',
     icon: '🛡️',
-    assets: ['USDT', 'Fixed Income'],
+    assets: ['USDT', 'PAXG', 'Fixed Income'],
     tagline: 'Your safety net',
     description: 'Stable assets that protect you during market drops',
     descriptionFa: 'دارایی‌های پایدار. پشتوانه‌ی امنت.',
@@ -43,7 +62,7 @@ export const LAYER_EXPLANATIONS = {
     name: 'Growth',
     nameFa: 'رشد',
     icon: '📈',
-    assets: ['Gold', 'BTC', 'QQQ'],
+    assets: ['BTC', 'ETH', 'BNB', 'XRP', 'KAG', 'QQQ'],
     tagline: 'Steady wealth building',
     description: 'Balanced assets that grow over time',
     descriptionFa: 'دارایی‌های متعادل برای رشد تدریجی.',
@@ -52,7 +71,7 @@ export const LAYER_EXPLANATIONS = {
     name: 'Upside',
     nameFa: 'رشد بالا',
     icon: '🚀',
-    assets: ['ETH', 'SOL', 'TON'],
+    assets: ['SOL', 'TON', 'LINK', 'AVAX', 'MATIC', 'ARB'],
     tagline: 'Higher potential returns',
     description: 'Riskier assets for bigger gains',
     descriptionFa: 'پتانسیل بالاتر، بالا و پایین بیشتر.',
@@ -67,6 +86,10 @@ export const ONBOARDING_STEPS = [
   { id: 'confirm', label: 'Confirm' },
 ];
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// THRESHOLDS & LIMITS
+// ═══════════════════════════════════════════════════════════════════════════════
+
 export const THRESHOLDS = {
   MIN_AMOUNT_IRR: 1_000_000,
   // Protection
@@ -78,15 +101,16 @@ export const THRESHOLDS = {
 };
 
 // Collateral LTV limits by layer (based on asset volatility)
-// Foundation = stable = higher LTV allowed
-// Upside = volatile = lower LTV to protect user
 export const COLLATERAL_LTV_BY_LAYER = {
   FOUNDATION: 0.7,  // 70% - stable assets
   GROWTH: 0.5,      // 50% - moderate volatility
   UPSIDE: 0.3,      // 30% - high volatility
 };
 
-// Target allocations based on risk score
+// ═══════════════════════════════════════════════════════════════════════════════
+// RISK ALLOCATIONS (Layer %)
+// ═══════════════════════════════════════════════════════════════════════════════
+
 export const RISK_ALLOCATIONS = {
   LOW: { FOUNDATION: 65, GROWTH: 30, UPSIDE: 5 },
   MEDIUM: { FOUNDATION: 50, GROWTH: 35, UPSIDE: 15 },
@@ -101,13 +125,127 @@ export const PREMIUM_RATES = {
 };
 
 // Assets eligible for protection (must have liquid derivative markets)
-export const PROTECTION_ELIGIBLE_ASSETS = ['BTC', 'ETH', 'GOLD', 'QQQ', 'SOL'];
+export const PROTECTION_ELIGIBLE_ASSETS = [
+  'BTC', 'ETH', 'PAXG', 'QQQ', 'SOL', 'BNB', 'XRP', 'LINK', 'AVAX'
+];
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INTRA-LAYER WEIGHTS (Static defaults, overridden by dynamic balancer)
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export const WEIGHTS = {
-  FOUNDATION: { IRR_FIXED_INCOME: 0.55, USDT: 0.45 },
-  GROWTH: { GOLD: 0.20, BTC: 0.50, QQQ: 0.30 },
-  UPSIDE: { ETH: 0.40, SOL: 0.35, TON: 0.25 },
+  FOUNDATION: {
+    USDT: 0.40,
+    PAXG: 0.30,
+    IRR_FIXED_INCOME: 0.30,
+  },
+  GROWTH: {
+    BTC: 0.25,
+    ETH: 0.20,
+    BNB: 0.15,
+    XRP: 0.10,
+    KAG: 0.15,
+    QQQ: 0.15,
+  },
+  UPSIDE: {
+    SOL: 0.20,
+    TON: 0.18,
+    LINK: 0.18,
+    AVAX: 0.16,
+    MATIC: 0.14,
+    ARB: 0.14,
+  },
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INTRA-LAYER BALANCING CONFIG (HRAM)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const BALANCER_CONFIG = {
+  // Weight caps (per asset within layer)
+  MIN_WEIGHT: 0.05,           // 5% minimum per asset
+  MAX_WEIGHT: 0.40,           // 40% maximum per asset
+
+  // Factor strengths
+  MOMENTUM_STRENGTH: 0.3,     // How much momentum affects weight (0-1)
+  CORRELATION_PENALTY: 0.2,   // How much correlation reduces weight (0-1)
+  LIQUIDITY_BONUS: 0.1,       // Bonus for high liquidity assets
+
+  // Lookback periods (days)
+  VOLATILITY_WINDOW: 30,
+  MOMENTUM_WINDOW: 50,
+  CORRELATION_WINDOW: 60,
+
+  // Rebalance triggers
+  DRIFT_THRESHOLD: 0.05,      // 5% drift triggers rebalance
+  MIN_REBALANCE_INTERVAL: 7,  // Days between rebalances
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// STRATEGY PRESETS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const STRATEGY_PRESETS = {
+  // Equal weight - simple diversification
+  EQUAL_WEIGHT: {
+    MOMENTUM_STRENGTH: 0,
+    CORRELATION_PENALTY: 0,
+    MIN_WEIGHT: 0.05,
+    MAX_WEIGHT: 0.50,
+  },
+
+  // Pure risk parity - volatility-based only
+  RISK_PARITY: {
+    MOMENTUM_STRENGTH: 0,
+    CORRELATION_PENALTY: 0,
+    MIN_WEIGHT: 0.05,
+    MAX_WEIGHT: 0.40,
+  },
+
+  // Momentum tilt - follow trends
+  MOMENTUM_TILT: {
+    MOMENTUM_STRENGTH: 0.5,
+    CORRELATION_PENALTY: 0.1,
+    MIN_WEIGHT: 0.05,
+    MAX_WEIGHT: 0.35,
+  },
+
+  // Maximum diversification - minimize correlation
+  MAX_DIVERSIFICATION: {
+    MOMENTUM_STRENGTH: 0.1,
+    CORRELATION_PENALTY: 0.4,
+    MIN_WEIGHT: 0.10,
+    MAX_WEIGHT: 0.30,
+  },
+
+  // Balanced hybrid (default)
+  BALANCED: {
+    MOMENTUM_STRENGTH: 0.3,
+    CORRELATION_PENALTY: 0.2,
+    MIN_WEIGHT: 0.05,
+    MAX_WEIGHT: 0.40,
+  },
+
+  // Conservative - prefer stability
+  CONSERVATIVE: {
+    MOMENTUM_STRENGTH: 0.1,
+    CORRELATION_PENALTY: 0.3,
+    MIN_WEIGHT: 0.10,
+    MAX_WEIGHT: 0.35,
+  },
+
+  // Aggressive - prefer momentum
+  AGGRESSIVE: {
+    MOMENTUM_STRENGTH: 0.5,
+    CORRELATION_PENALTY: 0.1,
+    MIN_WEIGHT: 0.05,
+    MAX_WEIGHT: 0.50,
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// UI LABELS
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export const PORTFOLIO_STATUS_LABELS = {
   BALANCED: 'Balanced',
@@ -115,7 +253,6 @@ export const PORTFOLIO_STATUS_LABELS = {
   ATTENTION_REQUIRED: 'Attention Required',
 };
 
-// Issue 2: Updated boundary terminology with status style
 export const BOUNDARY_LABELS = {
   SAFE: '✓ Looks good',
   DRIFT: '⚠ Minor drift',
@@ -123,7 +260,10 @@ export const BOUNDARY_LABELS = {
   STRESS: '⛔ High risk',
 };
 
-// User-friendly error messages for validation errors
+// ═══════════════════════════════════════════════════════════════════════════════
+// ERROR MESSAGES
+// ═══════════════════════════════════════════════════════════════════════════════
+
 export const ERROR_MESSAGES = {
   // General
   INVALID_AMOUNT: 'Please enter a valid amount.',
@@ -140,7 +280,7 @@ export const ERROR_MESSAGES = {
   NO_NOTIONAL: 'This asset has no value to protect.',
   ASSET_ALREADY_PROTECTED: 'This asset already has active protection.',
   INSUFFICIENT_CASH_FOR_PREMIUM: 'Not enough cash to pay the protection premium.',
-  ASSET_NOT_ELIGIBLE_FOR_PROTECTION: 'This asset is not eligible for protection. Only assets with liquid derivative markets (BTC, ETH, GOLD, QQQ, SOL) can be protected.',
+  ASSET_NOT_ELIGIBLE_FOR_PROTECTION: 'This asset is not eligible for protection. Only assets with liquid derivative markets can be protected.',
 
   // Borrow
   ASSET_ALREADY_FROZEN: 'This asset is already used as collateral for another loan.',

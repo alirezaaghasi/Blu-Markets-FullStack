@@ -12,16 +12,26 @@
 // DOMAIN PRIMITIVES
 // ============================================================================
 
-/** All supported asset identifiers */
+/** All supported asset identifiers (15-asset universe) */
 export type AssetId =
+  // Foundation (3)
   | 'USDT'
+  | 'PAXG'
   | 'IRR_FIXED_INCOME'
-  | 'GOLD'
+  // Growth (6)
   | 'BTC'
   | 'ETH'
+  | 'BNB'
+  | 'XRP'
+  | 'KAG'
   | 'QQQ'
+  // Upside (6)
   | 'SOL'
-  | 'TON';
+  | 'TON'
+  | 'LINK'
+  | 'AVAX'
+  | 'MATIC'
+  | 'ARB';
 
 /** Portfolio layer classification (risk tiers) */
 export type Layer = 'FOUNDATION' | 'GROWTH' | 'UPSIDE';
@@ -61,6 +71,24 @@ export type PortfolioStatus = 'BALANCED' | 'SLIGHTLY_OFF' | 'ATTENTION_REQUIRED'
 
 /** Rebalance execution mode */
 export type RebalanceMode = 'HOLDINGS_ONLY' | 'HOLDINGS_PLUS_CASH';
+
+/** Intra-layer balancing strategy presets */
+export type StrategyPreset =
+  | 'EQUAL_WEIGHT'
+  | 'RISK_PARITY'
+  | 'MOMENTUM_TILT'
+  | 'MAX_DIVERSIFICATION'
+  | 'BALANCED'
+  | 'CONSERVATIVE'
+  | 'AGGRESSIVE';
+
+/** User profile for strategy mapping */
+export type UserProfile =
+  | 'ANXIOUS_NOVICE'
+  | 'STEADY_BUILDER'
+  | 'AGGRESSIVE_ACCUMULATOR'
+  | 'WEALTH_PRESERVER'
+  | 'SPECULATOR';
 
 /** Loan status */
 export type LoanStatus = 'ACTIVE' | 'REPAID' | 'LIQUIDATED';
@@ -271,12 +299,41 @@ export interface RebalanceTrade {
   side: TradeSide;
 }
 
+/** Factors calculated by the HRAM algorithm */
+export interface HRAMFactors {
+  volatility: number;
+  riskParityWeight: number;
+  momentum: number;
+  momentumFactor: number;
+  avgCorrelation: number;
+  correlationFactor: number;
+  liquidityFactor: number;
+}
+
+/** Intra-layer weight calculation result */
+export interface IntraLayerWeightResult {
+  weights: Record<string, number>;
+  factors: Record<string, HRAMFactors>;
+  metadata: {
+    layer: Layer;
+    assetCount: number;
+    calculatedAt: string;
+  };
+}
+
 export interface RebalanceMeta {
   hasLockedCollateral: boolean;
   insufficientCash: boolean;
   residualDrift: number;
   trades: RebalanceTrade[];
   cashDeployed: number;
+  // Intra-layer balancing info
+  intraLayerWeights?: {
+    FOUNDATION?: IntraLayerWeightResult;
+    GROWTH?: IntraLayerWeightResult;
+    UPSIDE?: IntraLayerWeightResult;
+  };
+  strategy?: StrategyPreset;
 }
 
 // ============================================================================

@@ -1,9 +1,10 @@
 import { computeSnapshot } from "./snapshot.js";
 import { calcPremiumIRR, calcLiquidationIRR } from "./pricing.js";
-import { ASSET_LAYER } from "../state/domain.js";
-import { COLLATERAL_LTV_BY_LAYER, LAYERS, DEFAULT_PRICES, DEFAULT_FX_RATE, WEIGHTS } from "../constants/index.js";
+import { ASSET_LAYER, LAYER_ASSETS } from "../state/domain.js";
+import { COLLATERAL_LTV_BY_LAYER, LAYERS, DEFAULT_PRICES, DEFAULT_FX_RATE, WEIGHTS, STRATEGY_PRESETS } from "../constants/index.js";
 import { irrToFixedIncomeUnits } from "./fixedIncome.js";
 import { getAssetPriceUSD } from "../helpers.js";
+import { IntraLayerBalancer, MarketDataProvider } from "./intraLayerBalancer.js";
 
 /**
  * Calculate rebalance gap - determines if locked collateral prevents full rebalancing
@@ -375,9 +376,10 @@ function executeSells(surpluses, totalSurplus, amountToMove, sellableByLayer, pr
 
 /**
  * Helper: Execute buys into underweight layers using weighted distribution
+ * Supports both static WEIGHTS and dynamic intra-layer weights from balancer
  * @private
  */
-function executeBuys(deficits, totalDeficit, amountToAllocate, holdingsByLayer, prices, fxRate, meta) {
+function executeBuys(deficits, totalDeficit, amountToAllocate, holdingsByLayer, prices, fxRate, meta, dynamicWeights = null) {
   for (const layer of Object.keys(deficits)) {
     const layerBuy = (deficits[layer] / totalDeficit) * amountToAllocate;
     if (layerBuy <= 0) continue;
@@ -385,7 +387,8 @@ function executeBuys(deficits, totalDeficit, amountToAllocate, holdingsByLayer, 
     const assets = holdingsByLayer[layer];
     if (!assets.length) continue;
 
-    const layerWeights = WEIGHTS[layer] || {};
+    // Use dynamic weights if provided, otherwise fall back to static WEIGHTS
+    const layerWeights = dynamicWeights?.[layer]?.weights || WEIGHTS[layer] || {};
     const weightedAssets = assets.filter(h => layerWeights[h.assetId]);
 
     if (weightedAssets.length > 0) {
@@ -443,15 +446,16 @@ function calculateSurplusesAndDeficits(curIRR, targetIRR) {
 
 /**
  * Helper: Execute holdings-only rebalancing (sell overweight, buy underweight)
+ * Supports dynamic weights from intra-layer balancer
  * @private
  */
-function executeHoldingsOnlyRebalance(curIRR, targetIRR, sellableByLayer, holdingsByLayer, prices, fxRate, meta) {
+function executeHoldingsOnlyRebalance(curIRR, targetIRR, sellableByLayer, holdingsByLayer, prices, fxRate, meta, dynamicWeights = null) {
   const { surpluses, deficits, totalSurplus, totalDeficit } = calculateSurplusesAndDeficits(curIRR, targetIRR);
   const amountToMove = Math.min(totalSurplus, totalDeficit);
 
   if (amountToMove > 0) {
     executeSells(surpluses, totalSurplus, amountToMove, sellableByLayer, prices, fxRate, meta);
-    executeBuys(deficits, totalDeficit, amountToMove, holdingsByLayer, prices, fxRate, meta);
+    executeBuys(deficits, totalDeficit, amountToMove, holdingsByLayer, prices, fxRate, meta, dynamicWeights);
   }
 }
 
@@ -462,6 +466,7 @@ function executeHoldingsOnlyRebalance(curIRR, targetIRR, sellableByLayer, holdin
  * - SMART mode: First do HOLDINGS_ONLY, then use specified cash amount to fill remaining gaps.
  * - Never sells frozen collateral.
  * - Leaves residual drift if constrained.
+ * - Uses HRAM intra-layer balancer to calculate dynamic weights within each layer.
  * Returns state with _rebalanceMeta for constraint messaging.
  *
  * @param {Object} state - Current state
@@ -470,8 +475,10 @@ function executeHoldingsOnlyRebalance(curIRR, targetIRR, sellableByLayer, holdin
  * @param {number} params.useCashAmount - For SMART mode: specific amount of cash to deploy (optional)
  * @param {Object} params.prices - Current asset prices in USD (optional)
  * @param {number} params.fxRate - USD/IRR exchange rate (optional)
+ * @param {string} params.strategy - Strategy preset name (optional, defaults to 'BALANCED')
+ * @param {Object} params.priceHistory - Historical price data for HRAM calculations (optional)
  */
-export function previewRebalance(state, { mode, useCashAmount = 0, prices = DEFAULT_PRICES, fxRate = DEFAULT_FX_RATE }) {
+export function previewRebalance(state, { mode, useCashAmount = 0, prices = DEFAULT_PRICES, fxRate = DEFAULT_FX_RATE, strategy = 'BALANCED', priceHistory = {} }) {
   const next = cloneState(state);
   const snap = computeSnapshot(next.holdings, next.cashIRR, prices, fxRate);
   const holdingsTotal = snap.holdingsIRR || 1;
@@ -496,12 +503,25 @@ export function previewRebalance(state, { mode, useCashAmount = 0, prices = DEFA
     }
   }
 
+  // Calculate dynamic intra-layer weights using HRAM algorithm
+  const strategyConfig = STRATEGY_PRESETS[strategy] || STRATEGY_PRESETS.BALANCED;
+  const marketData = new MarketDataProvider(priceHistory);
+  const balancer = new IntraLayerBalancer(marketData, strategyConfig);
+
+  const intraLayerWeights = {};
+  for (const layer of LAYERS) {
+    const layerAssets = LAYER_ASSETS[layer] || [];
+    intraLayerWeights[layer] = balancer.calculateWeights(layer, layerAssets);
+  }
+
   const meta = {
     hasLockedCollateral,
     insufficientCash: false,
     residualDrift: 0,
     trades: [],
     cashDeployed: 0,
+    intraLayerWeights,
+    strategy,
   };
 
   const targetIRR = {
@@ -513,7 +533,7 @@ export function previewRebalance(state, { mode, useCashAmount = 0, prices = DEFA
 
   // HOLDINGS_ONLY: Rebalance by selling overweight and buying underweight
   if (mode === "HOLDINGS_ONLY" || mode === "SMART") {
-    executeHoldingsOnlyRebalance(curIRR, targetIRR, sellableByLayer, holdingsByLayer, prices, fxRate, meta);
+    executeHoldingsOnlyRebalance(curIRR, targetIRR, sellableByLayer, holdingsByLayer, prices, fxRate, meta, intraLayerWeights);
   }
 
   // SMART mode: Also deploy specified cash to fill remaining gaps
@@ -536,7 +556,7 @@ export function previewRebalance(state, { mode, useCashAmount = 0, prices = DEFA
 
     if (totalCashDeficit > 0) {
       const actualSpend = Math.min(useCashAmount, totalCashDeficit, next.cashIRR);
-      executeBuys(cashDeficits, totalCashDeficit, actualSpend, holdingsByLayer, prices, fxRate, meta);
+      executeBuys(cashDeficits, totalCashDeficit, actualSpend, holdingsByLayer, prices, fxRate, meta, intraLayerWeights);
       meta.cashDeployed = actualSpend;
       next.cashIRR -= actualSpend;
     }
@@ -562,7 +582,7 @@ export function previewRebalance(state, { mode, useCashAmount = 0, prices = DEFA
       const spend = Math.min(next.cashIRR, totalDef);
       if (next.cashIRR < totalDef) meta.insufficientCash = true;
 
-      executeBuys(deficits, totalDef, spend, holdingsByLayer, prices, fxRate, meta);
+      executeBuys(deficits, totalDef, spend, holdingsByLayer, prices, fxRate, meta, intraLayerWeights);
       meta.cashDeployed = spend;
       next.cashIRR -= spend;
     }
