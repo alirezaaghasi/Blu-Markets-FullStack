@@ -181,18 +181,6 @@ function OnboardingControls({ state, dispatch, prices, fxRate }) {
     });
   }, [borrowableHoldings]);
 
-  // Issue 11: Determine current onboarding step
-  const getOnboardingStep = () => {
-    switch (state.stage) {
-      case STAGES.WELCOME: return 1;
-      case STAGES.ONBOARDING_PHONE: return 1;
-      case STAGES.ONBOARDING_QUESTIONNAIRE: return 2;
-      case STAGES.ONBOARDING_RESULT: return 3;
-      case STAGES.AMOUNT_REQUIRED: return 4;
-      default: return 0;
-    }
-  };
-
   if (state.stage === STAGES.WELCOME) {
     return (
       <div>

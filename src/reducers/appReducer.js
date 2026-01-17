@@ -562,6 +562,9 @@ export function reducer(state, action) {
               durationMonths: p.payload.months,
               startISO,
               endISO,
+              // Pre-computed timestamps for O(1) comparisons in UI (avoid repeated Date parsing)
+              startTimeMs: new Date(startISO).getTime(),
+              endTimeMs: end.getTime(),
             },
           ];
         }

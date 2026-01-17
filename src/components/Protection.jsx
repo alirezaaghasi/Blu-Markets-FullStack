@@ -15,18 +15,20 @@ function Protection({ protections, dispatch }) {
   const list = protections || [];
 
   // Memoize partitioned protections with precomputed date values in single pass
+  // Uses pre-computed endTimeMs/startTimeMs when available (avoid repeated Date parsing)
   const { activeProtections, expiredProtections } = useMemo(() => {
     const now = Date.now();
     const active = [];
     const expired = [];
 
     for (const p of list) {
-      const endTime = new Date(p.endISO).getTime();
+      // Use pre-computed timestamps if available, fallback for legacy data
+      const endTime = p.endTimeMs ?? new Date(p.endISO).getTime();
       if (endTime < now) {
         expired.push(p);
       } else {
-        // Precompute date-derived values for active protections
-        const startTime = new Date(p.startISO || p.tsISO).getTime();
+        // Use pre-computed startTimeMs if available
+        const startTime = p.startTimeMs ?? new Date(p.startISO || p.tsISO).getTime();
         const totalDuration = endTime - startTime;
         const elapsed = now - startTime;
         const progressPct = Math.min(100, Math.max(0, 100 - (elapsed / totalDuration) * 100));

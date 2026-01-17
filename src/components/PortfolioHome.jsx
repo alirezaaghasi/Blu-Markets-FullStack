@@ -43,37 +43,38 @@ function PortfolioHome({ holdings, cashIRR, targetLayerPct, protections, loans, 
     );
   }
 
-  // Memoize total drift calculation (sum of absolute differences from target)
-  const totalDrift = useMemo(() => {
-    return LAYERS.reduce((sum, layer) => {
+  // Consolidated drift calculations - compute once and derive display flags
+  const { totalDrift, isOff, isAttention } = useMemo(() => {
+    const drift = LAYERS.reduce((sum, layer) => {
       return sum + Math.abs(snapshot.layerPct[layer] - targetLayerPct[layer]);
     }, 0);
-  }, [snapshot.layerPct, targetLayerPct]);
-
-  // Only show drift banner if there's meaningful drift (>1%)
-  // portfolioStatus uses fixed ranges, but we care about drift from user's actual target
-  const isOff = totalDrift > 1;
-  const isAttention = portfolioStatus === 'ATTENTION_REQUIRED' && totalDrift > 1;
+    return {
+      totalDrift: drift,
+      isOff: drift > 1,
+      isAttention: portfolioStatus === 'ATTENTION_REQUIRED' && drift > 1,
+    };
+  }, [snapshot.layerPct, targetLayerPct, portfolioStatus]);
 
   // Memoize protection days as a Map keyed by assetId for O(1) lookups
-  // clockTick dependency ensures this recalculates every minute for live countdown
+  // Uses pre-computed endTimeMs to avoid repeated Date parsing
   const protectionDaysMap = useMemo(() => {
     const map = new Map();
     const now = Date.now();
     for (const p of protections || []) {
-      const until = new Date(p.endISO).getTime();
+      // Use pre-computed endTimeMs if available, fallback for legacy data
+      const until = p.endTimeMs ?? new Date(p.endISO).getTime();
       map.set(p.assetId, Math.max(0, Math.ceil((until - now) / (1000 * 60 * 60 * 24))));
     }
     return map;
   }, [protections, clockTick]);
 
-  // Memoize loan summary calculations
+  // Consolidated loan summary - compute all loan metrics in single pass
   const { loanList, totalLoanAmount, criticalRatio } = useMemo(() => {
     const list = loans || [];
-    const total = list.reduce((sum, l) => sum + l.amountIRR, 0);
-    // Find highest LTV ratio in single pass
+    let total = 0;
     let maxRatio = 0;
     for (const loan of list) {
+      total += loan.amountIRR;
       const ratio = loan.amountIRR / loan.liquidationIRR;
       if (ratio > maxRatio) maxRatio = ratio;
     }

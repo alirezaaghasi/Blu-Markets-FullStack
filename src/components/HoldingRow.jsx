@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { formatIRR, formatUSD, formatQuantity, getAssetDisplayName } from '../helpers.js';
 
 /**
@@ -8,6 +8,7 @@ import { formatIRR, formatUSD, formatQuantity, getAssetDisplayName } from '../he
  */
 function HoldingRow({ holding, holdingValue, layerInfo, layer, protDays, onStartTrade, onStartProtect, onStartBorrow }) {
   const [showOverflow, setShowOverflow] = useState(false);
+  const menuRef = useRef(null);
 
   // v10: Use computed valueIRR from holdingValue, fallback to holding.valueIRR for backwards compat
   const valueIRR = holdingValue?.valueIRR ?? holding.valueIRR ?? 0;
@@ -17,13 +18,20 @@ function HoldingRow({ holding, holdingValue, layerInfo, layer, protDays, onStart
   const quantity = holdingValue?.quantity ?? holding.quantity;
   const priceUSD = holdingValue?.priceUSD;
 
-  // Close overflow when clicking outside
+  // Close overflow when clicking outside - uses ref instead of document listener per row
+  // Only attach listener when menu is open, clean up immediately when closed
   useEffect(() => {
-    if (showOverflow) {
-      const handleClick = () => setShowOverflow(false);
-      setTimeout(() => document.addEventListener('click', handleClick), 0);
-      return () => document.removeEventListener('click', handleClick);
-    }
+    if (!showOverflow) return;
+
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setShowOverflow(false);
+      }
+    };
+
+    // Use capture phase for reliable outside click detection
+    document.addEventListener('pointerdown', handleClickOutside, true);
+    return () => document.removeEventListener('pointerdown', handleClickOutside, true);
   }, [showOverflow]);
 
   return (
@@ -72,11 +80,11 @@ function HoldingRow({ holding, holdingValue, layerInfo, layer, protDays, onStart
           )}
         </div>
 
-        <div className="overflowContainer">
-          <button className="btn small overflowTrigger" onClick={(e) => { e.stopPropagation(); setShowOverflow(!showOverflow); }}>⋯</button>
+        <div className="overflowContainer" ref={menuRef}>
+          <button className="btn small overflowTrigger" onClick={() => setShowOverflow(!showOverflow)}>⋯</button>
 
           {showOverflow && (
-            <div className="overflowMenu" onClick={(e) => e.stopPropagation()}>
+            <div className="overflowMenu">
               <button
                 className="overflowItem"
                 onClick={() => { onStartProtect?.(holding.assetId); setShowOverflow(false); }}

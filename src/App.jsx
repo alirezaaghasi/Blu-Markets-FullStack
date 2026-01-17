@@ -86,9 +86,13 @@ function computeHeaderContent(activeTab, protections, loans, loansTotal, portfol
       };
     }
     case 'PROTECTION': {
-      // Filter to only count active protections (endISO >= now or missing endISO)
-      const now = new Date().toISOString();
-      const activeProtections = (protections || []).filter(p => !p.endISO || p.endISO >= now);
+      // Filter to only count active protections using pre-computed endTimeMs (avoid Date parsing)
+      const nowMs = Date.now();
+      const activeProtections = (protections || []).filter(p => {
+        // Use pre-computed endTimeMs if available, fallback to Date parsing for legacy data
+        const endMs = p.endTimeMs ?? (p.endISO ? new Date(p.endISO).getTime() : Infinity);
+        return endMs >= nowMs;
+      });
       const protectedCount = activeProtections.length;
       return {
         title: 'Your Protections',
