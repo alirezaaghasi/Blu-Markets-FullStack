@@ -10,29 +10,10 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        // Manual chunk splitting for better caching and smaller initial load
+        // Let Vite infer chunks from dynamic imports (lazy() calls in App.jsx)
+        // Only split out vendor chunks for better caching
         manualChunks: {
-          // Vendor chunks (always needed)
           'react-vendor': ['react', 'react-dom'],
-
-          // Feature chunks (lazy-loaded tabs) - let Vite handle dynamic imports
-          'portfolio': ['./src/components/PortfolioHome.jsx'],
-          'history': ['./src/components/HistoryPane.jsx'],
-          'protection': ['./src/components/Protection.jsx'],
-          'loans': ['./src/components/Loans.jsx'],
-
-          // Modals (rarely used, defer loading)
-          'modals': [
-            './src/components/ResetConfirmModal.jsx',
-            './src/components/ExecutionSummary.jsx',
-            './src/components/ConfirmModal.jsx',
-          ],
-
-          // Risk profiling data (loaded during onboarding)
-          'risk-profiling': [
-            './src/engine/riskScoring.js',
-            './src/data/questionnaire.v2.fa.json',
-          ],
         },
       },
     },

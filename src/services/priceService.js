@@ -192,6 +192,7 @@ export async function fetchUsdIrrRate(signal) {
 
 /**
  * Fetch all prices in one call
+ * Uses Promise.allSettled for resilience - partial failures don't block updates
  * @param {AbortSignal} signal - Optional AbortController signal
  */
 export async function fetchAllPrices(signal) {
@@ -207,11 +208,23 @@ export async function fetchAllPrices(signal) {
     fetches.push(fetchStockPrice('QQQ', signal));
   }
 
-  const results = await Promise.all(fetches);
+  // Use Promise.allSettled for graceful degradation on partial failures
+  const settled = await Promise.allSettled(fetches);
 
-  const cryptoResult = results[0];
-  const fxResult = results[1];
-  const stockResult = hasStockKey ? results[2] : { ok: false, error: 'API key not configured' };
+  // Extract results, handling both fulfilled and rejected states
+  const cryptoResult = settled[0].status === 'fulfilled'
+    ? settled[0].value
+    : { ok: false, error: settled[0].reason?.message || 'Crypto fetch failed' };
+
+  const fxResult = settled[1].status === 'fulfilled'
+    ? settled[1].value
+    : { ok: false, rate: FALLBACK_RATE, source: 'fallback', error: settled[1].reason?.message || 'FX fetch failed' };
+
+  const stockResult = hasStockKey
+    ? (settled[2].status === 'fulfilled'
+        ? settled[2].value
+        : { ok: false, error: settled[2].reason?.message || 'Stock fetch failed' })
+    : { ok: false, error: 'API key not configured' };
 
   const prices = {
     ...(cryptoResult.ok ? cryptoResult.prices : {}),
@@ -220,8 +233,8 @@ export async function fetchAllPrices(signal) {
 
   return {
     prices,
-    fxRate: fxResult.rate,
-    fxSource: fxResult.source,
+    fxRate: fxResult.rate || FALLBACK_RATE,
+    fxSource: fxResult.source || 'fallback',
     updatedAt: new Date().toISOString(),
     errors: {
       crypto: cryptoResult.ok ? null : cryptoResult.error,

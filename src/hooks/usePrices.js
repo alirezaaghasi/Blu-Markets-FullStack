@@ -6,6 +6,10 @@ import { createTabCoordinator } from '../utils/tabCoordinator.js';
 // LocalStorage keys for price caching
 const PRICE_CACHE_KEY = 'blu_prices_cache';
 const FX_CACHE_KEY = 'blu_fx_cache';
+const CACHE_TIMESTAMP_KEY = 'blu_prices_cache_ts';
+
+// Cache TTL: 10 minutes (prevents stale data across sessions)
+const CACHE_TTL_MS = 10 * 60 * 1000;
 
 /**
  * Shallow compare two price objects
@@ -22,10 +26,28 @@ function shallowEqualPrices(a, b) {
 }
 
 /**
- * Load cached prices from localStorage
+ * Check if cache is still valid (within TTL)
+ */
+function isCacheValid() {
+  try {
+    const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+    if (!timestamp) return false;
+    const age = Date.now() - parseInt(timestamp, 10);
+    return age < CACHE_TTL_MS;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Load cached prices from localStorage (with TTL check)
  */
 function loadCachedPrices() {
   try {
+    // Check if cache is still valid
+    if (!isCacheValid()) {
+      return DEFAULT_PRICES;
+    }
     const cached = localStorage.getItem(PRICE_CACHE_KEY);
     if (cached) {
       const parsed = JSON.parse(cached);
@@ -41,10 +63,14 @@ function loadCachedPrices() {
 }
 
 /**
- * Load cached FX rate from localStorage
+ * Load cached FX rate from localStorage (with TTL check)
  */
 function loadCachedFxRate() {
   try {
+    // Check if cache is still valid (uses same timestamp as prices)
+    if (!isCacheValid()) {
+      return DEFAULT_FX_RATE;
+    }
     const cached = localStorage.getItem(FX_CACHE_KEY);
     if (cached) {
       const parsed = parseFloat(cached);
@@ -59,12 +85,13 @@ function loadCachedFxRate() {
 }
 
 /**
- * Save prices to localStorage cache
+ * Save prices to localStorage cache (with timestamp for TTL)
  */
 function cachePrices(prices, fxRate) {
   try {
     localStorage.setItem(PRICE_CACHE_KEY, JSON.stringify(prices));
     localStorage.setItem(FX_CACHE_KEY, String(fxRate));
+    localStorage.setItem(CACHE_TIMESTAMP_KEY, String(Date.now()));
   } catch (e) {
     // Ignore storage errors (quota exceeded, etc.)
   }
