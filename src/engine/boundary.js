@@ -41,17 +41,21 @@ export function classifyActionBoundary({ kind, validation, before, after, stress
 export function frictionCopyForBoundary(boundary, kind = null, meta = {}) {
   // Rebalance-specific messaging when constrained
   if (kind === "REBALANCE" && boundary === "STRUCTURAL") {
-    const messages = ["We couldn't fully rebalance your portfolio."];
+    const messages = ["Your portfolio couldn't be fully rebalanced."];
 
     if (meta.hasLockedCollateral) {
-      messages.push("Some assets are locked for your loans.");
+      messages.push("Some assets are locked as collateral for your loans.");
     }
     if (meta.insufficientCash) {
       messages.push("Not enough cash to fully balance all layers.");
     }
-    // Issue 15: Hide zero drift, show success message otherwise
-    if (meta.residualDrift && meta.residualDrift > 0.1) {
-      messages.push(`Small drift remains: ${meta.residualDrift.toFixed(1)}% from target.`);
+    // Hide negligible drift (< 0.5% total), show for meaningful residual
+    if (meta.residualDrift && meta.residualDrift >= 0.5) {
+      // Use appropriate precision: 1 decimal for larger values, whole number for small
+      const driftDisplay = meta.residualDrift >= 1
+        ? `${Math.round(meta.residualDrift)}%`
+        : `${meta.residualDrift.toFixed(1)}%`;
+      messages.push(`Remaining drift: ${driftDisplay} from target.`);
     } else if (!meta.hasLockedCollateral && !meta.insufficientCash) {
       return ["Your portfolio is now on target."];
     }

@@ -592,7 +592,14 @@ export function reducer(state, action) {
       next.addFundsDraft = null;
       next.rebalanceDraft = null;
       next.ledger = [...next.ledger, entry];
-      next.lastAction = { type: p.kind, timestamp: Date.now(), ...p.payload };
+      next.lastAction = {
+        type: p.kind,
+        timestamp: Date.now(),
+        ...p.payload,
+        // Include boundary and rebalanceMeta for accurate toast messaging
+        boundary: p.boundary,
+        rebalanceMeta: p.rebalanceMeta,
+      };
       // Fix 6: Include boundary in action log for indicators
       next = addLogEntry(next, p.kind, { ...p.payload, boundary: p.boundary });
 

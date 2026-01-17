@@ -282,14 +282,33 @@ function PendingActionModal({ pendingAction, targetLayerPct, dispatch }) {
             </div>
           )}
 
-          {/* Rebalance-specific constraint warning */}
-          {kind === 'REBALANCE' && boundary === 'STRUCTURAL' && frictionCopy.length > 0 && (
+          {/* Rebalance-specific constraint warning - show if STRUCTURAL or has constraints */}
+          {kind === 'REBALANCE' && (
+            (boundary === 'STRUCTURAL' && frictionCopy.length > 0) ||
+            (rebalanceMeta?.hasLockedCollateral || rebalanceMeta?.insufficientCash || rebalanceMeta?.residualDrift >= 1)
+          ) && (
             <div className="rebalanceConstraintWarning">
               <div className="warningIcon">⚠️</div>
               <div className="warningMessages">
-                {frictionCopy.map((msg, i) => (
-                  <div key={i} className="warningMessage">{msg}</div>
-                ))}
+                {boundary === 'STRUCTURAL' && frictionCopy.length > 0 ? (
+                  frictionCopy.map((msg, i) => (
+                    <div key={i} className="warningMessage">{msg}</div>
+                  ))
+                ) : (
+                  <>
+                    {rebalanceMeta?.hasLockedCollateral && (
+                      <div className="warningMessage">Some assets are locked as collateral for your loans.</div>
+                    )}
+                    {rebalanceMeta?.insufficientCash && (
+                      <div className="warningMessage">Not enough cash to fully balance all layers.</div>
+                    )}
+                    {rebalanceMeta?.residualDrift >= 1 && (
+                      <div className="warningMessage">
+                        Remaining drift: {Math.round(rebalanceMeta.residualDrift)}% from target.
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           )}

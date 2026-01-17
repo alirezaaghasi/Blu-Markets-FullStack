@@ -29,8 +29,17 @@ function ExecutionSummary({ lastAction, dispatch }) {
         return '✓ Loan repaid';
       case 'PROTECT':
         return `✓ ${getAssetDisplayName(lastAction.assetId)} protected`;
-      case 'REBALANCE':
+      case 'REBALANCE': {
+        // Show accurate message based on constraints
+        const meta = lastAction.rebalanceMeta;
+        const hadConstraints = meta?.hasLockedCollateral || meta?.insufficientCash;
+        const hasResidualDrift = meta?.residualDrift > 1; // More than 1% total drift
+
+        if (lastAction.boundary === 'STRUCTURAL' || hadConstraints || hasResidualDrift) {
+          return '✓ Partially rebalanced';
+        }
         return '✓ Rebalanced successfully';
+      }
       default:
         return `✓ ${lastAction.type}`;
     }
