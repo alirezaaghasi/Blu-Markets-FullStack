@@ -231,6 +231,7 @@ export interface LedgerEntryDetails {
 export interface LedgerEntry {
   id: string;
   tsISO: string;           // ISO timestamp
+  tsDateLabel?: string;    // Pre-computed date label (e.g., "Today", "Jan 17") for O(1) grouping
   type: LedgerEntryType;
   details: LedgerEntryDetails;
 }

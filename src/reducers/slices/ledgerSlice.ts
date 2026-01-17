@@ -8,7 +8,7 @@
 
 import { cloneState, previewAddFunds, previewTrade, previewBorrow, previewRepay, previewRebalance } from '../../engine/preview';
 import { calcPremiumIRR } from '../../engine/pricing';
-import { uid, nowISO } from '../../helpers';
+import { uid, nowISO, computeDateLabel } from '../../helpers';
 import { addLogEntry } from '../initialState';
 import type { AppState, AppAction, LedgerEntry, LedgerEntryType, Protection, ActionPayload } from '../../types';
 
@@ -84,9 +84,11 @@ export function ledgerReducer(state: AppState, action: AppAction): AppState {
 
       // Reuse after snapshot from preview instead of recomputing
       // (state is deterministic, so after snapshot is identical)
+      const tsISO = nowISO();
       const entry: LedgerEntry = {
         id: uid(),
-        tsISO: nowISO(),
+        tsISO,
+        tsDateLabel: computeDateLabel(tsISO),  // Pre-computed for O(1) grouping in HistoryPane
         type: `${p.kind}_COMMIT` as LedgerEntryType,
         details: {
           kind: p.kind,

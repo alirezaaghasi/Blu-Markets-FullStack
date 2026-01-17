@@ -9,8 +9,12 @@ interface GroupedEntries {
   [date: string]: LedgerEntry[];
 }
 
+// Cached formatter for legacy entries without precomputed labels
+const dateLabelFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+
 /**
  * Helper to group entries by date
+ * Uses precomputed tsDateLabel when available (O(1)), falls back to Date parsing for legacy entries
  */
 function groupByDate(entries: LedgerEntry[]): GroupedEntries {
   const groups: GroupedEntries = {};
@@ -18,18 +22,19 @@ function groupByDate(entries: LedgerEntry[]): GroupedEntries {
   const yesterday = new Date(Date.now() - 86400000).toDateString();
 
   for (const entry of entries) {
-    const date = new Date(entry.tsISO).toDateString();
-    let label: string;
+    // Use precomputed label if available (fast path)
+    let label = entry.tsDateLabel;
 
-    if (date === today) {
-      label = 'Today';
-    } else if (date === yesterday) {
-      label = 'Yesterday';
-    } else {
-      label = new Date(entry.tsISO).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric'
-      });
+    // Fallback for legacy entries without precomputed label
+    if (!label) {
+      const date = new Date(entry.tsISO).toDateString();
+      if (date === today) {
+        label = 'Today';
+      } else if (date === yesterday) {
+        label = 'Yesterday';
+      } else {
+        label = dateLabelFormatter.format(new Date(entry.tsISO));
+      }
     }
 
     if (!groups[label]) groups[label] = [];

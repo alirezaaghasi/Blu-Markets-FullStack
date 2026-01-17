@@ -106,10 +106,12 @@ export function usePrices(interval: number = 30000, enabled: boolean = true): Us
         if (coordinatorRef.current?.isLeader) {
           coordinatorRef.current.broadcastPrices(computedPrices, computedFxRate, result.updatedAt);
         }
+        // Only update lastUpdated when data actually changes (reduces render churn)
+        setLastUpdated(result.updatedAt);
       }
 
-      setLastUpdated(result.updatedAt);
-      setError(null);
+      // Only clear error if it was set (avoids unnecessary re-render)
+      setError(prev => prev === null ? prev : null);
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
       if (!isMountedRef.current) return;
@@ -119,7 +121,8 @@ export function usePrices(interval: number = 30000, enabled: boolean = true): Us
       serviceErrorsRef.current = incrementAllErrors(serviceErrorsRef.current);
     } finally {
       if (isMountedRef.current) {
-        setLoading(false);
+        // Only update loading if it was true (avoids unnecessary re-render)
+        setLoading(prev => prev === false ? prev : false);
       }
     }
   }, [enabled]);
@@ -146,19 +149,25 @@ export function usePrices(interval: number = 30000, enabled: boolean = true): Us
     coordinatorRef.current.onPricesReceived((newPrices, newFxRate, updatedAt) => {
       if (!isMountedRef.current) return;
 
+      let dataChanged = false;
       setPrices(prev => {
         const merged = { ...prev, ...newPrices };
         if (shallowEqualPrices(prev, merged)) return prev;
+        dataChanged = true;
         return merged;
       });
 
       if (newFxRate && newFxRate !== fxRateRef.current) {
         setFxRate(newFxRate);
+        dataChanged = true;
       }
 
-      setLastUpdated(updatedAt);
-      setLoading(false);
-      setError(null);
+      // Only update lastUpdated when data actually changes (reduces render churn)
+      if (dataChanged) {
+        setLastUpdated(updatedAt);
+      }
+      setLoading(prev => prev === false ? prev : false);
+      setError(prev => prev === null ? prev : null);
     });
 
     // Start polling if leader and enabled

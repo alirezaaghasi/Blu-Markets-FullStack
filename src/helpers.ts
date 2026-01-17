@@ -52,6 +52,7 @@ export function formatQuantity(qty: number | string, assetId: string): string {
 const timeFormatter24h = new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 const timestampFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 const timeFormatter12h = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+const dateLabelFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
 
 export function formatTime(ts: number | string | Date): string {
   return timeFormatter24h.format(new Date(ts));
@@ -63,6 +64,21 @@ export function formatTimestamp(ts: number | string | Date): string {
 
 export function formatTimeOnly(ts: number | string | Date): string {
   return timeFormatter12h.format(new Date(ts));
+}
+
+/**
+ * Compute date label for ledger entries at creation time (pre-computed for O(1) grouping)
+ * Returns "Today", "Yesterday", or formatted date like "Jan 17"
+ * Note: "Today"/"Yesterday" become stale after midnight, but acceptable for historical entries
+ */
+export function computeDateLabel(tsISO: string): string {
+  const entryDate = new Date(tsISO).toDateString();
+  const today = new Date().toDateString();
+  const yesterday = new Date(Date.now() - 86400000).toDateString();
+
+  if (entryDate === today) return 'Today';
+  if (entryDate === yesterday) return 'Yesterday';
+  return dateLabelFormatter.format(new Date(tsISO));
 }
 
 export function uid(): string {

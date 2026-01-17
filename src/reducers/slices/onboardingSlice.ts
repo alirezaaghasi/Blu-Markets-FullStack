@@ -15,7 +15,7 @@
 import { STAGES, THRESHOLDS, LAYERS, WEIGHTS, DEFAULT_PRICES, DEFAULT_FX_RATE } from '../../constants/index';
 import { ASSETS } from '../../state/domain';
 import { irrToFixedIncomeUnits } from '../../engine/fixedIncome';
-import { uid, nowISO } from '../../helpers';
+import { uid, nowISO, computeDateLabel } from '../../helpers';
 import { calculateFinalRisk, answersToRichFormat } from '../../engine/riskScoring';
 import questionnaire from '../../data/questionnaire.v2.fa.json';
 import { addLogEntry } from '../initialState';
@@ -170,6 +170,7 @@ export function onboardingReducer(state: AppState, action: AppAction): AppState 
       const entry: LedgerEntry = {
         id: uid(),
         tsISO: createdAt,
+        tsDateLabel: computeDateLabel(createdAt),  // Pre-computed for O(1) grouping in HistoryPane
         type: 'PORTFOLIO_CREATED_COMMIT' as LedgerEntryType,
         details: { amountIRR: n, targetLayerPct: state.targetLayerPct },
       };

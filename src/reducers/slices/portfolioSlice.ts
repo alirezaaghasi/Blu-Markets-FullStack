@@ -32,7 +32,7 @@ import {
   calculateRebalanceGap,
 } from '../../engine/preview';
 import { STAGES, DEFAULT_PRICES, DEFAULT_FX_RATE } from '../../constants/index';
-import { uid, nowISO } from '../../helpers';
+import { uid, nowISO, computeDateLabel } from '../../helpers';
 import { addLogEntry } from '../initialState';
 import type { AppState, AppAction, ActionKind, ValidationResult, PendingAction, Holding, LedgerEntry, RebalanceMeta, RebalanceMode, LedgerEntryType, AssetId } from '../../types';
 
@@ -358,9 +358,11 @@ export function portfolioReducer(state: AppState, action: AppAction): AppState {
       const newProtections = state.protections.filter(p => p.id !== protectionId);
 
       // Create ledger entry
+      const tsISO = nowISO();
       const entry: LedgerEntry = {
         id: uid(),
-        tsISO: nowISO(),
+        tsISO,
+        tsDateLabel: computeDateLabel(tsISO),  // Pre-computed for O(1) grouping in HistoryPane
         type: 'PROTECTION_CANCELLED_COMMIT' as LedgerEntryType,
         details: {
           protectionId,
