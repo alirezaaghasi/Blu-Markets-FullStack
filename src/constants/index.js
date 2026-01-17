@@ -79,11 +79,12 @@ export const LAYER_EXPLANATIONS = {
 };
 
 // Issue 11: Onboarding step labels
+// Steps map to stages: Welcome (WELCOME/PHONE), Profile (QUESTIONNAIRE), Review (RESULT), Fund (AMOUNT)
 export const ONBOARDING_STEPS = [
   { id: 'welcome', label: 'Welcome' },
   { id: 'profile', label: 'Profile' },
-  { id: 'amount', label: 'Amount' },
-  { id: 'confirm', label: 'Confirm' },
+  { id: 'review', label: 'Review' },
+  { id: 'fund', label: 'Fund' },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════

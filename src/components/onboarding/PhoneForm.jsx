@@ -26,7 +26,7 @@ function PhoneForm({ state, dispatch }) {
           Continue
         </button>
       </div>
-      {state.phone && !isValid && <div className="validationError">+989XXXXXXXXX</div>}
+      {state.phone && !isValid && <div className="validationError">Enter a valid Iranian mobile number (+989...)</div>}
     </div>
   );
 }
