@@ -14,7 +14,7 @@
 
 import { STAGES, THRESHOLDS, LAYERS, WEIGHTS, DEFAULT_PRICES, DEFAULT_FX_RATE } from '../../constants/index';
 import { ASSETS } from '../../state/domain';
-import { irrToFixedIncomeUnits } from '../../engine/fixedIncome';
+import { irrToFixedIncomeUnits, FIXED_INCOME_UNIT_PRICE } from '../../engine/fixedIncome';
 import { uid, nowISO, computeDateLabel } from '../../helpers';
 import { calculateFinalRisk, answersToRichFormat } from '../../engine/riskScoring';
 import questionnaire from '../../data/questionnaire.v2.fa.json';
@@ -33,8 +33,20 @@ export const ONBOARDING_ACTIONS: string[] = [
 ];
 
 /**
+ * Helper to compute holding value in IRR from quantity
+ */
+function computeHoldingIRR(assetId: string, quantity: number, prices: Record<string, number>, fxRate: number): number {
+  if (assetId === 'IRR_FIXED_INCOME') {
+    return quantity * FIXED_INCOME_UNIT_PRICE;
+  }
+  const priceUSD = prices[assetId] || DEFAULT_PRICES[assetId] || 1;
+  return quantity * priceUSD * fxRate;
+}
+
+/**
  * Build initial portfolio holdings from investment amount and target allocation
  * v10: Holdings now store quantities instead of valueIRR
+ * v10.2.3: Added reconciliation step to ensure exact layer percentages
  */
 export function buildInitialHoldings(
   totalIRR: number,
@@ -55,16 +67,17 @@ export function buildInitialHoldings(
 
   for (const layer of LAYERS as Layer[]) {
     const pct = (targetLayerPct[layer] ?? 0) / 100;
-    const layerAmountIRR = Math.floor(totalIRR * pct);
+    const targetLayerIRR = Math.round(totalIRR * pct);  // Use round for target, not floor
     const weights = (WEIGHTS as Record<Layer, Record<string, number>>)[layer] || {};
-    let layerAllocated = 0;
+    const layerAssets = Object.keys(weights);
 
-    for (const assetId of Object.keys(weights)) {
+    // Phase 1: Initial allocation (may have rounding gaps)
+    for (const assetId of layerAssets) {
       const h = holdingsById[assetId];
       if (!h) continue;
 
-      const assetAmountIRR = Math.floor(layerAmountIRR * weights[assetId]);
-      layerAllocated += assetAmountIRR;
+      // Use round instead of floor for better initial distribution
+      const assetAmountIRR = Math.round(targetLayerIRR * weights[assetId]);
 
       // Convert IRR to quantity based on asset type
       if (assetId === 'IRR_FIXED_INCOME') {
@@ -76,18 +89,37 @@ export function buildInitialHoldings(
       }
     }
 
-    // Remainder to last asset in layer
-    const remainderIRR = layerAmountIRR - layerAllocated;
-    if (remainderIRR > 0) {
-      const layerAssets = Object.keys(weights);
-      const lastAsset = layerAssets[layerAssets.length - 1];
-      const h = holdingsById[lastAsset];
+    // Phase 2: Reconciliation - adjust last asset to hit exact target
+    // Calculate actual layer total after initial allocation
+    let actualLayerIRR = 0;
+    for (const assetId of layerAssets) {
+      const h = holdingsById[assetId];
       if (h) {
-        if (lastAsset === 'IRR_FIXED_INCOME') {
-          h.quantity += irrToFixedIncomeUnits(remainderIRR);
+        actualLayerIRR += computeHoldingIRR(assetId, h.quantity, prices, fxRate);
+      }
+    }
+
+    // Find the gap and adjust the last non-fixed-income asset
+    const gapIRR = targetLayerIRR - actualLayerIRR;
+    if (Math.abs(gapIRR) > 1) {  // Only adjust if gap is meaningful (> 1 IRR)
+      // Find last adjustable asset (prefer non-fixed-income for precision)
+      let adjustAssetId = layerAssets[layerAssets.length - 1];
+      for (let i = layerAssets.length - 1; i >= 0; i--) {
+        if (layerAssets[i] !== 'IRR_FIXED_INCOME') {
+          adjustAssetId = layerAssets[i];
+          break;
+        }
+      }
+
+      const h = holdingsById[adjustAssetId];
+      if (h) {
+        if (adjustAssetId === 'IRR_FIXED_INCOME') {
+          // For fixed income, adjust units
+          h.quantity += irrToFixedIncomeUnits(gapIRR);
         } else {
-          const priceUSD = prices[lastAsset] || DEFAULT_PRICES[lastAsset] || 1;
-          h.quantity += remainderIRR / (priceUSD * fxRate);
+          // For regular assets, adjust quantity
+          const priceUSD = prices[adjustAssetId] || DEFAULT_PRICES[adjustAssetId] || 1;
+          h.quantity += gapIRR / (priceUSD * fxRate);
         }
       }
     }
