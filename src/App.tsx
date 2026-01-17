@@ -133,7 +133,8 @@ export default function App() {
   // v10: Live price feeds for quantity-based holdings
   // Enable polling during AMOUNT_REQUIRED so portfolio is created with live prices
   // (avoids mismatch between creation prices and display prices)
-  const isPricePollingEnabled = state.stage === STAGES.ACTIVE || state.stage === STAGES.AMOUNT_REQUIRED;
+  // Also enable during PORTFOLIO_CREATED to show accurate values on summary
+  const isPricePollingEnabled = state.stage === STAGES.ACTIVE || state.stage === STAGES.AMOUNT_REQUIRED || state.stage === STAGES.PORTFOLIO_CREATED;
   const { prices, fxRate, loading: pricesLoading, lastUpdated: pricesUpdatedAt, error: pricesError } = usePrices(30000, isPricePollingEnabled);
 
   // Prefetch likely next tabs after mount to reduce latency on tab switch

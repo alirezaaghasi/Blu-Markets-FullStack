@@ -26,10 +26,14 @@ export const ONBOARDING_ACTIONS: string[] = [
   'SET_PHONE',
   'SUBMIT_PHONE',
   'ANSWER_QUESTION',
+  'GO_BACK_QUESTION',      // Task 4: Back button
   'ADVANCE_CONSENT',
   'SUBMIT_CONSENT',
+  'TOGGLE_CONSENT_CHECKBOX', // Task 2: Checkbox consent
+  'SUBMIT_CHECKBOX_CONSENT', // Task 2: Submit checkbox consent
   'SET_INVEST_AMOUNT',
   'EXECUTE_PORTFOLIO',
+  'GO_TO_DASHBOARD',        // Task 1: Navigate from summary
 ];
 
 /**
@@ -166,6 +170,19 @@ export function onboardingReducer(state: AppState, action: AppAction): AppState 
       return s;
     }
 
+    // Task 4: Back button in questionnaire
+    case 'GO_BACK_QUESTION': {
+      if (state.stage !== STAGES.ONBOARDING_QUESTIONNAIRE) return state;
+      if (state.questionnaire.index <= 0) return state;
+      return {
+        ...state,
+        questionnaire: {
+          ...state.questionnaire,
+          index: state.questionnaire.index - 1,
+        },
+      };
+    }
+
     case 'ADVANCE_CONSENT': {
       if (state.stage !== STAGES.ONBOARDING_RESULT) return state;
       const nextStep = state.consentStep + 1;
@@ -176,6 +193,33 @@ export function onboardingReducer(state: AppState, action: AppAction): AppState 
     case 'SUBMIT_CONSENT': {
       if (state.stage !== STAGES.ONBOARDING_RESULT) return state;
       if (String(action.text || '') !== questionnaire.consent_exact) return state;
+      return { ...state, stage: STAGES.AMOUNT_REQUIRED as Stage };
+    }
+
+    // Task 2: Toggle consent checkbox
+    case 'TOGGLE_CONSENT_CHECKBOX': {
+      if (state.stage !== STAGES.ONBOARDING_RESULT) return state;
+      const checkbox = (action as { type: 'TOGGLE_CONSENT_CHECKBOX'; checkbox: 'risk' | 'loss' | 'noGuarantee' }).checkbox;
+      const checkboxMap = {
+        risk: 'riskAcknowledged',
+        loss: 'lossAcknowledged',
+        noGuarantee: 'noGuaranteeAcknowledged',
+      } as const;
+      const field = checkboxMap[checkbox];
+      return {
+        ...state,
+        consentCheckboxes: {
+          ...state.consentCheckboxes,
+          [field]: !state.consentCheckboxes[field],
+        },
+      };
+    }
+
+    // Task 2: Submit checkbox consent
+    case 'SUBMIT_CHECKBOX_CONSENT': {
+      if (state.stage !== STAGES.ONBOARDING_RESULT) return state;
+      const { riskAcknowledged, lossAcknowledged, noGuaranteeAcknowledged } = state.consentCheckboxes;
+      if (!riskAcknowledged || !lossAcknowledged || !noGuaranteeAcknowledged) return state;
       return { ...state, stage: STAGES.AMOUNT_REQUIRED as Stage };
     }
 
@@ -196,7 +240,8 @@ export function onboardingReducer(state: AppState, action: AppAction): AppState 
       const createdAt = nowISO();
 
       const holdings = buildInitialHoldings(n, state.targetLayerPct, prices, fxRate, createdAt);
-      let s = { ...state, holdings, cashIRR: 0, stage: STAGES.ACTIVE as Stage };
+      // Task 1: Go to PORTFOLIO_CREATED summary screen instead of ACTIVE
+      let s = { ...state, holdings, cashIRR: 0, stage: STAGES.PORTFOLIO_CREATED as Stage };
 
       // Create ledger entry
       const entry: LedgerEntry = {
@@ -209,6 +254,12 @@ export function onboardingReducer(state: AppState, action: AppAction): AppState 
       s = { ...s, ledger: [entry], lastAction: { type: 'PORTFOLIO_CREATED', timestamp: Date.now() } } as AppState;
       s = addLogEntry(s, 'PORTFOLIO_CREATED', { amountIRR: n });
       return s;
+    }
+
+    // Task 1: Navigate from summary screen to dashboard
+    case 'GO_TO_DASHBOARD': {
+      if (state.stage !== STAGES.PORTFOLIO_CREATED) return state;
+      return { ...state, stage: STAGES.ACTIVE as Stage };
     }
 
     default:

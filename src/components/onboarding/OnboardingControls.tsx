@@ -143,11 +143,51 @@ interface OnboardingControlsProps {
  * Handles questionnaire, consent flow, investment amount, and action forms
  * v10: Updated for new 12-question questionnaire with ProfileResult screen
  */
+// Task 5: Calculate personalized quick amounts based on questionnaire answers
+function calculateSuggestedAmounts(answers: Record<string, number>): { amounts: number[]; recommendedIndex: number } {
+  // Map question indices to answer values
+  // q_buffer (index 1): 0=12+mo, 1=6-12mo, 2=3-6mo, 3=<3mo
+  // q_income (index 0): 0=fixed, 1=mostly, 2=variable, 3=uncertain
+  // q_past_behavior (index 7): 0=panic, 1=worried, 2=calm, 3=no experience
+
+  const buffer = answers['q_buffer'] ?? 2;  // Default: 3-6 months
+  const income = answers['q_income'] ?? 1;  // Default: mostly stable
+  const experience = answers['q_past_behavior'] ?? 3; // Default: no experience
+
+  // Determine tier based on signals
+  const lowCapacity = buffer >= 3 || income >= 3 || experience === 0;
+  const highCapacity = buffer <= 1 && income <= 1 && experience >= 2;
+
+  let tier: 'conservative' | 'moderate' | 'aggressive';
+  if (lowCapacity) {
+    tier = 'conservative';
+  } else if (highCapacity) {
+    tier = 'aggressive';
+  } else {
+    tier = 'moderate';
+  }
+
+  // Amount tiers (in IRR)
+  const amountTiers = {
+    conservative: [10_000_000, 25_000_000, 50_000_000, 100_000_000],
+    moderate: [50_000_000, 100_000_000, 250_000_000, 500_000_000],
+    aggressive: [100_000_000, 250_000_000, 500_000_000, 1_000_000_000],
+  };
+
+  return {
+    amounts: amountTiers[tier],
+    recommendedIndex: 1, // Second option is recommended
+  };
+}
+
 function OnboardingControls({ state, dispatch, prices, fxRate }: OnboardingControlsProps) {
-  const [consentText, setConsentText] = useState('');
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [showingProfile, setShowingProfile] = useState(true); // v10: Show profile before consent
-  const isConsentMatch = consentText === questionnaireV2.consent_exact;
+
+  // Task 2: Check if all consent checkboxes are checked
+  const allConsentsChecked = state.consentCheckboxes.riskAcknowledged &&
+    state.consentCheckboxes.lossAcknowledged &&
+    state.consentCheckboxes.noGuaranteeAcknowledged;
 
   // Optimization: Memoized holdingsById map for O(1) lookups instead of O(n) find()
   const holdingsById = useMemo(() => {
@@ -236,6 +276,9 @@ function OnboardingControls({ state, dispatch, prices, fxRate }: OnboardingContr
     const q = questionnaireV2.questions[idx];
     if (!q) return null;
 
+    // Task 4: Check if there's a previous answer for highlighting
+    const previousAnswer = state.questionnaire.answers[q.id];
+
     return (
       <div>
         <OnboardingProgress currentStep={2} />
@@ -248,10 +291,10 @@ function OnboardingControls({ state, dispatch, prices, fxRate }: OnboardingContr
           <div className="q-title">{q.text}</div>
           <div className="q-english">{q.english}</div>
           <div className="q-options">
-            {q.options.map((opt) => (
+            {q.options.map((opt, optIdx) => (
               <button
                 key={opt.id}
-                className="opt"
+                className={`opt ${previousAnswer === optIdx ? 'selected' : ''}`}
                 onClick={() => dispatch({ type: 'ANSWER_QUESTION', qId: q.id, optionId: opt.id })}
               >
                 {opt.text}
@@ -259,6 +302,15 @@ function OnboardingControls({ state, dispatch, prices, fxRate }: OnboardingContr
               </button>
             ))}
           </div>
+          {/* Task 4: Back button - only show on questions 2+ */}
+          {idx > 0 && (
+            <button
+              className="backBtn"
+              onClick={() => dispatch({ type: 'GO_BACK_QUESTION' })}
+            >
+              ← Back
+            </button>
+          )}
         </div>
       </div>
     );
@@ -278,123 +330,60 @@ function OnboardingControls({ state, dispatch, prices, fxRate }: OnboardingContr
       );
     }
 
-    const renderRecommendationMessage = () => (
-      <div className="recommendationMessage">
-        <p>Based on your answers, here's your recommended allocation:</p>
-        <div className="recommendationLayers">
-          <div className="recommendationLayer">
-            <span className="layerDot foundation"></span>
-            <span>Foundation ({state.targetLayerPct.FOUNDATION}%) — Stable assets</span>
-          </div>
-          <div className="recommendationLayer">
-            <span className="layerDot growth"></span>
-            <span>Growth ({state.targetLayerPct.GROWTH}%) — Balanced growth</span>
-          </div>
-          <div className="recommendationLayer">
-            <span className="layerDot upside"></span>
-            <span>Upside ({state.targetLayerPct.UPSIDE}%) — Higher potential</span>
-          </div>
-        </div>
-        <p>This balances protection with growth.</p>
-      </div>
-    );
-
-    interface ConsentStep {
-      id: string;
-      message: string;
-      button?: string;
-      consentRequired?: boolean;
-    }
-
-    const CONSENT_STEPS: ConsentStep[] = [
+    // Task 2: Checkbox consent data
+    const consentItems = [
       {
-        id: 'risk',
-        message: `With this allocation:\n\n📈 Good year: +15-25%\n📉 Bad quarter: -10-15%\n⏱️ Recovery: typically 3-6 months\n\nMarkets are uncertain. This is not a guarantee.`,
-        button: 'I understand'
+        id: 'risk' as const,
+        persian: 'این سبد دارایی ریسک دارد',
+        english: 'This portfolio carries risk',
+        checked: state.consentCheckboxes.riskAcknowledged,
       },
       {
-        id: 'control',
-        message: `You're always in control:\n\n✓ Adjust allocation anytime\n✓ Protect assets against drops\n✓ Borrow without selling\n✓ Exit to cash whenever`,
-        button: 'Continue'
+        id: 'loss' as const,
+        persian: 'ممکن است بخشی از سرمایه‌ام را از دست بدهم',
+        english: 'I may lose some of my investment',
+        checked: state.consentCheckboxes.lossAcknowledged,
       },
       {
-        id: 'consent',
-        message: `Ready to start? Type this to confirm:`,
-        consentRequired: true
-      }
+        id: 'noGuarantee' as const,
+        persian: 'این تضمین سود نیست',
+        english: 'This is not a guarantee of returns',
+        checked: state.consentCheckboxes.noGuaranteeAcknowledged,
+      },
     ];
-
-    const currentStep = state.consentStep;
-    const step = CONSENT_STEPS[currentStep];
-    const isConsentStep = currentStep >= CONSENT_STEPS.length - 1;
-
-    const renderStoredMessage = (msg: string, idx: number) => {
-      if (msg === '__RECOMMENDATION__') {
-        return (
-          <div key={idx} className="chatMessage bot">
-            <div className="messageContent">{renderRecommendationMessage()}</div>
-          </div>
-        );
-      }
-      return (
-        <div key={idx} className="chatMessage bot">
-          <div className="messageContent">{msg}</div>
-        </div>
-      );
-    };
 
     return (
       <div>
         <OnboardingProgress currentStep={3} />
         <div className="consentFlow" style={{ marginTop: 16 }}>
-          <div className="chatMessages">
-          {state.consentMessages.map((msg: string, i: number) => renderStoredMessage(msg, i))}
-          {step && !isConsentStep && (
-            <div className="chatMessage bot">
-              <div className="messageContent">
-                {step.message}
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="chatInputArea">
-          {!isConsentStep && step ? (
-            <button
-              className="btn primary"
-              style={{ width: '100%' }}
-              onClick={() => dispatch({ type: 'ADVANCE_CONSENT', message: step.message })}
-            >
-              {step.button}
-            </button>
-          ) : null}
+          {/* Task 2: Checkbox consent */}
+          <div className="consentHeader">
+            <h3>Before you start, confirm you understand:</h3>
+          </div>
 
-          {isConsentStep && (
-            <div className="consentInputSection">
-              <div className="consentPrompt">Ready to start? Type this to confirm:</div>
-              <div className="consentTextFarsi">{questionnaireV2.consent_exact}</div>
-              <div className="consentTextEnglish">{questionnaireV2.consent_english}</div>
+          <div className="consentCheckboxes">
+            {consentItems.map((item) => (
+              <label key={item.id} className="consentCheckboxRow">
+                <input
+                  type="checkbox"
+                  checked={item.checked}
+                  onChange={() => dispatch({ type: 'TOGGLE_CONSENT_CHECKBOX', checkbox: item.id })}
+                />
+                <div className="consentCheckboxText">
+                  <div className="consentPersian" dir="rtl">{item.persian}</div>
+                  <div className="consentEnglish">{item.english}</div>
+                </div>
+              </label>
+            ))}
+          </div>
 
-              <input
-                type="text"
-                className="consentInput"
-                placeholder="Type the Farsi sentence above to confirm..."
-                value={consentText}
-                onChange={(e) => setConsentText(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && isConsentMatch) dispatch({ type: 'SUBMIT_CONSENT', text: consentText }); }}
-                dir="rtl"
-              />
-
-              <button
-                className={`btn primary ${isConsentMatch ? '' : 'disabled'}`}
-                onClick={() => dispatch({ type: 'SUBMIT_CONSENT', text: consentText })}
-                disabled={!isConsentMatch}
-                style={{ width: '100%' }}
-              >
-                Continue
-              </button>
-            </div>
-          )}
-        </div>
+          <button
+            className={`btn primary consentSubmitBtn ${allConsentsChecked ? '' : 'disabled'}`}
+            onClick={() => dispatch({ type: 'SUBMIT_CHECKBOX_CONSENT' })}
+            disabled={!allConsentsChecked}
+          >
+            I Understand
+          </button>
         </div>
       </div>
     );
@@ -403,7 +392,9 @@ function OnboardingControls({ state, dispatch, prices, fxRate }: OnboardingContr
   if (state.stage === STAGES.AMOUNT_REQUIRED) {
     const amount = Number(state.investAmountIRR) || 0;
     const isValid = amount >= THRESHOLDS.MIN_AMOUNT_IRR;
-    const presetAmounts = [10_000_000, 50_000_000, 100_000_000, 500_000_000];
+
+    // Task 5: Personalized quick amounts based on questionnaire
+    const { amounts: suggestedAmounts, recommendedIndex } = calculateSuggestedAmounts(state.questionnaire.answers);
 
     const formatPreset = (val: number) => {
       if (val >= 1_000_000_000) return `${val / 1_000_000_000}B`;
@@ -418,16 +409,17 @@ function OnboardingControls({ state, dispatch, prices, fxRate }: OnboardingContr
           <h3>Let's bring your portfolio to life.</h3>
           <p className="muted">How much would you like to start with?</p>
         </div>
-        {/* Issue 20: Currency label above quick amounts */}
-        <div className="quickAmountsLabel">Quick amounts (IRR):</div>
+        {/* Task 5: Personalized quick amounts */}
+        <div className="quickAmountsLabel">Suggested for you (IRR):</div>
         <div className="quickAmounts">
-          {presetAmounts.map(preset => (
+          {suggestedAmounts.map((preset, idx) => (
             <button
               key={preset}
-              className={`quickAmountBtn ${amount === preset ? 'selected' : ''}`}
+              className={`quickAmountBtn ${amount === preset ? 'selected' : ''} ${idx === recommendedIndex ? 'recommended' : ''}`}
               onClick={() => dispatch({ type: 'SET_INVEST_AMOUNT', amountIRR: preset })}
             >
               {formatPreset(preset)}
+              {idx === recommendedIndex && <span className="recommendedStar">★</span>}
             </button>
           ))}
         </div>
@@ -455,6 +447,20 @@ function OnboardingControls({ state, dispatch, prices, fxRate }: OnboardingContr
         >
           {isValid ? 'Start Investing' : 'Enter amount to start'}
         </button>
+      </div>
+    );
+  }
+
+  // Task 1: Portfolio Created stage - show in left panel
+  if (state.stage === STAGES.PORTFOLIO_CREATED) {
+    return (
+      <div>
+        <OnboardingProgress currentStep={4} />
+        <div className="portfolioCreatedLeft">
+          <div className="createdMessage">
+            Your portfolio has been created successfully. Review the summary on the right.
+          </div>
+        </div>
       </div>
     );
   }

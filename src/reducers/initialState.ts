@@ -36,6 +36,7 @@ export function initialState(): AppState {
     profileResult: null,  // v10: Risk profile result from questionnaire
     consentStep: 0,
     consentMessages: [],
+    consentCheckboxes: { riskAcknowledged: false, lossAcknowledged: false, noGuaranteeAcknowledged: false },  // Task 2
     investAmountIRR: null,
     tab: 'PORTFOLIO',
     lastAction: null,

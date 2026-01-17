@@ -1,8 +1,24 @@
 import React, { Dispatch } from 'react';
 import { STAGES, LAYER_EXPLANATIONS, THRESHOLDS, LAYERS } from '../../constants/index';
-import { formatIRR } from '../../helpers';
+import { formatIRR, formatIRRShort } from '../../helpers';
 import DonutChart from '../DonutChart';
 import type { TargetLayerPct, Layer, AppAction } from '../../types';
+
+// Task 3: Question-to-layer highlighting map
+const LAYER_HIGHLIGHT_MAP: Record<number, string[]> = {
+  0: ['FOUNDATION', 'GROWTH', 'UPSIDE'], // q_income - all layers
+  1: ['FOUNDATION'],                      // q_buffer - Foundation
+  2: ['FOUNDATION'],                      // q_proportion - Foundation
+  3: ['GROWTH'],                          // q_goal - Growth
+  4: ['GROWTH'],                          // q_horizon - Growth
+  5: ['FOUNDATION', 'GROWTH', 'UPSIDE'], // q_crash_20 - gradient
+  6: ['UPSIDE'],                          // q_tradeoff - Upside
+  7: ['UPSIDE'],                          // q_past_behavior - Upside
+  8: ['FOUNDATION', 'GROWTH', 'UPSIDE'], // q_max_loss - gradient
+};
+
+// Questions that show gradient highlighting (risk questions)
+const GRADIENT_QUESTIONS = [5, 8];
 
 interface OnboardingRightPanelProps {
   stage: string;
@@ -54,6 +70,17 @@ function OnboardingRightPanel({ stage, questionIndex, targetLayers, investAmount
     const currentQuestionNumber = Math.min(questionIndex + 1, totalQuestions);
     const progress = (currentQuestionNumber / totalQuestions) * 100;
 
+    // Task 3: Get highlighted layers for current question
+    const highlightedLayers = LAYER_HIGHLIGHT_MAP[questionIndex] || ['FOUNDATION', 'GROWTH', 'UPSIDE'];
+    const isGradient = GRADIENT_QUESTIONS.includes(questionIndex);
+
+    // Gradient colors for risk questions
+    const gradientColors: Record<string, string> = {
+      FOUNDATION: '#22c55e', // green - safe
+      GROWTH: '#eab308',     // yellow - moderate
+      UPSIDE: '#ef4444',     // red - risky
+    };
+
     return (
       <div className="onboardingPanel">
         <div className="progressCard">
@@ -78,11 +105,18 @@ function OnboardingRightPanel({ stage, questionIndex, targetLayers, investAmount
         </div>
         <div className="layerPreviewCard">
           <h4>The Three Layers</h4>
-          {/* Issue 13: Two-line layer descriptions with tagline */}
+          {/* Task 3: Contextual layer highlighting */}
           {(LAYERS as Layer[]).map((layer: Layer) => {
             const info = (LAYER_EXPLANATIONS as Record<Layer, { name: string; tagline: string; description: string }>)[layer];
+            const isHighlighted = highlightedLayers.includes(layer);
+            const borderColor = isGradient && isHighlighted ? gradientColors[layer] : undefined;
+
             return (
-              <div key={layer} className="layerPreviewRow">
+              <div
+                key={layer}
+                className={`layerPreviewRow ${isHighlighted ? 'layer-highlighted' : 'layer-dimmed'}`}
+                style={borderColor ? { borderLeftColor: borderColor } : undefined}
+              >
                 <span className={`layerDot ${layer.toLowerCase()}`} style={{ marginTop: 4 }}></span>
                 <div>
                   <div className="layerPreviewName">{info.name}</div>
@@ -202,6 +236,58 @@ function OnboardingRightPanel({ stage, questionIndex, targetLayers, investAmount
               )}
             </>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // Task 1: Portfolio Created Summary Screen
+  if (stage === STAGES.PORTFOLIO_CREATED) {
+    const amount = Number(investAmount) || 0;
+
+    return (
+      <div className="onboardingPanel">
+        <div className="portfolioCreatedCard">
+          {/* Success checkmark */}
+          <div className="successCheck">✓</div>
+
+          <h2 className="createdTitle">Portfolio Created</h2>
+
+          <div className="createdTotal">
+            You invested <strong>{formatIRRShort(amount)} IRR</strong>
+          </div>
+
+          {/* Layer breakdown */}
+          <div className="createdBreakdown">
+            {(LAYERS as Layer[]).map((layer: Layer) => {
+              const info = (LAYER_EXPLANATIONS as Record<Layer, { name: string; assets: string[] }>)[layer];
+              const pct = targetLayers?.[layer] || 0;
+              const layerAmount = Math.floor(amount * pct / 100);
+
+              return (
+                <div key={layer} className="createdLayerRow">
+                  <div className="createdLayerHeader">
+                    <div className="createdLayerLeft">
+                      <span className={`layerDot ${layer.toLowerCase()}`}></span>
+                      <span className="createdLayerName">{info.name} ({pct}%)</span>
+                    </div>
+                    <span className="createdLayerAmount">{formatIRRShort(layerAmount)} IRR</span>
+                  </div>
+                  <div className="createdLayerAssets">
+                    {info.assets.join(', ')}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* CTA Button */}
+          <button
+            className="btn primary createdCta"
+            onClick={() => dispatch({ type: 'GO_TO_DASHBOARD' })}
+          >
+            Go to My Portfolio
+          </button>
         </div>
       </div>
     );

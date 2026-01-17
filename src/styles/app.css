@@ -497,7 +497,7 @@ body {
 /* Layer preview */
 .layerPreviewCard { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
 .layerPreviewCard h4 { margin: 0 0 12px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); font-weight: 500; }
-.layerPreviewRow { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+/* Note: .layerPreviewRow base styles moved to Quick amounts section for Task 3 highlighting */
 .layerPreviewRow:last-child { margin-bottom: 0; }
 .layerPreviewName { font-weight: 600; font-size: 13px; color: var(--text-primary); }
 .layerPreviewTagline { font-size: 12px; color: var(--accent); margin-top: 2px; font-weight: 500; }
@@ -554,10 +554,58 @@ body {
 .placeholderHint { text-align: center; font-size: 12px; color: var(--text-muted); padding: 12px; background: var(--bg-primary); border-radius: 8px; }
 
 /* Quick amounts */
-.quickAmounts { display: flex; gap: 8px; margin-bottom: 12px; }
-.quickAmountBtn { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-secondary); font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s; }
+.quickAmounts { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.quickAmountBtn { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-secondary); font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s; position: relative; }
 .quickAmountBtn:hover { border-color: var(--accent); color: var(--text-primary); }
 .quickAmountBtn.selected { background: var(--accent); border-color: var(--accent); color: white; }
+/* Task 5: Recommended amount button */
+.quickAmountBtn.recommended { border-color: var(--accent); }
+.quickAmountBtn.recommended .recommendedStar { margin-left: 4px; color: var(--accent); }
+.quickAmountBtn.selected.recommended .recommendedStar { color: white; }
+
+/* Task 3: Layer highlighting */
+.layerPreviewRow { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; padding: 8px; border-radius: 8px; border-left: 3px solid transparent; transition: opacity 0.2s, background 0.2s, border-color 0.2s; }
+.layerPreviewRow.layer-highlighted { opacity: 1; border-left-color: var(--accent); background: rgba(59, 130, 246, 0.08); }
+.layerPreviewRow.layer-dimmed { opacity: 0.4; }
+
+/* Task 4: Back button in questionnaire */
+.backBtn { display: inline-flex; align-items: center; gap: 4px; padding: 8px 0; background: none; border: none; color: var(--text-muted); font-size: 13px; cursor: pointer; margin-top: 12px; transition: color 0.15s; }
+.backBtn:hover { color: var(--text-primary); }
+
+/* Task 4: Selected answer option highlight */
+.opt.selected { background: var(--accent-muted); border-color: var(--accent-border); }
+
+/* Task 2: Checkbox consent */
+.consentHeader { margin-bottom: 16px; }
+.consentHeader h3 { font-size: 15px; font-weight: 500; color: var(--text-primary); margin: 0; }
+.consentCheckboxes { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+.consentCheckboxRow { display: flex; align-items: flex-start; gap: 12px; padding: 14px; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+.consentCheckboxRow:hover { border-color: var(--border-hover); background: var(--bg-elevated); }
+.consentCheckboxRow input[type="checkbox"] { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+.consentCheckboxText { flex: 1; }
+.consentPersian { font-family: var(--font-farsi); font-size: 14px; font-weight: 500; color: var(--text-primary); line-height: var(--farsi-line-height); }
+.consentEnglish { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.consentSubmitBtn { width: 100%; padding: 12px; font-size: 14px; }
+
+/* Task 1: Portfolio Created Summary Screen */
+.portfolioCreatedCard { text-align: center; padding: 20px; }
+.successCheck { width: 60px; height: 60px; border-radius: 50%; background: var(--success); color: white; font-size: 28px; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; animation: scaleIn 0.3s ease-out; }
+@keyframes scaleIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.createdTitle { font-size: 22px; font-weight: 600; color: var(--text-primary); margin: 0 0 8px; }
+.createdTotal { font-size: 14px; color: var(--text-secondary); margin-bottom: 24px; }
+.createdTotal strong { color: var(--text-primary); font-weight: 600; }
+.createdBreakdown { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 24px; text-align: left; }
+.createdLayerRow { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.createdLayerRow:last-child { border-bottom: none; padding-bottom: 0; }
+.createdLayerRow:first-child { padding-top: 0; }
+.createdLayerHeader { display: flex; justify-content: space-between; align-items: center; }
+.createdLayerLeft { display: flex; align-items: center; gap: 8px; }
+.createdLayerName { font-weight: 500; font-size: 14px; color: var(--text-primary); }
+.createdLayerAmount { font-weight: 600; font-size: 14px; color: var(--text-primary); }
+.createdLayerAssets { font-size: 12px; color: var(--text-muted); margin-top: 4px; margin-left: 14px; }
+.createdCta { width: 100%; padding: 14px; font-size: 15px; }
+.portfolioCreatedLeft { padding: 20px; text-align: center; }
+.createdMessage { font-size: 14px; color: var(--text-secondary); line-height: 1.6; }
 
 /* Holdings */
 .holdingsList { display: flex; flex-direction: column; gap: 8px; }

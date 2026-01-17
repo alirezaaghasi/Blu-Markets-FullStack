@@ -46,6 +46,7 @@ export type Stage =
   | 'ONBOARDING_QUESTIONNAIRE'
   | 'ONBOARDING_RESULT'
   | 'AMOUNT_REQUIRED'
+  | 'PORTFOLIO_CREATED'
   | 'ACTIVE';
 
 /** Active tab in the main UI */
@@ -414,6 +415,13 @@ export interface QuestionnaireState {
   answers: QuestionnaireAnswers;
 }
 
+/** Consent checkbox state for Task 2 */
+export interface ConsentCheckboxState {
+  riskAcknowledged: boolean;
+  lossAcknowledged: boolean;
+  noGuaranteeAcknowledged: boolean;
+}
+
 export interface LastAction {
   type: string;
   timestamp: number;
@@ -450,6 +458,7 @@ export interface AppState {
   profileResult: unknown;  // v10: Risk profile result from questionnaire (complex object)
   consentStep: number;
   consentMessages: string[];
+  consentCheckboxes: ConsentCheckboxState;  // Task 2: Checkbox consent state
   investAmountIRR: number | null;
   tab: TabId;
   lastAction: LastAction | null;
@@ -482,10 +491,14 @@ export type AppAction =
   | { type: 'SET_PHONE'; phone: string }
   | { type: 'SUBMIT_PHONE' }
   | { type: 'ANSWER_QUESTION'; qId: string; optionId: string }
+  | { type: 'GO_BACK_QUESTION' }  // Task 4: Back button in questionnaire
   | { type: 'ADVANCE_CONSENT'; message: string }
   | { type: 'SUBMIT_CONSENT'; text: string }
+  | { type: 'TOGGLE_CONSENT_CHECKBOX'; checkbox: 'risk' | 'loss' | 'noGuarantee' }  // Task 2: Checkbox consent
+  | { type: 'SUBMIT_CHECKBOX_CONSENT' }  // Task 2: Submit checkbox consent
   | { type: 'SET_INVEST_AMOUNT'; amountIRR: number | null }
   | { type: 'EXECUTE_PORTFOLIO'; prices?: Record<string, number>; fxRate?: number }
+  | { type: 'GO_TO_DASHBOARD' }  // Task 1: Navigate from summary to dashboard
   // Cancel
   | { type: 'CANCEL_PENDING' }
   | { type: 'CANCEL_PROTECTION'; protectionId: string }
