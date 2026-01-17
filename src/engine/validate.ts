@@ -1,6 +1,6 @@
 import type { ValidationResult, ValidationMeta, AppState, AssetId, TradeSide, RebalanceMode, Layer, Loan } from '../types';
 import { calcPremiumIRR } from './pricing';
-import { THRESHOLDS, PROTECTION_ELIGIBLE_ASSETS, COLLATERAL_LTV_BY_LAYER } from '../constants/index';
+import { THRESHOLDS, PROTECTION_ELIGIBLE_ASSETS, COLLATERAL_LTV_BY_LAYER, MAX_TOTAL_LOAN_PCT } from '../constants/index';
 import { ASSET_LAYER } from '../state/domain';
 import { getHoldingValueIRR } from '../helpers';
 
@@ -165,12 +165,34 @@ export function validateBorrow({ assetId, amountIRR, prices, fxRate }: BorrowPay
   const layer = ASSET_LAYER[assetId] as Layer;
   const maxLtv = COLLATERAL_LTV_BY_LAYER[layer] || 0.3;
   const holdingValueIRR = getHoldingValueIRR(h, prices, fxRate);
-  const maxBorrow = Math.floor(holdingValueIRR * maxLtv);
+  const maxBorrowAsset = Math.floor(holdingValueIRR * maxLtv);
 
-  if (amountIRR > maxBorrow) {
-    return fail(['EXCEEDS_MAX_BORROW'], { maxBorrow, maxLtv });
+  if (amountIRR > maxBorrowAsset) {
+    return fail(['EXCEEDS_MAX_BORROW'], { maxBorrow: maxBorrowAsset, maxLtv });
   }
-  return ok({ maxLtv, maxBorrow, holdingValueIRR });
+
+  // Global loan cap check (25% of total portfolio value)
+  const totalPortfolioIRR = state.cashIRR + state.holdings.reduce((sum, holding) => {
+    return sum + getHoldingValueIRR(holding, prices, fxRate);
+  }, 0);
+
+  const existingLoansIRR = (state.loans || []).reduce((sum, loan) => sum + loan.amountIRR, 0);
+  const maxTotalLoans = Math.floor(totalPortfolioIRR * MAX_TOTAL_LOAN_PCT);
+  const remainingLoanCapacity = maxTotalLoans - existingLoansIRR;
+
+  if (amountIRR > remainingLoanCapacity) {
+    return fail(['EXCEEDS_PORTFOLIO_LOAN_LIMIT'], {
+      maxTotalLoans,
+      existingLoans: existingLoansIRR,
+      remainingCapacity: remainingLoanCapacity,
+      requested: amountIRR
+    });
+  }
+
+  // Return the more restrictive of the two limits
+  const maxBorrow = Math.min(maxBorrowAsset, remainingLoanCapacity);
+
+  return ok({ maxLtv, maxBorrow, holdingValueIRR, remainingLoanCapacity });
 }
 
 /**

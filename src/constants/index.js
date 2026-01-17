@@ -91,6 +91,10 @@ export const COLLATERAL_LTV_BY_LAYER = {
   UPSIDE: 0.3,      // 30% - high volatility
 };
 
+// Global loan limit as percentage of total portfolio value
+// Per Business Review decision: cap at 25% to control loan revenue concentration
+export const MAX_TOTAL_LOAN_PCT = 0.25;  // 25% of total AUM
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // RISK ALLOCATIONS (Layer %)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -106,6 +110,14 @@ export const PREMIUM_RATES = {
   FOUNDATION: 0.004,
   GROWTH: 0.008,
   UPSIDE: 0.012,
+};
+
+// Trading spread by layer (disclosed on trade confirmation per Business Review)
+// Range: midpoint used for display, actual spread may vary
+export const SPREAD_BY_LAYER = {
+  FOUNDATION: 0.0015,  // 0.15% (range: 0.1% - 0.2%)
+  GROWTH: 0.003,       // 0.30% (range: 0.2% - 0.4%)
+  UPSIDE: 0.006,       // 0.60% (range: 0.4% - 0.8%)
 };
 
 // WEIGHTS and PROTECTION_ELIGIBLE_ASSETS are now imported from registry (see top of file)
@@ -242,6 +254,7 @@ export const ERROR_MESSAGES = {
   // Borrow
   ASSET_ALREADY_FROZEN: 'This asset is already used as collateral for another loan.',
   EXCEEDS_MAX_BORROW: 'Amount exceeds maximum you can borrow against this asset.',
+  EXCEEDS_PORTFOLIO_LOAN_LIMIT: 'Total loans cannot exceed 25% of your portfolio value.',
 
   // Repay
   NO_ACTIVE_LOAN: 'No active loan to repay.',

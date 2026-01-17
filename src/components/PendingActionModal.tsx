@@ -1,8 +1,18 @@
 import React, { useState, useMemo, Dispatch } from 'react';
 import { formatIRR, formatIRRShort, getAssetDisplayName } from '../helpers';
-import { ERROR_MESSAGES } from '../constants/index';
+import { ERROR_MESSAGES, SPREAD_BY_LAYER } from '../constants/index';
 import { LAYERS, LAYER_EXPLANATIONS } from '../constants/index';
+import { ASSET_LAYER } from '../state/domain';
 import type { Layer, PendingAction, TargetLayerPct, PortfolioSnapshot, RebalanceTrade, AppAction } from '../types';
+
+/**
+ * Get spread percentage for an asset based on its layer
+ * Disclosed on trade confirmation per Business Review decision
+ */
+function getSpreadPercent(assetId: string): number {
+  const layer = ASSET_LAYER[assetId] as keyof typeof SPREAD_BY_LAYER;
+  return ((SPREAD_BY_LAYER as Record<string, number>)[layer] || 0.003) * 100;  // Convert to percentage
+}
 
 interface RebalanceTradesSectionProps {
   trades: RebalanceTrade[];
@@ -338,6 +348,13 @@ function PendingActionModal({ pendingAction, targetLayerPct, dispatch }: Pending
           {kind === 'TRADE' && frictionCopy.length > 0 && (
             <div className="validationDisplay">
               {frictionCopy.map((msg: string, i: number) => <div key={i} className="validationWarning">{msg}</div>)}
+            </div>
+          )}
+
+          {/* Spread disclosure for TRADE - per Business Review decision */}
+          {kind === 'TRADE' && (
+            <div className="spreadDisclosure">
+              Price includes {getSpreadPercent(payloadAny.assetId as string).toFixed(2)}% spread
             </div>
           )}
         </>

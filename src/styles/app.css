@@ -308,6 +308,9 @@ body {
 .validationError { padding: 10px 12px; border-radius: 8px; background: rgba(248, 81, 73, .08); border: 1px solid rgba(248, 81, 73, .2); color: var(--danger); font-size: 12px; margin-bottom: 6px; }
 .validationWarning { padding: 10px 12px; border-radius: 8px; background: rgba(210, 153, 34, .08); border: 1px solid rgba(210, 153, 34, .2); color: var(--warning); font-size: 12px; margin-bottom: 6px; }
 
+/* Spread disclosure styling (per Business Review) */
+.spreadDisclosure { font-size: 12px; color: var(--text-muted); text-align: center; padding: 8px 0; border-top: 1px solid var(--border); margin-top: 12px; }
+
 /* Ledger / History */
 .ledgerList { display: flex; flex-direction: column; gap: 8px; }
 .ledgerEntry { border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: var(--bg-secondary); transition: border-color 0.15s; }
