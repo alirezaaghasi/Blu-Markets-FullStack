@@ -408,34 +408,6 @@ export const PROTECTION_ELIGIBLE_ASSETS = ASSETS.filter(
   id => ASSETS_CONFIG[id].protectionEligible
 );
 
-/**
- * Legacy ASSET_META for backwards compatibility
- * @deprecated Use ASSETS_CONFIG directly
- * @type {Record<string, object>}
- */
-export const ASSET_META = Object.fromEntries(
-  ASSETS.map(id => {
-    const config = ASSETS_CONFIG[id];
-    return [id, {
-      name: config.name,
-      coingeckoId: config.coingeckoId,
-      symbol: config.symbol,
-      source: config.source,
-      decimals: config.decimals,
-      currency: config.currency,
-      unit: config.unit,
-      category: config.category,
-      description: config.description,
-      baseVolatility: config.baseVolatility,
-      maxLTV: config.maxLTV,
-      liquidityScore: config.liquidityScore,
-      provider: config.provider,
-      unitPrice: config.unitPrice,
-      annualRate: config.annualRate,
-    }];
-  })
-);
-
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================

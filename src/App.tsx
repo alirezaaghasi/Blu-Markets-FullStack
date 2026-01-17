@@ -44,7 +44,6 @@ import { QUESTIONNAIRE_LENGTH } from './data/questionnaireMetadata';
 import {
   ActionLogPane,
   Tabs,
-  OnboardingControls,
 } from './components/index';
 
 // Lazy-loaded components (code-split for smaller initial bundle)
@@ -56,6 +55,7 @@ const PortfolioHome = lazy(() => import('./components/PortfolioHome'));
 
 // Stage-specific components (only load what's needed)
 const OnboardingRightPanel = lazy(() => import('./components/onboarding/OnboardingRightPanel'));
+const OnboardingControls = lazy(() => import('./components/onboarding/OnboardingControls'));
 
 // Modals (rarely used, defer loading)
 const ResetConfirmModal = lazy(() => import('./components/ResetConfirmModal'));
@@ -296,7 +296,9 @@ export default function App() {
             <ActionLogPane actionLog={state.actionLog} />
           </div>
           <div className="footer">
-            <OnboardingControls state={state} dispatch={dispatch} prices={prices} fxRate={fxRate} />
+            <Suspense fallback={<div className="controlsLoadingFallback">Loading controls...</div>}>
+              <OnboardingControls state={state} dispatch={dispatch} prices={prices} fxRate={fxRate} />
+            </Suspense>
           </div>
         </div>
 

@@ -2,14 +2,11 @@
 export { default as ActionLogPane } from './ActionLogPane';
 export { default as Tabs } from './Tabs';
 
-// Onboarding Controls (statically imported by App.tsx)
-export { OnboardingControls } from './onboarding/index';
-
 // Components below are lazy-loaded directly by App.tsx for code-splitting
 // Do NOT add them here as it creates static imports that prevent chunking:
 // - PortfolioHome, Protection, Loans, HistoryPane (tab content)
 // - ExecutionSummary, ResetConfirmModal (modals)
-// - OnboardingRightPanel (onboarding)
+// - OnboardingRightPanel, OnboardingControls (onboarding)
 
 // Shared components used by lazy-loaded modules (these get bundled with their consumers)
 export { default as DonutChart } from './DonutChart';

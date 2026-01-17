@@ -9,7 +9,6 @@ export {
   ASSETS,
   ASSET_LAYER,
   LAYER_ASSETS,
-  ASSET_META,
 } from '../registry/assetRegistry';
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -1076,6 +1076,14 @@ body {
   color: var(--text-muted);
 }
 
+/* Controls loading fallback - for lazy-loaded OnboardingControls */
+.controlsLoadingFallback {
+  padding: 12px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
 /* Header flex grow container */
 .headerFlexGrow {
   flex: 1;

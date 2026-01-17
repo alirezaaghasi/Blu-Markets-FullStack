@@ -22,7 +22,4 @@ export {
   DEFAULT_PRICES,
   WEIGHTS,
   PROTECTION_ELIGIBLE_ASSETS,
-
-  // Legacy (deprecated)
-  ASSET_META,
 } from './assetRegistry';

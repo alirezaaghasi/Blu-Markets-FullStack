@@ -14,7 +14,8 @@
  */
 
 import type { Layer, AssetId, TradeSide, StrategyPreset, IntraLayerWeightResult } from '../types';
-import { LAYER_ASSETS, ASSET_META } from '../state/domain';
+import { LAYER_ASSETS } from '../state/domain';
+import { ASSETS_CONFIG } from '../registry/assetRegistry';
 import { BALANCER_CONFIG, STRATEGY_PRESETS, DEFAULT_PRICES } from '../constants/index';
 
 interface PricePoint {
@@ -80,7 +81,7 @@ interface HoldingData {
 
 /**
  * Provides market data for balancing calculations
- * Can use historical price data or fall back to base volatility from ASSET_META
+ * Can use historical price data or fall back to base volatility from ASSETS_CONFIG
  */
 export class MarketDataProvider {
   private priceHistory: PriceHistory;
@@ -110,13 +111,13 @@ export class MarketDataProvider {
 
   /**
    * Calculate realized volatility from price history
-   * Falls back to base volatility from ASSET_META if insufficient data
+   * Falls back to base volatility from ASSETS_CONFIG if insufficient data
    */
   calculateVolatility(asset: string, days: number = BALANCER_CONFIG.VOLATILITY_WINDOW): number {
     const history = this.getPriceHistory(asset, days + 1);
     if (history.length < 2) {
-      const meta = ASSET_META[asset] as { baseVolatility?: number } | undefined;
-      return meta?.baseVolatility || 0.5;
+      const config = ASSETS_CONFIG[asset];
+      return config?.baseVolatility || 0.5;
     }
 
     const returns: number[] = [];
@@ -293,13 +294,13 @@ export class IntraLayerBalancer {
   }
 
   /**
-   * Get liquidity factor from ASSET_META
+   * Get liquidity factor from ASSETS_CONFIG
    */
   private _getLiquidityFactor(asset: string, config: BalancerConfig): number {
-    const meta = ASSET_META[asset] as { liquidityScore?: number } | undefined;
-    if (!meta) return 1;
+    const assetConfig = ASSETS_CONFIG[asset];
+    if (!assetConfig) return 1;
 
-    const baseScore = meta.liquidityScore || 0.80;
+    const baseScore = assetConfig.liquidityScore || 0.80;
     return 1 + (baseScore - 0.80) * (config.LIQUIDITY_BONUS || 0.5);
   }
 
@@ -603,7 +604,7 @@ export function calculateAllLayerWeights(strategyName: StrategyPreset = 'BALANCE
 
 /**
  * Get static weights (fallback when no price history available)
- * Uses base volatility from ASSET_META
+ * Uses base volatility from ASSETS_CONFIG
  */
 export function getStaticWeights(strategyName: StrategyPreset = 'BALANCED'): LayerWeightsResult {
   return calculateAllLayerWeights(strategyName, {});
