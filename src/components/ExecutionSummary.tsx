@@ -49,15 +49,15 @@ function ExecutionSummary({ lastAction, dispatch }: ExecutionSummaryProps): Reac
       case 'PROTECTION_CANCELLED':
         return `✓ Cancelled ${getAssetDisplayName(action.assetId!)} protection`;
       case 'REBALANCE': {
-        // Show accurate message based on constraints
+        // Show accurate message based on actual result (residualDrift), not just constraints
         const meta = action.rebalanceMeta;
-        const hadConstraints = meta?.hasLockedCollateral || meta?.insufficientCash;
-        const hasResidualDrift = (meta?.residualDrift || 0) > 1; // More than 1% total drift
+        const residualDrift = meta?.residualDrift || 0;
 
-        if (action.boundary === 'STRUCTURAL' || hadConstraints || hasResidualDrift) {
-          return '✓ Partially rebalanced';
+        // If drift is minimal (< 1% total), it's a full rebalance regardless of constraints
+        if (residualDrift < 1) {
+          return '✓ Rebalanced successfully';
         }
-        return '✓ Rebalanced successfully';
+        return '✓ Partially rebalanced';
       }
       default:
         return `✓ ${action.type}`;
