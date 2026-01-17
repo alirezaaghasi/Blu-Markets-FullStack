@@ -131,8 +131,9 @@ export default function App() {
   const [state, dispatch] = useReducer(reducer, null, initialState);
 
   // v10: Live price feeds for quantity-based holdings
-  // Optimization: Disable polling during onboarding to reduce API calls and re-renders
-  const isPricePollingEnabled = state.stage === STAGES.ACTIVE;
+  // Enable polling during AMOUNT_REQUIRED so portfolio is created with live prices
+  // (avoids mismatch between creation prices and display prices)
+  const isPricePollingEnabled = state.stage === STAGES.ACTIVE || state.stage === STAGES.AMOUNT_REQUIRED;
   const { prices, fxRate, loading: pricesLoading, lastUpdated: pricesUpdatedAt, error: pricesError } = usePrices(30000, isPricePollingEnabled);
 
   // Prefetch likely next tabs after mount to reduce latency on tab switch
