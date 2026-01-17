@@ -26,6 +26,7 @@ replit.nix
 # Documentation and design files (keep in separate docs repo if needed)
 *.md
 !README.md
+!MIGRATION_PLAN.md
 screenshots*/
 claude-code-prompt.md
 
