@@ -30,6 +30,62 @@ interface PriceUpdateMessage {
   from: string;
 }
 
+// ============================================================================
+// PAYLOAD VALIDATION
+// ============================================================================
+
+/**
+ * Validates that a PRICE_UPDATE payload has the correct shape and types.
+ * Guards against malformed storage entries or cross-tab contamination.
+ *
+ * @param data - The parsed payload to validate
+ * @returns true if the payload is valid, false otherwise
+ */
+function isValidPriceUpdatePayload(data: unknown): data is PriceUpdateMessage {
+  // Check for null/undefined
+  if (data === null || typeof data !== 'object') {
+    return false;
+  }
+
+  const msg = data as Record<string, unknown>;
+
+  // Validate type field
+  if (msg.type !== 'PRICE_UPDATE') {
+    return false;
+  }
+
+  // Validate prices: must be an object with numeric values
+  if (typeof msg.prices !== 'object' || msg.prices === null || Array.isArray(msg.prices)) {
+    return false;
+  }
+  const prices = msg.prices as Record<string, unknown>;
+  for (const value of Object.values(prices)) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return false;
+    }
+  }
+
+  // Validate fxRate: must be a positive finite number
+  if (typeof msg.fxRate !== 'number' || !Number.isFinite(msg.fxRate) || msg.fxRate <= 0) {
+    return false;
+  }
+
+  // Validate updatedAt: must be a non-empty string (ISO date format expected)
+  if (typeof msg.updatedAt !== 'string' || msg.updatedAt.length === 0) {
+    return false;
+  }
+
+  // Validate from: must be a non-empty string (tab ID)
+  if (typeof msg.from !== 'string' || msg.from.length === 0) {
+    return false;
+  }
+
+  return true;
+}
+
+// Export for testing
+export { isValidPriceUpdatePayload };
+
 export interface TabCoordinator {
   readonly isLeader: boolean;
   readonly tabId: string;
@@ -167,17 +223,27 @@ export function createTabCoordinator(): TabCoordinator {
   }
 
   /**
-   * Handle incoming price update
+   * Handle incoming price update with validation
+   * Validates payload shape before invoking callback to guard against
+   * malformed storage entries or cross-tab contamination.
    */
-  function handlePriceMessage(data: PriceUpdateMessage): void {
-    if (data.type === 'PRICE_UPDATE' && data.from !== tabId && priceCallback) {
+  function handlePriceMessage(data: unknown): void {
+    // Validate payload structure before processing
+    if (!isValidPriceUpdatePayload(data)) {
+      // Silently ignore invalid payloads - could be from old versions or corruption
+      return;
+    }
+
+    // Only process messages from other tabs
+    if (data.from !== tabId && priceCallback) {
       priceCallback(data.prices, data.fxRate, data.updatedAt);
     }
   }
 
-  // Listen for price updates from other tabs
+  // Listen for price updates from other tabs via BroadcastChannel
   if (channel) {
-    channel.onmessage = (event: MessageEvent<PriceUpdateMessage>): void => {
+    channel.onmessage = (event: MessageEvent): void => {
+      // event.data is validated inside handlePriceMessage
       handlePriceMessage(event.data);
     };
   }
@@ -186,10 +252,11 @@ export function createTabCoordinator(): TabCoordinator {
   function handleStorageChange(event: StorageEvent): void {
     if (event.key === 'blu_prices_broadcast' && event.newValue) {
       try {
-        const data = JSON.parse(event.newValue) as PriceUpdateMessage;
+        // Parse and pass to handlePriceMessage which validates the payload
+        const data: unknown = JSON.parse(event.newValue);
         handlePriceMessage(data);
       } catch {
-        // Ignore parse errors
+        // Ignore JSON parse errors - malformed data
       }
     }
 
