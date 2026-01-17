@@ -177,8 +177,12 @@ export const BALANCER_CONFIG = {
   CORRELATION_WINDOW: 60,
 
   // Rebalance triggers
-  DRIFT_THRESHOLD: 0.05,      // 5% drift triggers rebalance
-  MIN_REBALANCE_INTERVAL: 7,  // Days between rebalances
+  DRIFT_THRESHOLD: 0.05,              // 5% drift triggers normal rebalance
+  EMERGENCY_DRIFT_THRESHOLD: 0.10,    // 10% drift triggers immediate rebalance (bypasses time)
+  MIN_REBALANCE_INTERVAL_DAYS: 1,     // 1 day between normal rebalances
+
+  // Trade execution
+  MIN_TRADE_VALUE_IRR: 100000,        // Skip trades smaller than 100,000 IRR (~$0.07)
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════

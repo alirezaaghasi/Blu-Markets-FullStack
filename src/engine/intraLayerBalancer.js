@@ -293,9 +293,20 @@ export class IntraLayerBalancer {
   }
 
   /**
-   * Check if rebalance is needed based on drift threshold
+   * Check if rebalance is needed based on drift threshold and time
+   *
+   * Decision logic:
+   * - EMERGENCY: >10% drift → Rebalance immediately (ignores time limit)
+   * - NORMAL: >5% drift AND ≥1 day since last rebalance
+   * - WAIT: <5% drift OR (5-10% drift with <1 day since last rebalance)
+   *
+   * @param {string} layer - Layer name
+   * @param {object} currentWeights - Current weights by asset
+   * @param {object} targetWeights - Target weights by asset
+   * @param {Date|string|null} lastRebalanceTime - When layer was last rebalanced
+   * @returns {object} { shouldRebalance, reason, maxDrift, driftByAsset, daysSinceLastRebalance }
    */
-  needsRebalance(layer, currentWeights, targetWeights) {
+  needsRebalance(layer, currentWeights, targetWeights, lastRebalanceTime = null) {
     const assets = Object.keys(targetWeights);
     let maxDrift = 0;
     const driftByAsset = {};
@@ -308,11 +319,44 @@ export class IntraLayerBalancer {
       maxDrift = Math.max(maxDrift, Math.abs(drift));
     }
 
+    // Calculate days since last rebalance
+    const now = new Date();
+    const daysSinceLastRebalance = lastRebalanceTime
+      ? (now - new Date(lastRebalanceTime)) / (1000 * 60 * 60 * 24)
+      : Infinity; // If no last rebalance, treat as long time ago
+
+    // Decision logic
+    let shouldRebalance = false;
+    let reason = null;
+
+    const emergencyThreshold = this.config.EMERGENCY_DRIFT_THRESHOLD || 0.10;
+    const normalThreshold = this.config.DRIFT_THRESHOLD || 0.05;
+    const minIntervalDays = this.config.MIN_REBALANCE_INTERVAL_DAYS || 1;
+
+    if (maxDrift > emergencyThreshold) {
+      // EMERGENCY: Drift > 10% → Rebalance immediately, ignore time limit
+      shouldRebalance = true;
+      reason = 'EMERGENCY';
+    } else if (maxDrift > normalThreshold && daysSinceLastRebalance >= minIntervalDays) {
+      // NORMAL: Drift > 5% AND at least 1 day since last rebalance
+      shouldRebalance = true;
+      reason = 'NORMAL';
+    }
+
     return {
-      needsRebalance: maxDrift > this.config.DRIFT_THRESHOLD,
+      shouldRebalance,
+      reason,           // 'EMERGENCY' | 'NORMAL' | null
       maxDrift,
       driftByAsset,
+      daysSinceLastRebalance,
     };
+  }
+
+  /**
+   * Alias for needsRebalance for API consistency with reference implementation
+   */
+  shouldRebalance(layer, currentWeights, targetWeights, lastRebalanceTime = null) {
+    return this.needsRebalance(layer, currentWeights, targetWeights, lastRebalanceTime);
   }
 
   /**
@@ -358,8 +402,9 @@ export class IntraLayerBalancer {
       const weightDiff = targetWeight - currentWeight;
       const valueDiff = weightDiff * portfolioValue;
 
-      // Skip small trades (less than 100,000 IRR ~= $0.07)
-      if (Math.abs(valueDiff) < 100000) continue;
+      // Skip small trades (use config threshold or default 100,000 IRR)
+      const minTradeValue = this.config.MIN_TRADE_VALUE_IRR || 100000;
+      if (Math.abs(valueDiff) < minTradeValue) continue;
 
       const price = this.marketData.getCurrentPrice(asset);
       if (!price) continue;
