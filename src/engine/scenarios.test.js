@@ -262,14 +262,20 @@ test('5.3 LTV by layer: Upside 30%', () => {
   return COLLATERAL_LTV_BY_LAYER.UPSIDE === 0.3;
 });
 
-test('5.4 Borrow against BTC (Growth): max 50% LTV', () => {
+test('5.4 Borrow against BTC (Growth): respects both LTV and global loan cap', () => {
+  // Note: With v10.2.7 global loan cap of 25%, the effective max borrow
+  // is min(50% LTV, 25% of portfolio). With only BTC in portfolio,
+  // 25% of portfolio < 50% LTV, so global cap is the limiting factor.
   const state = createState({
     holdings: [h('BTC', 1)], // 1 BTC = ~142B IRR
     cashIRR: 0,
   });
   const btcValueIRR = 97500 * FX;
-  const maxBorrow = btcValueIRR * 0.5;
-  const validation = validateBorrow({ assetId: 'BTC', amountIRR: maxBorrow, prices: BASELINE_PRICES, fxRate: FX }, state);
+  // Max borrow is limited by global loan cap (25% of AUM) since portfolio = BTC only
+  const maxBorrowByLtv = btcValueIRR * 0.5;       // 50% LTV
+  const maxBorrowByGlobalCap = btcValueIRR * 0.25; // 25% of portfolio
+  const effectiveMaxBorrow = Math.min(maxBorrowByLtv, maxBorrowByGlobalCap);
+  const validation = validateBorrow({ assetId: 'BTC', amountIRR: effectiveMaxBorrow, prices: BASELINE_PRICES, fxRate: FX }, state);
   return validation.ok === true;
 });
 

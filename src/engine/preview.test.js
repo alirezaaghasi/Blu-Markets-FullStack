@@ -38,15 +38,18 @@ function h(assetId, quantity, frozen = false) {
 }
 
 // Fixed prices for testing (in USD)
+// Note: Layer assignments are: FOUNDATION (USDT, PAXG, IRR_FIXED_INCOME),
+// GROWTH (BTC, ETH, BNB, XRP, KAG, QQQ), UPSIDE (SOL, TON, LINK, AVAX, MATIC, ARB)
 const P = {
   USDT: 1,
-  BTC: 100000,
-  ETH: 3000,
-  GOLD: 2000,
-  QQQ: 500,
-  SOL: 150,
-  TON: 5,
-  IRR_FIXED_INCOME: 1,
+  PAXG: 2000,           // FOUNDATION - gold
+  BTC: 100000,          // GROWTH
+  ETH: 3000,            // GROWTH (not UPSIDE!)
+  GOLD: 2000,           // Alias for PAXG
+  QQQ: 500,             // GROWTH
+  SOL: 150,             // UPSIDE
+  TON: 5,               // UPSIDE
+  IRR_FIXED_INCOME: 1,  // FOUNDATION (special handling)
 };
 
 // Fixed FX rate: 700,000 IRR per USD
@@ -143,14 +146,15 @@ test('1.6 All in UPSIDE can rebalance to target', () => {
 });
 
 test('1.7 Multiple assets per layer can rebalance', () => {
+  // FOUNDATION: USDT, PAXG; GROWTH: BTC, ETH; UPSIDE: SOL, TON
   const state = createMockState({
     holdings: [
-      h('USDT', 500),
-      h('IRR_FIXED_INCOME', 100),
-      h('BTC', 0.005),
-      h('GOLD', 0.5),
-      h('ETH', 0.1),
-      h('SOL', 5),
+      h('USDT', 500),           // FOUNDATION
+      h('PAXG', 0.1),           // FOUNDATION
+      h('BTC', 0.005),          // GROWTH
+      h('ETH', 0.05),           // GROWTH
+      h('SOL', 5),              // UPSIDE
+      h('TON', 100),            // UPSIDE
     ],
   });
   const gap = calculateRebalanceGap(state, P, FX);
@@ -256,9 +260,9 @@ test('3.1 Two frozen layers both overweight', () => {
 test('3.2 All three layers have frozen assets', () => {
   const state = createMockState({
     holdings: [
-      h('USDT', 300, true),
-      h('BTC', 0.003, true),
-      h('ETH', 0.05, true),
+      h('USDT', 300, true),    // FOUNDATION frozen
+      h('BTC', 0.003, true),   // GROWTH frozen
+      h('SOL', 1, true),       // UPSIDE frozen (SOL is UPSIDE, not ETH)
     ],
   });
   const gap = calculateRebalanceGap(state, P, FX);
@@ -455,7 +459,7 @@ test('6.4 SMART mode reduces cash balance', () => {
 
 test('6.5 SMART mode increases holdings value', () => {
   const state = createMockState({
-    holdings: [h('USDT', 400), h('BTC', 0.003), h('ETH', 0.03)],
+    holdings: [h('USDT', 400), h('BTC', 0.003), h('SOL', 0.6)],  // SOL is UPSIDE
     cashIRR: 300_000_000,
   });
   const beforeSnap = computeSnapshot(state.holdings, state.cashIRR, P, FX);
@@ -499,7 +503,7 @@ test('7.2 HOLDINGS_ONLY generates sell and buy trades', () => {
 
 test('7.3 HOLDINGS_ONLY preserves total holdings value', () => {
   const state = createMockState({
-    holdings: [h('USDT', 500), h('BTC', 0.003), h('ETH', 0.05)],
+    holdings: [h('USDT', 500), h('BTC', 0.003), h('SOL', 1)],  // SOL is UPSIDE
   });
   const beforeSnap = computeSnapshot(state.holdings, 0, P, FX);
   const result = previewRebalance(state, { mode: 'HOLDINGS_ONLY', prices: P, fxRate: FX });
@@ -521,7 +525,7 @@ test('7.4 HOLDINGS_ONLY does not sell frozen assets', () => {
 
 test('7.5 HOLDINGS_ONLY achieves target when no constraints', () => {
   const state = createMockState({
-    holdings: [h('USDT', 800), h('BTC', 0.001), h('ETH', 0.02)],
+    holdings: [h('USDT', 800), h('BTC', 0.001), h('SOL', 0.4)],  // SOL is UPSIDE
     targetLayerPct: { FOUNDATION: 50, GROWTH: 30, UPSIDE: 20 },
   });
   const result = previewRebalance(state, { mode: 'HOLDINGS_ONLY', prices: P, fxRate: FX });
@@ -604,11 +608,13 @@ console.log('\n📁 CATEGORY 9: Math Verification Tests');
 
 test('9.1 Cash formula: D = V/T - H', () => {
   // UPSIDE frozen at 40% (target 20%)
+  // SOL is UPSIDE layer (ETH is GROWTH!)
+  // USDT: $300 (30%), BTC: $300 (30%), SOL: 2.667 * $150 = $400 (40%)
   const state = createMockState({
     holdings: [
       h('USDT', 300),         // 30%
       h('BTC', 0.003),        // 30%
-      h('ETH', 0.133, true),  // 40% frozen
+      h('SOL', 2.667, true),  // 40% frozen (UPSIDE)
     ],
     targetLayerPct: { FOUNDATION: 50, GROWTH: 30, UPSIDE: 20 },
   });
