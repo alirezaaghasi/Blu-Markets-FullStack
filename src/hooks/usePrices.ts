@@ -183,10 +183,12 @@ export function usePrices(interval: number = 30000, enabled: boolean = true): Us
       if (coordinatorRef.current.isLeader) {
         refresh().then(scheduleNextPoll);
       } else {
-        setLoading(false);
+        // Follower tab: only update if currently loading (avoids unnecessary re-render)
+        setLoading(prev => prev === false ? prev : false);
       }
     } else {
-      setLoading(false);
+      // Disabled or offline: only update if currently loading (avoids unnecessary re-render)
+      setLoading(prev => prev === false ? prev : false);
     }
 
     return () => {
