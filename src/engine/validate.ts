@@ -120,10 +120,12 @@ export function validateProtect({ assetId, months, prices, fxRate }: ProtectPayl
   }
 
   // P-2: Check for existing active protection on this asset
+  const nowMs = Date.now();
   const existingProtection = (state.protections || []).find(p => {
     if (p.assetId !== assetId) return false;
-    const endDate = new Date(p.endISO);
-    return endDate > new Date(); // Still active
+    // Use pre-computed endTimeMs if available, fallback to Date parsing for legacy data
+    const endTimeMs = (p as typeof p & { endTimeMs?: number }).endTimeMs ?? new Date(p.endISO).getTime();
+    return endTimeMs > nowMs; // Still active
   });
 
   if (existingProtection) {

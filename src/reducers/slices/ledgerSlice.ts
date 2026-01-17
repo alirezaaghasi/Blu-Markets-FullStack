@@ -10,7 +10,19 @@ import { cloneState, previewAddFunds, previewTrade, previewBorrow, previewRepay,
 import { calcPremiumIRR } from '../../engine/pricing';
 import { uid, nowISO, computeDateLabel } from '../../helpers';
 import { addLogEntry } from '../initialState';
-import type { AppState, AppAction, LedgerEntry, LedgerEntryType, Protection, ActionPayload } from '../../types';
+import type {
+  AppState,
+  AppAction,
+  LedgerEntry,
+  LedgerEntryType,
+  ActionPayload,
+  AddFundsPayload,
+  TradePayload,
+  ProtectPayload,
+  BorrowPayload,
+  RepayPayload,
+  RebalancePayload,
+} from '../../types';
 
 export const LEDGER_ACTIONS: string[] = ['CONFIRM_PENDING', 'CANCEL_PENDING'];
 
@@ -37,17 +49,31 @@ export function ledgerReducer(state: AppState, action: AppAction): AppState {
 
       let next = cloneState(state);
 
-      // Commit by replaying deterministic preview
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const payload = p.payload as any;
-      if (p.kind === 'ADD_FUNDS') next = previewAddFunds(next, payload);
-      if (p.kind === 'TRADE') next = previewTrade(next, payload);
-      if (p.kind === 'BORROW') next = previewBorrow(next, payload);
-      if (p.kind === 'REPAY') next = previewRepay(next, payload);
-      if (p.kind === 'REBALANCE') next = previewRebalance(next, payload);
+      // Commit by replaying deterministic preview with type-safe payload dispatch
+      switch (p.kind) {
+        case 'ADD_FUNDS':
+          next = previewAddFunds(next, p.payload as AddFundsPayload);
+          break;
+        case 'TRADE':
+          next = previewTrade(next, p.payload as TradePayload);
+          break;
+        case 'BORROW':
+          next = previewBorrow(next, p.payload as BorrowPayload);
+          break;
+        case 'REPAY':
+          next = previewRepay(next, p.payload as RepayPayload);
+          break;
+        case 'REBALANCE':
+          next = previewRebalance(next, p.payload as RebalancePayload);
+          break;
+        case 'PROTECT':
+          // Handled separately below
+          break;
+      }
 
       if (p.kind === 'PROTECT') {
-        const holding = next.holdings.find(h => h.assetId === payload.assetId);
+        const protectPayload = p.payload as ProtectPayload;
+        const holding = next.holdings.find(h => h.assetId === protectPayload.assetId);
         if (holding) {
           // v10: Get notionalIRR from computed snapshot, not holding directly
           const notionalIRR = p.after.holdingsIRRByAsset[holding.assetId] || 0;
@@ -55,13 +81,13 @@ export function ledgerReducer(state: AppState, action: AppAction): AppState {
           const premium = calcPremiumIRR({
             assetId: holding.assetId,
             notionalIRR,
-            months: payload.months,
+            months: protectPayload.months,
           });
           next.cashIRR -= premium;
 
           const startISO = new Date().toISOString().slice(0, 10);
           const end = new Date();
-          end.setMonth(end.getMonth() + payload.months);
+          end.setMonth(end.getMonth() + protectPayload.months);
           const endISO = end.toISOString().slice(0, 10);
 
           next.protections = [
@@ -71,7 +97,7 @@ export function ledgerReducer(state: AppState, action: AppAction): AppState {
               assetId: holding.assetId,
               notionalIRR,
               premiumIRR: premium,
-              durationMonths: payload.months,
+              durationMonths: protectPayload.months,
               startISO,
               endISO,
               // Pre-computed timestamps for O(1) comparisons in UI (avoid repeated Date parsing)

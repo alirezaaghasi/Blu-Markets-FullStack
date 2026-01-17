@@ -16,7 +16,8 @@ export function selectLoanSummary(loans: Loan[]): LoanSummary {
 
   for (const loan of list) {
     total += loan.amountIRR;
-    const ratio = loan.amountIRR / loan.liquidationIRR;
+    // Guard against division by zero (liquidationIRR should never be 0, but be defensive)
+    const ratio = loan.liquidationIRR > 0 ? loan.amountIRR / loan.liquidationIRR : 0;
     if (ratio > maxRatio) maxRatio = ratio;
   }
 

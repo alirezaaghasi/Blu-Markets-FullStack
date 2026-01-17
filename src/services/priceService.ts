@@ -74,6 +74,7 @@ export interface AllPricesResult {
 /**
  * Fetch with timeout support
  * Creates a race between the fetch and a timeout abort
+ * Uses polyfill for AbortSignal.any() for browser compatibility
  */
 async function fetchWithTimeout(
   url: string,
@@ -83,21 +84,35 @@ async function fetchWithTimeout(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  // Create combined signal if external signal provided
-  const combinedSignal = signal
-    ? (AbortSignal as typeof AbortSignal & { any?: (signals: AbortSignal[]) => AbortSignal }).any
-      ? (AbortSignal as typeof AbortSignal & { any: (signals: AbortSignal[]) => AbortSignal }).any([signal, controller.signal])
-      : controller.signal // Fallback for older browsers
-    : controller.signal;
+  // Polyfill for AbortSignal.any() - combines multiple abort signals
+  // AbortSignal.any() is only available in modern browsers (Chrome 116+, Firefox 124+)
+  let cleanup: (() => void) | null = null;
+  if (signal) {
+    // If external signal is already aborted, abort immediately
+    if (signal.aborted) {
+      clearTimeout(timeoutId);
+      controller.abort();
+    } else {
+      // Forward external abort to our controller
+      const onExternalAbort = () => controller.abort();
+      signal.addEventListener('abort', onExternalAbort);
+      cleanup = () => signal.removeEventListener('abort', onExternalAbort);
+    }
+  }
 
   try {
-    const response = await fetch(url, { signal: combinedSignal });
+    const response = await fetch(url, { signal: controller.signal });
     clearTimeout(timeoutId);
+    cleanup?.();
     return response;
   } catch (error) {
     clearTimeout(timeoutId);
+    cleanup?.();
     // Distinguish between external abort and timeout
-    if ((error as Error).name === 'AbortError' && !signal?.aborted) {
+    if ((error as Error).name === 'AbortError') {
+      // If external signal was aborted, re-throw as abort
+      if (signal?.aborted) throw error;
+      // Otherwise it was our timeout
       throw new Error(`Request timeout after ${timeoutMs}ms`);
     }
     throw error;
@@ -127,7 +142,12 @@ export async function fetchCryptoPrices(signal?: AbortSignal): Promise<CryptoPri
     const response = await fetchWithTimeout(url, signal);
     if (!response.ok) throw new Error(`CoinGecko error: ${response.status}`);
 
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error('Invalid JSON response from CoinGecko');
+    }
 
     // Map back to our asset IDs
     const prices: Record<string, number> = {};
@@ -170,7 +190,12 @@ export async function fetchStockPrice(
     const response = await fetchWithTimeout(url, signal);
     if (!response.ok) throw new Error(`Finnhub error: ${response.status}`);
 
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error('Invalid JSON response from Finnhub');
+    }
 
     if (data.c) {  // 'c' is current price
       return {
@@ -209,7 +234,18 @@ export async function fetchUsdIrrRate(signal?: AbortSignal): Promise<FxRateRespo
       };
     }
 
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      console.warn('Invalid JSON from Bonbast, using fallback rate');
+      return {
+        ok: true,
+        rate: FALLBACK_RATE,
+        source: 'fallback',
+        updatedAt: new Date().toISOString(),
+      };
+    }
 
     // API returns: { usd: { sell: 145600, buy: 145400 }, ... }
     // Values are in Toman, multiply by 10 for Rial

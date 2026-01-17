@@ -50,7 +50,7 @@ function computeHoldingIRR(assetId: string, quantity: number, prices: Record<str
 /**
  * Build initial portfolio holdings from investment amount and target allocation
  * v10: Holdings now store quantities instead of valueIRR
- * v10.2.3: Added reconciliation step to ensure exact layer percentages
+ * v10.2.5: Added reconciliation step to ensure exact layer percentages
  */
 export function buildInitialHoldings(
   totalIRR: number,

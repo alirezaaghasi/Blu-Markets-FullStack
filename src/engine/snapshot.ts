@@ -76,10 +76,13 @@ function computeHoldingValue(
   const quantity = holding.quantity || 0;
   const priceUSD = prices[holding.assetId] || DEFAULT_PRICES[holding.assetId] || 0;
 
-  // Check cache first
+  // Check cache first (LRU: delete+re-insert moves to end of Map iteration order)
   const cacheKey = getHoldingCacheKey(holding.assetId, quantity, priceUSD, holding.purchasedAt);
   const cached = holdingValueCache.get(cacheKey);
   if (cached) {
+    // LRU: move to end by re-inserting
+    holdingValueCache.delete(cacheKey);
+    holdingValueCache.set(cacheKey, cached);
     return cached;
   }
 
@@ -95,11 +98,11 @@ function computeHoldingValue(
     result = { valueIRR, priceUSD, breakdown: null };
   }
 
-  // Store in cache (with size limit)
+  // Store in cache (with LRU eviction when at capacity)
   if (holdingValueCache.size >= CACHE_MAX_SIZE) {
-    // Clear oldest entries (simple FIFO via iterator)
-    const firstKey = holdingValueCache.keys().next().value;
-    if (firstKey) holdingValueCache.delete(firstKey);
+    // Evict least recently used (first key in Map iteration order)
+    const lruKey = holdingValueCache.keys().next().value;
+    if (lruKey) holdingValueCache.delete(lruKey);
   }
   holdingValueCache.set(cacheKey, result);
 

@@ -144,15 +144,18 @@ interface OnboardingControlsProps {
  * v10: Updated for new 12-question questionnaire with ProfileResult screen
  */
 // Task 5: Calculate personalized quick amounts based on questionnaire answers
-function calculateSuggestedAmounts(answers: Record<string, number>): { amounts: number[]; recommendedIndex: number } {
-  // Map question indices to answer values
+function calculateSuggestedAmounts(answers: Record<string, string | number>): { amounts: number[]; recommendedIndex: number } {
+  // Map question indices to answer values (coerce to number, fallback to default)
   // q_buffer (index 1): 0=12+mo, 1=6-12mo, 2=3-6mo, 3=<3mo
   // q_income (index 0): 0=fixed, 1=mostly, 2=variable, 3=uncertain
   // q_past_behavior (index 7): 0=panic, 1=worried, 2=calm, 3=no experience
 
-  const buffer = answers['q_buffer'] ?? 2;  // Default: 3-6 months
-  const income = answers['q_income'] ?? 1;  // Default: mostly stable
-  const experience = answers['q_past_behavior'] ?? 3; // Default: no experience
+  const toNumber = (val: string | number | undefined, defaultVal: number): number =>
+    typeof val === 'number' ? val : defaultVal;
+
+  const buffer = toNumber(answers['q_buffer'], 2);  // Default: 3-6 months
+  const income = toNumber(answers['q_income'], 1);  // Default: mostly stable
+  const experience = toNumber(answers['q_past_behavior'], 3); // Default: no experience
 
   // Determine tier based on signals
   const lowCapacity = buffer >= 3 || income >= 3 || experience === 0;
