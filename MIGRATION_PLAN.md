@@ -50,6 +50,46 @@ This plan migrates the Blu Markets prototype from a frontend-only React app to a
 
 ---
 
+## Critical Risks & Mitigations
+
+Before implementation, address these production-critical issues:
+
+### Risk 1: Floating Point Precision (Database Schema)
+
+**Issue**: Using `Float` for financial values (`cashIRR`, `quantity`, `amountIRR`) causes precision loss. Example: `0.1 + 0.2 !== 0.3` in floating point math.
+
+**Impact**: Money "leaks" over thousands of transactions in a ledger system.
+
+**Fix**: Use `Decimal` type for all monetary fields in Prisma schema. See updated schema in Phase 1.2.
+
+### Risk 2: Offline Market Trade Execution
+
+**Issue**: Queuing market trades while offline means execution at stale prices when reconnecting.
+
+**Impact**: User queues "Sell BTC" at $100k, reconnects when BTC is $90k, trade executes at lower price.
+
+**Fix**:
+- **Read-only offline**: Allow viewing cached portfolio data
+- **Block market trades offline**: Return error "Internet required for live pricing"
+- **Allow non-market actions**: Profile updates, settings changes can be queued
+
+### Risk 3: Concurrency & Double Spending
+
+**Issue**: Two simultaneous trade requests can race to spend the same cash balance.
+
+**Fix**: Implement Optimistic Concurrency Control (OCC):
+- Add `version Int @default(1)` field to Portfolio model
+- Update query: `WHERE id = portfolioId AND version = currentVersion`
+- On conflict (0 rows affected), retry the transaction
+
+### Risk 4: Browser Globals in Shared Package
+
+**Issue**: Moving files with `localStorage` or `window` references to `packages/shared` will crash the Node.js backend.
+
+**Fix**: Audit imports during Phase 0. Keep browser-specific files in `apps/web`. See Phase 0.1 for the explicit file list.
+
+---
+
 ## Phase 0: Preparation (Day 1)
 
 ### Goal: Set up shared infrastructure without breaking existing app
@@ -87,8 +127,16 @@ Tasks:
    - Copy src/constants/index.js → constants.ts
    - Copy src/registry/assetRegistry.js → assetRegistry.ts
    - Copy src/config.ts
+   - Copy src/engine/* (all engine files - these are pure, no browser deps)
 5. Update apps/web imports to use @blu/shared
 6. Verify build still works
+
+CRITICAL - Browser-Specific Files (DO NOT move to shared):
+These files use localStorage/window and must stay in apps/web:
+- src/services/priceCache.ts (localStorage for price caching)
+- src/services/priceCoordinator.ts (localStorage + window.addEventListener)
+- src/utils/tabCoordinator.js (localStorage + window.addEventListener)
+- src/hooks/usePrices.ts (window.addEventListener for online/offline)
 
 Do NOT change any logic, just reorganize.
 ```
@@ -164,6 +212,9 @@ export const TradeRequestSchema = z.object({
   side: z.enum(['BUY', 'SELL']),
   assetId: z.string(),
   amountIRR: z.number().positive(),
+  // Slippage protection: reject if price moved beyond tolerance
+  expectedPriceUSD: z.number().positive(),
+  slippageTolerance: z.number().min(0).max(0.1).default(0.01), // 1% default, max 10%
 });
 
 export const ProtectRequestSchema = z.object({
@@ -312,7 +363,8 @@ model Portfolio {
   id        String   @id @default(cuid())
   userId    String   @unique
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  cashIRR   Float    @default(0)
+  cashIRR   Decimal  @default(0) @db.Decimal(20, 0) // IRR has no decimals
+  version   Int      @default(1) // Optimistic concurrency control
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -330,7 +382,7 @@ model Holding {
   portfolioId String
   portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
   assetId     String    // e.g., 'BTC', 'ETH' - NOT an enum for flexibility
-  quantity    Float
+  quantity    Decimal   @db.Decimal(20, 8) // Crypto needs high precision
   frozen      Boolean   @default(false)
   layer       Layer
   createdAt   DateTime  @default(now())
@@ -345,10 +397,10 @@ model Loan {
   portfolioId       String
   portfolio         Portfolio  @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
   collateralAssetId String
-  amountIRR         Float
-  repaidIRR         Float      @default(0)
-  ltv               Float
-  liquidationIRR    Float
+  amountIRR         Decimal    @db.Decimal(20, 0)
+  repaidIRR         Decimal    @default(0) @db.Decimal(20, 0)
+  ltv               Decimal    @db.Decimal(5, 4) // e.g., 0.5000 for 50%
+  liquidationIRR    Decimal    @db.Decimal(20, 0)
   status            LoanStatus @default(ACTIVE)
   startedAt         DateTime   @default(now())
 
@@ -361,9 +413,9 @@ model Protection {
   portfolioId String
   portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
   assetId     String
-  notionalIRR Float
-  premiumIRR  Float
-  floorPrice  Float?
+  notionalIRR Decimal   @db.Decimal(20, 0)
+  premiumIRR  Decimal   @db.Decimal(20, 0)
+  floorPrice  Decimal?  @db.Decimal(20, 8)
   startedAt   DateTime  @default(now())
   expiresAt   DateTime
 
@@ -781,6 +833,7 @@ Tasks:
    - Queue failed mutations when offline
    - Persist queue to localStorage
    - Retry when back online
+   - IMPORTANT: Only queue NON-MARKET actions (see below)
 
 2. Update React Query config:
    - Enable persistence with @tanstack/query-sync-storage-persister
@@ -788,10 +841,26 @@ Tasks:
 
 3. Add online/offline indicator in UI
 
-4. Actions while offline:
-   - Allow viewing portfolio (cached)
-   - Queue mutations, show "pending sync" indicator
-   - Process queue when online
+4. Actions while offline - CRITICAL DISTINCTION:
+
+   ALLOWED offline (queue for later):
+   - Profile updates
+   - Settings changes
+   - Target allocation changes
+
+   BLOCKED offline (fail immediately with clear error):
+   - Trade (BUY/SELL) - prices are stale, could cause massive loss
+   - Borrow - collateral values are stale
+   - Protect - premium calculations need live prices
+   - Rebalance - requires live price calculations
+
+   Error message for blocked actions:
+   "This action requires live market prices. Please reconnect to the internet."
+
+5. Portfolio viewing:
+   - Allow viewing cached portfolio (read-only)
+   - Show "Last updated: X minutes ago" indicator
+   - Show stale data warning if cache > 5 minutes old
 ```
 
 ### 6.3 Security Hardening
@@ -818,6 +887,64 @@ Tasks:
 
 5. Secure headers:
    - Add helmet-like headers (HSTS, X-Frame-Options, etc.)
+```
+
+### 6.4 Shadow Mode Testing
+
+Before enabling `USE_BACKEND_ACTIONS = true` in production, run both engines in parallel to catch calculation discrepancies.
+
+**Prompt for Claude:**
+```
+Implement Shadow Mode for safe backend rollout.
+
+Tasks:
+1. Create apps/web/src/lib/shadowMode.ts:
+
+   export async function executeShadowAction(
+     actionType: string,
+     payload: any,
+     frontendResult: PortfolioSnapshot
+   ) {
+     if (!config.SHADOW_MODE_ENABLED) return;
+
+     try {
+       const backendResult = await api.post(`/actions/${actionType}`, payload);
+
+       // Compare critical values
+       const discrepancies = compareSnapshots(frontendResult, backendResult);
+
+       if (discrepancies.length > 0) {
+         // Log to monitoring service (Sentry, etc.)
+         logDiscrepancy({
+           actionType,
+           payload,
+           frontendResult,
+           backendResult,
+           discrepancies,
+           timestamp: new Date().toISOString(),
+         });
+       }
+     } catch (error) {
+       // Shadow mode failures are silent - don't affect user
+       console.error('[ShadowMode] Backend call failed:', error);
+     }
+   }
+
+2. Add to config.ts:
+   SHADOW_MODE_ENABLED: boolean  // Enable parallel execution
+   SHADOW_MODE_LOG_ENDPOINT: string  // Where to send discrepancy logs
+
+3. Integration in action handlers:
+   - Frontend calculates and applies result (existing behavior)
+   - Fire-and-forget call to backend with same payload
+   - Compare results, log any differences
+
+4. Key comparisons to make:
+   - cashIRR difference > 1 IRR (rounding tolerance)
+   - holding quantity difference > 0.00000001
+   - loan/protection creation mismatch
+
+5. Run shadow mode for at least 1 week before flipping USE_BACKEND_ACTIONS
 ```
 
 ---
@@ -919,17 +1046,41 @@ If issues arise after enabling a feature flag:
 
 ## Files to Keep Client-Side
 
-These files contain logic that should remain on the frontend for instant UX:
+### Browser-Specific Files (MUST stay in apps/web)
+
+These files use `localStorage`, `window`, or other browser globals and **cannot** be moved to the shared package:
+
+| File | Browser Dependency | Purpose |
+|------|-------------------|---------|
+| `services/priceCache.ts` | `localStorage` | Caches prices for offline/instant display |
+| `services/priceCoordinator.ts` | `localStorage`, `window.addEventListener` | Cross-tab leader election for price fetching |
+| `utils/tabCoordinator.js` | `localStorage`, `window.addEventListener` | Cross-tab communication fallback |
+| `hooks/usePrices.ts` | `window.addEventListener` | Online/offline event handling |
+
+### Shared Engine Files (Move to packages/shared)
+
+These files are **pure** (no browser dependencies) and should be moved to shared so both frontend and backend can use them:
+
+| File | Purpose | Notes |
+|------|---------|-------|
+| `engine/snapshot.ts` | Portfolio value calculation | Frontend: instant display. Backend: authoritative. |
+| `engine/preview.ts` | Action preview | Frontend only (instant feedback) |
+| `engine/validate.ts` | Validation rules | Both: same logic, single source of truth |
+| `engine/pricing.ts` | Price calculations | Both use this |
+| `engine/boundary.ts` | Layer boundary logic | Both use this |
+| `engine/portfolioStatus.ts` | Status derivation | Both use this |
+| `engine/intraLayerBalancer.ts` | Rebalancing logic | Both use this |
+| `engine/fixedIncome.ts` | Fixed income calcs | Both use this |
+| `engine/riskScoring.js` | Risk tier logic | Both use this |
+
+### UI-Only Files (Stay in apps/web, not shared)
 
 | File | Reason |
 |------|--------|
-| `engine/snapshot.ts` | Instant portfolio value calculation |
-| `engine/preview.ts` | Instant action preview |
-| `engine/validate.ts` | Instant validation feedback |
-| `selectors/*` | Derived state for UI |
-| `reducers/` | Can be replaced with Zustand for UI state |
-
-The backend will have copies of `validate.ts` and `snapshot.ts` logic for authoritative processing, but the frontend keeps its copies for instant feedback.
+| `selectors/*` | React-specific derived state |
+| `reducers/` | Will be replaced with Zustand for UI state |
+| `hooks/*` | React hooks are browser-only |
+| `components/*` | React components |
 
 ---
 
