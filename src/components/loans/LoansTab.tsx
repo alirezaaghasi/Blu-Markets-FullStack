@@ -1,6 +1,5 @@
 import React, { useMemo, Dispatch } from 'react';
-import { getHoldingValueIRR } from '../../helpers';
-import { MAX_TOTAL_LOAN_PCT, DEFAULT_FX_RATE } from '../../constants/index';
+import { MAX_TOTAL_LOAN_PCT } from '../../constants/index';
 import ActiveLoanCard from './ActiveLoanCard';
 import LoanCapacityBar from './LoanCapacityBar';
 import type { Loan, Holding, AppAction } from '../../types';
@@ -17,22 +16,11 @@ interface LoansTabProps {
 
 function LoansTab({
   loans,
-  holdings,
-  cashIRR,
   totalPortfolioIRR,
-  prices = {},
-  fxRate = DEFAULT_FX_RATE,
   dispatch,
 }: LoansTabProps) {
   const loanList = loans || [];
   const activeLoans = loanList.filter((l) => l.status !== 'REPAID' && l.status !== 'LIQUIDATED');
-
-  // Create holdings map for quick lookup
-  const holdingsMap = useMemo(() => {
-    const map = new Map<string, Holding>();
-    (holdings || []).forEach((h) => map.set(h.assetId, h));
-    return map;
-  }, [holdings]);
 
   // Loan capacity calculations
   const loanCapacity = useMemo(() => {
@@ -41,13 +29,6 @@ function LoansTab({
     const remainingCapacity = Math.max(0, maxLoans - totalBorrowed);
     return { totalBorrowed, maxLoans, remainingCapacity };
   }, [loanList, totalPortfolioIRR]);
-
-  // Calculate collateral value for a loan
-  const getCollateralValue = (loan: Loan): number => {
-    const holding = holdingsMap.get(loan.collateralAssetId);
-    if (!holding) return 0;
-    return getHoldingValueIRR(holding, prices, fxRate);
-  };
 
   const handleRepay = (loanId: string) => {
     dispatch({ type: 'START_REPAY', loanId });
@@ -81,7 +62,6 @@ function LoansTab({
           <ActiveLoanCard
             key={loan.id}
             loan={loan}
-            collateralValue={getCollateralValue(loan)}
             onRepay={() => handleRepay(loan.id)}
           />
         ))}
