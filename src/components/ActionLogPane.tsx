@@ -32,7 +32,7 @@ function formatActivityMessage(entry: ActionLogEntryWithDetails): string {
         ? `Bought ${getAssetDisplayName(entry.assetId!)} (${formatIRRShort(entry.amountIRR || 0)})`
         : `Sold ${getAssetDisplayName(entry.assetId!)} (${formatIRRShort(entry.amountIRR || 0)})`;
     case 'BORROW':
-      return `Borrowed ${formatIRRShort(entry.amountIRR || 0)} against ${getAssetDisplayName(entry.assetId!)}`;
+      return `Borrowed ${formatIRRShort(entry.amountIRR || 0)} IRR against ${getAssetDisplayName(entry.assetId!)}`;
     case 'REPAY':
       // Enhanced repay message with collateral and installment info
       if (entry.isSettlement && entry.collateralName) {
