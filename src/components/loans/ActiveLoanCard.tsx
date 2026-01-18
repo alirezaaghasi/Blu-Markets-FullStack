@@ -115,7 +115,14 @@ function ActiveLoanCard({ loan, collateralValue, onRepay }: ActiveLoanCardProps)
             {getAssetDisplayName(loan.collateralAssetId)} Collateral
           </div>
           <div className="loanBorrowedAmount">{formatIRR(loan.amountIRR)}</div>
-          <div className="loanInterestBadge">{Math.round(LOAN_INTEREST_RATE * 100)}% annual</div>
+          <div className="loanBadges">
+            <div className="loanInterestBadge">{Math.round(LOAN_INTEREST_RATE * 100)}% annual</div>
+            {loan.installments && loan.installments.length > 0 && (
+              <div className="installmentBadge">
+                {loan.installmentsPaid || 0} / 6 paid
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

@@ -20,6 +20,8 @@ export type {
   StrategyPreset,
   UserProfileType,
   LoanStatus,
+  InstallmentStatus,
+  LoanInstallment,
   TargetLayerPct,
   LayerWeights,
   TargetAllocation,

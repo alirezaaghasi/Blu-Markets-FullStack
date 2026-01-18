@@ -1,4 +1,4 @@
-import type { AppState, Holding, Layer, AssetId, TradeSide, RebalanceMode, RebalanceTrade, TargetLayerPct, IntraLayerWeightResult, StrategyPreset } from '../types';
+import type { AppState, Holding, Layer, AssetId, TradeSide, RebalanceMode, RebalanceTrade, TargetLayerPct, IntraLayerWeightResult, StrategyPreset, LoanInstallment } from '../types';
 import { computeSnapshot } from './snapshot';
 import { calcPremiumIRR, calcLiquidationIRR } from './pricing';
 import { ASSET_LAYER, LAYER_ASSETS } from '../state/domain';
@@ -6,6 +6,58 @@ import { COLLATERAL_LTV_BY_LAYER, LAYERS, DEFAULT_PRICES, DEFAULT_FX_RATE, WEIGH
 import { irrToFixedIncomeUnits } from './fixedIncome';
 import { getAssetPriceUSD } from '../helpers';
 import { IntraLayerBalancer, MarketDataProvider } from './intraLayerBalancer';
+
+/**
+ * Generate 6 installment schedule for a loan
+ */
+function generateInstallments(
+  principalIRR: number,
+  startISO: string,
+  durationMonths: 3 | 6,
+  interestRate: number = LOAN_INTEREST_RATE
+): LoanInstallment[] {
+  const INSTALLMENT_COUNT = 6;
+  const installments: LoanInstallment[] = [];
+
+  // Calculate total interest for full term
+  const totalInterest = Math.floor(principalIRR * interestRate * (durationMonths / 12));
+
+  // Equal principal + interest per installment
+  const principalPerInstallment = Math.floor(principalIRR / INSTALLMENT_COUNT);
+  const interestPerInstallment = Math.floor(totalInterest / INSTALLMENT_COUNT);
+
+  // Days between installments
+  const totalDays = durationMonths * 30;
+  const daysPerInstallment = Math.floor(totalDays / INSTALLMENT_COUNT);
+
+  const startDate = new Date(startISO);
+
+  for (let i = 0; i < INSTALLMENT_COUNT; i++) {
+    const dueDate = new Date(startDate);
+    dueDate.setDate(dueDate.getDate() + (daysPerInstallment * (i + 1)));
+
+    // Last installment gets rounding remainder
+    const isLast = i === INSTALLMENT_COUNT - 1;
+    const principal = isLast
+      ? principalIRR - (principalPerInstallment * (INSTALLMENT_COUNT - 1))
+      : principalPerInstallment;
+    const interest = isLast
+      ? totalInterest - (interestPerInstallment * (INSTALLMENT_COUNT - 1))
+      : interestPerInstallment;
+
+    installments.push({
+      number: i + 1,
+      dueISO: dueDate.toISOString().slice(0, 10),
+      principalIRR: principal,
+      interestIRR: interest,
+      totalIRR: principal + interest,
+      status: 'PENDING',
+      paidIRR: 0,
+    });
+  }
+
+  return installments;
+}
 
 export interface GapAnalysis {
   hasFrozenAssets: boolean;
@@ -342,11 +394,16 @@ export function previewBorrow(state: AppState, { assetId, amountIRR, durationMon
   const dueISO = dueDate.toISOString().slice(0, 10);
   const loanId = `loan_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
+  // Generate installment schedule
+  const installments = generateInstallments(amountIRR, todayISO, durationMonths, LOAN_INTEREST_RATE);
+  const totalInterestIRR = installments.reduce((sum, inst) => sum + inst.interestIRR, 0);
+
   next.loans = [
     ...next.loans,
     {
       id: loanId,
       amountIRR,
+      originalAmountIRR: amountIRR,  // Store original for progress tracking
       collateralAssetId: assetId,
       collateralQuantity: h.quantity,
       ltv,
@@ -356,6 +413,11 @@ export function previewBorrow(state: AppState, { assetId, amountIRR, durationMon
       dueISO,
       durationMonths,
       status: 'ACTIVE' as const,
+      // Installment fields
+      installments,
+      installmentsPaid: 0,
+      totalPaidIRR: 0,
+      totalInterestIRR,
     },
   ];
 
@@ -375,16 +437,55 @@ export function previewRepay(state: AppState, { loanId, amountIRR }: RepayPayloa
   const loanIndex = next.loans.findIndex((l) => l.id === loanId);
   if (loanIndex === -1) return next;
 
-  const loan = next.loans[loanIndex];
-  const repay = Math.min(amountIRR, next.cashIRR, loan.amountIRR);
+  const loan = { ...next.loans[loanIndex] };
+  const repay = Math.min(amountIRR, next.cashIRR, loan.amountIRR + (loan.accruedInterestIRR || 0));
+
+  if (repay <= 0) return next;
+
   next.cashIRR -= repay;
-  loan.amountIRR -= repay;
+  loan.totalPaidIRR = (loan.totalPaidIRR || 0) + repay;
+
+  // Update installment statuses based on total paid
+  if (loan.installments) {
+    let remaining = loan.totalPaidIRR;
+    let paidCount = 0;
+
+    loan.installments = loan.installments.map(inst => {
+      if (remaining >= inst.totalIRR) {
+        remaining -= inst.totalIRR;
+        paidCount++;
+        return {
+          ...inst,
+          status: 'PAID' as const,
+          paidIRR: inst.totalIRR,
+          paidISO: new Date().toISOString().slice(0, 10),
+        };
+      } else if (remaining > 0) {
+        const partial = remaining;
+        remaining = 0;
+        return {
+          ...inst,
+          status: 'PARTIAL' as const,
+          paidIRR: partial,
+        };
+      }
+      return inst;
+    });
+
+    loan.installmentsPaid = paidCount;
+  }
+
+  // Reduce principal
+  loan.amountIRR = Math.max(0, loan.amountIRR - repay);
 
   if (loan.amountIRR <= 0) {
     const collateral = next.holdings.find((x) => x.assetId === loan.collateralAssetId);
     if (collateral) collateral.frozen = false;
     next.loans = next.loans.filter((l) => l.id !== loanId);
+  } else {
+    next.loans[loanIndex] = loan;
   }
+
   return next;
 }
 

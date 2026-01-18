@@ -84,6 +84,21 @@ export type UserProfileType =
 /** Loan status */
 export type LoanStatus = 'ACTIVE' | 'REPAID' | 'LIQUIDATED';
 
+/** Loan installment status */
+export type InstallmentStatus = 'PENDING' | 'PAID' | 'PARTIAL';
+
+/** Loan installment record */
+export interface LoanInstallment {
+  number: number;           // 1, 2, 3, 4, 5, 6
+  dueISO: string;           // Due date
+  principalIRR: number;     // Principal portion
+  interestIRR: number;      // Interest portion
+  totalIRR: number;         // principalIRR + interestIRR
+  status: InstallmentStatus;
+  paidIRR: number;          // Amount actually paid
+  paidISO?: string;         // When paid
+}
+
 // ============================================================================
 // PORTFOLIO ENTITIES
 // ============================================================================
@@ -139,6 +154,7 @@ export interface Loan {
   collateralAssetId: AssetId;
   collateralQuantity?: number;
   amountIRR: number;
+  originalAmountIRR?: number;     // Store original for progress calc
   ltv: number;
   interestRate?: number;
   liquidationIRR: number;
@@ -148,6 +164,12 @@ export interface Loan {
   status?: LoanStatus;
   repaidIRR?: number;
   accruedInterestIRR?: number;
+
+  // Installment tracking
+  installments?: LoanInstallment[];  // Array of 6 installments
+  installmentsPaid?: number;         // Count: 0-6
+  totalPaidIRR?: number;             // Total paid so far
+  totalInterestIRR?: number;         // Interest for full term
 }
 
 // ============================================================================
