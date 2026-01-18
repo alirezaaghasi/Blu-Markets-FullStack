@@ -418,6 +418,7 @@ body {
 .loanCardAmount { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .loanCardAmount .amountLabel { font-size: 13px; color: var(--text-secondary); }
 .loanCardAmount .amountValue { font-size: 20px; font-weight: 600; color: var(--text-primary); }
+.loanCardAmount .interestRate { font-size: 11px; color: var(--success); background: rgba(34, 197, 94, 0.1); padding: 2px 8px; border-radius: 4px; }
 .loanHealthSection { margin-bottom: 12px; }
 .healthBarTrack { height: 8px; background: var(--bg-primary); border-radius: 4px; overflow: hidden; }
 .healthBarFill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
@@ -429,6 +430,12 @@ body {
 .loanWarning.warning { background: rgba(249, 115, 22, 0.1); border: 1px solid rgba(249, 115, 22, 0.2); }
 .loanWarning .warningIcon { font-size: 14px; flex-shrink: 0; }
 .loanWarning .warningText { font-size: 12px; color: var(--text-primary); line-height: 1.4; }
+
+/* Loan details (duration, maturity) */
+.loanDetails { margin-top: 12px; padding: 8px 0; }
+.loanDetailRow { display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 4px 0; }
+.loanDetailLabel { color: var(--text-secondary); }
+.loanDetailValue { font-weight: 500; color: var(--text-primary); }
 
 /* Decision 11: Loan liquidation display */
 .loanLiquidation { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
@@ -1120,6 +1127,10 @@ body {
   color: #f59e0b;
 }
 
+/* Utility text colors for summaries */
+.summaryValue.successText { color: var(--success); }
+.summaryValue.warningText { color: #f59e0b; }
+
 .liquidationWarning {
   margin-top: 12px;
   padding: 10px 12px;
@@ -1129,6 +1140,21 @@ body {
   font-size: 12px;
   color: #fbbf24;
   line-height: 1.4;
+}
+
+.liquidationNote {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.liquidationNote.warningNote {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(245, 158, 11, 0.2);
 }
 
 /* ===== PROTECTION CONTRACT SECTION ===== */
@@ -1219,4 +1245,1329 @@ body {
 .borrowHintNote {
   color: #fbbf24;
   font-size: 11px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   LOANS REDESIGN (v10.4.0)
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ===== LOANS DASHBOARD ===== */
+
+.loansDashboard {
+  padding: 16px;
+}
+
+.emptyLoansState {
+  text-align: center;
+  padding: 40px 20px;
+  margin-bottom: 24px;
+}
+
+.emptyLoansState .emptyIcon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.emptyLoansState h3 {
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.emptyLoansState p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.loanProductsSection {
+  margin-bottom: 24px;
+}
+
+.loanProductsSection .sectionTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+/* Active Loan Card */
+.activeLoanCard {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.activeLoanIcon {
+  width: 64px;
+  height: 64px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 12px;
+  font-size: 28px;
+}
+
+.activeLoanTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.activeLoanSubtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+}
+
+.viewDetailsBtn {
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.viewDetailsBtn:hover {
+  background: var(--accent);
+  color: white;
+}
+
+/* Loan Product Cards */
+.loanProductCard {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.loanProductCard:hover {
+  border-color: var(--accent);
+}
+
+.productHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.productLayerInfo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.productLayerIcon {
+  font-size: 24px;
+}
+
+.productLayerName {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.productAssets {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.productLtv {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.productFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+  margin-top: 12px;
+}
+
+.productBadge {
+  background: rgba(74, 222, 128, 0.15);
+  color: #4ade80;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.productApr {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* Loan Capacity Bar */
+.capacityHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.capacityLabel {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.capacityValue {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.capacityBarContainer {
+  height: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.capacityBar {
+  height: 100%;
+  background: #4ade80;
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+.capacityBar.caution { background: #fbbf24; }
+.capacityBar.warning { background: #f97316; }
+.capacityBar.danger { background: #ef4444; }
+
+.capacityHint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+/* ===== NEW LOAN FORM ===== */
+
+.newLoanForm {
+  padding: 16px;
+}
+
+.formTitle {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.formSection {
+  margin-bottom: 24px;
+}
+
+.formLabel {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.collateralSelect {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.collateralInfo {
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 8px;
+}
+
+.collateralRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.collateralRow:last-child { margin-bottom: 0; }
+
+.amountInput {
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.amountSlider {
+  width: 100%;
+  margin-top: 12px;
+  accent-color: var(--accent);
+}
+
+.sliderLabels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.durationToggle {
+  display: flex;
+  gap: 12px;
+}
+
+.durationBtn {
+  flex: 1;
+  padding: 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.durationBtn.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+/* Loan Summary Section */
+.loanSummarySection {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.summaryTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.loanSummarySection .summaryRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.loanSummarySection .summaryRow.total {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-weight: 600;
+}
+
+/* Liquidation Risk Box */
+.liquidationRiskBox {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.riskHeader {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fbbf24;
+  margin-bottom: 12px;
+}
+
+.riskRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.riskRow .warning {
+  color: #f97316;
+}
+
+.riskExplanation {
+  font-size: 12px;
+  color: #fbbf24;
+  margin-top: 12px;
+  line-height: 1.5;
+}
+
+/* Form Actions */
+.formActions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.confirmLoanBtn {
+  padding: 16px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.cancelBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 12px;
+  cursor: pointer;
+}
+
+/* ===== LOAN HEALTH BAR ===== */
+
+.loanHealthSection {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.loanHealthHeader {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.loanHealthBarContainer {
+  height: 10px;
+  background: var(--bg-tertiary);
+  border-radius: 5px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.loanHealthBar {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.3s, background 0.3s;
+}
+
+.loanHealthBar.healthy { background: #4ade80; }
+.loanHealthBar.caution { background: #fbbf24; }
+.loanHealthBar.warning { background: #f97316; }
+.loanHealthBar.danger { background: #ef4444; }
+
+.loanHealthMetrics {
+  margin-bottom: 12px;
+}
+
+.healthMetricRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.healthMetricLabel {
+  color: var(--text-secondary);
+}
+
+.healthMetricValue {
+  font-weight: 500;
+}
+
+.healthMetricValue.danger {
+  color: #ef4444;
+}
+
+.ltvDisplay {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.ltvDivider {
+  color: var(--border);
+}
+
+/* ===== ACTIVE LOAN DETAIL ===== */
+
+.loanDetailView {
+  padding: 16px;
+}
+
+.loanDetailNav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.backBtn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.loanDetailTitle {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.loanDetailHeader {
+  text-align: center;
+  padding: 24px 16px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.countdownCircle {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 4px solid var(--accent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.countdownDays {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.countdownLabel {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.loanPrincipal {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.loanStartDate {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.interestSummary {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.interestBox {
+  text-align: center;
+}
+
+.interestLabel {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.interestValue {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* Collateral Card */
+.collateralCard {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.collateralCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.lockIcon {
+  font-size: 20px;
+}
+
+.collateralName {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.collateralDetails {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* Repayment Summary */
+.repaymentSummary {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.repaymentSummary .summaryRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.repaymentSummary .summaryRow.total {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.earlyRepayDiscount {
+  color: #4ade80;
+}
+
+.repayLoanBtn {
+  width: 100%;
+  padding: 16px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* ===== RECEIPT ===== */
+
+.receiptContainer {
+  text-align: center;
+  padding: 24px;
+}
+
+.receiptIcon {
+  width: 80px;
+  height: 80px;
+  background: rgba(74, 222, 128, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  font-size: 36px;
+  color: #4ade80;
+}
+
+.receiptTitle {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.receiptAmount {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.receiptBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(74, 222, 128, 0.2);
+  color: #4ade80;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 24px;
+}
+
+.receiptDetails {
+  text-align: left;
+  border-top: 1px dashed var(--border);
+  padding-top: 16px;
+}
+
+.receiptRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.receiptLabel {
+  color: var(--text-secondary);
+}
+
+.receiptActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.receiptActionBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.backToPortfolioBtn {
+  width: 100%;
+  margin-top: 16px;
+  padding: 16px;
+  font-size: 16px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   ENHANCED LOAN COMPONENTS (v10.5.6)
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ===== ENHANCED ACTIVE LOAN CARD ===== */
+
+.activeLoanCardEnhanced {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.activeLoanCardEnhanced .loanCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+/* Countdown Circle with SVG */
+.activeLoanCardEnhanced .countdownCircle {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 0;
+  margin: 0;
+}
+
+.countdownSvg {
+  width: 100%;
+  height: 100%;
+}
+
+.countdownContent {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+.activeLoanCardEnhanced .countdownDays {
+  display: block;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.activeLoanCardEnhanced .countdownLabel {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.loanHeaderInfo {
+  flex: 1;
+}
+
+.activeLoanCardEnhanced .loanCollateralName {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.loanBorrowedAmount {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.loanInterestBadge {
+  display: inline-block;
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Interest Summary Box */
+.activeLoanCardEnhanced .interestSummary {
+  display: flex;
+  align-items: center;
+  background: var(--bg-tertiary);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  margin-top: 0;
+  padding-top: 16px;
+  border-top: none;
+  gap: 0;
+  justify-content: flex-start;
+}
+
+.activeLoanCardEnhanced .interestBox {
+  flex: 1;
+  text-align: center;
+}
+
+.activeLoanCardEnhanced .interestLabel {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  letter-spacing: 0.5px;
+}
+
+.activeLoanCardEnhanced .interestValue {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.interestDivider {
+  width: 1px;
+  height: 40px;
+  background: var(--border);
+  margin: 0 16px;
+}
+
+/* Loan Health Section */
+.activeLoanCardEnhanced .loanHealthSection {
+  margin-bottom: 16px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+.healthHeader {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.healthLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.healthLtv {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.healthBarContainer {
+  height: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.healthBar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+.healthBar.healthy { background: #4ade80; }
+.healthBar.caution { background: #fbbf24; }
+.healthBar.warning { background: #f97316; }
+.healthBar.danger { background: #ef4444; }
+
+.healthMetrics {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.liquidationLabel .danger {
+  color: #f97316;
+}
+
+/* Loan Details Section */
+.loanDetailsSection {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  margin-bottom: 16px;
+}
+
+.loanDetailsSection .detailRow {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.loanDetailsSection .detailRow:last-child {
+  margin-bottom: 0;
+}
+
+.loanDetailsSection .detailLabel {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.loanDetailsSection .detailValue {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.loanDetailsSection .detailValue.danger {
+  color: #f97316;
+}
+
+/* Repay Button */
+.repayButton {
+  width: 100%;
+  padding: 14px;
+  background: var(--accent);
+  border: none;
+  border-radius: 10px;
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.repayButton:hover {
+  opacity: 0.9;
+}
+
+/* ===== REPAYMENT PANEL ===== */
+
+.repaymentPanel {
+  padding: 16px;
+}
+
+.panelTitle {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: var(--text-primary);
+}
+
+/* Repayment Options */
+.repaymentOptions {
+  margin-bottom: 20px;
+}
+
+.optionLabel {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  letter-spacing: 0.5px;
+}
+
+.optionButtons {
+  display: flex;
+  gap: 8px;
+}
+
+.optionBtn {
+  flex: 1;
+  padding: 12px 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.optionBtn.selected {
+  border-color: var(--accent);
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.optionTitle {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 2px;
+  color: var(--text-primary);
+}
+
+.optionSubtitle {
+  display: block;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* Custom Amount Slider */
+.customAmountSection {
+  background: var(--bg-secondary);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+}
+
+.customAmountHeader {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.customSlider {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+/* Payment Breakdown */
+.paymentBreakdown {
+  background: var(--bg-secondary);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+}
+
+.breakdownRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  margin-bottom: 10px;
+  color: var(--text-primary);
+}
+
+.breakdownRow:last-child {
+  margin-bottom: 0;
+}
+
+.breakdownRow.savings {
+  color: #4ade80;
+}
+
+.savingsValue {
+  font-weight: 500;
+}
+
+.breakdownRow.total {
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 15px;
+}
+
+/* Cash Available Section */
+.cashAvailableSection {
+  background: var(--bg-tertiary);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.cashRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 6px;
+  color: var(--text-primary);
+}
+
+.cashRow:last-child {
+  margin-bottom: 0;
+}
+
+.cashRow .danger {
+  color: #ef4444;
+}
+
+/* Repayment Note */
+.repaymentNote {
+  font-size: 13px;
+  color: #4ade80;
+  margin-bottom: 20px;
+  padding: 10px 12px;
+  background: rgba(74, 222, 128, 0.1);
+  border-radius: 8px;
+  text-align: center;
+}
+
+/* Panel Actions */
+.panelActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.confirmBtn {
+  padding: 14px;
+  font-size: 15px;
+}
+
+.cancelBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 12px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* ===== ENHANCED RECEIPT SCREEN ===== */
+
+.receiptScreen {
+  padding: 32px 24px;
+  text-align: center;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.receiptScreen .receiptIcon {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 20px;
+  background: transparent;
+  border-radius: 0;
+}
+
+.checkIconSvg {
+  width: 100%;
+  height: 100%;
+}
+
+.receiptScreen .receiptTitle {
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.receiptScreen .receiptAmount {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+}
+
+.successBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(74, 222, 128, 0.2);
+  color: #4ade80;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 24px;
+}
+
+.checkmark {
+  font-size: 16px;
+}
+
+.receiptDivider {
+  width: 100%;
+  height: 1px;
+  background: var(--border);
+  background-image: linear-gradient(to right, var(--border) 50%, transparent 50%);
+  background-size: 8px 1px;
+  margin-bottom: 24px;
+}
+
+.receiptScreen .receiptDetails {
+  width: 100%;
+  text-align: left;
+  margin-bottom: 32px;
+  border-top: none;
+  padding-top: 0;
+}
+
+.receiptScreen .receiptRow {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.receiptScreen .receiptRow.savings {
+  color: #4ade80;
+}
+
+.receiptScreen .receiptLabel {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.receiptScreen .receiptValue {
+  font-size: 14px;
+  font-weight: 500;
+  text-align: right;
+  color: var(--text-primary);
+}
+
+.receiptScreen .receiptValue.savingsValue {
+  color: #4ade80;
+}
+
+.receiptRef {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+/* Receipt Logo */
+.receiptLogo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 32px;
+}
+
+.logoIcon {
+  width: 48px;
+  height: 48px;
+  background: var(--accent);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 8px;
+}
+
+.logoText {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* Receipt Actions */
+.receiptScreen .receiptActions {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 16px;
+  margin-top: 0;
+}
+
+.receiptScreen .receiptActionBtn {
+  flex: 1;
+  padding: 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.receiptScreen .receiptActionBtn:hover {
+  background: var(--bg-tertiary);
+}
+
+.doneBtn {
+  width: 100%;
+  padding: 16px;
+  background: var(--accent);
+  border: none;
+  border-radius: 10px;
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ===== ACTIVE LOANS SECTION ===== */
+
+.activeLoansSection {
+  margin-bottom: 24px;
+}
+
+.activeLoansSection .sectionTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+/* ===== UTILITY CLASSES ===== */
+
+.danger {
+  color: #ef4444;
 }

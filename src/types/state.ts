@@ -75,6 +75,7 @@ export interface ProtectPayload {
 export interface BorrowPayload {
   assetId: AssetId;
   amountIRR: number;
+  durationMonths: 3 | 6;
 }
 
 export interface RepayPayload {
@@ -209,6 +210,7 @@ export interface ProtectDraft {
 export interface BorrowDraft {
   assetId: AssetId;
   amountIRR: number | null;
+  durationMonths: 3 | 6;
 }
 
 export interface RepayDraft {

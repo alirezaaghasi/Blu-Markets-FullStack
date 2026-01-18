@@ -137,12 +137,17 @@ export interface Protection {
 export interface Loan {
   id: string;
   collateralAssetId: AssetId;
+  collateralQuantity?: number;
   amountIRR: number;
   ltv: number;
+  interestRate?: number;
   liquidationIRR: number;
   startISO: string;
+  dueISO?: string;
+  durationMonths: 3 | 6;
   status?: LoanStatus;
   repaidIRR?: number;
+  accruedInterestIRR?: number;
 }
 
 // ============================================================================

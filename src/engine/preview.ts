@@ -2,7 +2,7 @@ import type { AppState, Holding, Layer, AssetId, TradeSide, RebalanceMode, Rebal
 import { computeSnapshot } from './snapshot';
 import { calcPremiumIRR, calcLiquidationIRR } from './pricing';
 import { ASSET_LAYER, LAYER_ASSETS } from '../state/domain';
-import { COLLATERAL_LTV_BY_LAYER, LAYERS, DEFAULT_PRICES, DEFAULT_FX_RATE, WEIGHTS, STRATEGY_PRESETS } from '../constants/index';
+import { COLLATERAL_LTV_BY_LAYER, LAYERS, DEFAULT_PRICES, DEFAULT_FX_RATE, WEIGHTS, STRATEGY_PRESETS, LOAN_INTEREST_RATE } from '../constants/index';
 import { irrToFixedIncomeUnits } from './fixedIncome';
 import { getAssetPriceUSD } from '../helpers';
 import { IntraLayerBalancer, MarketDataProvider } from './intraLayerBalancer';
@@ -317,12 +317,13 @@ export function previewProtect(
 interface BorrowPayload {
   assetId: AssetId;
   amountIRR: number;
+  durationMonths?: 3 | 6;
 }
 
 /**
  * Preview a borrow action
  */
-export function previewBorrow(state: AppState, { assetId, amountIRR }: BorrowPayload): AppState {
+export function previewBorrow(state: AppState, { assetId, amountIRR, durationMonths = 3 }: BorrowPayload): AppState {
   const next = cloneState(state);
   const h = next.holdings.find((x) => x.assetId === assetId);
   if (!h) return next;
@@ -334,12 +335,28 @@ export function previewBorrow(state: AppState, { assetId, amountIRR }: BorrowPay
   next.cashIRR += amountIRR;
 
   const liquidationIRR = calcLiquidationIRR({ amountIRR, ltv });
-  const todayISO = new Date().toISOString().slice(0, 10);
+  const startDate = new Date();
+  const todayISO = startDate.toISOString().slice(0, 10);
+  const dueDate = new Date(startDate);
+  dueDate.setMonth(dueDate.getMonth() + durationMonths);
+  const dueISO = dueDate.toISOString().slice(0, 10);
   const loanId = `loan_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
   next.loans = [
     ...next.loans,
-    { id: loanId, amountIRR, collateralAssetId: assetId, ltv, liquidationIRR, startISO: todayISO },
+    {
+      id: loanId,
+      amountIRR,
+      collateralAssetId: assetId,
+      collateralQuantity: h.quantity,
+      ltv,
+      interestRate: LOAN_INTEREST_RATE,
+      liquidationIRR,
+      startISO: todayISO,
+      dueISO,
+      durationMonths,
+      status: 'ACTIVE' as const,
+    },
   ];
 
   return next;

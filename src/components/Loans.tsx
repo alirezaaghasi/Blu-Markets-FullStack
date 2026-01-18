@@ -1,14 +1,17 @@
 import React, { useMemo, Dispatch } from 'react';
 import { formatIRR, getAssetDisplayName } from '../helpers';
-import { selectHoldingsById, selectLoanSummary, selectLoanHealth } from '../selectors/index';
+import { selectHoldingsById, selectLoanSummary } from '../selectors/index';
+import { LOAN_INTEREST_RATE } from '../constants/index';
 import type { Loan, Holding, AppAction } from '../types';
 
 /**
  * Calculate liquidation price in IRR for a loan
+ * Liquidation happens when collateral value drops below loan amount
  */
 function getLiquidationPriceIRR(loan: Loan, quantity: number | undefined): number | null {
   if (!quantity || quantity <= 0) return null;
-  return loan.liquidationIRR / quantity;
+  // Liquidation price = loan amount / quantity (not using liquidationIRR which was LTV-based)
+  return loan.amountIRR / quantity;
 }
 
 // ============================================================================
@@ -22,12 +25,15 @@ interface LoanCardProps {
 }
 
 const LoanCard = React.memo(function LoanCard({ loan, holdingQuantity, dispatch }: LoanCardProps) {
-  const usedPercent = (loan.amountIRR / loan.liquidationIRR) * 100;
-  const health = selectLoanHealth(usedPercent);
   const liquidationPrice = getLiquidationPriceIRR(loan, holdingQuantity);
 
+  // Calculate maturity date from start date + duration
+  const maturityDate = new Date(loan.startISO);
+  maturityDate.setMonth(maturityDate.getMonth() + (loan.durationMonths || 3));
+  const maturityStr = maturityDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+
   return (
-    <div className={`loanCard ${health.level}`}>
+    <div className="loanCard">
       <div className="loanCardHeader">
         <div className="loanCardTitle">
           <span className="loanLabel">LOAN</span>
@@ -38,19 +44,17 @@ const LoanCard = React.memo(function LoanCard({ loan, holdingQuantity, dispatch 
       <div className="loanCardAmount">
         <span className="amountLabel">Borrowed:</span>
         <span className="amountValue">{formatIRR(loan.amountIRR)}</span>
+        <span className="interestRate">{Math.round(LOAN_INTEREST_RATE * 100)}% annual</span>
       </div>
 
-      {/* Health bar */}
-      <div className="loanHealthSection">
-        <div className="healthBarTrack">
-          <div
-            className="healthBarFill"
-            style={{ width: `${Math.min(100, usedPercent)}%`, background: health.color }}
-          />
+      <div className="loanDetails">
+        <div className="loanDetailRow">
+          <span className="loanDetailLabel">Duration:</span>
+          <span className="loanDetailValue">{loan.durationMonths || 3} months</span>
         </div>
-        <div className="healthLabelRow">
-          <span className="healthPercent">{Math.round(usedPercent)}% used</span>
-          <span className="healthLimit">Limit: {formatIRR(loan.liquidationIRR)}</span>
+        <div className="loanDetailRow">
+          <span className="loanDetailLabel">Maturity:</span>
+          <span className="loanDetailValue">{maturityStr}</span>
         </div>
       </div>
 
@@ -59,7 +63,7 @@ const LoanCard = React.memo(function LoanCard({ loan, holdingQuantity, dispatch 
         <div className="loanLiquidation">
           <div className="liquidationRow">
             <span className="liquidationLabel">Liquidation price:</span>
-            <span className="liquidationPrice">{formatIRR(liquidationPrice)}</span>
+            <span className="liquidationPrice">{formatIRR(liquidationPrice)} / unit</span>
           </div>
         </div>
       )}

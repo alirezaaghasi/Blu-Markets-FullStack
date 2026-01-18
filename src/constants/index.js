@@ -95,6 +95,12 @@ export const COLLATERAL_LTV_BY_LAYER = {
 // Per Business Review decision: cap at 25% to control loan revenue concentration
 export const MAX_TOTAL_LOAN_PCT = 0.25;  // 25% of total AUM
 
+// Loan interest rate (annual)
+export const LOAN_INTEREST_RATE = 0.30;  // 30% annual
+
+// Loan duration options (in months)
+export const LOAN_DURATION_OPTIONS = [3, 6];  // 3 months or 6 months
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // RISK ALLOCATIONS (Layer %)
 // ═══════════════════════════════════════════════════════════════════════════════

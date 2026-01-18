@@ -43,12 +43,13 @@ export interface LoanHealth {
 }
 
 /**
- * Get loan health level based on usage percentage
+ * Get loan health level based on LTV percentage
+ * Thresholds adjusted so new loans (max 70% LTV) start healthy
  */
 export function selectLoanHealth(usedPercent: number): LoanHealth {
   const color = '#3B82F6';
-  if (usedPercent >= 75) return { level: 'critical', color };
-  if (usedPercent >= 65) return { level: 'warning', color };
-  if (usedPercent >= 50) return { level: 'caution', color };
+  if (usedPercent >= 90) return { level: 'critical', color };
+  if (usedPercent >= 80) return { level: 'warning', color };
+  if (usedPercent >= 75) return { level: 'caution', color };
   return { level: 'healthy', color };
 }

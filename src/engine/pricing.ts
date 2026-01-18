@@ -31,7 +31,9 @@ export function calcPremiumIRR({ assetId, notionalIRR, months }: CalcPremiumPara
 
 /**
  * Calculate liquidation threshold in IRR
+ * Liquidation happens when collateral value drops below the outstanding debt (loan + interest)
+ * At loan creation, this equals the loan amount
  */
-export function calcLiquidationIRR({ amountIRR, ltv }: CalcLiquidationParams): number {
-  return Math.floor(amountIRR / ltv);
+export function calcLiquidationIRR({ amountIRR }: CalcLiquidationParams): number {
+  return Math.floor(amountIRR);
 }

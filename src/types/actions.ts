@@ -59,6 +59,7 @@ export type AppAction =
   | { type: 'START_BORROW'; assetId?: AssetId }
   | { type: 'SET_BORROW_ASSET'; assetId: string }
   | { type: 'SET_BORROW_AMOUNT'; amountIRR: string | number }
+  | { type: 'SET_BORROW_DURATION'; durationMonths: 3 | 6 }
   | { type: 'PREVIEW_BORROW'; prices?: Record<string, number>; fxRate?: number }
   // Repay
   | { type: 'START_REPAY'; loanId?: string }

@@ -297,7 +297,7 @@ export default function App() {
           </div>
           <div className="footer">
             <Suspense fallback={<div className="controlsLoadingFallback">Loading controls...</div>}>
-              <OnboardingControls state={state} dispatch={dispatch} prices={prices} fxRate={fxRate} />
+              <OnboardingControls state={state} dispatch={dispatch} prices={prices} fxRate={fxRate} pricesLoading={pricesLoading} />
             </Suspense>
           </div>
         </div>

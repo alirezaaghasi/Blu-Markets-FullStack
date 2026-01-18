@@ -55,6 +55,7 @@ export const PORTFOLIO_ACTIONS: string[] = [
   'START_BORROW',
   'SET_BORROW_ASSET',
   'SET_BORROW_AMOUNT',
+  'SET_BORROW_DURATION',
   'PREVIEW_BORROW',
   // Repay
   'START_REPAY',
@@ -221,7 +222,7 @@ export function portfolioReducer(state: AppState, action: AppAction): AppState {
       const assetId = action.assetId || available[0].assetId;
       return {
         ...state,
-        borrowDraft: { assetId, amountIRR: null },
+        borrowDraft: { assetId, amountIRR: null, durationMonths: 3 },
         pendingAction: null,
       };
     }
@@ -237,14 +238,25 @@ export function portfolioReducer(state: AppState, action: AppAction): AppState {
       return { ...state, borrowDraft: { ...state.borrowDraft, amountIRR } };
     }
 
+    case 'SET_BORROW_DURATION': {
+      if (!state.borrowDraft) return state;
+      const durationMonths = action.durationMonths as 3 | 6;
+      return { ...state, borrowDraft: { ...state.borrowDraft, durationMonths } };
+    }
+
     case 'PREVIEW_BORROW': {
       if (state.stage !== STAGES.ACTIVE || !state.borrowDraft) return state;
       // v10: Include prices and fxRate for quantity-based value computation
       const prices = action.prices || DEFAULT_PRICES;
       const fxRate = action.fxRate || DEFAULT_FX_RATE;
+      // Get collateral quantity for liquidation price calculation in modal
+      const collateralHolding = state.holdings.find((h: Holding) => h.assetId === state.borrowDraft!.assetId);
+      const collateralQuantity = collateralHolding?.quantity || 0;
       const payload = {
         assetId: state.borrowDraft.assetId,
         amountIRR: Number(state.borrowDraft.amountIRR),
+        durationMonths: state.borrowDraft.durationMonths,
+        collateralQuantity,
         prices,
         fxRate,
       };

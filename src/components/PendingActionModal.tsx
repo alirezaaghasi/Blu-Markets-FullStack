@@ -1,6 +1,6 @@
 import React, { useState, useMemo, Dispatch } from 'react';
 import { formatIRR, formatIRRShort, getAssetDisplayName } from '../helpers';
-import { ERROR_MESSAGES, SPREAD_BY_LAYER, DEFAULT_PRICES, DEFAULT_FX_RATE } from '../constants/index';
+import { ERROR_MESSAGES, SPREAD_BY_LAYER, DEFAULT_PRICES, DEFAULT_FX_RATE, LOAN_INTEREST_RATE } from '../constants/index';
 import { LAYERS, LAYER_EXPLANATIONS } from '../constants/index';
 import { ASSET_LAYER } from '../state/domain';
 import { calcLiquidationIRR } from '../engine/pricing';
@@ -287,15 +287,21 @@ function PendingActionModal({ pendingAction, targetLayerPct, dispatch }: Pending
         );
 
       case 'BORROW':
-        // Calculate liquidation details from validation meta
-        const borrowMeta = validation.meta || {};
-        const holdingValueIRR = borrowMeta.holdingValueIRR as number || 0;
-        const maxLtv = borrowMeta.maxLtv as number || 0.3;
+        // Loan model: interest accrues, liquidation when collateral < debt
         const loanAmount = payloadAny.amountIRR as number;
-        const liquidationThreshold = calcLiquidationIRR({ amountIRR: loanAmount, ltv: maxLtv });
-        const bufferPct = holdingValueIRR > 0
-          ? ((holdingValueIRR - liquidationThreshold) / holdingValueIRR * 100)
-          : 0;
+        const durationMonths = payloadAny.durationMonths as number || 3;
+        // Get quantity from payload (passed from PREVIEW_BORROW)
+        const quantity = payloadAny.collateralQuantity as number || 0;
+        // Liquidation happens when collateral value <= loan amount (at creation, no interest yet)
+        const liquidationPriceIRR = quantity > 0 ? loanAmount / quantity : 0;
+        // Calculate maturity date
+        const maturityDate = new Date();
+        maturityDate.setMonth(maturityDate.getMonth() + durationMonths);
+        const maturityStr = maturityDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        // Calculate total payable (principal + interest)
+        const interestAmount = Math.floor(loanAmount * (LOAN_INTEREST_RATE / 12) * durationMonths);
+        const totalPayable = loanAmount + interestAmount;
+        const collateralAssetName = getAssetDisplayName(payloadAny.assetId as string);
 
         return (
           <div className="simpleSummary">
@@ -304,35 +310,28 @@ function PendingActionModal({ pendingAction, targetLayerPct, dispatch }: Pending
               <span className="summaryValue">{formatIRR(loanAmount)}</span>
             </div>
             <div className="summaryRow">
-              <span className="summaryLabel">Collateral</span>
-              <span className="summaryValue">{getAssetDisplayName(payloadAny.assetId as string)} 🔒</span>
+              <span className="summaryLabel">Duration</span>
+              <span className="summaryValue">{durationMonths} months</span>
             </div>
             <div className="summaryRow">
-              <span className="summaryLabel">New cash balance</span>
-              <span className="summaryValue">{formatIRR(after.cashIRR)}</span>
+              <span className="summaryLabel">Maturity date</span>
+              <span className="summaryValue">{maturityStr}</span>
             </div>
-
-            {/* Liquidation Risk Section */}
-            <div className="liquidationRiskSection">
-              <div className="liquidationHeader">Liquidation Risk</div>
-              <div className="summaryRow">
-                <span className="summaryLabel">Liquidation threshold</span>
-                <span className="summaryValue">{formatIRR(liquidationThreshold)}</span>
-              </div>
-              <div className="summaryRow">
-                <span className="summaryLabel">Current collateral value</span>
-                <span className="summaryValue">{formatIRR(holdingValueIRR)}</span>
-              </div>
-              <div className="summaryRow">
-                <span className="summaryLabel">Buffer</span>
-                <span className={`summaryValue ${bufferPct < 20 ? 'warning' : ''}`}>
-                  {bufferPct.toFixed(1)}% below current
-                </span>
-              </div>
-              <div className="liquidationWarning">
-                If collateral value falls below the liquidation threshold,
-                your asset may be sold to repay the loan.
-              </div>
+            <div className="summaryRow">
+              <span className="summaryLabel">Interest rate</span>
+              <span className="summaryValue">{Math.round(LOAN_INTEREST_RATE * 100)}% annual</span>
+            </div>
+            <div className="summaryRow">
+              <span className="summaryLabel">Total payable</span>
+              <span className="summaryValue">{formatIRR(totalPayable)}</span>
+            </div>
+            <div className="summaryRow">
+              <span className="summaryLabel">Collateral</span>
+              <span className="summaryValue">{collateralAssetName} 🔒</span>
+            </div>
+            <div className="summaryRow liquidationPriceRow">
+              <span className="summaryLabel">Liquidation price</span>
+              <span className="summaryValue warningText">{formatIRRShort(liquidationPriceIRR)} IRR / {payloadAny.assetId as string}</span>
             </div>
           </div>
         );

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, Dispatch, ReactNode } from 'react';
 import { STAGES, LAYER_EXPLANATIONS, THRESHOLDS, COLLATERAL_LTV_BY_LAYER, ONBOARDING_STEPS, MAX_TOTAL_LOAN_PCT } from '../../constants/index';
-import { formatIRR, getAssetDisplayName, getHoldingValueIRR } from '../../helpers';
+import { formatIRR, getAssetDisplayName, getHoldingValueIRR, formatNumberInput, parseFormattedNumber } from '../../helpers';
 import { calcPremiumIRR } from '../../engine/pricing';
 import { ASSET_LAYER } from '../../state/domain';
 import PhoneForm from './PhoneForm';
@@ -136,6 +136,7 @@ interface OnboardingControlsProps {
   dispatch: Dispatch<AppAction>;
   prices: Record<string, number>;
   fxRate: number;
+  pricesLoading?: boolean;
 }
 
 /**
@@ -183,7 +184,7 @@ function calculateSuggestedAmounts(answers: Record<string, string | number>): { 
   };
 }
 
-function OnboardingControls({ state, dispatch, prices, fxRate }: OnboardingControlsProps) {
+function OnboardingControls({ state, dispatch, prices, fxRate, pricesLoading = false }: OnboardingControlsProps) {
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [showingProfile, setShowingProfile] = useState(true); // v10: Show profile before consent
 
@@ -273,8 +274,7 @@ function OnboardingControls({ state, dispatch, prices, fxRate }: OnboardingContr
     return borrowableHoldings.map(h => {
       const layer = ASSET_LAYER[h.assetId];
       const info = LAYER_EXPLANATIONS[layer];
-      const ltv = COLLATERAL_LTV_BY_LAYER[layer] || 0.3;
-      return { assetId: h.assetId, label: `${info.icon} ${getAssetDisplayName(h.assetId)} (${Math.round(ltv * 100)}% LTV)` };
+      return { assetId: h.assetId, label: `${info.icon} ${getAssetDisplayName(h.assetId)}` };
     });
   }, [borrowableHoldings]);
 
@@ -468,12 +468,12 @@ function OnboardingControls({ state, dispatch, prices, fxRate }: OnboardingContr
         <div className="investMinimum">Minimum: {formatIRR(THRESHOLDS.MIN_AMOUNT_IRR)}</div>
         <p className="investReassurance">You can add more anytime. No lock-in.</p>
         <button
-          className={`btn primary ${isValid ? '' : 'disabled'}`}
+          className={`btn primary ${isValid && !pricesLoading ? '' : 'disabled'}`}
           style={{ width: '100%' }}
           onClick={() => dispatch({ type: 'EXECUTE_PORTFOLIO', prices, fxRate })}
-          disabled={!isValid}
+          disabled={!isValid || pricesLoading}
         >
-          {isValid ? 'Start Investing' : 'Enter amount to start'}
+          {pricesLoading ? 'Loading prices...' : isValid ? 'Start Investing' : 'Enter amount to start'}
         </button>
       </div>
     );
@@ -504,10 +504,11 @@ function OnboardingControls({ state, dispatch, prices, fxRate }: OnboardingContr
       <ActionCard title="Add Funds">
         <input
           className="input"
-          type="number"
+          type="text"
+          inputMode="numeric"
           placeholder="Amount (IRR)"
-          value={state.addFundsDraft.amountIRR || ''}
-          onChange={(e) => dispatch({ type: 'SET_ADD_FUNDS_AMOUNT', amountIRR: e.target.value })}
+          value={formatNumberInput(state.addFundsDraft.amountIRR)}
+          onChange={(e) => dispatch({ type: 'SET_ADD_FUNDS_AMOUNT', amountIRR: parseFormattedNumber(e.target.value) })}
         />
         <div className="row" style={{ marginTop: 10 }}>
           <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_ADD_FUNDS' })} disabled={!state.addFundsDraft.amountIRR}>Preview</button>
@@ -527,10 +528,11 @@ function OnboardingControls({ state, dispatch, prices, fxRate }: OnboardingContr
         <input
           className="input"
           style={{ marginTop: 8 }}
-          type="number"
+          type="text"
+          inputMode="numeric"
           placeholder="Amount (IRR)"
-          value={state.tradeDraft.amountIRR ?? ''}
-          onChange={(e) => dispatch({ type: 'SET_TRADE_AMOUNT', amountIRR: e.target.value })}
+          value={formatNumberInput(state.tradeDraft.amountIRR)}
+          onChange={(e) => dispatch({ type: 'SET_TRADE_AMOUNT', amountIRR: parseFormattedNumber(e.target.value) })}
         />
         <div className="row" style={{ marginTop: 10 }}>
           <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_TRADE', prices, fxRate })} disabled={!state.tradeDraft.amountIRR}>Preview</button>
@@ -577,25 +579,10 @@ function OnboardingControls({ state, dispatch, prices, fxRate }: OnboardingContr
 
     return (
       <ActionCard title="💰 Borrow">
-        {/* Global Loan Capacity Display */}
-        <div className="loanCapacitySection">
-          <div className="loanCapacityHeader">
-            <span className="loanCapacityLabel">Portfolio Loan Capacity</span>
-            <span className="loanCapacityValue">
-              {formatIRR(loanCapacity.existingLoansIRR)} / {formatIRR(loanCapacity.maxTotalLoans)}
-            </span>
-          </div>
-          <div className="loanCapacityBarContainer">
-            <div
-              className={`loanCapacityBar ${loanCapacity.usedPct >= 80 ? 'warning' : loanCapacity.usedPct >= 60 ? 'caution' : ''}`}
-              style={{ width: `${Math.min(100, loanCapacity.usedPct)}%` }}
-            />
-          </div>
-          <div className="loanCapacityHint">
-            {loanCapacity.remainingCapacity > 0
-              ? `${formatIRR(loanCapacity.remainingCapacity)} available (25% of portfolio)`
-              : 'Portfolio loan limit reached'}
-          </div>
+        {/* Loan Capacity Display */}
+        <div className="loanCapacitySimple" style={{ marginBottom: 12, fontSize: 14 }}>
+          <span style={{ color: 'var(--text-secondary)' }}>Loan Capacity: </span>
+          <span style={{ fontWeight: 600 }}>{formatIRR(loanCapacity.remainingCapacity)}</span>
         </div>
 
         <select
@@ -607,23 +594,41 @@ function OnboardingControls({ state, dispatch, prices, fxRate }: OnboardingContr
             <option key={opt.assetId} value={opt.assetId}>{opt.label}</option>
           ))}
         </select>
-        <div className="borrowLtvInfo" style={{ marginTop: 8, padding: '8px 12px', background: 'var(--bg-tertiary)', borderRadius: 8, fontSize: 12 }}>
-          <span style={{ color: 'var(--text-secondary)' }}>{borrowData.layerInfo?.icon} {borrowData.layerInfo?.name} assets: </span>
-          <span style={{ fontWeight: 600 }}>{Math.round(borrowData.layerLtv * 100)}% max LTV</span>
-        </div>
         <input
           className="input"
           style={{ marginTop: 8 }}
-          type="number"
+          type="text"
+          inputMode="numeric"
           placeholder="Loan amount (IRR)"
-          value={state.borrowDraft.amountIRR ?? ''}
-          onChange={(e) => dispatch({ type: 'SET_BORROW_AMOUNT', amountIRR: e.target.value })}
+          value={formatNumberInput(state.borrowDraft.amountIRR)}
+          onChange={(e) => dispatch({ type: 'SET_BORROW_AMOUNT', amountIRR: parseFormattedNumber(e.target.value) })}
         />
         <div className="borrowHint">
           Max: {formatIRR(effectiveMax)}
           {effectiveMax < borrowData.maxBorrow && (
             <span className="borrowHintNote"> (limited by portfolio cap)</span>
           )}
+        </div>
+        <div className="durationSelector" style={{ marginTop: 12 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-secondary)', marginRight: 8 }}>Duration:</span>
+          <div className="durationButtons" style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              className={`btn ${state.borrowDraft.durationMonths === 3 ? 'primary' : ''}`}
+              style={{ flex: 1, padding: '8px 12px' }}
+              onClick={() => dispatch({ type: 'SET_BORROW_DURATION', durationMonths: 3 })}
+            >
+              3 months
+            </button>
+            <button
+              type="button"
+              className={`btn ${state.borrowDraft.durationMonths === 6 ? 'primary' : ''}`}
+              style={{ flex: 1, padding: '8px 12px' }}
+              onClick={() => dispatch({ type: 'SET_BORROW_DURATION', durationMonths: 6 })}
+            >
+              6 months
+            </button>
+          </div>
         </div>
         <div className="row" style={{ marginTop: 10 }}>
           <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_BORROW', prices, fxRate })} disabled={!state.borrowDraft.amountIRR}>Preview</button>

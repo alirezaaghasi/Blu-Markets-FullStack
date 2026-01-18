@@ -156,3 +156,24 @@ export function getHoldingValueIRR(
   const priceUSD = getAssetPriceUSD(holding.assetId, prices);
   return Math.round(holding.quantity * priceUSD * fxRate);
 }
+
+/**
+ * Format a number with thousand separators for display in inputs
+ * e.g., 1000000 -> "1,000,000"
+ */
+export function formatNumberInput(n: number | string): string {
+  const num = Number(n) || 0;
+  if (num === 0) return '';
+  return irrFormatter.format(Math.round(num));
+}
+
+/**
+ * Parse a formatted number string back to a number
+ * e.g., "1,000,000" -> 1000000
+ */
+export function parseFormattedNumber(str: string): number {
+  if (!str) return 0;
+  // Remove all non-digit characters except minus sign
+  const cleaned = str.replace(/[^\d-]/g, '');
+  return Number(cleaned) || 0;
+}
