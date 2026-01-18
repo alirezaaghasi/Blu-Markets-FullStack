@@ -1,10 +1,9 @@
 import React, { useMemo, Dispatch } from 'react';
-import { formatIRR, getHoldingValueIRR } from '../../helpers';
+import { getHoldingValueIRR } from '../../helpers';
 import { MAX_TOTAL_LOAN_PCT, DEFAULT_FX_RATE } from '../../constants/index';
 import ActiveLoanCard from './ActiveLoanCard';
-import LoanProductCard from './LoanProductCard';
 import LoanCapacityBar from './LoanCapacityBar';
-import type { Loan, Holding, Layer, AppAction } from '../../types';
+import type { Loan, Holding, AppAction } from '../../types';
 
 interface LoansTabProps {
   loans: Loan[];
@@ -14,8 +13,6 @@ interface LoansTabProps {
   prices?: Record<string, number>;
   fxRate?: number;
   dispatch: Dispatch<AppAction>;
-  onViewLoan?: (loanId: string) => void;
-  onNewLoan?: (layer: Layer) => void;
 }
 
 function LoansTab({
@@ -26,8 +23,6 @@ function LoansTab({
   prices = {},
   fxRate = DEFAULT_FX_RATE,
   dispatch,
-  onViewLoan,
-  onNewLoan,
 }: LoansTabProps) {
   const loanList = loans || [];
   const activeLoans = loanList.filter((l) => l.status !== 'REPAID' && l.status !== 'LIQUIDATED');
@@ -58,50 +53,14 @@ function LoansTab({
     dispatch({ type: 'START_REPAY', loanId });
   };
 
-  const handleNewLoan = (layer: Layer) => {
-    if (onNewLoan) {
-      onNewLoan(layer);
-    } else {
-      dispatch({ type: 'START_BORROW' });
-    }
-  };
-
   // Empty state
-  if (activeLoans.length === 0 && loanCapacity.totalBorrowed === 0) {
+  if (activeLoans.length === 0) {
     return (
       <div className="loansDashboard">
         <div className="emptyLoansState">
           <div className="emptyIcon">💰</div>
           <h3>No Active Loans</h3>
-          <p>Borrow against your assets without selling them. Keep your investments while accessing cash.</p>
-        </div>
-
-        <div className="loanProductsSection">
-          <h3 className="sectionTitle">Borrow Against Your Assets</h3>
-
-          <LoanProductCard
-            layer="FOUNDATION"
-            maxLtv={70}
-            apr={30}
-            assets={['USDT', 'PAXG']}
-            onSelect={() => handleNewLoan('FOUNDATION')}
-          />
-
-          <LoanProductCard
-            layer="GROWTH"
-            maxLtv={50}
-            apr={30}
-            assets={['BTC', 'ETH', 'BNB', 'XRP']}
-            onSelect={() => handleNewLoan('GROWTH')}
-          />
-
-          <LoanProductCard
-            layer="UPSIDE"
-            maxLtv={30}
-            apr={30}
-            assets={['SOL', 'TON', 'LINK', 'AVAX']}
-            onSelect={() => handleNewLoan('UPSIDE')}
-          />
+          <p>Borrow against your assets without selling them. Select an asset from your Portfolio to get started.</p>
         </div>
 
         <LoanCapacityBar
@@ -115,48 +74,17 @@ function LoansTab({
 
   return (
     <div className="loansDashboard">
-      {/* Active Loans - Enhanced Cards */}
-      {activeLoans.length > 0 && (
-        <div className="activeLoansSection">
-          <h3 className="sectionTitle">Active Loans</h3>
-          {activeLoans.map((loan) => (
-            <ActiveLoanCard
-              key={loan.id}
-              loan={loan}
-              collateralValue={getCollateralValue(loan)}
-              onRepay={() => handleRepay(loan.id)}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Loan Products by Layer */}
-      <div className="loanProductsSection">
-        <h3 className="sectionTitle">Borrow Against Your Assets</h3>
-
-        <LoanProductCard
-          layer="FOUNDATION"
-          maxLtv={70}
-          apr={30}
-          assets={['USDT', 'PAXG']}
-          onSelect={() => handleNewLoan('FOUNDATION')}
-        />
-
-        <LoanProductCard
-          layer="GROWTH"
-          maxLtv={50}
-          apr={30}
-          assets={['BTC', 'ETH', 'BNB', 'XRP']}
-          onSelect={() => handleNewLoan('GROWTH')}
-        />
-
-        <LoanProductCard
-          layer="UPSIDE"
-          maxLtv={30}
-          apr={30}
-          assets={['SOL', 'TON', 'LINK', 'AVAX']}
-          onSelect={() => handleNewLoan('UPSIDE')}
-        />
+      {/* Active Loans */}
+      <div className="activeLoansSection">
+        <h3 className="sectionTitle">Active Loans</h3>
+        {activeLoans.map((loan) => (
+          <ActiveLoanCard
+            key={loan.id}
+            loan={loan}
+            collateralValue={getCollateralValue(loan)}
+            onRepay={() => handleRepay(loan.id)}
+          />
+        ))}
       </div>
 
       {/* Portfolio Loan Capacity */}
