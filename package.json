@@ -1,6 +1,6 @@
 {
-  "name": "blu-markets-v10",
-  "version": "10.5.5",
+  "name": "blu-markets",
+  "version": "11.0.0",
   "private": true,
   "type": "module",
   "scripts": {
