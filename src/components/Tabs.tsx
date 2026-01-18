@@ -23,7 +23,7 @@ const TAB_IDS: TabId[] = ['PORTFOLIO', 'PROTECTION', 'LOANS', 'HISTORY'];
 const preloadFunctions: Record<TabId, () => void> = {
   PORTFOLIO: () => import('./PortfolioHome'),
   PROTECTION: () => import('./Protection'),
-  LOANS: () => import('./Loans'),
+  LOANS: () => import('./loans/LoansTab'),
   HISTORY: () => import('./HistoryPane'),
 };
 

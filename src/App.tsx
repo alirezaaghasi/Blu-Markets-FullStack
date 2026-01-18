@@ -141,7 +141,7 @@ export default function App() {
       // Prefetch Protection and Loans tabs after a short delay
       const timer = setTimeout(() => {
         import('./components/Protection');
-        import('./components/Loans');
+        import('./components/loans/LoansTab');
       }, 2000);
       return () => clearTimeout(timer);
     }
