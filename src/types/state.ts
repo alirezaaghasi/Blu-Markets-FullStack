@@ -81,6 +81,10 @@ export interface BorrowPayload {
 export interface RepayPayload {
   loanId: string;
   amountIRR: number;
+  // Enhanced fields for history/log display (populated at commit time)
+  collateralName?: string;
+  installmentsPaid?: number;
+  isSettlement?: boolean;
 }
 
 export interface RebalancePayload {

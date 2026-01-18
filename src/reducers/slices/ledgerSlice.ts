@@ -128,6 +128,19 @@ export function ledgerReducer(state: AppState, action: AppAction): AppState {
       // Reuse after snapshot from preview instead of recomputing
       // (state is deterministic, so after snapshot is identical)
       const tsISO = nowISO();
+
+      // Determine the payload to store - enrich REPAY with collateral info for History display
+      let storedPayload: ActionPayload = p.payload as ActionPayload;
+      if (p.kind === 'REPAY' && repayLoanInfo) {
+        const repayPayload = p.payload as RepayPayload;
+        storedPayload = {
+          ...repayPayload,
+          collateralName: getAssetDisplayName(repayLoanInfo.collateralAssetId),
+          installmentsPaid: repayLoanInfo.installmentsPaid,
+          isSettlement: repayLoanInfo.isSettlement,
+        };
+      }
+
       const entry: LedgerEntry = {
         id: uid(),
         tsISO,
@@ -135,7 +148,7 @@ export function ledgerReducer(state: AppState, action: AppAction): AppState {
         type: `${p.kind}_COMMIT` as LedgerEntryType,
         details: {
           kind: p.kind,
-          payload: p.payload as ActionPayload,
+          payload: storedPayload,
           boundary: p.boundary,
           validation: p.validation,
           before: p.before,

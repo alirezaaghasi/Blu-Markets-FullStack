@@ -103,7 +103,18 @@ function formatLedgerAction(entry: LedgerEntry): string {
     case 'REBALANCE': return 'Rebalanced';
     case 'PROTECT': return `Protected ${getAssetDisplayName(payload?.assetId as string)} (${payload?.months}mo)`;
     case 'BORROW': return `Borrowed ${formatIRRShort(payload?.amountIRR as number)} IRR against ${getAssetDisplayName(payload?.assetId as string)}`;
-    case 'REPAY': return 'Loan Repaid';
+    case 'REPAY': {
+      const collateralName = payload?.collateralName as string | undefined;
+      const installmentsPaid = payload?.installmentsPaid as number | undefined;
+      const isSettlement = payload?.isSettlement as boolean | undefined;
+
+      if (isSettlement && collateralName) {
+        return `Settled ${collateralName} loan`;
+      } else if (collateralName && installmentsPaid) {
+        return `Repaid ${collateralName} loan (${installmentsPaid}/6)`;
+      }
+      return 'Loan Repaid';
+    }
     case 'CANCEL_PROTECTION':
     case 'PROTECTION_CANCELLED': return `Cancelled ${getAssetDisplayName(payload?.assetId as string)} protection`;
     default: return type;
