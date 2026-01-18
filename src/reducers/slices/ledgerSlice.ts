@@ -60,7 +60,7 @@ export function ledgerReducer(state: AppState, action: AppAction): AppState {
           const willSettle = repayPayload.amountIRR >= totalOwed;
           repayLoanInfo = {
             collateralAssetId: loan.collateralAssetId,
-            installmentsPaid: (loan.installmentsPaid || 0) + 1, // Will increment after this payment
+            installmentsPaid: 0, // Will be updated after preview
             isSettlement: willSettle,
           };
         }
@@ -86,6 +86,19 @@ export function ledgerReducer(state: AppState, action: AppAction): AppState {
         case 'PROTECT':
           // Handled separately below
           break;
+      }
+
+      // Update repayLoanInfo with actual installmentsPaid AFTER preview runs
+      if (p.kind === 'REPAY' && repayLoanInfo) {
+        const repayPayload = p.payload as RepayPayload;
+        const updatedLoan = next.loans.find(l => l.id === repayPayload.loanId);
+        if (updatedLoan) {
+          // Loan still exists - get actual installmentsPaid from updated loan
+          repayLoanInfo.installmentsPaid = updatedLoan.installmentsPaid || 0;
+        } else {
+          // Loan was settled - all 6 installments are considered paid
+          repayLoanInfo.installmentsPaid = 6;
+        }
       }
 
       if (p.kind === 'PROTECT') {
