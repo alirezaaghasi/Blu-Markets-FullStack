@@ -256,17 +256,28 @@ export class IntraLayerBalancer {
 
   /**
    * Calculate all four HRAM factors for an asset
+   * Uses layerWeight from ASSETS_CONFIG as the base, with small adjustments
    */
   private _calculateFactors(asset: string, allAssets: string[], config: BalancerConfig): AssetFactors {
-    // 1. Risk Parity (inverse volatility)
-    const volatility = this.marketData.calculateVolatility(asset);
-    const riskParityWeight = 1 / Math.max(volatility, 0.01);
+    const assetConfig = ASSETS_CONFIG[asset];
 
-    // 2. Momentum Factor
+    // 1. Base Weight from ASSETS_CONFIG (respects intended allocation)
+    // Use layerWeight as the primary driver, not pure inverse volatility
+    const baseWeight = assetConfig?.layerWeight || (1 / allAssets.length);
+    const volatility = this.marketData.calculateVolatility(asset);
+
+    // Apply a mild volatility adjustment (±15% max) instead of pure inverse volatility
+    // This preserves the intended layerWeight while still preferring less volatile assets
+    const avgVolatility = 0.30; // Approximate average across all assets
+    const volatilityRatio = avgVolatility / Math.max(volatility, 0.01);
+    const volatilityAdjustment = Math.max(0.85, Math.min(1.15, 0.85 + (volatilityRatio - 1) * 0.15));
+    const riskParityWeight = baseWeight * volatilityAdjustment;
+
+    // 2. Momentum Factor (unchanged)
     const momentum = this.marketData.calculateMomentum(asset);
     const momentumFactor = 1 + (momentum * (config.MOMENTUM_STRENGTH || 0.3));
 
-    // 3. Correlation Factor
+    // 3. Correlation Factor (unchanged)
     let totalCorrelation = 0;
     let correlationCount = 0;
     for (const other of allAssets) {
@@ -279,7 +290,7 @@ export class IntraLayerBalancer {
     const avgCorrelation = correlationCount > 0 ? totalCorrelation / correlationCount : 0;
     const correlationFactor = 1 - (avgCorrelation * (config.CORRELATION_PENALTY || 0.2));
 
-    // 4. Liquidity Factor
+    // 4. Liquidity Factor (unchanged)
     const liquidityFactor = this._getLiquidityFactor(asset, config);
 
     return {
