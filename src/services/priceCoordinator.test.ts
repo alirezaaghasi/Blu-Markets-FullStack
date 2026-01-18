@@ -94,9 +94,7 @@ function setupMocks(mockStorage: MockStorage): void {
 }
 
 function restoreMocks(): void {
-  // @ts-expect-error - Restoring global
   globalThis.localStorage = originalLocalStorage;
-  // @ts-expect-error - Restoring global
   globalThis.BroadcastChannel = originalBroadcastChannel;
 }
 
