@@ -50,7 +50,7 @@ import {
 // Tab panels
 const HistoryPane = lazy(() => import('./components/HistoryPane'));
 const Protection = lazy(() => import('./components/Protection'));
-const Loans = lazy(() => import('./components/Loans'));
+const LoansTab = lazy(() => import('./components/loans/LoansTab'));
 const PortfolioHome = lazy(() => import('./components/PortfolioHome'));
 
 // Stage-specific components (only load what's needed)
@@ -247,9 +247,17 @@ export default function App() {
   // Memoize loans tab content separately (only depends on loans and holdings)
   const loansContent = useMemo(() => (
     <Suspense fallback={<TabLoadingFallback />}>
-      <Loans loans={state.loans} holdings={state.holdings} dispatch={dispatch} />
+      <LoansTab
+        loans={state.loans}
+        holdings={state.holdings}
+        cashIRR={state.cashIRR}
+        totalPortfolioIRR={snapshot.totalIRR}
+        prices={prices}
+        fxRate={fxRate}
+        dispatch={dispatch}
+      />
     </Suspense>
-  ), [state.loans, state.holdings]);
+  ), [state.loans, state.holdings, state.cashIRR, snapshot.totalIRR, prices, fxRate]);
 
   // Select right panel content based on stage and tab
   // Optimization: Each tab's content is memoized separately with minimal deps
