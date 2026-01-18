@@ -150,9 +150,10 @@ export async function fetchCryptoPrices(signal?: AbortSignal): Promise<CryptoPri
     }
 
     // Map back to our asset IDs
+    // Use typeof check to accept zero-valued prices (0 is a valid price)
     const prices: Record<string, number> = {};
     for (const [assetId, geckoId] of Object.entries(COINGECKO_IDS)) {
-      if (data[geckoId]?.usd) {
+      if (typeof data[geckoId]?.usd === 'number') {
         prices[assetId] = data[geckoId].usd;
       }
     }
@@ -197,7 +198,8 @@ export async function fetchStockPrice(
       throw new Error('Invalid JSON response from Finnhub');
     }
 
-    if (data.c) {  // 'c' is current price
+    // 'c' is current price - use typeof to accept zero-valued prices
+    if (typeof data.c === 'number') {
       return {
         ok: true,
         price: data.c,
@@ -249,9 +251,11 @@ export async function fetchUsdIrrRate(signal?: AbortSignal): Promise<FxRateRespo
 
     // API returns: { usd: { sell: 145600, buy: 145400 }, ... }
     // Values are in Toman, multiply by 10 for Rial
-    const sellRate = data.usd?.sell || data.USD?.sell;
+    // Use nullish coalescing to prefer usd.sell but fall back to USD.sell
+    const sellRate = data.usd?.sell ?? data.USD?.sell;
 
-    if (sellRate) {
+    // Use typeof check to accept zero-valued rates (though unlikely for FX)
+    if (typeof sellRate === 'number') {
       return {
         ok: true,
         rate: sellRate * 10,  // Convert Toman to Rial
@@ -317,13 +321,14 @@ export async function fetchAllPrices(signal?: AbortSignal): Promise<AllPricesRes
 
   return {
     prices,
-    fxRate: fxResult.rate || FALLBACK_RATE,
-    fxSource: fxResult.source || 'fallback',
+    // Use Number.isFinite to accept zero rates without falling back
+    fxRate: Number.isFinite(fxResult.rate) ? fxResult.rate : FALLBACK_RATE,
+    fxSource: fxResult.source ?? 'fallback',
     updatedAt: new Date().toISOString(),
     errors: {
       crypto: cryptoResult.ok ? null : (cryptoResult as CryptoPricesError).error,
       stock: stockResult.ok ? null : (stockResult as StockPriceError).error,
-      fx: fxResult.ok ? null : (fxResult as FxRateError).error || null,
+      fx: fxResult.ok ? null : (fxResult as FxRateError).error ?? null,
     },
   };
 }

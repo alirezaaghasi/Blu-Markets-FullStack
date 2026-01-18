@@ -8,7 +8,7 @@
 
 import { cloneState, previewAddFunds, previewTrade, previewBorrow, previewRepay, previewRebalance } from '../../engine/preview';
 import { calcPremiumIRR } from '../../engine/pricing';
-import { uid, nowISO, computeDateLabel } from '../../helpers';
+import { uid, nowISO, computeDateLabel, getAssetDisplayName } from '../../helpers';
 import { addLogEntry } from '../initialState';
 import type {
   AppState,
@@ -48,6 +48,23 @@ export function ledgerReducer(state: AppState, action: AppAction): AppState {
       if (!p || !p.validation.ok) return state;
 
       let next = cloneState(state);
+
+      // Capture loan details BEFORE processing REPAY (loan may be removed if settled)
+      let repayLoanInfo: { collateralAssetId: string; installmentsPaid: number; isSettlement: boolean } | null = null;
+      if (p.kind === 'REPAY') {
+        const repayPayload = p.payload as RepayPayload;
+        const loan = state.loans.find(l => l.id === repayPayload.loanId);
+        if (loan) {
+          // Determine if this payment will settle the loan
+          const totalOwed = loan.amountIRR + (loan.accruedInterestIRR || 0);
+          const willSettle = repayPayload.amountIRR >= totalOwed;
+          repayLoanInfo = {
+            collateralAssetId: loan.collateralAssetId,
+            installmentsPaid: (loan.installmentsPaid || 0) + 1, // Will increment after this payment
+            isSettlement: willSettle,
+          };
+        }
+      }
 
       // Commit by replaying deterministic preview with type-safe payload dispatch
       switch (p.kind) {
@@ -145,7 +162,18 @@ export function ledgerReducer(state: AppState, action: AppAction): AppState {
         rebalanceMeta: p.rebalanceMeta,
       };
       // Fix 6: Include boundary in action log for indicators
-      next = addLogEntry(next, p.kind, { ...p.payload, boundary: p.boundary });
+      // For REPAY: include collateral name and installment info for enhanced log messages
+      if (p.kind === 'REPAY' && repayLoanInfo) {
+        next = addLogEntry(next, p.kind, {
+          ...p.payload,
+          boundary: p.boundary,
+          collateralName: getAssetDisplayName(repayLoanInfo.collateralAssetId),
+          installmentsPaid: repayLoanInfo.installmentsPaid,
+          isSettlement: repayLoanInfo.isSettlement,
+        });
+      } else {
+        next = addLogEntry(next, p.kind, { ...p.payload, boundary: p.boundary });
+      }
 
       // G-3: Portfolio Gravity - return to Portfolio Home after any action
       next.tab = 'PORTFOLIO';

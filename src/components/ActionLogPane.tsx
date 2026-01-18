@@ -11,6 +11,10 @@ interface ActionLogEntryWithDetails extends ActionLogEntry {
   side?: TradeSide;
   assetId?: AssetId;
   months?: number;
+  // REPAY enhanced fields
+  collateralName?: string;
+  installmentsPaid?: number;
+  isSettlement?: boolean;
 }
 
 /**
@@ -30,7 +34,13 @@ function formatActivityMessage(entry: ActionLogEntryWithDetails): string {
     case 'BORROW':
       return `Borrowed ${formatIRRShort(entry.amountIRR || 0)} against ${getAssetDisplayName(entry.assetId!)}`;
     case 'REPAY':
-      return `Repaid ${formatIRRShort(entry.amountIRR || 0)} loan`;
+      // Enhanced repay message with collateral and installment info
+      if (entry.isSettlement && entry.collateralName) {
+        return `Settled ${entry.collateralName} loan · ${formatIRRShort(entry.amountIRR || 0)} IRR`;
+      } else if (entry.collateralName && entry.installmentsPaid) {
+        return `Repaid ${formatIRRShort(entry.amountIRR || 0)} IRR · ${entry.collateralName} loan (${entry.installmentsPaid}/6)`;
+      }
+      return `Repaid ${formatIRRShort(entry.amountIRR || 0)} IRR loan`;
     case 'PROTECT':
       return `Protected ${getAssetDisplayName(entry.assetId!)} for ${entry.months}mo`;
     case 'REBALANCE':

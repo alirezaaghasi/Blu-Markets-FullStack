@@ -1,7 +1,7 @@
 // Utility functions for Blu Markets v10
 // Optimization: Cached Intl.NumberFormat instances to avoid repeated allocations
 
-import type { AssetId, Holding } from './types';
+import type { Holding } from './types';
 import { DEFAULT_PRICES, DEFAULT_FX_RATE } from './constants/index';
 import { calculateFixedIncomeValue } from './engine/fixedIncome';
 
@@ -50,16 +50,11 @@ export function formatQuantity(qty: number | string, assetId: string): string {
 
 // Cached time formatters
 const timeFormatter24h = new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-const timestampFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 const timeFormatter12h = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 const dateLabelFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
 
 export function formatTime(ts: number | string | Date): string {
   return timeFormatter24h.format(new Date(ts));
-}
-
-export function formatTimestamp(ts: number | string | Date): string {
-  return timestampFormatter.format(new Date(ts));
 }
 
 export function formatTimeOnly(ts: number | string | Date): string {
@@ -133,18 +128,6 @@ export function getAssetDisplayName(assetId: string): string {
  */
 export function getAssetPriceUSD(assetId: string, prices: Record<string, number> = DEFAULT_PRICES): number {
   return prices[assetId] ?? DEFAULT_PRICES[assetId] ?? 0;
-}
-
-/**
- * Build a holdings lookup map for O(1) access by assetId
- * Use this instead of repeated .find() calls in hot paths
- */
-export function buildHoldingsMap(holdings: Holding[]): Record<AssetId, Holding> {
-  const map: Record<string, Holding> = {};
-  for (const h of holdings) {
-    map[h.assetId] = h;
-  }
-  return map as Record<AssetId, Holding>;
 }
 
 /**
