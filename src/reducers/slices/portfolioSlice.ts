@@ -59,6 +59,7 @@ export const PORTFOLIO_ACTIONS: string[] = [
   'PREVIEW_BORROW',
   // Repay
   'START_REPAY',
+  'SET_REPAY_AMOUNT',
   'PREVIEW_REPAY',
   // Rebalance
   'START_REBALANCE',
@@ -279,6 +280,14 @@ export function portfolioReducer(state: AppState, action: AppAction): AppState {
         ...state,
         repayDraft: { loanId: loan.id, amountIRR: loan.amountIRR },
         pendingAction: null,
+      };
+    }
+
+    case 'SET_REPAY_AMOUNT': {
+      if (!state.repayDraft) return state;
+      return {
+        ...state,
+        repayDraft: { ...state.repayDraft, amountIRR: action.amountIRR },
       };
     }
 

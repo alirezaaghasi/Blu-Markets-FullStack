@@ -6,6 +6,7 @@ import { ASSET_LAYER } from '../../state/domain';
 import PhoneForm from './PhoneForm';
 import PendingActionModal from '../PendingActionModal';
 import ProfileResult from '../ProfileResult';
+import { RepaymentPanel } from '../loans';
 import questionnaireV2 from '../../data/questionnaire.v2.fa.json';
 import type { AppState, AppAction } from '../../types';
 
@@ -640,19 +641,26 @@ function OnboardingControls({ state, dispatch, prices, fxRate, pricesLoading = f
 
   if (state.repayDraft) {
     const loan = (state.loans || []).find((l: { id: string }) => l.id === state.repayDraft?.loanId);
-    const loanAmount = loan?.amountIRR || state.repayDraft.amountIRR || 0;
 
+    if (loan) {
+      return (
+        <RepaymentPanel
+          loan={loan}
+          cashAvailable={state.cashIRR || 0}
+          onConfirm={(amount) => {
+            dispatch({ type: 'SET_REPAY_AMOUNT', amountIRR: amount });
+            dispatch({ type: 'PREVIEW_REPAY' });
+          }}
+          onCancel={() => dispatch({ type: 'CANCEL_PENDING' })}
+        />
+      );
+    }
+
+    // Fallback if loan not found
     return (
       <ActionCard title="Repay Loan">
-        <div className="repayDetails">
-          <div className="repayRow"><span>Loan:</span><span>{formatIRR(loanAmount)}</span></div>
-          {loan && <div className="repayRow"><span>Collateral:</span><span>{getAssetDisplayName(loan.collateralAssetId)}</span></div>}
-          <div className="repayRow"><span>Cash:</span><span>{formatIRR(state.cashIRR || 0)}</span></div>
-        </div>
-        <div className="row" style={{ marginTop: 10 }}>
-          <button className="btn primary" onClick={() => dispatch({ type: 'PREVIEW_REPAY' })} disabled={(state.cashIRR || 0) < loanAmount}>Preview</button>
-          <button className="btn" onClick={() => dispatch({ type: 'CANCEL_PENDING' })}>Cancel</button>
-        </div>
+        <div className="muted">Loan not found</div>
+        <button className="btn" onClick={() => dispatch({ type: 'CANCEL_PENDING' })}>Cancel</button>
       </ActionCard>
     );
   }

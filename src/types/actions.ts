@@ -63,6 +63,7 @@ export type AppAction =
   | { type: 'PREVIEW_BORROW'; prices?: Record<string, number>; fxRate?: number }
   // Repay
   | { type: 'START_REPAY'; loanId?: string }
+  | { type: 'SET_REPAY_AMOUNT'; amountIRR: number }
   | { type: 'PREVIEW_REPAY' }
   // Rebalance
   | { type: 'START_REBALANCE'; prices?: Record<string, number>; fxRate?: number }
