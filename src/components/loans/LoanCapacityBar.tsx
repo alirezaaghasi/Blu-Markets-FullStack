@@ -18,7 +18,7 @@ function LoanCapacityBar({ used, max, remaining }: LoanCapacityBarProps) {
   };
 
   return (
-    <div className="loanCapacitySection">
+    <div className="loanCapacitySection" title="Maximum borrowing is 25% of total portfolio value">
       <div className="capacityHeader">
         <span className="capacityLabel">Portfolio Loan Capacity</span>
         <span className="capacityValue">

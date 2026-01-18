@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { formatIRR, getAssetDisplayName } from '../../helpers';
+import { formatIRR, formatIRRShort, getAssetDisplayName } from '../../helpers';
 import { useLoanCalculations } from '../../hooks/useLoanCalculations';
 import type { Loan } from '../../types';
 
@@ -176,7 +176,7 @@ function RepaymentPanel({ loan, cashAvailable, onConfirm, onCancel }: RepaymentP
           onClick={() => onConfirm(repayAmount)}
           disabled={!canRepay}
         >
-          {canRepay ? 'Confirm Repayment' : 'Insufficient Cash'}
+          {canRepay ? 'Confirm Repayment' : `Need ${formatIRRShort(repayAmount - cashAvailable)} IRR more`}
         </button>
         <button className="btn secondary" onClick={onCancel}>
           Cancel

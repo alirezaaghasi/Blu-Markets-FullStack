@@ -265,6 +265,9 @@ function HistoryPane({ ledger }: HistoryPaneProps) {
           <div className="emptyIcon">📋</div>
           <div className="emptyText">No actions yet</div>
           <div className="emptySubtext">Your decisions will be recorded here</div>
+          <div className="emptyHint" style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
+            Try buying an asset or rebalancing your portfolio
+          </div>
         </div>
       </div>
     );

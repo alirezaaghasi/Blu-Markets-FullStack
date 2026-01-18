@@ -122,7 +122,7 @@ function PortfolioHome({ holdings, cashIRR, targetLayerPct, protections, loans, 
           </div>
           {onStartRebalance && (
             <button className="btn small driftAction" onClick={onStartRebalance}>
-              Rebalance
+              Rebalance ({Math.round(totalDrift)}% off)
             </button>
           )}
         </div>

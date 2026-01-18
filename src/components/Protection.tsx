@@ -134,6 +134,7 @@ function Protection({ protections, dispatch }: ProtectionProps) {
               <li>Pay a one-time premium upfront</li>
               <li>If price crashes, you're covered for the loss</li>
               <li>If price stays up, your premium is the only cost</li>
+              <li>Cancel anytime if you change your mind</li>
             </ul>
           </div>
         </div>
