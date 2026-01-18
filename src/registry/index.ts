@@ -1,4 +1,3 @@
-// @ts-check
 /**
  * Asset Registry - Public API
  *
@@ -7,6 +6,9 @@
  */
 
 export {
+  // Types
+  type AssetConfig,
+
   // Primary configuration
   ASSETS_CONFIG,
   getAssetConfig,

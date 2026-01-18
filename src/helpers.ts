@@ -81,7 +81,16 @@ export function computeDateLabel(tsISO: string): string {
   return dateLabelFormatter.format(new Date(tsISO));
 }
 
+/**
+ * Generate a unique identifier using crypto.randomUUID() with fallback
+ * for environments where it's unavailable.
+ */
 export function uid(): string {
+  // Prefer crypto.randomUUID() for stronger uniqueness guarantees
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  // Fallback for older environments: combine random hex with timestamp
   return `${Math.random().toString(16).slice(2)}-${Date.now().toString(16)}`;
 }
 

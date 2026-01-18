@@ -1,4 +1,3 @@
-// @ts-check
 /**
  * Asset Registry - Single source of truth for all asset configuration
  *
@@ -9,41 +8,41 @@
  * All other modules should derive their asset data from this registry.
  */
 
+import type { Layer, AssetId } from '../types/domain';
+
+// ============================================================================
+// ASSET CONFIGURATION TYPES
+// ============================================================================
+
+export interface AssetConfig {
+  id: AssetId;
+  name: string;
+  displayName: string;
+  layer: Layer;
+  category: 'stablecoin' | 'gold' | 'silver' | 'fixed_income' | 'crypto_large' | 'equity_etf' | 'alt_l1' | 'infrastructure' | 'l2';
+  source: 'coingecko' | 'finnhub' | 'internal';
+  coingeckoId?: string;
+  symbol?: string;
+  defaultPrice: number;
+  decimals: number;
+  currency: 'USD' | 'IRR';
+  unit?: string;
+  layerWeight: number;
+  baseVolatility: number;
+  maxLTV: number;
+  liquidityScore: number;
+  protectionEligible: boolean;
+  description: string;
+  provider: string;
+  unitPrice?: number;
+  annualRate?: number;
+}
+
 // ============================================================================
 // ASSET CONFIGURATION - Single Source of Truth
 // ============================================================================
 
-/**
- * @typedef {'FOUNDATION' | 'GROWTH' | 'UPSIDE'} Layer
- */
-
-/**
- * @typedef {Object} AssetConfig
- * @property {string} id - Asset identifier
- * @property {string} name - Full asset name
- * @property {string} displayName - Short display name (optional, defaults to name)
- * @property {Layer} layer - Portfolio layer classification
- * @property {string} category - Asset category (stablecoin, crypto_large, alt_l1, etc.)
- * @property {string} source - Price source (coingecko, finnhub, internal)
- * @property {string} [coingeckoId] - CoinGecko API ID (if source is coingecko)
- * @property {string} [symbol] - Stock symbol (if source is finnhub)
- * @property {number} defaultPrice - Fallback price in USD
- * @property {number} decimals - Display decimal places
- * @property {string} currency - Price currency (USD, IRR)
- * @property {string} [unit] - Unit of measurement (oz for gold/silver)
- * @property {number} layerWeight - Weight within layer (0-1, must sum to 1 per layer)
- * @property {number} baseVolatility - Annual volatility (0-1)
- * @property {number} maxLTV - Maximum loan-to-value ratio (0-100)
- * @property {number} liquidityScore - Liquidity score (0-1)
- * @property {boolean} protectionEligible - Whether asset can be protected
- * @property {string} description - Brief description
- * @property {string} provider - Service provider
- * @property {number} [unitPrice] - Fixed unit price for internal assets (IRR)
- * @property {number} [annualRate] - Annual return rate for fixed income
- */
-
-/** @type {Record<string, AssetConfig>} */
-export const ASSETS_CONFIG = {
+export const ASSETS_CONFIG: Record<AssetId, AssetConfig> = {
   // ═══════════════════════════════════════════════════════════════════════════
   // FOUNDATION — Capital Preservation
   // "Sleep at night. Protect purchasing power."
@@ -367,31 +366,31 @@ export const ASSETS_CONFIG = {
 // DERIVED DATA - Computed from ASSETS_CONFIG
 // ============================================================================
 
-/** @type {string[]} All asset IDs in canonical order */
-export const ASSETS = Object.keys(ASSETS_CONFIG);
+/** All asset IDs in canonical order */
+export const ASSETS: AssetId[] = Object.keys(ASSETS_CONFIG) as AssetId[];
 
-/** @type {Record<string, Layer>} Asset ID to Layer mapping */
-export const ASSET_LAYER = Object.fromEntries(
+/** Asset ID to Layer mapping */
+export const ASSET_LAYER: Record<AssetId, Layer> = Object.fromEntries(
   ASSETS.map(id => [id, ASSETS_CONFIG[id].layer])
-);
+) as Record<AssetId, Layer>;
 
-/** @type {Record<Layer, string[]>} Assets grouped by layer */
-export const LAYER_ASSETS = ASSETS.reduce((acc, id) => {
+/** Assets grouped by layer */
+export const LAYER_ASSETS: Record<Layer, AssetId[]> = ASSETS.reduce((acc, id) => {
   const layer = ASSETS_CONFIG[id].layer;
   if (!acc[layer]) acc[layer] = [];
   acc[layer].push(id);
   return acc;
-}, /** @type {Record<Layer, string[]>} */ ({}));
+}, {} as Record<Layer, AssetId[]>);
 
-/** @type {Record<string, number>} Default prices in USD */
-export const DEFAULT_PRICES = Object.fromEntries(
+/** Default prices in USD */
+export const DEFAULT_PRICES: Record<string, number> = Object.fromEntries(
   ASSETS
     .filter(id => ASSETS_CONFIG[id].source !== 'internal')
     .map(id => [id, ASSETS_CONFIG[id].defaultPrice])
 );
 
-/** @type {Record<Layer, Record<string, number>>} Intra-layer weights */
-export const WEIGHTS = {
+/** Intra-layer weights */
+export const WEIGHTS: Record<Layer, Record<string, number>> = {
   FOUNDATION: Object.fromEntries(
     LAYER_ASSETS.FOUNDATION.map(id => [id, ASSETS_CONFIG[id].layerWeight])
   ),
@@ -403,8 +402,8 @@ export const WEIGHTS = {
   ),
 };
 
-/** @type {string[]} Assets eligible for protection */
-export const PROTECTION_ELIGIBLE_ASSETS = ASSETS.filter(
+/** Assets eligible for protection */
+export const PROTECTION_ELIGIBLE_ASSETS: AssetId[] = ASSETS.filter(
   id => ASSETS_CONFIG[id].protectionEligible
 );
 
@@ -414,49 +413,40 @@ export const PROTECTION_ELIGIBLE_ASSETS = ASSETS.filter(
 
 /**
  * Get asset configuration by ID
- * @param {string} assetId
- * @returns {AssetConfig | undefined}
  */
-export function getAssetConfig(assetId) {
-  return ASSETS_CONFIG[assetId];
+export function getAssetConfig(assetId: string): AssetConfig | undefined {
+  return ASSETS_CONFIG[assetId as AssetId];
 }
 
 /**
  * Get display name for an asset
- * @param {string} assetId
- * @returns {string}
  */
-export function getAssetDisplayName(assetId) {
-  const config = ASSETS_CONFIG[assetId];
+export function getAssetDisplayName(assetId: string): string {
+  const config = ASSETS_CONFIG[assetId as AssetId];
   return config?.displayName || config?.name || assetId;
 }
 
 /**
  * Get CoinGecko IDs for all coingecko-sourced assets
- * @returns {Record<string, string>}
  */
-export function getCoinGeckoIds() {
+export function getCoinGeckoIds(): Record<string, string> {
   return Object.fromEntries(
     ASSETS
       .filter(id => ASSETS_CONFIG[id].source === 'coingecko' && ASSETS_CONFIG[id].coingeckoId)
-      .map(id => [id, ASSETS_CONFIG[id].coingeckoId])
+      .map(id => [id, ASSETS_CONFIG[id].coingeckoId as string])
   );
 }
 
 /**
  * Check if an asset is eligible for protection
- * @param {string} assetId
- * @returns {boolean}
  */
-export function isProtectionEligible(assetId) {
-  return ASSETS_CONFIG[assetId]?.protectionEligible === true;
+export function isProtectionEligible(assetId: string): boolean {
+  return ASSETS_CONFIG[assetId as AssetId]?.protectionEligible === true;
 }
 
 /**
  * Get the layer for an asset
- * @param {string} assetId
- * @returns {Layer | undefined}
  */
-export function getAssetLayer(assetId) {
-  return ASSETS_CONFIG[assetId]?.layer;
+export function getAssetLayer(assetId: string): Layer | undefined {
+  return ASSETS_CONFIG[assetId as AssetId]?.layer;
 }
