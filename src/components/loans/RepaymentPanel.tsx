@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { formatIRR, getAssetDisplayName } from '../../helpers';
-import { LOAN_INTEREST_RATE } from '../../constants/index';
+import { useLoanCalculations } from '../../hooks/useLoanCalculations';
 import type { Loan } from '../../types';
 
 type RepayOption = 'INSTALLMENT' | 'SETTLE' | 'CUSTOM';
@@ -12,10 +12,17 @@ interface RepaymentPanelProps {
   onCancel: () => void;
 }
 
+/**
+ * RepaymentPanel - Loan repayment options with installment, settle, and custom modes
+ * Uses shared useLoanCalculations hook to eliminate duplicate date calculations
+ */
 function RepaymentPanel({ loan, cashAvailable, onConfirm, onCancel }: RepaymentPanelProps) {
   const [selectedOption, setSelectedOption] = useState<RepayOption>('INSTALLMENT');
   const [customInstallments, setCustomInstallments] = useState<number>(1);
   const [showSchedule, setShowSchedule] = useState(false);
+
+  // Use shared hook for all loan calculations
+  const calc = useLoanCalculations(loan);
 
   const installments = loan.installments || [];
   const installmentsPaid = loan.installmentsPaid || 0;
@@ -23,38 +30,19 @@ function RepaymentPanel({ loan, cashAvailable, onConfirm, onCancel }: RepaymentP
   const nextInstallment = pendingInstallments[0];
   const maxCustomInstallments = pendingInstallments.length;
 
-  const calculations = useMemo(() => {
-    const now = new Date();
-    const start = new Date(loan.startISO);
-    const daysElapsed = Math.max(0, Math.ceil((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
-    const dailyRate = LOAN_INTEREST_RATE / 365;
-    const accruedInterest = Math.floor(loan.amountIRR * dailyRate * daysElapsed);
-
-    const maturity = new Date(start);
-    maturity.setMonth(maturity.getMonth() + (loan.durationMonths || 3));
-    const totalDays = Math.ceil((maturity.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    const fullTermInterest = Math.floor(loan.amountIRR * dailyRate * totalDays);
-    const interestForgiveness = Math.max(0, fullTermInterest - accruedInterest);
-    const settlementAmount = loan.amountIRR + accruedInterest;
-    const customAmount = pendingInstallments
+  // Only need custom amount calculation locally
+  const customAmount = useMemo(() => {
+    return pendingInstallments
       .slice(0, customInstallments)
       .reduce((sum, i) => sum + i.totalIRR, 0);
-
-    return {
-      installmentAmount: nextInstallment?.totalIRR || 0,
-      settlementAmount,
-      interestForgiveness,
-      accruedInterest,
-      daysElapsed,
-      customAmount,
-    };
-  }, [loan, customInstallments, nextInstallment, pendingInstallments]);
+  }, [pendingInstallments, customInstallments]);
 
   const getRepayAmount = () => {
+    if (!calc) return 0;
     switch (selectedOption) {
-      case 'INSTALLMENT': return calculations.installmentAmount;
-      case 'SETTLE': return calculations.settlementAmount;
-      case 'CUSTOM': return calculations.customAmount;
+      case 'INSTALLMENT': return calc.nextInstallmentAmount;
+      case 'SETTLE': return calc.settlementAmount;
+      case 'CUSTOM': return customAmount;
     }
   };
 
@@ -65,6 +53,8 @@ function RepaymentPanel({ loan, cashAvailable, onConfirm, onCancel }: RepaymentP
   const willUnlockCollateral = selectedOption === 'SETTLE' ||
     (selectedOption === 'INSTALLMENT' && installmentsPaid === 5) ||
     (selectedOption === 'CUSTOM' && customInstallments === maxCustomInstallments);
+
+  if (!calc) return null;
 
   return (
     <div className="repaymentPanel compact">
@@ -123,13 +113,13 @@ function RepaymentPanel({ loan, cashAvailable, onConfirm, onCancel }: RepaymentP
               <span>{formatIRR(loan.amountIRR)}</span>
             </div>
             <div className="paymentRow">
-              <span>Interest ({calculations.daysElapsed}d)</span>
-              <span>{formatIRR(calculations.accruedInterest)}</span>
+              <span>Interest ({calc.daysElapsed}d)</span>
+              <span>{formatIRR(calc.accruedInterest)}</span>
             </div>
-            {calculations.interestForgiveness > 0 && (
+            {calc.interestForgiveness > 0 && (
               <div className="paymentRow savings">
                 <span>You save</span>
-                <span>-{formatIRR(calculations.interestForgiveness)}</span>
+                <span>-{formatIRR(calc.interestForgiveness)}</span>
               </div>
             )}
           </>

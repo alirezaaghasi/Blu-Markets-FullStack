@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { formatIRR, getAssetDisplayName } from '../../helpers';
 import { LOAN_INTEREST_RATE } from '../../constants/index';
+import { useLoanCalculations } from '../../hooks/useLoanCalculations';
 import type { Loan } from '../../types';
 
 interface ActiveLoanCardProps {
@@ -10,46 +11,19 @@ interface ActiveLoanCardProps {
 
 /**
  * ActiveLoanCard - Loan card with countdown circle and interest display
+ * Uses shared useLoanCalculations hook to eliminate duplicate date calculations
  */
 function ActiveLoanCard({ loan, onRepay }: ActiveLoanCardProps) {
-  // Calculate days remaining and progress
-  const { daysRemaining, daysElapsed, progressPct } = useMemo(() => {
-    const now = new Date();
-    const start = new Date(loan.startISO);
-    const maturity = new Date(start);
-    maturity.setMonth(maturity.getMonth() + (loan.durationMonths || 3));
-
-    const remaining = Math.max(0, Math.ceil((maturity.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-    const total = (loan.durationMonths || 3) * 30;
-    const elapsed = Math.max(0, Math.ceil((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
-    const progress = Math.min(100, (elapsed / total) * 100);
-
-    return { daysRemaining: remaining, daysElapsed: elapsed, progressPct: progress };
-  }, [loan.startISO, loan.durationMonths]);
-
-  // Calculate interest details
-  const { accruedInterest, totalDue } = useMemo(() => {
-    const dailyRate = LOAN_INTEREST_RATE / 365;
-    const accrued = Math.floor(loan.amountIRR * dailyRate * daysElapsed);
-    const total = Math.floor(loan.amountIRR * (LOAN_INTEREST_RATE / 12) * (loan.durationMonths || 3));
-    return {
-      accruedInterest: accrued,
-      totalDue: loan.amountIRR + total,
-    };
-  }, [loan.amountIRR, loan.durationMonths, daysElapsed]);
-
-  // Calculate maturity date
-  const maturityDate = useMemo(() => {
-    const start = new Date(loan.startISO);
-    const maturity = new Date(start);
-    maturity.setMonth(maturity.getMonth() + (loan.durationMonths || 3));
-    return maturity.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  }, [loan.startISO, loan.durationMonths]);
+  const calc = useLoanCalculations(loan);
 
   // SVG circle calculations (circumference = 2 * PI * radius)
   const radius = 45;
   const circumference = 2 * Math.PI * radius;
-  const strokeDasharray = `${(progressPct / 100) * circumference} ${circumference}`;
+  const strokeDasharray = calc
+    ? `${(calc.progressPct / 100) * circumference} ${circumference}`
+    : `0 ${circumference}`;
+
+  if (!calc) return null;
 
   return (
     <div className="activeLoanCardEnhanced">
@@ -78,7 +52,7 @@ function ActiveLoanCard({ loan, onRepay }: ActiveLoanCardProps) {
             />
           </svg>
           <div className="countdownContent">
-            <span className="countdownDays">{daysRemaining}</span>
+            <span className="countdownDays">{calc.daysRemaining}</span>
             <span className="countdownLabel">days left</span>
           </div>
         </div>
@@ -103,12 +77,12 @@ function ActiveLoanCard({ loan, onRepay }: ActiveLoanCardProps) {
       <div className="interestSummary">
         <div className="interestBox">
           <div className="interestLabel">Accrued Interest</div>
-          <div className="interestValue">{formatIRR(accruedInterest)}</div>
+          <div className="interestValue">{formatIRR(calc.accruedInterest)}</div>
         </div>
         <div className="interestDivider" />
         <div className="interestBox">
           <div className="interestLabel">Total at Maturity</div>
-          <div className="interestValue">{formatIRR(totalDue)}</div>
+          <div className="interestValue">{formatIRR(calc.totalAtMaturity)}</div>
         </div>
       </div>
 
@@ -120,7 +94,7 @@ function ActiveLoanCard({ loan, onRepay }: ActiveLoanCardProps) {
         </div>
         <div className="detailRow">
           <span className="detailLabel">Maturity</span>
-          <span className="detailValue">{maturityDate}</span>
+          <span className="detailValue">{calc.maturityDate}</span>
         </div>
       </div>
 
