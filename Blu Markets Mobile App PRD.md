@@ -1,8 +1,8 @@
 # Blu Markets: Native Mobile App PRD
 
-**Version:** 3.2
+**Version:** 3.4
 **Date:** January 2026
-**Status:** Draft
+**Status:** Final Draft
 
 ---
 
@@ -396,7 +396,38 @@ Loans Tab → Active Loan
     Success → Loans Tab
 ```
 
-### 5.7 History Flow
+### 5.7 Add Funds Flow
+
+```
+Dashboard
+    │
+    ▼ (Tap "Add Funds")
+┌─────────────────┐
+│ Add Funds Sheet │
+│ ─────────────── │
+│ Amount: _______ │
+│ IRR keypad      │
+│ ─────────────── │
+│ Quick chips:    │
+│ [5M][10M][25M]  │
+│ ─────────────── │
+│ Available cash: │
+│ X IRR           │
+│ ─────────────── │
+│ [Add Funds]     │
+└────────┬────────┘
+         ▼
+┌─────────────────┐
+│ Success + Toast │
+│ Activity logged │
+│ "Added X IRR"   │
+└─────────────────┘
+         │
+         ▼
+    Dashboard
+```
+
+### 5.8 History Flow
 
 ```
 History Tab
@@ -626,6 +657,44 @@ The Activity Feed is a **critical differentiating feature** that provides real-t
 | **Support** | Help center, contact |
 | **Logout** | Logout button with confirmation |
 
+### 8.7 UI State Patterns
+
+**Loading States**
+
+| Context | Pattern | Duration Expectation |
+|---------|---------|---------------------|
+| Initial load | Full-screen skeleton | < 2s |
+| Action execution | Button spinner + disabled | < 3s |
+| Price refresh | Subtle pulse on values | < 1s |
+| Pull-to-refresh | Standard iOS/Android pull | < 2s |
+
+**Empty States**
+
+| Screen | Illustration | Message | CTA |
+|--------|--------------|---------|-----|
+| Protection Tab | Shield icon | "No active protections" | [Protect an Asset] |
+| Loans Tab | Wallet icon | "No active loans" | [Borrow Funds] |
+| History Tab | Clock icon | "No activity yet" | (none) |
+| Holdings (new user) | Portfolio icon | "Your portfolio is empty" | [Add Funds] |
+
+**Error States**
+
+| Error Type | Display Pattern | Recovery Action |
+|------------|-----------------|-----------------|
+| Network error | Banner at top | [Retry] button + auto-retry |
+| Validation error | Inline below input | Highlight field, show message |
+| Action failed | Modal with explanation | [Try Again] or [Cancel] |
+| Session expired | Full-screen | [Log In Again] |
+
+**Success States**
+
+| Context | Pattern | Duration |
+|---------|---------|----------|
+| Trade complete | Toast + Activity Feed update | 3s auto-dismiss |
+| Funds added | Toast + balance animation | 3s auto-dismiss |
+| Loan created | Success modal + redirect | Tap to dismiss |
+| Rebalance done | Success modal + allocation update | Tap to dismiss |
+
 ---
 
 # Part IV: Technical Implementation
@@ -798,6 +867,16 @@ interface Loan {
   installmentsPaid: number;
 }
 
+interface LoanInstallment {
+  number: number;           // 1-6
+  dueISO: string;           // Due date
+  principalIRR: number;     // Principal portion
+  interestIRR: number;      // Interest portion
+  totalIRR: number;         // principalIRR + interestIRR
+  paidIRR: number;          // Amount paid so far
+  status: 'PENDING' | 'PARTIAL' | 'PAID';
+}
+
 type ActionType =
   | 'PORTFOLIO_CREATED'
   | 'ADD_FUNDS'
@@ -811,6 +890,28 @@ type ActionType =
 type Boundary = 'SAFE' | 'DRIFT' | 'STRUCTURAL' | 'STRESS';
 type Layer = 'FOUNDATION' | 'GROWTH' | 'UPSIDE';
 type TabId = 'PORTFOLIO' | 'PROTECTION' | 'LOANS' | 'HISTORY' | 'PROFILE';
+```
+
+### ActionLog vs Ledger (Critical Distinction)
+
+| Data Store | Purpose | Max Size | Contains |
+|------------|---------|----------|----------|
+| **actionLog** | Dashboard mini-feed | 50 entries | Last 50 actions, pre-formatted messages |
+| **ledger** | Complete audit trail | Unlimited | Full history with before/after snapshots |
+
+```
+ActionLog (for Activity Feed):
+  - Lightweight, pre-formatted messages
+  - Used for dashboard "Recent Activity" display
+  - Capped at 50 entries (FIFO eviction)
+  - Fast render, no computation needed
+
+Ledger (for History Tab):
+  - Full audit trail with complete snapshots
+  - Before/after portfolio state for each action
+  - Transaction IDs, block numbers
+  - Used for expand/collapse detail views
+  - Persisted indefinitely
 ```
 
 ### Asset Universe
@@ -1101,6 +1202,47 @@ Example (Willingness):
   Willingness = (8.0 + 7.5 + 3.0 + 9.0) / (2.0 + 1.5 + 1.0 + 1.5) = 27.5 / 6.0 = 4.58
 ```
 
+### 16.8 Complete Questionnaire Reference
+
+**Block 1: Financial Situation (Capacity)**
+
+| Q# | Question | Options (Score) |
+|----|----------|-----------------|
+| q_income | "How predictable is your income?" | Fixed/reliable (8), Mostly stable (6), Variable (4), Uncertain (1) |
+| q_buffer | "Without this money, how many months can you cover expenses?" | 12+ months (10), 6-12 months (7), 3-6 months (4), <3 months (1) |
+| q_proportion | "What percentage of your total wealth is this?" | <25% (10), 25-50% (6), 50-75% (3), >75% (1) ⚑high_proportion |
+
+**Block 2: Goals (Horizon + Goal)**
+
+| Q# | Question | Options (Score) |
+|----|----------|-----------------|
+| q_goal | "What's your main goal for this investment?" | Preserve value (2), Steady income (4), Long-term growth (7), Maximum returns (10) |
+| q_horizon | "When might you need to withdraw this money?" | <1 year (1) ⚑cap:3, 1-3 years (4) ⚑cap:5, 3-7 years (7), 7+ years (10) |
+
+**Block 3: Risk Behavior (Willingness)**
+
+| Q# | Question | Options (Score) |
+|----|----------|-----------------|
+| q_crash_20 | "Portfolio down 20% after 3 months. What do you do?" | Sell everything (1) ⚑panic_seller, Sell some (3), Wait (6), Buy more (9) |
+| q_tradeoff | "Which do you prefer?" | Guaranteed 20% (2), 50% chance +40%/-10% (5), 50% chance +80%/-25% (8), 50% chance +150%/-50% (10) ⚑gambler |
+| q_past_behavior | "Last time an investment dropped, how did you feel?" | Very stressed (1), Worried but managed (4), Relatively calm (7), No experience (5) ⚑inexperienced |
+| q_max_loss | "Maximum drop you can tolerate without selling?" | 5% (1), 15% (4), 30% (7), 50%+ (10) |
+
+### 16.9 Exact Allocation by Score
+
+| Score | Profile | Foundation | Growth | Upside |
+|-------|---------|------------|--------|--------|
+| 1 | Capital Preservation | 85% | 12% | 3% |
+| 2 | Capital Preservation | 80% | 15% | 5% |
+| 3 | Conservative | 70% | 25% | 5% |
+| 4 | Conservative | 65% | 30% | 5% |
+| 5 | Balanced | 55% | 35% | 10% |
+| 6 | Balanced | 50% | 35% | 15% |
+| 7 | Growth | 45% | 38% | 17% |
+| 8 | Growth | 40% | 40% | 20% |
+| 9 | Aggressive | 35% | 40% | 25% |
+| 10 | Aggressive | 30% | 40% | 30% |
+
 ---
 
 ## 17. Asset Configuration
@@ -1133,14 +1275,28 @@ Example (Willingness):
 | GROWTH | 20% | 45% | - | - | 5% |
 | UPSIDE | 0% | 20% | - | 25% | 5% |
 
-### 17.3 Default Asset Prices (USD)
+### 17.3 Default Asset Prices
+
+| Asset | Price (USD) | Price (IRR) | Notes |
+|-------|-------------|-------------|-------|
+| USDT | $1.00 | 1,456,000 | Stablecoin |
+| PAXG | $2,650 | 3,858,400,000 | Gold-backed |
+| IRR_FIXED_INCOME | N/A | 500,000/unit | Fixed IRR price |
+| BTC | $97,500 | 141,960,000,000 | Bitcoin |
+| ETH | $3,200 | 4,659,200,000 | Ethereum |
+| BNB | $680 | 990,080,000 | Binance Coin |
+| XRP | $2.20 | 3,203,200 | Ripple |
+| KAG | $30 | 43,680,000 | Kinesis Gold |
+| QQQ | $521 | 758,576,000 | Nasdaq ETF |
+| SOL | $185 | 269,360,000 | Solana |
+| TON | $5.20 | 7,571,200 | Toncoin |
+| LINK | $22 | 32,032,000 | Chainlink |
+| AVAX | $35 | 50,960,000 | Avalanche |
+| MATIC | $0.45 | 655,200 | Polygon |
+| ARB | $0.80 | 1,164,800 | Arbitrum |
 
 ```
-USDT:    1.00      PAXG:   2,650     BTC:    97,500
-ETH:     3,200     BNB:    680       XRP:    2.20
-KAG:     30        QQQ:    521       SOL:    185
-TON:     5.20      LINK:   22        AVAX:   35
-MATIC:   0.45      ARB:    0.80
+IRR Conversion: priceIRR = priceUSD × 1,456,000
 ```
 
 ### 17.4 Fixed Income Asset Model
@@ -1667,6 +1823,160 @@ Total Value:
   daysHeld = (now - purchaseDate) / 86400000
   accruedInterest = principal × 0.30 × (daysHeld / 365)
   totalValue = principal + accruedInterest
+```
+
+### 23.7 Price Data Sources & APIs
+
+**Three External Data Sources:**
+
+| Source | Data Provided | Rate Limits | Auth Required |
+|--------|---------------|-------------|---------------|
+| **CoinGecko** | Crypto prices (BTC, ETH, SOL, etc.) | ~30 calls/min | No |
+| **Finnhub** | Stock/ETF prices (QQQ) | 60 calls/min | API key |
+| **Bonbast** | USD/IRR exchange rate | No limit | No |
+
+**CoinGecko API:**
+```
+Endpoint: https://api.coingecko.com/api/v3/simple/price
+Params:   ?ids={coinIds}&vs_currencies=usd
+Response: { "bitcoin": { "usd": 97500 }, ... }
+```
+
+**Finnhub API:**
+```
+Endpoint: https://finnhub.io/api/v1/quote
+Params:   ?symbol={symbol}&token={apiKey}
+Response: { "c": 521.00, ... }  // "c" = current price
+```
+
+**Bonbast API (USD/IRR):**
+```
+Endpoint: https://bonbast.amirhn.com/latest
+Response: { "usd": { "sell": 145600, "buy": 145400 }, ... }
+
+NOTE: Values are in Toman (÷10 of Rial)
+      Multiply by 10 to get Rial: 145600 × 10 = 1,456,000 IRR
+```
+
+### 23.8 CoinGecko ID Mappings
+
+| Asset ID | CoinGecko ID | Layer |
+|----------|--------------|-------|
+| USDT | `tether` | FOUNDATION |
+| PAXG | `pax-gold` | FOUNDATION |
+| BTC | `bitcoin` | GROWTH |
+| ETH | `ethereum` | GROWTH |
+| BNB | `binancecoin` | GROWTH |
+| XRP | `ripple` | GROWTH |
+| KAG | `kinesis-gold` | GROWTH |
+| SOL | `solana` | UPSIDE |
+| TON | `the-open-network` | UPSIDE |
+| LINK | `chainlink` | UPSIDE |
+| AVAX | `avalanche-2` | UPSIDE |
+| MATIC | `matic-network` | UPSIDE |
+| ARB | `arbitrum` | UPSIDE |
+
+**Assets NOT from CoinGecko:**
+- **QQQ**: Fetched from Finnhub (stock/ETF)
+- **IRR_FIXED_INCOME**: Internal asset (fixed price: 500,000 IRR/unit)
+
+### 23.9 Price Calculation Formulas
+
+**For Crypto Assets (from CoinGecko):**
+```
+priceIRR = priceUSD × fxRate
+
+Example (BTC):
+  priceUSD = 97,500 (from CoinGecko)
+  fxRate = 1,456,000 (from Bonbast or fallback)
+  priceIRR = 97,500 × 1,456,000 = 141,960,000,000 IRR
+```
+
+**For ETF Assets (from Finnhub):**
+```
+priceIRR = priceUSD × fxRate
+
+Example (QQQ):
+  priceUSD = 521.00 (from Finnhub)
+  fxRate = 1,456,000
+  priceIRR = 521 × 1,456,000 = 758,576,000 IRR
+```
+
+**For Fixed Income (Internal):**
+```
+unitPriceIRR = 500,000 (constant)
+valueIRR = quantity × 500,000 + accruedInterest
+```
+
+**Holding Value Calculation:**
+```
+holdingValueIRR = quantity × priceUSD × fxRate
+
+Example (0.5 BTC):
+  valueIRR = 0.5 × 97,500 × 1,456,000 = 70,980,000,000 IRR
+```
+
+### 23.10 FX Rate Fallback Strategy
+
+```
+Primary Source:   Bonbast API (live rate)
+Fallback:         Environment variable VITE_FALLBACK_USD_IRR
+Default:          1,456,000 IRR per USD
+
+Fallback Triggers:
+  1. Bonbast API returns non-200 status
+  2. Bonbast returns invalid JSON
+  3. Response missing 'usd.sell' field
+  4. Network timeout (8 seconds)
+
+Response Format:
+  { ok: true, rate: 1456000, source: 'bonbast' }  // live
+  { ok: true, rate: 1456000, source: 'fallback' } // fallback
+```
+
+### 23.11 Price Fetch Error Handling
+
+```
+On Fetch Error:
+  1. Log error to console
+  2. Return partial data (other sources may succeed)
+  3. UI shows "Last updated: X ago" indicator
+  4. Retry with exponential backoff
+
+Response Structure:
+  {
+    prices: { BTC: 97500, ETH: 3200, ... },
+    fxRate: 1456000,
+    fxSource: 'bonbast' | 'fallback',
+    updatedAt: '2026-01-19T12:00:00Z',
+    errors: {
+      crypto: null | 'CoinGecko error: 429',
+      stock: null | 'API key not configured',
+      fx: null | 'Network timeout'
+    }
+  }
+
+Partial Success:
+  If CoinGecko fails but Finnhub works → QQQ price still available
+  If Bonbast fails → fallback rate used automatically
+```
+
+### 23.12 Price Refresh Strategy
+
+| Context | Refresh Interval | Notes |
+|---------|------------------|-------|
+| App foreground | 30 seconds | Base interval |
+| Action preview | On-demand | Fresh price before confirm |
+| Background | Paused | No polling when backgrounded |
+| Error backoff | 30s → 45s → 67s → 100s → ... | 1.5x multiplier, max 5 min |
+
+```
+Retry Logic:
+  interval = min(BASE_INTERVAL × (1.5 ^ retryCount), MAX_BACKOFF)
+
+Health Check:
+  Every 5 seconds, verify price polling is active
+  Restart if stuck or failed
 ```
 
 ---
