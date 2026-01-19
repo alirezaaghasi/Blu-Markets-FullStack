@@ -8,7 +8,7 @@
 
 ## TL;DR
 
-This document defines the UX, UI, and technical requirements for the Blu Markets **native mobile app**, based on the existing web prototype. It translates 7 core user flows into mobile-native designs while preserving the **Activity Feed (Chat UI)** as a critical differentiator and staying compliant with the product philosophy, design system, and existing Figma tokens.
+This document defines the UX, UI, and technical requirements for the Blu Markets **native mobile app**, based on the existing web prototype. It translates 7 core user flows into mobile-native designs while preserving the **Activity Feed (Chat UI)** as a critical differentiator and staying compliant with the product philosophy and design system.
 
 ---
 
@@ -57,9 +57,8 @@ This document defines the UX, UI, and technical requirements for the Blu Markets
 30. [Per-Asset LTV Details](#30-per-asset-ltv-details)
 31. [Key Business Invariants](#31-key-business-invariants)
 
-**Appendices**
-- [A: Existing Design Assets](#appendix-a-existing-design-assets)
-- [B: Glossary](#appendix-b-glossary)
+**Appendix**
+- [Glossary](#appendix-glossary)
 
 ---
 
@@ -1727,62 +1726,7 @@ maxBorrow = min(maxBorrowAsset, maxBorrowGlobal - existingLoansIRR)
 
 ---
 
-## Appendix A: Existing Design Assets
-
-Reference the 71 design screens in `/stitch_designs/stitch_portfolio_asset_detail/`:
-
-**Onboarding**
-- `1._mobile_welcome_entry`
-- `2._mobile_risk_questionnaire`
-- `3._mobile_allocation_review`
-- `4._mobile_funding_screen`
-- `welcome_screen_(iphone_16_pro)`
-- `risk_questionnaire_(iphone_16_pro)`
-- `recommended_allocation_(iphone_16_pro)`
-- `initial_funding_(iphone_16_pro)`
-
-**Dashboard**
-- `4._mobile_dashboard_hub`
-- `mobile_dashboard_(iphone_16_pro)`
-- `new_mobile_dashboard`
-- `blu_markets_main_dashboard`
-
-**Trading**
-- `buy_asset_bottom_sheet`
-- `buy_asset_sheet_(iphone_16_pro)`
-- `sell_asset_sheet_(iphone_16_pro)`
-- `trade_success_screen_(iphone_16_pro)`
-- `custom_irr_keypad_(iphone_16_pro)`
-
-**History (Activity Feed)**
-- `immutable_action_history`
-- `history_tab_(iphone_16_pro)_1`
-- `history_tab_(iphone_16_pro)_2`
-- `history_tab_(iphone_16_pro)_3`
-- `action_history_tab`
-
-**Loans**
-- `loans_tab_(iphone_16_pro)_1`
-- `loans_tab_(iphone_16_pro)_2`
-- `loans_tab_(iphone_16_pro)_3`
-- `mobile_loans_interface`
-- `active_loans_overview`
-
-**Protection**
-- `protections_tab_(iphone_16_pro)_1`
-- `protections_tab_(iphone_16_pro)_2`
-- `protections_tab_(iphone_16_pro)_3`
-- `protections_tab_overview`
-
-**Rebalance**
-- `rebalance_sheet_(iphone_16_pro)`
-- `rebalance_preview_sheet`
-- `rebalance_success_(iphone_16_pro)`
-- `mobile_rebalance_(iphone_16_pro)`
-
----
-
-## Appendix B: Glossary
+## Appendix: Glossary
 
 | Term | Definition |
 |------|------------|
@@ -1802,14 +1746,9 @@ Reference the 71 design screens in `/stitch_designs/stitch_portfolio_asset_detai
 
 ## Final Notes
 
-This PRD reflects Blu Markets' product, design, and ethical principles. It translates a best-in-class web experience into a deliberate, mobile-first product while preserving the Activity Feed as a core differentiator.
+This PRD reflects Blu Markets' product and ethical principles. It translates a best-in-class web experience into a deliberate, mobile-first product while preserving the Activity Feed as a core differentiator.
 
-Every screen was derived from real user flows, with full compliance to:
-- Product Vision & Strategy
-- Mobile Design Brief
-- High-Level Design System
-- Figma Token System
-- Existing Web App Implementation
+Every feature was derived from real user flows and existing web app implementation, ensuring complete business logic parity.
 
 ### Core Principle
 
