@@ -1,6 +1,6 @@
 # Blu Markets: Native Mobile App PRD
 
-**Version:** 3.1
+**Version:** 3.2
 **Date:** January 2026
 **Status:** Draft
 
@@ -59,6 +59,7 @@ This document defines the UX, UI, and technical requirements for the Blu Markets
 
 **Appendix**
 - [Glossary](#appendix-glossary)
+- [Figma Token System](#appendix-figma-token-system)
 
 ---
 
@@ -1059,6 +1060,47 @@ Round to nearest integer
 | WEALTH_PRESERVER | MAX_DIVERSIFICATION |
 | SPECULATOR | AGGRESSIVE |
 
+### 16.5 Pathological User Detection Rules
+
+| Archetype | Detection Criteria | Cap Applied |
+|-----------|-------------------|-------------|
+| **PANIC_SELLER** | q_crash_20 answer = "sell everything" | Hard cap at 3 |
+| **GAMBLER** | High risk tolerance + low experience | Cap willingness at 7 |
+| **GAMBLER + HIGH_PROPORTION** | Gambler + invests large % of wealth | Hard cap at 5 |
+| **INEXPERIENCED + GAMBLER** | No investment history + gambler traits | Hard cap at 5 |
+
+### 16.6 Consistency Penalty Details
+
+```
+Penalty Condition:
+  q_crash_20.score <= 2 (would panic sell at -20%)
+  AND
+  q_max_loss.score >= 7 (claims 30%+ loss tolerance)
+
+Interpretation: User claims high loss tolerance but would actually panic sell
+
+Penalty Applied: -1 to final score
+```
+
+### 16.7 Weighted Average Calculation
+
+```
+For each dimension:
+  numerator = Σ(answer.score × question.weight)
+  denominator = Σ(question.weight)
+  dimensionScore = numerator / denominator
+
+If question.weight not specified → default weight = 1.0
+
+Example (Willingness):
+  q_crash_20:      score=4, weight=2.0 → 8.0
+  q_tradeoff:      score=5, weight=1.5 → 7.5
+  q_past_behavior: score=3, weight=1.0 → 3.0
+  q_max_loss:      score=6, weight=1.5 → 9.0
+
+  Willingness = (8.0 + 7.5 + 3.0 + 9.0) / (2.0 + 1.5 + 1.0 + 1.5) = 27.5 / 6.0 = 4.58
+```
+
 ---
 
 ## 17. Asset Configuration
@@ -1195,6 +1237,92 @@ MAX_WEIGHT = 40%
 If residualDrift < 0.5%  → Hide (negligible)
 If residualDrift < 1.0%  → Show 1 decimal (e.g., "0.7%")
 If residualDrift ≥ 1.0%  → Show whole number (e.g., "2%")
+```
+
+### 18.6 Intra-Layer Weight Capping Algorithm
+
+```
+Iterative Cap-and-Renormalize (max 10 iterations):
+
+For each iteration:
+  1. Identify assets exceeding MAX_WEIGHT (40%)
+  2. Cap those assets at MAX_WEIGHT
+  3. Calculate surplus = Σ(actualWeight - MAX_WEIGHT)
+  4. Identify under-weight assets (below cap)
+  5. Redistribute surplus proportionally to under-weight assets
+  6. Identify assets below MIN_WEIGHT (5%)
+  7. Floor those assets at MIN_WEIGHT
+  8. Recalculate deficit from floored assets
+  9. Reduce over-weight assets to compensate
+
+Exit when: no changes OR iteration limit reached
+```
+
+### 18.7 Volatility Adjustment Rationale
+
+```
+Uses MILD adjustment (±15% max) NOT pure inverse volatility
+
+Why: Pure inverse volatility would dominate and override
+     intended layer weights from risk profiling
+
+Formula:
+  volatilityRatio = targetVolatility(0.30) / assetVolatility
+  adjustment = 0.85 + (volatilityRatio - 1) × 0.15
+  adjustment = clamp(adjustment, 0.85, 1.15)
+
+Effect: Low-volatility assets get up to +15% weight boost
+        High-volatility assets get up to -15% weight reduction
+```
+
+### 18.8 Rebalance Mode Detailed Behavior
+
+**HOLDINGS_ONLY:**
+```
+1. Calculate target layer allocations
+2. Identify overweight layers (current > target)
+3. For each overweight layer:
+   sellableAmount = min(surplus, unfrozenHoldingsValue)
+4. Execute sells from overweight layers
+5. Execute buys in underweight layers using sale proceeds
+6. Cash balance unchanged
+```
+
+**HOLDINGS_PLUS_CASH:**
+```
+1. Calculate target layer allocations
+2. Add all available cash to investment pool
+3. Distribute total (holdings + cash) per target
+4. Execute sells/buys to reach target
+5. Cash balance = 0 after completion
+```
+
+**SMART:**
+```
+1. Execute HOLDINGS_ONLY first
+2. Calculate remaining deficits per layer
+3. If deficits exist AND useCash specified:
+   deployAmount = min(useCash, totalDeficit)
+   Distribute deployAmount proportionally to deficient layers
+4. Execute additional buys with deployed cash
+```
+
+### 18.9 Frozen Collateral Handling
+
+```
+On rebalance preview:
+  1. Partition holdings into frozen vs unfrozen by layer
+  2. Only unfrozen holdings are "sellable"
+  3. Set flag: hasLockedCollateral = (frozenTotal > 0)
+
+During rebalance:
+  1. Never include frozen holdings in sell trades
+  2. Calculate achievable balance with sellable assets only
+  3. Report residualDrift if target unachievable
+
+Post-rebalance messaging:
+  If hasLockedCollateral:
+    "Some assets are locked as collateral for your loans."
 ```
 
 ---
@@ -1354,6 +1482,59 @@ On full repayment: holding.frozen = false
 While frozen:      Cannot sell, cannot use as collateral again
 ```
 
+### 21.8 Repayment Application Logic
+
+```
+Payments applied sequentially in installment order:
+
+For each installment (in order):
+  If remaining >= inst.totalIRR:
+    Mark installment as PAID
+    remaining -= inst.totalIRR
+    installmentsPaid++
+  Else if remaining > 0:
+    Mark installment as PARTIAL
+    inst.paidIRR += remaining
+    remaining = 0
+  Else:
+    Keep as PENDING
+
+Note: installmentsPaid counts fully completed installments only
+```
+
+### 21.9 Loan Settlement Rule
+
+```
+Settlement Condition:
+  repayAmount >= (amountIRR + accruedInterestIRR)
+
+On Settlement:
+  1. Loan removed from active loans
+  2. Collateral automatically unfrozen (holding.frozen = false)
+  3. Ledger records: installmentsPaid = 6, isSettlement = true
+```
+
+### 21.10 Installment Status States
+
+| Status | Condition |
+|--------|-----------|
+| **PENDING** | No payment received yet |
+| **PARTIAL** | 0 < paidIRR < totalIRR |
+| **PAID** | paidIRR >= totalIRR |
+
+### 21.11 Loan Health Level Thresholds
+
+| LTV % | Health Level | UI Indicator |
+|-------|--------------|--------------|
+| >= 90% | Critical | Red |
+| >= 80% | Warning | Orange |
+| >= 75% | Caution | Yellow |
+| < 75% | Healthy | Green |
+
+```
+currentLTV = outstandingPrincipal / collateralValue × 100
+```
+
 ---
 
 ## 22. Protection Rules
@@ -1437,6 +1618,57 @@ Decimal precision:
   Fixed Income:  0 decimals (whole units only)
 ```
 
+### 23.4 Portfolio Value Composition
+
+```
+Total Portfolio Value (for display):
+  totalIRR = holdingsIRR + cashIRR
+
+Holdings Value (for calculations):
+  holdingsIRR = Σ(holding.valueIRR)
+
+Layer Percentages (CRITICAL):
+  layerPct = layerValueIRR / holdingsIRR × 100
+
+  NOTE: Cash is EXCLUDED from layer percentage calculations
+        This ensures allocation percentages always sum to 100%
+```
+
+### 23.5 Spread Application
+
+| Layer | Spread | Applied On |
+|-------|--------|------------|
+| FOUNDATION | 0.15% | Buy AND Sell |
+| GROWTH | 0.30% | Buy AND Sell |
+| UPSIDE | 0.60% | Buy AND Sell |
+
+```
+Spread is disclosed in trade preview:
+  "Spread: 0.30%"
+
+Calculation:
+  effectivePrice = basePrice × (1 + spread)  // on buy
+  effectivePrice = basePrice × (1 - spread)  // on sell
+```
+
+### 23.6 Fixed Income Accrual Details
+
+```
+Unit Price:      500,000 IRR
+Annual Rate:     30% (simple interest)
+Accrual Method:  Daily simple interest
+
+Daily Accrual:
+  principal = quantity × 500,000
+  dailyRate = 0.30 / 365 = 0.000822
+  dailyAccrual = principal × dailyRate
+
+Total Value:
+  daysHeld = (now - purchaseDate) / 86400000
+  accruedInterest = principal × 0.30 × (daysHeld / 365)
+  totalValue = principal + accruedInterest
+```
+
 ---
 
 ## 24. Configuration Constants
@@ -1502,6 +1734,66 @@ For each layer:
 | < 5 | LOW | 65% | 30% | 5% |
 | 5-10 | MEDIUM | 50% | 35% | 15% |
 | > 10 | HIGH | 40% | 40% | 20% |
+
+### 25.3 Reconciliation Strategy Details
+
+```
+Why Reconciliation:
+  Rounding in Phase 1 creates gaps between target and actual
+
+Reconciliation Rules:
+  1. Only reconcile if |gap| > 1 IRR (ignore dust)
+  2. Prefer non-fixed-income assets (better price precision)
+  3. Adjust quantity of last eligible asset in layer
+  4. Never create negative quantities
+
+Example:
+  Target: 5,000,000 IRR in FOUNDATION
+  After Phase 1: 4,999,850 IRR (due to rounding)
+  Gap: 150 IRR → reconcile by adding more USDT
+```
+
+### 25.4 Default Target Allocation
+
+```
+If no target allocation provided (edge case):
+  Use midpoint of acceptable range for each layer
+
+  Foundation: (40% + 70%) / 2 = 55%
+  Growth:     (20% + 45%) / 2 = 32.5%
+  Upside:     (0%  + 20%) / 2 = 10%
+
+  Note: Total = 97.5%, remainder goes to Foundation
+```
+
+### 25.5 Gap Analysis Algorithm
+
+```
+Purpose: Determine best rebalance mode recommendation
+
+Step 1: Calculate current allocation
+  currentPct[layer] = layerValue / totalHoldingsValue
+
+Step 2: Calculate drift from target
+  drift[layer] = |currentPct[layer] - targetPct[layer]|
+
+Step 3: Partition holdings
+  frozenByLayer = sum of frozen (collateral) holdings per layer
+  unfrozenByLayer = sum of tradeable holdings per layer
+
+Step 4: Simulate HOLDINGS_ONLY
+  For overweight layers:
+    sellable = min(surplus, unfrozenByLayer)
+  Calculate achievable allocation
+
+Step 5: Calculate cash needed
+  cashNeeded = deficit in underweight layers after HOLDINGS_ONLY
+
+Step 6: Recommend mode
+  If cashNeeded = 0: HOLDINGS_ONLY sufficient
+  If cashAvailable >= cashNeeded: HOLDINGS_PLUS_CASH optimal
+  Else: SMART with partial cash deployment
+```
 
 ---
 
@@ -1626,6 +1918,46 @@ LedgerEntry {
 | HEARTBEAT_MS | 5,000 | Health check interval |
 | BACKOFF_MULTIPLIER | 1.5 | Exponential backoff factor |
 
+### 28.5 LRU Cache Implementation
+
+```
+Holding Value Cache:
+  Key:   ${assetId}:${quantity}:${priceUSD}:${purchasedAt}
+  Value: Computed IRR value
+
+  purchasedAt: Only included for fixed income (accrual depends on date)
+
+Eviction Policy:
+  1. Track entries in insertion order
+  2. On cache hit: move entry to end (most recent)
+  3. On cache miss: compute value, add to cache
+  4. If size > MAX_SIZE (100): delete first entry (oldest)
+
+Hit Rate Optimization:
+  Same holding with same price → instant lookup
+  Price change → cache miss, recompute
+```
+
+### 28.6 Date Label Pre-computation
+
+```
+On ledger entry creation:
+  tsDateLabel = computeDateLabel(tsISO)
+
+computeDateLabel(iso):
+  today = new Date().setHours(0,0,0,0)
+  entryDate = new Date(iso).setHours(0,0,0,0)
+
+  If entryDate == today: return "Today"
+  If entryDate == today - 86400000: return "Yesterday"
+  Else: return formatted date (e.g., "Jan 17")
+
+Staleness Note:
+  Labels become stale after midnight
+  Acceptable for historical entries
+  Dashboard feed uses relative time (e.g., "2 hours ago")
+```
+
 ---
 
 ## 29. Onboarding Rules
@@ -1637,6 +1969,13 @@ Format: +989XXXXXXXXX
 Length: 13 characters total
 Prefix: +989
 Remaining: 9 digits
+
+Validation Code:
+  isValid = phone.startsWith('+989') && phone.length === 13
+
+Example Valid:   +989123456789
+Example Invalid: +98912345678  (12 chars)
+Example Invalid: +971234567890 (wrong prefix)
 ```
 
 ### 29.2 Questionnaire Flow
@@ -1649,7 +1988,26 @@ Back navigation: GO_BACK_QUESTION (index - 1)
 Completion: index reaches 9 → proceed to result
 ```
 
-### 29.3 Consent Requirements
+### 29.3 Answer Storage Format
+
+```
+Answers stored as option INDEX (0-based), not option ID
+
+State Shape:
+  questionnaireAnswers: {
+    [questionId]: optionIndex  // e.g., "q_income": 2
+  }
+
+Conversion for Risk Scoring:
+  richAnswer = {
+    questionId: questionId,
+    optionIndex: storedIndex,
+    score: questions[questionId].options[storedIndex].score,
+    weight: questions[questionId].weight
+  }
+```
+
+### 29.4 Consent Requirements
 
 Three mandatory checkboxes (all required):
 1. **riskAcknowledged**: "I understand this involves risk"
@@ -1741,6 +2099,136 @@ maxBorrow = min(maxBorrowAsset, maxBorrowGlobal - existingLoansIRR)
 | **Portfolio Gravity** | Design principle: return to dashboard after every action |
 | **Protection** | Insurance-like derivative contract hedging downside |
 | **Upside** | High-risk layer: SOL, TON, LINK, AVAX, MATIC, ARB |
+
+---
+
+## Appendix: Figma Token System
+
+This token system is **derivative**, not original. It mirrors Blu Bank's visual primitives and extends them with **semantic and decision-layer tokens** required for Blu Markets.
+
+### Color Tokens
+
+**Core (Inherited)**
+```
+color.background.primary = #0E1420
+color.background.surface = #151C28
+color.background.elevated = #1C2433
+
+color.text.primary = #FFFFFF
+color.text.secondary = #9AA4B2
+color.text.muted = #6B7482
+
+color.blue.primary = #6FAAF8
+color.blue.secondary = #4F7EDB
+```
+
+**Semantic (Extended)**
+```
+color.semantic.success.realized = #2ECC71
+color.semantic.warning.uncertainty = #F4B942
+color.semantic.loss.realized = #E74C3C
+color.semantic.neutral.information = color.blue.primary
+```
+
+Rule: *No semantic color may be reused for a different meaning.*
+
+### Typography Tokens
+
+```
+font.family.primary = BluSans
+
+font.size.xs = 11
+font.size.sm = 13
+font.size.md = 15
+font.size.lg = 18
+font.size.xl = 22
+font.size.hero = 32
+
+font.weight.regular = 400
+font.weight.medium = 500
+font.weight.bold = 700
+```
+
+**Semantic Text Styles**
+```
+text.heading.decision = font.size.lg / font.weight.bold
+text.number.primary = font.size.hero / font.weight.bold
+text.label.supporting = font.size.sm / font.weight.regular
+text.annotation = font.size.xs / font.weight.regular
+```
+
+### Spacing Tokens
+
+```
+space.1 = 4
+space.2 = 8
+space.3 = 12
+space.4 = 16
+space.5 = 24
+space.6 = 32
+space.7 = 40
+```
+
+Rule: No arbitrary spacing allowed.
+
+### Radius Tokens
+
+```
+radius.sm = 8
+radius.md = 12
+radius.lg = 16
+radius.xl = 24
+```
+
+### Elevation Tokens
+
+```
+elevation.none = 0
+
+elevation.card = 0px 4px 16px rgba(0,0,0,0.25)
+elevation.modal = 0px 12px 32px rgba(0,0,0,0.4)
+```
+
+### Component Tokens
+
+**Button**
+```
+button.primary.background = color.blue.primary
+button.primary.text = color.text.primary
+button.primary.radius = radius.lg
+button.primary.height = 52
+
+button.disabled.background = #2A3446
+button.disabled.text = color.text.muted
+```
+
+**Card**
+```
+card.background = color.background.surface
+card.radius = radius.lg
+card.padding = space.5
+```
+
+### Decision Tokens (Blu Markets–Only)
+
+These do not exist in Blu Bank and must not be back-ported.
+
+```
+decision.confidence.high = color.semantic.success.realized
+decision.confidence.medium = color.semantic.warning.uncertainty
+decision.confidence.low = color.semantic.loss.realized
+```
+
+Usage is restricted to **explanatory UI**, never CTAs.
+
+### Token Governance Rules
+
+- Tokens are append-only
+- No renaming
+- No overloading semantics
+- Any new token must map to a real user decision
+
+If a token does not change a user decision, it does not belong in the system.
 
 ---
 
