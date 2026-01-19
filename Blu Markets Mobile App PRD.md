@@ -1,6 +1,6 @@
 # Blu Markets: Native Mobile App PRD
 
-**Version:** 2.0
+**Version:** 2.1
 **Date:** January 2026
 **Status:** Draft
 
@@ -112,7 +112,11 @@ From the moment they onboard, users are shown that risk is not hidden — it's m
 
 The mobile experience turns Blu's philosophical foundations into tactile, day-to-day empowerment.
 
-> **Design Principle:** If it doesn't preserve or expand user choice, it doesn't ship.
+Every feature answers one question:
+
+> **Does this preserve or expand the user's future ability to choose?**
+
+If yes, it ships. If not, it doesn't. There are no nudges. No "fear of missing out." Just a quiet interface for powerful actions — risk-managed, always legible.
 
 ---
 
@@ -1049,4 +1053,15 @@ Every screen was derived from real user flows, with full compliance to:
 - Figma Token System
 - Existing Web App Implementation
 
-> **If it doesn't preserve or expand user choice, it doesn't ship.**
+### Core Principle
+
+> **If a feature reduces user risk-awareness or limits future options without consent, it's out.**
+
+### Division of Responsibility
+
+| Role | Job |
+|------|-----|
+| **System** | Show consequences early |
+| **User** | Choose |
+
+This is the contract. The app informs; the user decides. No dark patterns, no nudges, no manufactured urgency.
