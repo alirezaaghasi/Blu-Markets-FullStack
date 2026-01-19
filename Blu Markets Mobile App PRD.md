@@ -1,6 +1,6 @@
 # Blu Markets: Native Mobile App PRD
 
-**Version:** 4.0
+**Version:** 4.1
 **Date:** January 2026
 **Status:** Final Draft
 
@@ -1312,32 +1312,56 @@ WS     /prices/stream        # Real-time price updates
 
 ## 14. Localization
 
-### Supported Languages (Phase 1)
+### Language Policy (Critical)
+
+> **All UI elements are in English**, with the following exceptions:
+> - **Onboarding Questionnaire**: Questions and answer options displayed in Farsi
+> - **Consent Screen**: Consent sentences displayed in Farsi
+> - **Profile Names**: Risk profile names shown in Farsi (e.g., "متعادل" for Balanced)
+
+| UI Element | Language | Notes |
+|------------|----------|-------|
+| Navigation labels | English | Portfolio, Protection, Loans, History, Profile |
+| Buttons | English | "Confirm", "Cancel", "Rebalance", etc. |
+| Headers & titles | English | "Total Portfolio Value", "Active Loans" |
+| Status badges | English | "Balanced", "Rebalance needed" |
+| Activity Feed | English | "Bought BTC", "Added funds" |
+| Numbers & currency | Western digits | 1,456,000 IRR (not ۱,۴۵۶,۰۰۰) |
+| **Questionnaire Q&A** | **Farsi** | See Section 17.8 for exact texts |
+| **Consent sentences** | **Farsi** | See Section 14.3 for exact texts |
+| **Profile result name** | **Farsi** | e.g., "شما یک سرمایه‌گذار متعادل هستید" |
+
+### 14.1 Supported Languages (Phase 1)
 
 | Language | Code | Direction | Calendar |
 |----------|------|-----------|----------|
-| Farsi (Persian) | fa | RTL | Jalali option |
 | English | en | LTR | Gregorian |
 
-### RTL Considerations
+**Note**: Full RTL Farsi localization is deferred to Phase 2. Phase 1 uses English UI with Farsi only for questionnaire and consent.
 
-- Mirror entire layout for Farsi
-- Swap navigation directions
-- Number formatting (Persian digits optional)
-- Currency: Always IRR with proper formatting
-- Questionnaire and consent in Farsi with English subtitles
+### 14.2 Number & Currency Formatting
 
-### Sample Localized Strings
+```
+Format: Western digits with comma grouping
+Example: 1,456,000 IRR (not ۱،۴۵۶،۰۰۰ ریال)
 
-```json
-{
-  "dashboard.total_value": "ارزش کل پرتفوی",
-  "dashboard.balanced": "متعادل",
-  "dashboard.rebalance_needed": "نیاز به تعادل‌سازی",
-  "activity.started_with": "شروع با {amount} ریال",
-  "activity.bought": "خرید {asset} ({amount} ریال)",
-  "activity.rebalanced": "تعادل‌سازی پرتفوی"
-}
+Rationale: Consistent with Blu Bank app, easier to parse at a glance
+```
+
+### 14.3 Consent Sentences (Farsi)
+
+The consent screen displays these three checkboxes in Farsi:
+
+| # | Farsi Text | English (for reference) |
+|---|------------|-------------------------|
+| 1 | متوجه ریسک این سرمایه‌گذاری هستم | I understand the risk of this investment |
+| 2 | ممکنه بخشی یا تمام سرمایه‌ام رو از دست بدم | I may lose some or all of my investment |
+| 3 | هیچ تضمینی برای سود وجود نداره | There is no guarantee of returns |
+
+**Final Consent Confirmation:**
+```
+Farsi:   متوجه ریسک این سبد دارایی شدم و باهاش موافق هستم.
+English: I understand the risk of this portfolio and I agree with it.
 ```
 
 ---
@@ -1499,33 +1523,160 @@ Example (Willingness):
   Willingness = (8.0 + 7.5 + 3.0 + 9.0) / (2.0 + 1.5 + 1.0 + 1.5) = 27.5 / 6.0 = 4.58
 ```
 
-### 16.8 Complete Questionnaire Reference
+### 17.8 Complete Questionnaire Reference (Farsi + English)
 
-**Block 1: Financial Situation (Capacity)**
+> **Display Language**: Questions and answers are shown to users in **Farsi only**.
+> English translations below are for developer/QA reference.
 
-| Q# | Question | Options (Score) |
-|----|----------|-----------------|
-| q_income | "How predictable is your income?" | Fixed/reliable (8), Mostly stable (6), Variable (4), Uncertain (1) |
-| q_buffer | "Without this money, how many months can you cover expenses?" | 12+ months (10), 6-12 months (7), 3-6 months (4), <3 months (1) |
-| q_proportion | "What percentage of your total wealth is this?" | <25% (10), 25-50% (6), 50-75% (3), >75% (1) ⚑high_proportion |
+---
 
-**Block 2: Goals (Horizon + Goal)**
+**Block 1: وضعیت مالی شما (Your Financial Situation)**
 
-| Q# | Question | Options (Score) |
-|----|----------|-----------------|
-| q_goal | "What's your main goal for this investment?" | Preserve value (2), Steady income (4), Long-term growth (7), Maximum returns (10) |
-| q_horizon | "When might you need to withdraw this money?" | <1 year (1) ⚑cap:3, 1-3 years (4) ⚑cap:5, 3-7 years (7), 7+ years (10) |
+**Q1: q_income** (weight: 1.0)
+```
+Farsi:   درآمدت چقدر قابل پیش‌بینیه؟
+English: How predictable is your income?
+```
 
-**Block 3: Risk Behavior (Willingness)**
+| Option | Farsi | English | Score |
+|--------|-------|---------|-------|
+| A | ثابت و مطمئن (حقوق، مستمری) | Fixed and reliable (salary, pension) | 8 |
+| B | تقریباً ثابت با کمی نوسان | Mostly stable with some variation | 6 |
+| C | متغیر (فریلنس، کسب‌وکار) | Variable (freelance, business) | 4 |
+| D | نامشخص یا بی‌کار | Uncertain or unemployed | 1 |
 
-| Q# | Question | Options (Score) |
-|----|----------|-----------------|
-| q_crash_20 | "Portfolio down 20% after 3 months. What do you do?" | Sell everything (1) ⚑panic_seller, Sell some (3), Wait (6), Buy more (9) |
-| q_tradeoff | "Which do you prefer?" | Guaranteed 20% (2), 50% chance +40%/-10% (5), 50% chance +80%/-25% (8), 50% chance +150%/-50% (10) ⚑gambler |
-| q_past_behavior | "Last time an investment dropped, how did you feel?" | Very stressed (1), Worried but managed (4), Relatively calm (7), No experience (5) ⚑inexperienced |
-| q_max_loss | "Maximum drop you can tolerate without selling?" | 5% (1), 15% (4), 30% (7), 50%+ (10) |
+**Q2: q_buffer** (weight: 1.2)
+```
+Farsi:   بدون این پول، چند ماه می‌تونی خرج زندگیت رو بدی؟
+English: Without this money, how many months can you cover expenses?
+```
 
-### 16.9 Exact Allocation by Score
+| Option | Farsi | English | Score |
+|--------|-------|---------|-------|
+| A | بیش از ۱۲ ماه | More than 12 months | 10 |
+| B | ۶ تا ۱۲ ماه | 6 to 12 months | 7 |
+| C | ۳ تا ۶ ماه | 3 to 6 months | 4 |
+| D | کمتر از ۳ ماه | Less than 3 months | 1 |
+
+**Q3: q_proportion** (weight: 1.3)
+```
+Farsi:   این پول چند درصد از کل دارایی‌هاته؟
+English: What percentage of your total wealth is this?
+```
+
+| Option | Farsi | English | Score | Flag |
+|--------|-------|---------|-------|------|
+| A | کمتر از ۲۵٪ | Less than 25% | 10 | |
+| B | ۲۵٪ تا ۵۰٪ | 25% to 50% | 6 | |
+| C | ۵۰٪ تا ۷۵٪ | 50% to 75% | 3 | |
+| D | بیشتر از ۷۵٪ | More than 75% | 1 | ⚑high_proportion |
+
+---
+
+**Block 2: اهداف شما (Your Goals)**
+
+**Q4: q_goal** (weight: 1.0)
+```
+Farsi:   هدف اصلیت از این سرمایه‌گذاری چیه؟
+English: What's your main goal for this investment?
+```
+
+| Option | Farsi | English | Score |
+|--------|-------|---------|-------|
+| A | حفظ ارزش پول در برابر تورم | Preserve value against inflation | 2 |
+| B | درآمد ثابت (سود منظم) | Steady income (regular returns) | 4 |
+| C | رشد سرمایه در بلندمدت | Long-term wealth growth | 7 |
+| D | حداکثر بازدهی (ریسک بالا قبوله) | Maximum returns (high risk OK) | 10 |
+
+**Q5: q_horizon** (weight: 1.0)
+```
+Farsi:   کِی ممکنه بخوای این پول رو برداری؟
+English: When might you need to withdraw this money?
+```
+
+| Option | Farsi | English | Score | Hard Cap |
+|--------|-------|---------|-------|----------|
+| A | کمتر از ۱ سال | Less than 1 year | 1 | cap at 3 |
+| B | ۱ تا ۳ سال | 1 to 3 years | 4 | cap at 5 |
+| C | ۳ تا ۷ سال | 3 to 7 years | 7 | |
+| D | بیش از ۷ سال | More than 7 years | 10 | |
+
+---
+
+**Block 3: واکنش شما (How You React)**
+
+**Q6: q_crash_20** (weight: 2.0) — *Most important question*
+```
+Farsi:   فرض کن ۳ ماه بعد از سرمایه‌گذاری، ارزش پورتفوت ۲۰٪ کم شده. چیکار می‌کنی؟
+English: Imagine 3 months after investing, your portfolio is down 20%. What do you do?
+```
+
+| Option | Farsi | English | Score | Flag |
+|--------|-------|---------|-------|------|
+| A | همه رو می‌فروشم که بیشتر ضرر نکنم | Sell everything to avoid more loss | 1 | ⚑panic_seller |
+| B | یه مقدار می‌فروشم، بقیه رو نگه می‌دارم | Sell some, keep the rest | 3 | |
+| C | صبر می‌کنم تا بازار برگرده | Wait for the market to recover | 6 | |
+| D | بیشتر می‌خرم چون ارزون شده | Buy more because it's cheaper | 9 | |
+
+**Q7: q_tradeoff** (weight: 1.5)
+```
+Farsi:   کدوم رو ترجیح میدی؟
+English: Which do you prefer?
+```
+
+| Option | Farsi | English | Score | Flag |
+|--------|-------|---------|-------|------|
+| A | سود تضمینی ۲۰٪ در سال | Guaranteed 20% annual return | 2 | |
+| B | ۵۰٪ شانس سود ۴۰٪ یا ضرر ۱۰٪ | 50% chance of +40% or -10% | 5 | |
+| C | ۵۰٪ شانس سود ۸۰٪ یا ضرر ۲۵٪ | 50% chance of +80% or -25% | 8 | |
+| D | ۵۰٪ شانس سود ۱۵۰٪ یا ضرر ۵۰٪ | 50% chance of +150% or -50% | 10 | ⚑gambler |
+
+**Q8: q_past_behavior** (weight: 1.0)
+```
+Farsi:   آخرین باری که یه سرمایه‌گذاریت افت کرد، چه حسی داشتی؟
+English: Last time an investment dropped, how did you feel?
+```
+
+| Option | Farsi | English | Score | Flag |
+|--------|-------|---------|-------|------|
+| A | خیلی استرس داشتم، شب‌ها خوابم نمی‌برد | Very stressed, couldn't sleep | 1 | |
+| B | نگران بودم ولی دووم آوردم | Worried but managed | 4 | |
+| C | نسبتاً آروم بودم | Relatively calm | 7 | |
+| D | تجربه‌ای ندارم | No experience | 5 | ⚑inexperienced |
+
+**Q9: q_max_loss** (weight: 1.5)
+```
+Farsi:   حداکثر چند درصد افت رو می‌تونی تحمل کنی بدون اینکه بفروشی؟
+English: What's the maximum drop you can tolerate without selling?
+```
+
+| Option | Farsi | English | Score |
+|--------|-------|---------|-------|
+| A | ۵٪ — بیشتر از این نه | 5% — no more than this | 1 |
+| B | ۱۵٪ — یه کم درد داره ولی اوکیه | 15% — hurts but OK | 4 |
+| C | ۳۰٪ — سخته ولی صبر می‌کنم | 30% — tough but I'll wait | 7 |
+| D | ۵۰٪ یا بیشتر — بلندمدت فکر می‌کنم | 50%+ — I think long-term | 10 |
+
+---
+
+### 17.9 Risk Profile Names (Farsi)
+
+| Score | English Name | Farsi Name |
+|-------|--------------|------------|
+| 1-2 | Capital Preservation | حفظ سرمایه |
+| 3-4 | Conservative | محتاط |
+| 5-6 | Balanced | متعادل |
+| 7-8 | Growth | رشدگرا |
+| 9-10 | Aggressive | جسور |
+
+**Profile Result Display:**
+```
+Farsi:   شما یک سرمایه‌گذار [نام پروفایل] هستید
+Example: شما یک سرمایه‌گذار متعادل هستید
+English: You are a Balanced investor
+```
+
+### 17.10 Exact Allocation by Score
 
 | Score | Profile | Foundation | Growth | Upside |
 |-------|---------|------------|--------|--------|
