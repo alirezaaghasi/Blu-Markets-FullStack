@@ -1,6 +1,6 @@
 # Blu Markets: Native Mobile App PRD
 
-**Version:** 3.4
+**Version:** 4.0
 **Date:** January 2026
 **Status:** Final Draft
 
@@ -9,6 +9,42 @@
 ## TL;DR
 
 This document defines the UX, UI, and technical requirements for the Blu Markets **native mobile app**, based on the existing web prototype. It translates 7 core user flows into mobile-native designs while preserving the **Activity Feed (Chat UI)** as a critical differentiator and staying compliant with the product philosophy and design system.
+
+---
+
+## Problem Statement
+
+### The Core Friction
+
+Iranian users face a **trust/agency paradox** when trying to preserve and grow wealth:
+
+| Option | Problem |
+|--------|---------|
+| **Bank deposits** | Real returns negative after 40%+ inflation; no agency |
+| **Real estate/gold** | Illiquid, high entry barrier, no diversification |
+| **Crypto apps** | Extractive design, no risk guardrails, gambling-adjacent UX |
+| **Foreign exchange** | Sanction-constrained, volatile, legally gray |
+
+**The gap**: No product exists that offers *exposure without annihilation* — a system that provides growth potential while actively protecting users from catastrophic loss.
+
+### What Happens If We Do Nothing
+
+- Users continue losing purchasing power to inflation (40%+ annually)
+- Those who try crypto face 70%+ drawdowns with no safety net
+- Trust in financial products erodes further
+- Wealth preservation becomes a privilege of the already-wealthy
+
+### Why Blu Is Uniquely Suited
+
+1. **Risk-first architecture**: Every feature asks "does this preserve the user's ability to choose?"
+2. **Layer-based portfolio model**: Foundation/Growth/Upside separates safety from speculation
+3. **Friction by design**: Warnings, previews, and boundaries prevent impulsive mistakes
+4. **Activity Feed transparency**: Users see exactly what happened and why
+5. **Insurance-like protection**: Downside hedging built into the product, not bolted on
+
+### The Promise
+
+> **Blu Markets gives Iranian users a way to grow wealth without gambling it away — through a system that tells the truth, shows consequences early, and never manufactures urgency.**
 
 ---
 
@@ -21,41 +57,42 @@ This document defines the UX, UI, and technical requirements for the Blu Markets
 4. [Success Metrics](#4-success-metrics)
 
 **Part II: User Experience**
-5. [User Flows](#5-user-flows)
-6. [Navigation Architecture](#6-navigation-architecture)
-7. [Activity Feed (Chat UI)](#7-activity-feed-chat-ui)
+5. [End-to-End User Journey](#5-end-to-end-user-journey)
+6. [User Flows](#6-user-flows)
+7. [Navigation Architecture](#7-navigation-architecture)
+8. [Activity Feed (Chat UI)](#8-activity-feed-chat-ui)
 
 **Part III: Screen Specifications**
-8. [Screen-by-Screen Specs](#8-screen-by-screen-specs)
+9. [Screen-by-Screen Specs](#9-screen-by-screen-specs)
 
 **Part IV: Technical Implementation**
-9. [Design System](#9-design-system)
-10. [Data Models](#10-data-models)
-11. [Technical Requirements](#11-technical-requirements)
-12. [Security & Compliance](#12-security--compliance)
+10. [Design System](#10-design-system)
+11. [Data Models](#11-data-models)
+12. [Technical Requirements](#12-technical-requirements)
+13. [Security & Compliance](#13-security--compliance)
 
 **Part V: Launch Planning**
-13. [Localization](#13-localization)
-14. [Milestones & Sequencing](#14-milestones--sequencing)
-15. [Feature Parity Checklist](#15-feature-parity-checklist)
+14. [Localization](#14-localization)
+15. [Milestones & Sequencing](#15-milestones--sequencing)
+16. [Feature Parity Checklist](#16-feature-parity-checklist)
 
 **Part VI: Business Logic Reference**
-16. [Risk Profiling Algorithm](#16-risk-profiling-algorithm)
-17. [Asset Configuration](#17-asset-configuration)
-18. [HRAM Rebalancing Algorithm](#18-hram-rebalancing-algorithm)
-19. [Boundary Classification](#19-boundary-classification)
-20. [Trading Rules](#20-trading-rules)
-21. [Loan Rules](#21-loan-rules)
-22. [Protection Rules](#22-protection-rules)
-23. [Currency & Pricing](#23-currency--pricing)
-24. [Configuration Constants](#24-configuration-constants)
-25. [Portfolio Creation Algorithm](#25-portfolio-creation-algorithm)
-26. [Validation & Error Codes](#26-validation--error-codes)
-27. [Ledger Entry Types](#27-ledger-entry-types)
-28. [Performance Optimizations](#28-performance-optimizations)
-29. [Onboarding Rules](#29-onboarding-rules)
-30. [Per-Asset LTV Details](#30-per-asset-ltv-details)
-31. [Key Business Invariants](#31-key-business-invariants)
+17. [Risk Profiling Algorithm](#17-risk-profiling-algorithm)
+18. [Asset Configuration](#18-asset-configuration)
+19. [HRAM Rebalancing Algorithm](#19-hram-rebalancing-algorithm)
+20. [Boundary Classification](#20-boundary-classification)
+21. [Trading Rules](#21-trading-rules)
+22. [Loan Rules](#22-loan-rules)
+23. [Protection Rules](#23-protection-rules)
+24. [Currency & Pricing](#24-currency--pricing)
+25. [Configuration Constants](#25-configuration-constants)
+26. [Portfolio Creation Algorithm](#26-portfolio-creation-algorithm)
+27. [Validation & Error Codes](#27-validation--error-codes)
+28. [Ledger Entry Types](#28-ledger-entry-types)
+29. [Performance Optimizations](#29-performance-optimizations)
+30. [Onboarding Rules](#30-onboarding-rules)
+31. [Per-Asset LTV Details](#31-per-asset-ltv-details)
+32. [Key Business Invariants](#32-key-business-invariants)
 
 **Appendix**
 - [Glossary](#appendix-glossary)
@@ -114,6 +151,38 @@ This document defines the UX, UI, and technical requirements for the Blu Markets
 - As a **user**, I want to protect high-risk assets against losses through insurance-like contracts.
 - As a **user**, I want to review a complete, immutable history of everything I've done.
 
+### Persona-Specific Stories
+
+**🐢 Anxious Novice** (Score 1-3: Capital Preservation)
+> *"I've never invested before. I'm terrified of losing my savings but inflation is eating them anyway."*
+
+| Story | Acceptance Criteria |
+|-------|---------------------|
+| As an Anxious Novice, I want to see a clear, simple summary of what's at risk vs. what's safe | Foundation layer prominently shows "stable" badge; risk layer shows explicit % at risk |
+| As an Anxious Novice, I want the system to stop me before I do something dangerous | STRUCTURAL/STRESS warnings block one-tap execution; require explicit "I understand" |
+| As an Anxious Novice, I want reassurance that my base is protected | Dashboard shows Foundation % with "protected base" indicator when > 60% |
+| As an Anxious Novice, I want to understand every term in plain Farsi | No jargon without inline explanation; "LTV" → "loan-to-value (how much you can borrow)" |
+
+**🏛 Wealth Preserver** (Score 4-6: Conservative/Balanced)
+> *"I have savings to protect. I want modest growth but I won't risk my family's security."*
+
+| Story | Acceptance Criteria |
+|-------|---------------------|
+| As a Wealth Preserver, I want to see how my portfolio performs against inflation | Dashboard shows real return (nominal - inflation estimate) |
+| As a Wealth Preserver, I want to protect my growth assets without selling them | Protection flow accessible from any Growth/Upside holding with clear premium cost |
+| As a Wealth Preserver, I want to borrow against stable assets for emergencies | Loan flow shows USDT/PAXG as preferred collateral with 70% LTV highlighted |
+| As a Wealth Preserver, I want rebalancing to be automatic and conservative | Rebalance preview emphasizes "back to your target" not "maximize returns" |
+
+**🚀 Aggressive Accumulator** (Score 7-10: Growth/Aggressive)
+> *"I understand the risks. I want maximum exposure to upside while keeping a safety net."*
+
+| Story | Acceptance Criteria |
+|-------|---------------------|
+| As an Aggressive Accumulator, I want to quickly deploy cash into high-growth assets | Quick-buy chips for Upside assets; minimal friction for SAFE boundary trades |
+| As an Aggressive Accumulator, I want to see my momentum plays clearly separated | Upside layer expanded by default; shows individual asset performance |
+| As an Aggressive Accumulator, I want to leverage my portfolio without liquidation fear | Loan health indicator shows buffer %; liquidation price clearly displayed |
+| As an Aggressive Accumulator, I still want a protected base I can't accidentally destroy | Foundation hard minimum (30%) enforced; system refuses trades that breach it |
+
 ---
 
 ## 3. Narrative
@@ -169,13 +238,241 @@ If yes, it ships. If not, it doesn't. There are no nudges. No "fear of missing o
 | App store rating | > 4.5 | iOS/Android stores |
 | Trade execution time (tap to confirm) | < 30s | Analytics |
 
+### Behavioral Metrics (UX Health)
+
+| Metric | Target | Measurement | Why It Matters |
+|--------|--------|-------------|----------------|
+| **Override rate** | < 15% | % of trades where user proceeds past DRIFT/STRUCTURAL warning | High = users ignoring guidance = trust problem |
+| **Time to first action** | < 2 min | Time from dashboard load to first trade/rebalance | Shows if UI is clear enough to act |
+| **Foundation intact after 30 days** | > 90% | % of portfolios where Foundation layer ≥ 80% of initial | Core promise: protect the base |
+| **Rebalance response time** | < 72 hrs | Median time from drift alert to rebalance | Shows if users understand/trust the system |
+| **Protection adoption on Upside** | > 25% | % of Upside holdings with active protection | Shows if users understand downside hedging |
+| **Abandoned action rate** | < 20% | % of preview screens closed without confirming | High = friction copy unclear or scary |
+| **Activity Feed scroll depth** | > 3 entries | Avg entries viewed per session | Shows if narrative is engaging |
+| **Help/tooltip tap rate** | Track only | Taps on "?" icons or info tooltips | Reveals confusion points |
+
+### Cohort Analysis Segments
+
+| Segment | Definition | Key Metric |
+|---------|------------|------------|
+| **New users (0-7 days)** | First week after portfolio creation | Activation rate, first action type |
+| **Engaged (7-30 days)** | Active in weeks 2-4 | Actions per week, override rate |
+| **Retained (30+ days)** | Monthly active after day 30 | Foundation intact %, rebalance frequency |
+| **Churned** | No activity in 30 days | Last action before churn, override rate before churn |
+
 ---
 
 # Part II: User Experience
 
-## 5. User Flows
+## 5. End-to-End User Journey
 
-### 5.1 Onboarding Flow
+### Journey: Install → Protected Portfolio (First 10 Minutes)
+
+This is the golden path for a new user from app install to having a protected, balanced portfolio.
+
+```
+PHASE 1: DISCOVERY & TRUST (0-2 min)
+─────────────────────────────────────
+📱 Install app from store
+         │
+         ▼
+┌─────────────────────────────────────┐
+│ WELCOME SCREEN                      │
+│ "Markets, but mindful"              │
+│                                     │
+│ User sees: Calm, professional       │
+│ User feels: "This isn't like other  │
+│             crypto apps"            │
+│                                     │
+│ [Continue →]                        │
+└─────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────┐
+│ PHONE VERIFICATION                  │
+│ +98 9XX XXX XXXX                    │
+│                                     │
+│ User action: Enter phone, get OTP   │
+│ Trust signal: Standard auth, no     │
+│               excessive data grab   │
+└─────────────────────────────────────┘
+
+
+PHASE 2: RISK PROFILING (2-4 min)
+─────────────────────────────────────
+         │
+         ▼
+┌─────────────────────────────────────┐
+│ QUESTIONNAIRE (9 cards)             │
+│ Progress: ████░░░░░ 4/9             │
+│                                     │
+│ "If your portfolio dropped 20%,     │
+│  what would you do?"                │
+│                                     │
+│ ○ Sell everything                   │
+│ ○ Sell some                         │
+│ ● Wait and see           ← tapped   │
+│ ○ Buy more                          │
+│                                     │
+│ User learns: Questions make sense,  │
+│              system is trying to    │
+│              understand ME          │
+└─────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────┐
+│ PROFILE RESULT                      │
+│                                     │
+│ "You're a Steady Builder"           │
+│                                     │
+│     ┌──────────────┐                │
+│     │   ◐ 50%      │ ← Donut chart  │
+│     │  Foundation  │                │
+│     └──────────────┘                │
+│   Growth 35%  │  Upside 15%         │
+│                                     │
+│ User feels: "They get me. This      │
+│             allocation makes sense" │
+│                                     │
+│ [This looks right →]                │
+└─────────────────────────────────────┘
+
+
+PHASE 3: COMMITMENT (4-6 min)
+─────────────────────────────────────
+         │
+         ▼
+┌─────────────────────────────────────┐
+│ CONSENT SCREEN (Farsi + English)    │
+│                                     │
+│ ☑ I understand this involves risk   │
+│ ☑ I may lose some investment        │
+│ ☑ Returns are not guaranteed        │
+│                                     │
+│ User thinks: "They're being honest  │
+│              upfront. Good sign."   │
+│                                     │
+│ [I understand →]                    │
+└─────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────┐
+│ INITIAL FUNDING                     │
+│                                     │
+│ Amount: [10,000,000] IRR            │
+│         [5M] [10M] [25M] [50M]      │
+│                                     │
+│ Preview:                            │
+│ ├─ Foundation: 5,000,000 IRR        │
+│ ├─ Growth:     3,500,000 IRR        │
+│ └─ Upside:     1,500,000 IRR        │
+│                                     │
+│ User sees: Exactly where money goes │
+│                                     │
+│ [Create My Portfolio →]             │
+└─────────────────────────────────────┘
+
+
+PHASE 4: ACTIVATION (6-8 min)
+─────────────────────────────────────
+         │
+         ▼
+┌─────────────────────────────────────┐
+│ 🎉 SUCCESS                          │
+│                                     │
+│ "Your portfolio is ready"           │
+│                                     │
+│ Foundation: 50% ████████░░ STABLE   │
+│ Growth:     35% ██████░░░░          │
+│ Upside:     15% ███░░░░░░░          │
+│                                     │
+│ Activity Feed:                      │
+│ ● Just now: Started with 10M IRR 🟢 │
+│                                     │
+│ [Go to Dashboard →]                 │
+└─────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────┐
+│ DASHBOARD (Home state)              │
+│                                     │
+│ Total: 10,000,000 IRR               │
+│ Status: ✓ Balanced                  │
+│                                     │
+│ User sees: Clear value, stable      │
+│            status, no red flags     │
+│                                     │
+│ [Add Funds] [Rebalance - disabled]  │
+└─────────────────────────────────────┘
+
+
+PHASE 5: FIRST PROTECTION (8-10 min)
+─────────────────────────────────────
+         │
+         ▼ (User taps Upside layer → SOL)
+┌─────────────────────────────────────┐
+│ SOL HOLDING DETAIL                  │
+│                                     │
+│ Value: 750,000 IRR                  │
+│ Layer: UPSIDE (high risk)           │
+│                                     │
+│ [Buy More] [Sell] [Protect 🛡]      │
+└─────────────────────────────────────┘
+         │
+         ▼ (Taps Protect)
+┌─────────────────────────────────────┐
+│ PROTECTION SHEET                    │
+│                                     │
+│ Protect SOL for:                    │
+│ [1mo] [3mo ✓] [6mo]                 │
+│                                     │
+│ Premium: 27,000 IRR                 │
+│ (1.2% × 3 months × 750,000)         │
+│                                     │
+│ "If SOL drops, you're covered."     │
+│                                     │
+│ [Protect for 27,000 IRR →]          │
+└─────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────┐
+│ ✓ PROTECTED                         │
+│                                     │
+│ Activity Feed:                      │
+│ ● Just now: Protected SOL 3mo 🟢    │
+│ ● 2 min ago: Started with 10M   🟢  │
+│                                     │
+│ User feels: "My risky asset has a   │
+│             safety net. I can sleep"│
+└─────────────────────────────────────┘
+```
+
+### Key Moments That Build Trust
+
+| Moment | What User Experiences | Trust Signal |
+|--------|----------------------|--------------|
+| **Questionnaire** | Questions about MY situation, not generic | "They care about my risk tolerance" |
+| **Profile result** | Clear explanation of allocation | "I understand why this split" |
+| **Consent** | Honest warnings upfront | "No hidden agenda" |
+| **Funding preview** | Exact breakdown before confirming | "I see where every Rial goes" |
+| **Activity Feed** | Immediate record of action | "Everything is tracked and visible" |
+| **Protection** | Simple, clear premium | "I can hedge without PhD" |
+
+### Journey Failure Points (Watch For)
+
+| Failure Point | Signal | Mitigation |
+|---------------|--------|------------|
+| Drops at questionnaire | > 30% abandon rate | Simplify questions, add progress motivation |
+| Drops at consent | > 20% abandon rate | Reword warnings to be firm but not scary |
+| Drops at funding | > 25% abandon rate | Lower minimum, add "start small" messaging |
+| No action in first session | > 40% passive | Add gentle first-action prompt (not pushy) |
+| No protection on Upside | > 70% unprotected after 7 days | Education tooltip, but NO dark patterns |
+
+---
+
+## 6. User Flows
+
+### 6.1 Onboarding Flow
 
 ```
 ┌─────────────────┐
@@ -234,7 +531,7 @@ If yes, it ships. If not, it doesn't. There are no nudges. No "fear of missing o
 └─────────────────┘
 ```
 
-### 5.2 Trade Flow (Buy/Sell)
+### 6.2 Trade Flow (Buy/Sell)
 
 ```
 Dashboard
@@ -279,7 +576,7 @@ Dashboard
     Dashboard
 ```
 
-### 5.3 Rebalance Flow
+### 6.3 Rebalance Flow
 
 ```
 Dashboard (Drift banner visible)
@@ -308,7 +605,7 @@ Dashboard (Drift banner visible)
     Success → Dashboard
 ```
 
-### 5.4 Protection Flow
+### 6.4 Protection Flow
 
 ```
 Asset → More → "Protect"
@@ -335,7 +632,7 @@ Asset → More → "Protect"
     Success → Dashboard
 ```
 
-### 5.5 Borrow Flow
+### 6.5 Borrow Flow
 
 ```
 Asset → More → "Borrow"
@@ -364,7 +661,7 @@ Asset → More → "Borrow"
     Success → Loans Tab
 ```
 
-### 5.6 Repay Flow
+### 6.6 Repay Flow
 
 ```
 Loans Tab → Active Loan
@@ -396,7 +693,7 @@ Loans Tab → Active Loan
     Success → Loans Tab
 ```
 
-### 5.7 Add Funds Flow
+### 6.7 Add Funds Flow
 
 ```
 Dashboard
@@ -427,7 +724,7 @@ Dashboard
     Dashboard
 ```
 
-### 5.8 History Flow
+### 6.8 History Flow
 
 ```
 History Tab
@@ -463,7 +760,7 @@ History Tab
 
 ---
 
-## 6. Navigation Architecture
+## 7. Navigation Architecture
 
 ### Tab Bar (Bottom Navigation)
 
@@ -500,7 +797,7 @@ History Tab
 
 ---
 
-## 7. Activity Feed (Chat UI)
+## 8. Activity Feed (Chat UI)
 
 ### Overview
 
@@ -591,9 +888,9 @@ The Activity Feed is a **critical differentiating feature** that provides real-t
 
 # Part III: Screen Specifications
 
-## 8. Screen-by-Screen Specs
+## 9. Screen-by-Screen Specs
 
-### 8.1 Dashboard Screen
+### 9.1 Dashboard Screen
 
 **Purpose**: Primary hub for portfolio overview and quick actions
 
@@ -607,7 +904,7 @@ The Activity Feed is a **critical differentiating feature** that provides real-t
 | **Holdings** | Accordion grouped by layer, each showing assets with value and status |
 | **Sticky Footer** | [Add Funds] secondary, [Rebalance] primary (if drift detected) |
 
-### 8.2 Trade Bottom Sheet
+### 9.2 Trade Bottom Sheet
 
 | Section | Components |
 |---------|------------|
@@ -620,7 +917,7 @@ The Activity Feed is a **critical differentiating feature** that provides real-t
 | **Warnings** | Friction copy if DRIFT or STRUCTURAL |
 | **Actions** | [Confirm Trade] primary button |
 
-### 8.3 Protection Tab
+### 9.3 Protection Tab
 
 | Section | Components |
 |---------|------------|
@@ -628,7 +925,7 @@ The Activity Feed is a **critical differentiating feature** that provides real-t
 | **Empty State** | Illustration, "Protect your holdings" message, [Browse Assets] CTA |
 | **Education** | Collapsible card explaining protection and premium rates |
 
-### 8.4 Loans Tab
+### 9.4 Loans Tab
 
 | Section | Components |
 |---------|------------|
@@ -637,7 +934,7 @@ The Activity Feed is a **critical differentiating feature** that provides real-t
 | **Empty State** | Illustration, "Borrow against holdings" message, [New Loan] CTA |
 | **FAB** | Floating action button for new loan |
 
-### 8.5 History Tab
+### 9.5 History Tab
 
 | Section | Components |
 |---------|------------|
@@ -647,7 +944,7 @@ The Activity Feed is a **critical differentiating feature** that provides real-t
 | **Expanded View** | Before/after allocation, transaction ID, block number |
 | **Pagination** | Infinite scroll, 20 entries per page |
 
-### 8.6 Profile Tab
+### 9.6 Profile Tab
 
 | Section | Components |
 |---------|------------|
@@ -657,7 +954,7 @@ The Activity Feed is a **critical differentiating feature** that provides real-t
 | **Support** | Help center, contact |
 | **Logout** | Logout button with confirmation |
 
-### 8.7 UI State Patterns
+### 9.7 UI State Patterns
 
 **Loading States**
 
@@ -699,7 +996,7 @@ The Activity Feed is a **critical differentiating feature** that provides real-t
 
 # Part IV: Technical Implementation
 
-## 9. Design System
+## 10. Design System
 
 ### Colors
 
@@ -798,7 +1095,7 @@ The Activity Feed is a **critical differentiating feature** that provides real-t
 
 ---
 
-## 10. Data Models
+## 11. Data Models
 
 ### Core State (TypeScript)
 
@@ -924,7 +1221,7 @@ Ledger (for History Tab):
 
 ---
 
-## 11. Technical Requirements
+## 12. Technical Requirements
 
 ### Platform Support
 
@@ -982,7 +1279,7 @@ WS     /prices/stream        # Real-time price updates
 
 ---
 
-## 12. Security & Compliance
+## 13. Security & Compliance
 
 ### Authentication
 
@@ -1013,7 +1310,7 @@ WS     /prices/stream        # Real-time price updates
 
 # Part V: Launch Planning
 
-## 13. Localization
+## 14. Localization
 
 ### Supported Languages (Phase 1)
 
@@ -1045,7 +1342,7 @@ WS     /prices/stream        # Real-time price updates
 
 ---
 
-## 14. Milestones & Sequencing
+## 15. Milestones & Sequencing
 
 | Phase | Scope | Dependencies |
 |-------|-------|--------------|
@@ -1062,7 +1359,7 @@ WS     /prices/stream        # Real-time price updates
 
 ---
 
-## 15. Feature Parity Checklist
+## 16. Feature Parity Checklist
 
 | Web Feature | Mobile Status | Notes |
 |-------------|---------------|-------|
@@ -1092,7 +1389,7 @@ WS     /prices/stream        # Real-time price updates
 
 This section documents all algorithms, formulas, thresholds, and business rules from the web app that must be replicated in the mobile app.
 
-## 16. Risk Profiling Algorithm
+## 17. Risk Profiling Algorithm
 
 ### 16.1 Questionnaire Structure
 
@@ -1245,7 +1542,7 @@ Example (Willingness):
 
 ---
 
-## 17. Asset Configuration
+## 18. Asset Configuration
 
 ### 17.1 Complete Asset Table
 
@@ -1314,7 +1611,7 @@ Value Calculation:
 
 ---
 
-## 18. HRAM Rebalancing Algorithm
+## 19. HRAM Rebalancing Algorithm
 
 ### 18.1 Four-Factor Model
 
@@ -1483,7 +1780,7 @@ Post-rebalance messaging:
 
 ---
 
-## 19. Boundary Classification
+## 20. Boundary Classification
 
 ### 19.1 Portfolio Status Determination
 
@@ -1532,7 +1829,7 @@ Post-rebalance messaging:
 
 ---
 
-## 20. Trading Rules
+## 21. Trading Rules
 
 ### 20.1 Spread by Layer
 
@@ -1566,7 +1863,7 @@ MIN_TRADE_AMOUNT = 1,000,000 IRR
 
 ---
 
-## 21. Loan Rules
+## 22. Loan Rules
 
 ### 21.1 LTV (Loan-to-Value) by Layer
 
@@ -1693,7 +1990,7 @@ currentLTV = outstandingPrincipal / collateralValue × 100
 
 ---
 
-## 22. Protection Rules
+## 23. Protection Rules
 
 ### 22.1 Premium Rates (Monthly)
 
@@ -1743,7 +2040,7 @@ USDT, PAXG, BTC, ETH, BNB, XRP, KAG, QQQ, SOL, LINK, AVAX
 
 ---
 
-## 23. Currency & Pricing
+## 24. Currency & Pricing
 
 ### 23.1 FX Rate
 
@@ -1981,7 +2278,7 @@ Health Check:
 
 ---
 
-## 24. Configuration Constants
+## 25. Configuration Constants
 
 ### 24.1 Thresholds
 
@@ -2009,7 +2306,7 @@ Health Check:
 
 ---
 
-## 25. Portfolio Creation Algorithm
+## 26. Portfolio Creation Algorithm
 
 ### 25.1 Two-Phase Construction
 
@@ -2107,7 +2404,7 @@ Step 6: Recommend mode
 
 ---
 
-## 26. Validation & Error Codes
+## 27. Validation & Error Codes
 
 ### 26.1 Error Code Reference
 
@@ -2147,7 +2444,7 @@ ValidationResult {
 
 ---
 
-## 27. Ledger Entry Types
+## 28. Ledger Entry Types
 
 ### 27.1 Entry Type Reference
 
@@ -2193,7 +2490,7 @@ LedgerEntry {
 
 ---
 
-## 28. Performance Optimizations
+## 29. Performance Optimizations
 
 ### 28.1 Caching Strategy
 
@@ -2270,7 +2567,7 @@ Staleness Note:
 
 ---
 
-## 29. Onboarding Rules
+## 30. Onboarding Rules
 
 ### 29.1 Phone Validation
 
@@ -2334,7 +2631,7 @@ Three mandatory checkboxes (all required):
 
 ---
 
-## 30. Per-Asset LTV Details
+## 31. Per-Asset LTV Details
 
 ### 30.1 Granular LTV by Asset
 
@@ -2366,7 +2663,7 @@ maxBorrow = min(maxBorrowAsset, maxBorrowGlobal - existingLoansIRR)
 
 ---
 
-## 31. Key Business Invariants
+## 32. Key Business Invariants
 
 ### 31.1 Core Rules
 
