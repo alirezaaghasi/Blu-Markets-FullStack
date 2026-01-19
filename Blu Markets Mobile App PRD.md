@@ -1,100 +1,155 @@
-# Blu Markets Mobile App
-## Product Requirements Document (PRD)
+# Blu Markets: Native Mobile App PRD
 
-**Version:** 1.0
+**Version:** 2.0
 **Date:** January 2026
 **Status:** Draft
 
 ---
 
+## TL;DR
+
+This document defines the UX, UI, and technical requirements for the Blu Markets **native mobile app**, based on the existing web prototype. It translates 7 core user flows into mobile-native designs while preserving the **Activity Feed (Chat UI)** as a critical differentiator and staying compliant with the product philosophy, design system, and existing Figma tokens.
+
+---
+
 ## Table of Contents
 
-1. [Executive Summary](#1-executive-summary)
-2. [Product Vision](#2-product-vision)
-3. [Target Users](#3-target-users)
-4. [Core Features](#4-core-features)
+**Part I: Strategy & Vision**
+1. [Goals & Non-Goals](#1-goals--non-goals)
+2. [User Stories](#2-user-stories)
+3. [Narrative](#3-narrative)
+4. [Success Metrics](#4-success-metrics)
+
+**Part II: User Experience**
 5. [User Flows](#5-user-flows)
 6. [Navigation Architecture](#6-navigation-architecture)
 7. [Activity Feed (Chat UI)](#7-activity-feed-chat-ui)
-8. [Screen Specifications](#8-screen-specifications)
+
+**Part III: Screen Specifications**
+8. [Screen-by-Screen Specs](#8-screen-by-screen-specs)
+
+**Part IV: Technical Implementation**
 9. [Design System](#9-design-system)
-10. [Technical Requirements](#10-technical-requirements)
-11. [Data Models](#11-data-models)
+10. [Data Models](#10-data-models)
+11. [Technical Requirements](#11-technical-requirements)
 12. [Security & Compliance](#12-security--compliance)
-13. [Analytics & Tracking](#13-analytics--tracking)
-14. [Localization](#14-localization)
-15. [Success Metrics](#15-success-metrics)
+
+**Part V: Launch Planning**
+13. [Localization](#13-localization)
+14. [Milestones & Sequencing](#14-milestones--sequencing)
+15. [Feature Parity Checklist](#15-feature-parity-checklist)
+
+**Appendices**
+- [A: Existing Design Assets](#appendix-a-existing-design-assets)
+- [B: Glossary](#appendix-b-glossary)
 
 ---
 
-## 1. Executive Summary
+# Part I: Strategy & Vision
 
-Blu Markets Mobile is a native iOS/Android application that brings mindful portfolio management to mobile devices. The app enables users to manage multi-layer investment portfolios (Foundation, Growth, Upside), protect assets through derivatives, borrow against holdings, and maintain complete visibility into their financial journey through an immutable activity feed.
+## 1. Goals & Non-Goals
 
-### Key Differentiators
-- **Three-Layer Allocation Model**: Foundation (stable), Growth (balanced), Upside (high-potential)
-- **Activity Feed (Chat UI)**: Real-time, conversational narrative of all portfolio actions
-- **Risk-Aware Trading**: Visual friction and warnings for actions that deviate from targets
-- **Collateralized Lending**: Borrow against holdings with transparent LTV limits
-- **Asset Protection**: Insurance-like contracts to hedge downside risk
+### Business Goals
 
----
+| Goal | Rationale |
+|------|-----------|
+| Expand reach via mobile-native experience | Meet users where they are (mobile-first market) |
+| Improve engagement for Android-dominant user base | 80%+ Android market share in Iran |
+| Reduce risk of user error in critical financial actions | Build trust through guided, friction-aware UX |
+| Preserve Activity Feed as core differentiator | Real-time narrative creates engagement and transparency |
 
-## 2. Product Vision
+### User Goals
 
-### Mission Statement
-"Markets, but mindful" — Help users build wealth through disciplined, risk-aware portfolio management while maintaining complete transparency and control.
+| Goal | How We Deliver |
+|------|----------------|
+| Understand portfolio state at a glance | Hero value + allocation bar + layer accordions |
+| Take actions with clear outcomes | Preview screens with before/after visualization |
+| Avoid forced selling or irreversible damage | Friction copy, boundary warnings, confirmation flows |
+| See a narrative of their financial journey | Activity Feed on dashboard + full History tab |
 
-### Design Principles
+### Non-Goals
 
-| Principle | Description |
-|-----------|-------------|
-| **Portfolio Gravity** | Every action returns user to portfolio dashboard |
-| **Preview Before Commit** | All actions show impact before execution |
-| **Friction for Protection** | Visual warnings scale with risk level |
-| **Immutable History** | Every action recorded and visible |
-| **Mobile-First Interactions** | Bottom sheets, swipe gestures, haptic feedback |
-
----
-
-## 3. Target Users
-
-### Primary Persona: Iranian Retail Investor
-- Age: 25-45
-- Tech-savvy, mobile-first
-- Seeks wealth preservation and growth
-- Values transparency and control
-- Comfortable with crypto and traditional assets
-
-### User Needs
-- Quick portfolio health check (< 5 seconds)
-- Execute trades on-the-go
-- Monitor loan obligations
-- Review activity history
-- Receive timely alerts
+| Explicitly Out of Scope | Rationale |
+|------------------------|-----------|
+| New features beyond web MVP | Mobile parity first, innovation later |
+| Deep trading tools (limit orders, charts) | Not aligned with "mindful" philosophy |
+| Staking or yield farming | Complexity contradicts simplicity goal |
+| Speculative tooling (leverage trading) | Against risk-aware principles |
+| Social/community features | Focus on individual portfolio management |
 
 ---
 
-## 4. Core Features
+## 2. User Stories
 
-### Feature Matrix
+### Onboarding
+- As a **new user**, I want to create my risk profile so I get a recommended portfolio that matches my tolerance.
+- As a **new user**, I want to understand what I'm consenting to before investing.
 
-| Feature | Priority | Description |
-|---------|----------|-------------|
-| **Onboarding** | P0 | Phone auth, risk questionnaire, initial funding |
-| **Portfolio Dashboard** | P0 | Total value, layer breakdown, holdings list |
-| **Activity Feed** | P0 | Real-time action log with conversational narrative |
-| **Trading (Buy/Sell)** | P0 | Bottom sheet trade execution with preview |
-| **Rebalancing** | P0 | One-tap rebalance with constraint handling |
-| **Asset Protection** | P1 | Purchase derivative protection contracts |
-| **Borrowing** | P1 | Collateralized loans with installment tracking |
-| **Loan Repayment** | P1 | Partial/full repayment with progress tracking |
-| **History Tab** | P1 | Full ledger with date grouping and export |
-| **Push Notifications** | P1 | Alerts for drift, loan due dates, price moves |
-| **Biometric Auth** | P2 | Face ID / Touch ID / Fingerprint |
-| **Widgets** | P2 | Home screen portfolio value widget |
+### Portfolio Management
+- As a **user**, I want to view my total portfolio value and allocation by layer at a glance.
+- As a **user**, I want to see a real-time feed of my recent actions so I understand my journey.
+- As a **user**, I want to buy or sell assets and see exactly how my portfolio will be affected before confirming.
+- As a **user**, I want to rebalance when my portfolio drifts, with clear visibility into what trades will execute.
+
+### Advanced Features
+- As a **user**, I want to borrow money against my holdings without selling them.
+- As a **user**, I want to protect high-risk assets against losses through insurance-like contracts.
+- As a **user**, I want to review a complete, immutable history of everything I've done.
 
 ---
+
+## 3. Narrative
+
+In a country where inflation, sanctions, and economic uncertainty collide, Blu Markets offers a platform where every user decision still matters. The mobile app is the bridge that brings these powerful ideas into the palm of the user's hand.
+
+From the moment they onboard, users are shown that risk is not hidden — it's managed. That every action has an impact — but is never irreversible without warning. The mobile UI reinforces this at every step:
+
+- **Buying an asset** shows how your portfolio shifts toward or away from your target
+- **Borrowing** is deliberate, with clear consequences and installment tracking
+- **Protection** feels calm, not anxious — a rational hedge, not a panic button
+- **Rebalancing** feels like discipline, not panic — guided by your own chosen allocation
+- **The Activity Feed** tells the story of your financial journey in plain language
+
+The mobile experience turns Blu's philosophical foundations into tactile, day-to-day empowerment.
+
+> **Design Principle:** If it doesn't preserve or expand user choice, it doesn't ship.
+
+---
+
+## 4. Success Metrics
+
+### North Star Metric
+**Monthly Active Portfolios with Balanced Allocation**
+
+### Activation & Engagement
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| Onboarding completion rate | > 70% | Funnel: welcome → portfolio created |
+| Time from onboarding start to first investment | < 4 mins | Analytics timestamp delta |
+| Activation-to-investment conversion | > 50% | % of signups who fund portfolio |
+| D1 / D7 / D30 retention | 60% / 40% / 25% | Cohort analysis |
+
+### Feature Adoption
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| Rebalance within 3 days of drift warning | > 60% | Event: drift_detected → rebalance_executed |
+| Activity Feed engagement | > 50% | % sessions where feed is expanded/viewed |
+| Protection contracts on Upside assets | > 30% | % of Upside holdings with active protection |
+
+### Quality & Trust
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| Actions rolled back due to user confusion | < 2% | Support tickets + in-app cancellations |
+| App crash rate | < 0.1% | Crashlytics |
+| App store rating | > 4.5 | iOS/Android stores |
+| Trade execution time (tap to confirm) | < 30s | Analytics |
+
+---
+
+# Part II: User Experience
 
 ## 5. User Flows
 
@@ -121,6 +176,7 @@ Blu Markets Mobile is a native iOS/Android application that brings mindful portf
          ▼
 ┌─────────────────┐
 │ Risk Questions  │
+│  Swipeable cards│
 │  (9 questions)  │
 │  Progress bar   │
 │  Layer preview  │
@@ -135,6 +191,8 @@ Blu Markets Mobile is a native iOS/Android application that brings mindful portf
          ▼
 ┌─────────────────┐
 │  Consent        │
+│  (Farsi RTL +   │
+│   English sub)  │
 │  ☐ Risk ack     │
 │  ☐ Loss ack     │
 │  ☐ No guarantee │
@@ -143,7 +201,7 @@ Blu Markets Mobile is a native iOS/Android application that brings mindful portf
 ┌─────────────────┐
 │ Initial Funding │
 │ Amount: _______ │
-│ Min: 1,000,000  │
+│ Preview alloc.  │
 │  [Create]       │
 └────────┬────────┘
          ▼
@@ -164,37 +222,34 @@ Dashboard
 │ Asset Selector  │
 │ (Bottom Sheet)  │
 │ Search/filter   │
-│ Asset cards     │
 └────────┬────────┘
          ▼
 ┌─────────────────┐
 │ Trade Sheet     │
 │ [BUY] [SELL]    │
-│ Amount input    │
+│ Amount + chips  │
 │ IRR keypad      │
-│ Available: XXX  │
 └────────┬────────┘
          ▼
 ┌─────────────────┐
 │ Trade Preview   │
-│ ─────────────── │
-│ Asset: BTC      │
-│ Amount: 5M IRR  │
-│ Spread: 0.30%   │
 │ ─────────────── │
 │ ALLOCATION      │
 │ Before ████░░   │
 │ Target █████░   │
 │ After  ███░░░   │
 │ ─────────────── │
-│ ⚠ Drift warning │
+│ Moves toward/   │
+│ away badge      │
+│ ─────────────── │
+│ Spread: 0.30%   │
+│ ⚠ Warning copy  │
 │ ─────────────── │
 │ [Confirm Trade] │
 └────────┬────────┘
          ▼
 ┌─────────────────┐
-│ Success Toast   │
-│ ✓ Bought BTC    │
+│ Success + Toast │
 │ Activity logged │
 └─────────────────┘
          │
@@ -205,141 +260,102 @@ Dashboard
 ### 5.3 Rebalance Flow
 
 ```
-Dashboard (Drift detected)
+Dashboard (Drift banner visible)
     │
-    ▼ (Badge: "⚠ Rebalance")
+    ▼ (Tap "Rebalance")
 ┌─────────────────┐
 │ Rebalance Sheet │
 │ ─────────────── │
-│ Mode Selection: │
-│ ○ Holdings only │
-│ ● Holdings+Cash │
-│ ○ Smart (auto)  │
+│ Allocation bars │
+│ Before → After  │
 │ ─────────────── │
-│ PROPOSED TRADES │
-│ ▼ Expand list   │
+│ Summary:        │
+│ Selling 2 assets│
+│ Buying 3 assets │
+│ ─────────────── │
+│ ▼ Expand trades │
 │ • Sell 5M ETH   │
 │ • Buy 8M USDT   │
 │ ─────────────── │
-│ Cash deployed:  │
-│ 2,000,000 IRR   │
-│ ─────────────── │
-│ Residual drift: │
-│ 2.3% (locked    │
-│ collateral)     │
+│ ⚠ Locked assets │
+│   warning       │
 │ ─────────────── │
 │ [Confirm]       │
 └────────┬────────┘
          ▼
-┌─────────────────┐
-│ Success Screen  │
-│ ✓ Rebalanced    │
-│ 4 trades done   │
-└─────────────────┘
+    Success → Dashboard
 ```
 
 ### 5.4 Protection Flow
 
 ```
-Portfolio Tab
+Asset → More → "Protect"
     │
-    ▼ (Tap asset → "Protect")
+    ▼
 ┌─────────────────┐
 │ Protection Sheet│
 │ ─────────────── │
 │ Asset: BTC      │
 │ Value: 50M IRR  │
 │ ─────────────── │
-│ Duration:       │
+│ Coverage & dur. │
 │ [1m][3m][6m]    │
 │ ─────────────── │
-│ Premium:        │
+│ Premium calc:   │
 │ 1,200,000 IRR   │
-│ (2.4% for 3mo)  │
 │ ─────────────── │
-│ Coverage period │
-│ Jan 19 - Apr 19 │
+│ How it works    │
+│ (disclosure)    │
 │ ─────────────── │
 │ [Buy Protection]│
 └────────┬────────┘
          ▼
-┌─────────────────┐
-│ Success Screen  │
-│ ☂ BTC Protected │
-│ 90 days coverage│
-└─────────────────┘
+    Success → Dashboard
 ```
 
 ### 5.5 Borrow Flow
 
 ```
-Loans Tab → [New Loan]
+Asset → More → "Borrow"
     │
     ▼
 ┌─────────────────┐
-│ Select Collat.  │
-│ (Bottom Sheet)  │
-│ ─────────────── │
-│ BTC  100M  50%  │
-│ ETH   80M  50%  │
-│ SOL   20M  30%  │
-│ (value) (LTV)   │
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│ Configure Loan  │
+│ Loan Config     │
 │ ─────────────── │
 │ Collateral: BTC │
-│ Max: 50,000,000 │
+│ Amount input    │
+│ Duration toggle │
 │ ─────────────── │
-│ Borrow amount:  │
-│ [    30,000,000]│
+│ Preview panel:  │
+│ • LTV: 50%      │
+│ • Interest: 30% │
+│ • Maturity date │
 │ ─────────────── │
-│ Duration:       │
-│ [3 mo] [6 mo]   │
+│ Info box:       │
+│ Liquidation     │
+│ threshold,      │
+│ repayment terms │
 │ ─────────────── │
-│ Interest: 30%/yr│
-│ Total: 34.5M    │
-│ Liquidation: $X │
-│ ─────────────── │
-│ [Review Loan]   │
+│ [Confirm Loan]  │
 └────────┬────────┘
          ▼
-┌─────────────────┐
-│ Loan Review     │
-│ ─────────────── │
-│ Summary card    │
-│ 6 installments  │
-│ First due: Feb  │
-│ ─────────────── │
-│ ⚠ Asset frozen  │
-│ ─────────────── │
-│ [Confirm Borrow]│
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│ Success Screen  │
-│ ✓ 30M borrowed  │
-│ BTC locked      │
-└─────────────────┘
+    Success → Loans Tab
 ```
 
 ### 5.6 Repay Flow
 
 ```
-Loans Tab
+Loans Tab → Active Loan
     │
-    ▼ (Tap active loan)
+    ▼
 ┌─────────────────┐
 │ Loan Detail     │
 │ ─────────────── │
-│ Collateral: BTC │
-│ Principal: 30M  │
-│ Paid: 10M (2/6) │
-│ Remaining: 20M  │
-│ ─────────────── │
 │ Progress bar    │
-│ ████░░░░░░ 33%  │
+│ ████░░░░ 2/6    │
+│ ─────────────── │
+│ Installments    │
+│ list            │
 │ ─────────────── │
 │ [Repay]         │
 └────────┬────────┘
@@ -352,18 +368,43 @@ Loans Tab
 │ ○ Custom amount │
 │ ● Full settle   │
 │ ─────────────── │
-│ Amount: 24.5M   │
-│ (incl. interest)│
-│ ─────────────── │
-│ Cash avail: 50M │
-│ ─────────────── │
 │ [Confirm Repay] │
 └────────┬────────┘
          ▼
+    Success → Loans Tab
+```
+
+### 5.7 History Flow
+
+```
+History Tab
+    │
+    ▼
 ┌─────────────────┐
-│ Success Screen  │
-│ ✓ Loan settled  │
-│ BTC unfrozen    │
+│ Your History    │
+│ [Export CSV]    │
+│ ─────────────── │
+│ TODAY           │
+│ ┌─────────────┐ │
+│ │⚖ Rebalanced │ │
+│ │  10:42 AM   │ │
+│ │  [Expand ▼] │ │
+│ └─────────────┘ │
+│ ┌─────────────┐ │
+│ │+ Bought BTC │ │
+│ │  09:15 AM   │ │
+│ └─────────────┘ │
+│ ─────────────── │
+│ YESTERDAY       │
+│ ...             │
+└─────────────────┘
+    │
+    ▼ (Tap to expand)
+┌─────────────────┐
+│ Before/After    │
+│ portfolio state │
+│ Transaction ID  │
+│ Block number    │
 └─────────────────┘
 ```
 
@@ -371,7 +412,7 @@ Loans Tab
 
 ## 6. Navigation Architecture
 
-### Tab Bar Navigation (Bottom)
+### Tab Bar (Bottom Navigation)
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -386,23 +427,23 @@ Loans Tab
 
 ### Tab Definitions
 
-| Tab | Icon | Primary Function |
-|-----|------|------------------|
-| **Portfolio** | 📊 | Dashboard, holdings, trade, rebalance |
-| **Protection** | 🛡 | Active protections, buy new |
-| **Loans** | 💰 | Active loans, borrow, repay |
-| **History** | 📜 | Full activity ledger |
+| Tab | Icon | Primary Actions |
+|-----|------|-----------------|
+| **Portfolio** | 📊 | View holdings, trade, rebalance, add funds |
+| **Protection** | 🛡 | View active protections, buy new |
+| **Loans** | 💰 | View loans, borrow, repay |
+| **History** | 📜 | Full activity ledger, export |
 | **Profile** | 👤 | Settings, risk profile, logout |
 
 ### Navigation Patterns
 
-| Pattern | Usage |
-|---------|-------|
-| **Bottom Sheet** | All action forms (trade, protect, borrow, repay) |
-| **Modal** | Confirmations, success screens |
-| **Push** | Asset detail, loan detail |
-| **Tab** | Main navigation between sections |
-| **Swipe** | Dismiss bottom sheets, navigate history |
+| Pattern | When to Use | Example |
+|---------|-------------|---------|
+| **Bottom Sheet** | All action forms | Trade, Protect, Borrow, Repay, Rebalance |
+| **Modal** | Confirmations, success | Trade success, loan created |
+| **Push Navigation** | Detail views | Asset detail, loan detail |
+| **Tab Switch** | Section navigation | Portfolio → Loans |
+| **Swipe Gesture** | Dismiss sheets | Close bottom sheet |
 
 ---
 
@@ -410,80 +451,54 @@ Loans Tab
 
 ### Overview
 
-The Activity Feed is a **critical differentiating feature** that provides real-time, conversational feedback on all user actions. It creates a narrative of the user's financial journey and must be preserved in the mobile experience.
+The Activity Feed is a **critical differentiating feature** that provides real-time, conversational feedback on all user actions. It creates a narrative of the user's financial journey and **must be preserved** in the mobile experience.
 
-### Implementation Options
+### Implementation: Combined Approach
 
-#### Option A: Floating Activity Feed (Recommended)
-- Persistent mini-feed overlay on dashboard
-- Shows last 3-5 actions
-- Tap to expand full history
-- Swipe to dismiss temporarily
+| Location | Component | Content |
+|----------|-----------|---------|
+| **Dashboard** | Mini Activity Feed | Last 5 actions, always visible |
+| **History Tab** | Full Ledger | Complete history with expand/collapse |
+| **Post-Action** | Toast Notification | Immediate confirmation |
+
+### Dashboard Mini-Feed Layout
 
 ```
 ┌─────────────────────────────────────────────┐
 │ Header: Total Value                         │
 ├─────────────────────────────────────────────┤
 │ ┌─────────────────────────────────────────┐ │
-│ │ 📝 Activity                          ▼  │ │
-│ │ ● 10:42  Rebalanced portfolio           │ │
-│ │ ● 10:35  Bought BTC (2.5M IRR)          │ │
-│ │ ● 10:30  Added 5M cash                  │ │
+│ │ 📝 Recent Activity                   ▼  │ │
+│ │ ─────────────────────────────────────── │ │
+│ │ ● 10:42  Rebalanced portfolio      🟢  │ │
+│ │ ● 10:35  Bought BTC (2.5M IRR)     🟡  │ │
+│ │ ● 10:30  Added 5M cash             🟢  │ │
+│ │ ● 10:15  Protected ETH for 3mo     🟢  │ │
+│ │ ● 09:45  Started with 10M IRR      🟢  │ │
 │ └─────────────────────────────────────────┘ │
 │                                             │
-│ [Holdings list...]                          │
-│                                             │
+│ [Holdings list continues below...]          │
 └─────────────────────────────────────────────┘
 ```
 
-#### Option B: Dedicated History Tab
-- Full-screen activity log in History tab
-- Pull-to-refresh
-- Date grouping (Today, Yesterday, etc.)
-- Expandable entries with before/after
-
-#### Option C: Combined Approach (Recommended)
-- **Dashboard**: Mini activity feed (last 5 actions)
-- **History Tab**: Full immutable ledger with details
-- **Toast Notifications**: Immediate feedback after actions
-
-### Activity Entry Format
+### Entry Format
 
 ```
-┌──────────────────────────────────────┐
-│ ● 10:42    Rebalanced portfolio      │
-│            4 trades • SAFE           │
-├──────────────────────────────────────┤
-│ ● 10:35    Bought BTC                │
-│            2,500,000 IRR • DRIFT     │
-├──────────────────────────────────────┤
-│ ● 10:30    Added funds               │
-│            5,000,000 IRR • SAFE      │
-└──────────────────────────────────────┘
+┌──────────────────────────────────────────────┐
+│ ● [TIME]    [ACTION VERB + DETAILS]    [DOT]│
+├──────────────────────────────────────────────┤
+│ ● 10:42    Rebalanced portfolio         🟢  │
+│ ● 10:35    Bought BTC (2,500,000 IRR)   🟡  │
+│ ● 10:30    Added 5,000,000 IRR cash     🟢  │
+│ ● 10:15    Borrowed 30M against ETH     🟢  │
+│ ● 09:45    Protected BTC for 3mo        🟢  │
+└──────────────────────────────────────────────┘
 ```
 
-### Entry Components
+### Action Message Templates
 
-| Component | Description |
-|-----------|-------------|
-| **Timestamp** | HH:MM format, muted color |
-| **Action Verb** | Present tense, verb-first ("Bought", "Sold", "Protected") |
-| **Asset/Amount** | Context-specific details |
-| **Boundary Indicator** | Color-coded risk level (green/yellow/orange/red) |
-
-### Boundary Colors
-
-| Boundary | Color | Dot/Badge |
-|----------|-------|-----------|
-| SAFE | Green | ● |
-| DRIFT | Yellow/Amber | ⚠ |
-| STRUCTURAL | Orange | ⚠ |
-| STRESS | Red | ⛔ |
-
-### Action Types to Log
-
-| Action | Log Message Format |
-|--------|-------------------|
+| Action Type | Message Format |
+|-------------|----------------|
 | Portfolio Created | "Started with {amount} IRR" |
 | Add Funds | "Added {amount} IRR cash" |
 | Trade (Buy) | "Bought {asset} ({amount} IRR)" |
@@ -494,137 +509,104 @@ The Activity Feed is a **critical differentiating feature** that provides real-t
 | Borrow | "Borrowed {amount} IRR against {asset}" |
 | Repay | "Repaid {amount} IRR · {asset} loan ({n}/{total})" |
 
+### Boundary Indicator Colors
+
+| Boundary | Meaning | Color | Indicator |
+|----------|---------|-------|-----------|
+| SAFE | Action aligns with target | Green | 🟢 |
+| DRIFT | Minor deviation from target | Yellow/Amber | 🟡 |
+| STRUCTURAL | Major deviation from target | Orange | 🟠 |
+| STRESS | High risk action | Red | 🔴 |
+
+### History Tab: Expanded Entry
+
+```
+┌──────────────────────────────────────────────┐
+│ ⚖ Rebalanced Portfolio                       │
+│ 10:42 AM · Transaction #8X92...F29A          │
+├──────────────────────────────────────────────┤
+│ BEFORE                    AFTER              │
+│ Foundation  40% ████░░    35% ███░░  ↓5%    │
+│ Growth      40% ████░░    45% ████░  ↑5%    │
+│ Upside      20% ██░░░░    20% ██░░░  —      │
+├──────────────────────────────────────────────┤
+│ 🔒 Immutable · Block 1928492                 │
+└──────────────────────────────────────────────┘
+```
+
 ---
 
-## 8. Screen Specifications
+# Part III: Screen Specifications
+
+## 8. Screen-by-Screen Specs
 
 ### 8.1 Dashboard Screen
 
 **Purpose**: Primary hub for portfolio overview and quick actions
 
-**Components**:
-1. **Header**
-   - Blu Markets logo
-   - Status chips (Balanced/Rebalance needed, Active Loans count)
-   - Notifications bell
-   - Profile avatar
-
-2. **Hero Section**
-   - Total portfolio value (large, prominent)
-   - Daily change percentage with trend indicator
-   - Currency: IRR
-
-3. **Activity Feed Mini** (Chat UI)
-   - Last 5 actions
-   - Expandable to full history
-   - Real-time updates
-
-4. **Alert Banner** (conditional)
-   - Portfolio drift warning (amber)
-   - Loan due date warning (amber)
-   - Protection expiring (blue)
-
-5. **Allocation Bar**
-   - Horizontal stacked bar
-   - Foundation (blue), Growth (purple), Upside (green/amber)
-
-6. **Holdings Accordion**
-   - Grouped by layer
-   - Expandable/collapsible
-   - Each holding shows: name, value, status icons
-
-7. **Sticky Footer**
-   - [Add Funds] secondary button
-   - [Rebalance] primary button (if drift detected)
+| Section | Components |
+|---------|------------|
+| **Header** | Logo, status chips (Balanced/Rebalance), notifications, profile avatar |
+| **Hero** | Total portfolio value (large), daily change % with trend icon |
+| **Activity Feed** | Last 5 actions with timestamps and boundary indicators |
+| **Alert Banner** | Drift warning (amber), loan due (amber), protection expiring (blue) |
+| **Allocation Bar** | Horizontal stacked bar: Foundation (blue), Growth (purple), Upside (green) |
+| **Holdings** | Accordion grouped by layer, each showing assets with value and status |
+| **Sticky Footer** | [Add Funds] secondary, [Rebalance] primary (if drift detected) |
 
 ### 8.2 Trade Bottom Sheet
 
-**Trigger**: Tap asset or FAB button
-
-**Components**:
-1. Asset selector (if not pre-selected)
-2. Buy/Sell toggle
-3. Amount input with IRR keypad
-4. Available balance display
-5. Preview section:
-   - Trade details (price, spread)
-   - Allocation impact visualization
-   - Friction copy (warnings)
-6. Confirm button
+| Section | Components |
+|---------|------------|
+| **Header** | Asset name, current price, drag indicator |
+| **Toggle** | [BUY] / [SELL] segmented control |
+| **Amount** | Input field + quick amount chips (25%, 50%, 75%, Max) |
+| **Keypad** | Custom IRR numeric keypad |
+| **Available** | "Available: X IRR" or "Holding: X units" |
+| **Preview** | Allocation bars (before/target/after), spread disclosure |
+| **Warnings** | Friction copy if DRIFT or STRUCTURAL |
+| **Actions** | [Confirm Trade] primary button |
 
 ### 8.3 Protection Tab
 
-**Components**:
-1. **Active Protections List**
-   - Asset name and layer badge
-   - Premium paid
-   - Days remaining with countdown
-   - Progress bar
-   - Cancel button
-
-2. **Empty State**
-   - Illustration
-   - "Protect your holdings" message
-   - [Browse Assets] CTA
-
-3. **Education Card** (if < 2 protections)
-   - Brief explanation of protection
-   - Premium rates by layer
+| Section | Components |
+|---------|------------|
+| **Active List** | Cards with: asset, layer badge, premium, days remaining, progress bar, [Cancel] |
+| **Empty State** | Illustration, "Protect your holdings" message, [Browse Assets] CTA |
+| **Education** | Collapsible card explaining protection and premium rates |
 
 ### 8.4 Loans Tab
 
-**Components**:
-1. **Loan Capacity Bar**
-   - Used / Maximum / Remaining
-   - 25% portfolio limit indicator
-
-2. **Active Loans List**
-   - Collateral asset (with FROZEN badge)
-   - Principal and interest
-   - Installment progress (e.g., 2/6 paid)
-   - Days remaining
-   - [Repay] button
-
-3. **Empty State**
-   - Illustration
-   - "Borrow against your holdings"
-   - [New Loan] CTA
-
-4. **New Loan FAB**
-   - Opens collateral selector
+| Section | Components |
+|---------|------------|
+| **Capacity Bar** | Used / Maximum / Remaining (25% portfolio limit) |
+| **Active Loans** | Cards with: collateral (FROZEN badge), principal, interest, installment progress, [Repay] |
+| **Empty State** | Illustration, "Borrow against holdings" message, [New Loan] CTA |
+| **FAB** | Floating action button for new loan |
 
 ### 8.5 History Tab
 
-**Purpose**: Full immutable activity ledger
+| Section | Components |
+|---------|------------|
+| **Header** | "Your History" title, [Export CSV] button |
+| **Date Groups** | Section headers: Today, Yesterday, Jan 17, etc. |
+| **Entry Cards** | Icon, action description, amount, timestamp, boundary dot |
+| **Expanded View** | Before/after allocation, transaction ID, block number |
+| **Pagination** | Infinite scroll, 20 entries per page |
 
-**Components**:
-1. **Header**
-   - "Your History" title
-   - Export CSV button
+### 8.6 Profile Tab
 
-2. **Date-Grouped List**
-   - Section headers: Today, Yesterday, Jan 17, etc.
-   - Expandable entries
-   - Pull-to-refresh
-
-3. **Entry Card (Collapsed)**
-   - Icon (action type)
-   - Action description
-   - Amount
-   - Timestamp
-   - Boundary indicator
-
-4. **Entry Card (Expanded)**
-   - Before/after allocation comparison
-   - Transaction ID
-   - Full details
-   - Block number (immutability indicator)
-
-5. **Pagination**
-   - Load more on scroll
-   - 20 entries per page
+| Section | Components |
+|---------|------------|
+| **User Info** | Phone number, member since date |
+| **Risk Profile** | Current profile name, [Retake Quiz] option |
+| **Settings** | Notifications, biometric auth, language |
+| **Support** | Help center, contact |
+| **Logout** | Logout button with confirmation |
 
 ---
+
+# Part IV: Technical Implementation
 
 ## 9. Design System
 
@@ -642,6 +624,7 @@ The Activity Feed is a **critical differentiating feature** that provides real-t
 /* Surface */
 --surface-dark: #232f48;
 --card-dark: #1a2230;
+--border-dark: #232f48;
 
 /* Text */
 --text-primary-light: #0f172a;
@@ -654,10 +637,16 @@ The Activity Feed is a **critical differentiating feature** that provides real-t
 --error: #ef4444;
 --info: #3b82f6;
 
-/* Layers */
+/* Layer Identity */
 --layer-foundation: #3b82f6;  /* Blue */
 --layer-growth: #a855f7;       /* Purple */
 --layer-upside: #10b981;       /* Emerald */
+
+/* Boundary Indicators */
+--boundary-safe: #22c55e;
+--boundary-drift: #f59e0b;
+--boundary-structural: #f97316;
+--boundary-stress: #ef4444;
 ```
 
 ### Typography
@@ -684,9 +673,10 @@ The Activity Feed is a **critical differentiating feature** that provides real-t
 --font-extrabold: 800;
 ```
 
-### Spacing
+### Spacing & Radius
 
 ```css
+/* Spacing */
 --space-1: 4px;
 --space-2: 8px;
 --space-3: 12px;
@@ -694,12 +684,8 @@ The Activity Feed is a **critical differentiating feature** that provides real-t
 --space-5: 20px;
 --space-6: 24px;
 --space-8: 32px;
---space-10: 40px;
-```
 
-### Border Radius
-
-```css
+/* Border Radius */
 --radius-sm: 8px;
 --radius-default: 16px;
 --radius-lg: 24px;
@@ -707,91 +693,23 @@ The Activity Feed is a **critical differentiating feature** that provides real-t
 --radius-full: 9999px;
 ```
 
-### Components
+### Component Specs
 
 | Component | Specs |
 |-----------|-------|
-| **Button (Primary)** | h-56px, radius-full, bg-primary, font-bold |
+| **Button (Primary)** | h-56px, radius-full, bg-primary, font-bold, shadow-lg |
 | **Button (Secondary)** | h-56px, radius-full, bg-surface, border, font-bold |
 | **Card** | radius-default, bg-surface, border-subtle, p-20 |
 | **Bottom Sheet** | radius-top-xl, drag indicator, backdrop blur |
 | **Input** | h-48px, radius-default, border, focus:ring-primary |
 | **Badge/Chip** | h-32px, radius-full, px-16, font-bold |
-
-### Icons
-
-- **Library**: Material Symbols Outlined
-- **Size**: 20px (small), 24px (default), 32px (large)
-- **Style**: Outlined, weight 400
+| **Tab Bar** | h-64px, bg-surface, 5 items evenly spaced |
 
 ---
 
-## 10. Technical Requirements
+## 10. Data Models
 
-### Platform Support
-
-| Platform | Minimum Version |
-|----------|-----------------|
-| iOS | 15.0+ |
-| Android | API 26 (Android 8.0)+ |
-
-### Framework Options
-
-| Option | Pros | Cons |
-|--------|------|------|
-| **React Native** | Shared codebase with web, faster dev | Bridge overhead |
-| **Flutter** | High performance, single codebase | Different language (Dart) |
-| **Native (Swift/Kotlin)** | Best performance, platform APIs | Two codebases |
-
-**Recommendation**: React Native with shared business logic from web app
-
-### State Management
-
-- Reuse existing reducer pattern from web app
-- Deterministic engine for calculations
-- AsyncStorage for persistence
-- Real-time price updates via WebSocket
-
-### Offline Support
-
-| Feature | Offline Behavior |
-|---------|------------------|
-| View Portfolio | Cached values, "Last updated" timestamp |
-| View History | Full offline access |
-| Execute Trades | Queue for later (with warning) |
-| Biometric Auth | Works offline |
-
-### Push Notifications
-
-| Trigger | Notification |
-|---------|--------------|
-| Portfolio drift > 5% | "Your portfolio has drifted. Tap to rebalance." |
-| Loan installment due | "Loan payment due in 3 days" |
-| Protection expiring | "BTC protection expires in 7 days" |
-| Price alert | "BTC moved +10% today" |
-
-### API Requirements
-
-```
-POST   /auth/phone         # Send OTP
-POST   /auth/verify        # Verify OTP
-GET    /portfolio          # Get portfolio state
-POST   /portfolio/trade    # Execute trade
-POST   /portfolio/rebalance # Execute rebalance
-POST   /protection         # Create protection
-DELETE /protection/:id     # Cancel protection
-POST   /loan               # Create loan
-POST   /loan/:id/repay     # Repay loan
-GET    /history            # Get ledger entries
-GET    /prices             # Get current prices
-WS     /prices/stream      # Real-time price updates
-```
-
----
-
-## 11. Data Models
-
-### Portfolio State (matches web app)
+### Core State (TypeScript)
 
 ```typescript
 interface MobileAppState {
@@ -806,11 +724,11 @@ interface MobileAppState {
   protections: Protection[];
   loans: Loan[];
 
-  // Activity
-  actionLog: ActionLogEntry[];  // Chat UI data
+  // Activity Feed (Chat UI)
+  actionLog: ActionLogEntry[];
   ledger: LedgerEntry[];
 
-  // UI
+  // UI State
   currentTab: TabId;
   pendingAction: PendingAction | null;
   isLoading: boolean;
@@ -825,13 +743,37 @@ interface Holding {
 }
 
 interface ActionLogEntry {
-  id: number;           // Timestamp ms
-  timestamp: string;    // ISO string
+  id: number;              // Timestamp ms
+  timestamp: string;       // ISO string
   type: ActionType;
   boundary: Boundary;
   amountIRR?: number;
   assetId?: AssetId;
-  message: string;      // Pre-formatted for display
+  message: string;         // Pre-formatted display text
+}
+
+interface Protection {
+  id: string;
+  assetId: AssetId;
+  notionalIRR: number;
+  premiumIRR: number;
+  startISO: string;
+  endISO: string;
+  durationMonths: number;
+}
+
+interface Loan {
+  id: string;
+  collateralAssetId: AssetId;
+  collateralQuantity: number;
+  amountIRR: number;
+  interestRate: number;
+  durationMonths: 3 | 6;
+  startISO: string;
+  dueISO: string;
+  status: 'ACTIVE' | 'REPAID' | 'LIQUIDATED';
+  installments: LoanInstallment[];
+  installmentsPaid: number;
 }
 
 type ActionType =
@@ -845,7 +787,75 @@ type ActionType =
   | 'REPAY';
 
 type Boundary = 'SAFE' | 'DRIFT' | 'STRUCTURAL' | 'STRESS';
+type Layer = 'FOUNDATION' | 'GROWTH' | 'UPSIDE';
+type TabId = 'PORTFOLIO' | 'PROTECTION' | 'LOANS' | 'HISTORY' | 'PROFILE';
 ```
+
+### Asset Universe
+
+| Layer | Assets | LTV | Protection Premium |
+|-------|--------|-----|-------------------|
+| **Foundation** | USDT, PAXG, IRR_FIXED_INCOME | 70% | 0.4%/mo |
+| **Growth** | BTC, ETH, BNB, XRP, KAG, QQQ | 50% | 0.8%/mo |
+| **Upside** | SOL, TON, LINK, AVAX, MATIC, ARB | 30% | 1.2%/mo |
+
+---
+
+## 11. Technical Requirements
+
+### Platform Support
+
+| Platform | Minimum Version |
+|----------|-----------------|
+| iOS | 15.0+ |
+| Android | API 26 (Android 8.0)+ |
+
+### Recommended Stack
+
+| Layer | Technology | Rationale |
+|-------|------------|-----------|
+| **Framework** | React Native | Shared logic with web, large ecosystem |
+| **State** | Redux + existing reducer | Reuse web app's deterministic engine |
+| **Styling** | Tailwind-style (NativeWind) | Matches web, design system tokens |
+| **Navigation** | React Navigation | Industry standard, bottom tabs + stacks |
+| **Storage** | AsyncStorage + Keychain | Persist state, secure auth tokens |
+
+### API Endpoints
+
+```
+POST   /auth/phone           # Send OTP
+POST   /auth/verify          # Verify OTP, get tokens
+GET    /portfolio            # Get full portfolio state
+POST   /portfolio/trade      # Execute trade
+POST   /portfolio/rebalance  # Execute rebalance
+POST   /portfolio/add-funds  # Add cash
+POST   /protection           # Create protection
+DELETE /protection/:id       # Cancel protection
+POST   /loan                 # Create loan
+POST   /loan/:id/repay       # Repay loan
+GET    /history              # Get ledger (paginated)
+GET    /prices               # Get current prices
+WS     /prices/stream        # Real-time price updates
+```
+
+### Offline Support
+
+| Feature | Offline Behavior |
+|---------|------------------|
+| View Portfolio | Cached values with "Last updated" timestamp |
+| View Activity Feed | Full offline access |
+| View History | Full offline access |
+| Execute Actions | Queue with warning, sync when online |
+| Biometric Auth | Works offline |
+
+### Push Notifications
+
+| Trigger | Message |
+|---------|---------|
+| Portfolio drift > 5% | "Your portfolio has drifted. Tap to rebalance." |
+| Loan installment due in 3 days | "Loan payment due in 3 days" |
+| Protection expiring in 7 days | "BTC protection expires in 7 days" |
+| Significant price movement | "BTC moved +10% today" |
 
 ---
 
@@ -855,109 +865,103 @@ type Boundary = 'SAFE' | 'DRIFT' | 'STRUCTURAL' | 'STRESS';
 
 | Method | Implementation |
 |--------|----------------|
-| Phone OTP | Primary auth, Iranian mobile format |
-| Biometric | Face ID / Touch ID / Fingerprint (optional) |
-| Session Token | JWT with 24hr expiry, refresh token |
-| Pin Code | 6-digit backup for biometric failure |
+| **Phone OTP** | Primary auth, Iranian mobile format (+98) |
+| **Biometric** | Face ID / Touch ID / Fingerprint (optional) |
+| **PIN Code** | 6-digit backup for biometric failure |
+| **Session** | JWT (24hr) + refresh token |
 
 ### Data Security
 
 - All API calls over HTTPS (TLS 1.3)
 - Sensitive data encrypted at rest (Keychain/Keystore)
-- No sensitive data in logs
 - Certificate pinning for API endpoints
+- No sensitive data in logs or analytics
+- Secure enclave for biometric data
 
-### Compliance
+### Compliance Considerations
 
-- KYC flow integration point (future)
-- Transaction limits (IRR-based)
-- Risk disclaimers and consent tracking
-- GDPR-style data export capability
-
----
-
-## 13. Analytics & Tracking
-
-### Events to Track
-
-| Category | Event | Properties |
-|----------|-------|------------|
-| Onboarding | questionnaire_completed | risk_profile, time_spent |
-| Onboarding | portfolio_created | initial_amount, allocation |
-| Trading | trade_executed | asset, side, amount, boundary |
-| Trading | rebalance_executed | trades_count, residual_drift |
-| Protection | protection_purchased | asset, duration, premium |
-| Lending | loan_created | collateral, amount, duration |
-| Lending | loan_repaid | amount, is_settlement |
-| Engagement | tab_viewed | tab_name |
-| Engagement | activity_feed_expanded | entries_count |
-
-### Retention Metrics
-
-- D1, D7, D30 retention
-- Portfolio check frequency
-- Trade frequency
-- Time to first trade
-- Rebalance adoption rate
+- KYC integration point (future)
+- Transaction limits based on verification level
+- Risk disclaimers with explicit consent tracking
+- Data export capability (GDPR-style)
+- Audit trail (immutable ledger)
 
 ---
 
-## 14. Localization
+# Part V: Launch Planning
+
+## 13. Localization
 
 ### Supported Languages (Phase 1)
 
-| Language | Code | Direction |
-|----------|------|-----------|
-| Farsi (Persian) | fa | RTL |
-| English | en | LTR |
+| Language | Code | Direction | Calendar |
+|----------|------|-----------|----------|
+| Farsi (Persian) | fa | RTL | Jalali option |
+| English | en | LTR | Gregorian |
 
 ### RTL Considerations
 
-- Mirror layout for Farsi
+- Mirror entire layout for Farsi
+- Swap navigation directions
 - Number formatting (Persian digits optional)
-- Currency formatting (IRR)
-- Date formatting (Jalali calendar option)
+- Currency: Always IRR with proper formatting
+- Questionnaire and consent in Farsi with English subtitles
 
-### Localized Strings
+### Sample Localized Strings
 
 ```json
 {
   "dashboard.total_value": "ارزش کل پرتفوی",
   "dashboard.balanced": "متعادل",
-  "dashboard.rebalance_needed": "نیاز به تعادل",
+  "dashboard.rebalance_needed": "نیاز به تعادل‌سازی",
   "activity.started_with": "شروع با {amount} ریال",
   "activity.bought": "خرید {asset} ({amount} ریال)",
-  "activity.sold": "فروش {asset} ({amount} ریال)"
+  "activity.rebalanced": "تعادل‌سازی پرتفوی"
 }
 ```
 
 ---
 
-## 15. Success Metrics
+## 14. Milestones & Sequencing
 
-### North Star Metric
-**Monthly Active Portfolios with Balanced Allocation**
+| Phase | Scope | Dependencies |
+|-------|-------|--------------|
+| **1. Foundation** | Auth, state management, navigation shell | API endpoints |
+| **2. Onboarding** | Phone → Questionnaire → Funding → Success | Phase 1 |
+| **3. Dashboard** | Portfolio view, Activity Feed, allocation | Phase 2 |
+| **4. Trading** | Buy/Sell bottom sheet, preview, confirm | Phase 3 |
+| **5. Rebalance** | Drift detection, rebalance preview, confirm | Phase 4 |
+| **6. Loans** | Borrow flow, repayment, installment tracking | Phase 3 |
+| **7. Protection** | Protection purchase, management, cancellation | Phase 3 |
+| **8. History** | Full ledger, date grouping, expand/collapse | Phase 3 |
+| **9. Polish** | Animations, haptics, edge cases | All phases |
+| **10. QA & Launch** | Testing, beta, app store submission | Phase 9 |
 
-### Key Performance Indicators
+---
 
-| Metric | Target | Measurement |
-|--------|--------|-------------|
-| Onboarding completion | > 70% | Funnel analytics |
-| D7 retention | > 40% | Cohort analysis |
-| Rebalance adoption | > 50% | % users who rebalance when prompted |
-| Activity feed engagement | > 60% | % users who expand/view |
-| Trade execution time | < 30s | From tap to confirmation |
-| App crash rate | < 0.1% | Crashlytics |
-| App store rating | > 4.5 | iOS/Android stores |
+## 15. Feature Parity Checklist
 
-### Quality Metrics
-
-| Metric | Target |
-|--------|--------|
-| App launch time | < 2s |
-| Trade preview load | < 1s |
-| Bottom sheet animation | 60fps |
-| Offline capability | View portfolio + history |
+| Web Feature | Mobile Status | Notes |
+|-------------|---------------|-------|
+| Phone onboarding | ✅ Required | Add OTP verification |
+| Risk questionnaire (9 questions) | ✅ Required | Swipeable cards with layer preview |
+| Profile result + donut chart | ✅ Required | Full visualization |
+| Consent flow (3 checkboxes) | ✅ Required | Farsi RTL + English |
+| Initial funding | ✅ Required | IRR keypad |
+| Portfolio dashboard | ✅ Required | Layer accordions |
+| **Activity Feed (Chat UI)** | ✅ **Critical** | Mini (dashboard) + full (History) |
+| Buy/Sell trades | ✅ Required | Bottom sheet |
+| Add funds | ✅ Required | Bottom sheet |
+| Rebalance with preview | ✅ Required | Mode selection + trade list |
+| Protection purchase | ✅ Required | Duration selector |
+| Protection cancel | ✅ Required | Confirmation prompt |
+| Borrow against holdings | ✅ Required | Collateral + amount + duration |
+| Loan repayment | ✅ Required | Partial/full + installment tracking |
+| History/Ledger | ✅ Required | Date grouping + expand |
+| Boundary indicators | ✅ Required | Color-coded (green/yellow/orange/red) |
+| Friction copy (warnings) | ✅ Required | Plain language, contextual |
+| Allocation visualization | ✅ Required | Before/target/after bars |
+| Reset portfolio | ⏸ Deferred | Profile settings only |
 
 ---
 
@@ -965,53 +969,84 @@ type Boundary = 'SAFE' | 'DRIFT' | 'STRUCTURAL' | 'STRESS';
 
 Reference the 71 design screens in `/stitch_designs/stitch_portfolio_asset_detail/`:
 
-- Welcome & Onboarding: `1._mobile_welcome_entry`, `2._mobile_risk_questionnaire`, etc.
-- Dashboard: `4._mobile_dashboard_hub`, `mobile_dashboard_(iphone_16_pro)`
-- Trading: `buy_asset_bottom_sheet`, `sell_asset_sheet_(iphone_16_pro)`
-- History: `immutable_action_history`, `history_tab_(iphone_16_pro)_*`
-- Loans: `loans_tab_(iphone_16_pro)_*`, `mobile_loans_interface`
-- Protection: `protections_tab_(iphone_16_pro)_*`
-- Rebalance: `rebalance_sheet_(iphone_16_pro)`, `rebalance_preview_sheet`
+**Onboarding**
+- `1._mobile_welcome_entry`
+- `2._mobile_risk_questionnaire`
+- `3._mobile_allocation_review`
+- `4._mobile_funding_screen`
+- `welcome_screen_(iphone_16_pro)`
+- `risk_questionnaire_(iphone_16_pro)`
+- `recommended_allocation_(iphone_16_pro)`
+- `initial_funding_(iphone_16_pro)`
+
+**Dashboard**
+- `4._mobile_dashboard_hub`
+- `mobile_dashboard_(iphone_16_pro)`
+- `new_mobile_dashboard`
+- `blu_markets_main_dashboard`
+
+**Trading**
+- `buy_asset_bottom_sheet`
+- `buy_asset_sheet_(iphone_16_pro)`
+- `sell_asset_sheet_(iphone_16_pro)`
+- `trade_success_screen_(iphone_16_pro)`
+- `custom_irr_keypad_(iphone_16_pro)`
+
+**History (Activity Feed)**
+- `immutable_action_history`
+- `history_tab_(iphone_16_pro)_1`
+- `history_tab_(iphone_16_pro)_2`
+- `history_tab_(iphone_16_pro)_3`
+- `action_history_tab`
+
+**Loans**
+- `loans_tab_(iphone_16_pro)_1`
+- `loans_tab_(iphone_16_pro)_2`
+- `loans_tab_(iphone_16_pro)_3`
+- `mobile_loans_interface`
+- `active_loans_overview`
+
+**Protection**
+- `protections_tab_(iphone_16_pro)_1`
+- `protections_tab_(iphone_16_pro)_2`
+- `protections_tab_(iphone_16_pro)_3`
+- `protections_tab_overview`
+
+**Rebalance**
+- `rebalance_sheet_(iphone_16_pro)`
+- `rebalance_preview_sheet`
+- `rebalance_success_(iphone_16_pro)`
+- `mobile_rebalance_(iphone_16_pro)`
 
 ---
 
-## Appendix B: Web App Feature Parity Checklist
-
-| Web Feature | Mobile Status | Notes |
-|-------------|---------------|-------|
-| Phone onboarding | ✅ Required | Add OTP verification |
-| Risk questionnaire | ✅ Required | 9 questions with layer preview |
-| Profile result | ✅ Required | Donut chart + allocation |
-| Consent flow | ✅ Required | 3 checkboxes |
-| Initial funding | ✅ Required | IRR keypad |
-| Portfolio dashboard | ✅ Required | Accordion for layers |
-| Activity feed (Chat UI) | ✅ **Critical** | Mini + full history |
-| Buy/Sell trades | ✅ Required | Bottom sheet |
-| Add funds | ✅ Required | Bottom sheet |
-| Rebalance | ✅ Required | Mode selection + preview |
-| Protection purchase | ✅ Required | Duration selector |
-| Protection cancel | ✅ Required | Confirmation prompt |
-| Borrow | ✅ Required | Collateral + amount + duration |
-| Repay | ✅ Required | Partial/full options |
-| History/Ledger | ✅ Required | Date grouping + expand |
-| Boundary indicators | ✅ Required | Color coding |
-| Friction copy | ✅ Required | Plain language warnings |
-| Reset portfolio | ⏸ Deferred | Settings only, with confirmation |
-
----
-
-## Appendix C: Glossary
+## Appendix B: Glossary
 
 | Term | Definition |
 |------|------------|
-| **Activity Feed** | Real-time log of user actions (the "Chat UI") |
-| **Boundary** | Risk classification of an action (SAFE/DRIFT/STRUCTURAL/STRESS) |
-| **Foundation** | Low-risk layer (USDT, PAXG, IRR Fixed Income) |
+| **Activity Feed** | Real-time log of user actions displayed on dashboard (the "Chat UI") |
+| **Boundary** | Risk classification of an action: SAFE, DRIFT, STRUCTURAL, STRESS |
+| **Foundation** | Low-risk layer: USDT, PAXG, IRR Fixed Income |
 | **Friction Copy** | Plain language warnings shown before risky actions |
-| **Frozen** | Asset state when used as loan collateral |
-| **Growth** | Medium-risk layer (BTC, ETH, BNB, XRP, KAG, QQQ) |
+| **Frozen** | Asset state when used as loan collateral (cannot be traded) |
+| **Growth** | Medium-risk layer: BTC, ETH, BNB, XRP, KAG, QQQ |
 | **HRAM** | Hybrid Risk-Adjusted Multi-factor balancing algorithm |
 | **LTV** | Loan-to-Value ratio for collateralized borrowing |
-| **Portfolio Gravity** | Design principle: return to dashboard after actions |
-| **Protection** | Insurance-like derivative contract |
-| **Upside** | High-risk layer (SOL, TON, LINK, AVAX, MATIC, ARB) |
+| **Portfolio Gravity** | Design principle: return to dashboard after every action |
+| **Protection** | Insurance-like derivative contract hedging downside |
+| **Upside** | High-risk layer: SOL, TON, LINK, AVAX, MATIC, ARB |
+
+---
+
+## Final Notes
+
+This PRD reflects Blu Markets' product, design, and ethical principles. It translates a best-in-class web experience into a deliberate, mobile-first product while preserving the Activity Feed as a core differentiator.
+
+Every screen was derived from real user flows, with full compliance to:
+- Product Vision & Strategy
+- Mobile Design Brief
+- High-Level Design System
+- Figma Token System
+- Existing Web App Implementation
+
+> **If it doesn't preserve or expand user choice, it doesn't ship.**
