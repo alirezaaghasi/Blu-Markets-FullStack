@@ -1,6 +1,6 @@
 # Blu Markets: Native Mobile App PRD
 
-**Version:** 2.1
+**Version:** 3.0
 **Date:** January 2026
 **Status:** Draft
 
@@ -38,6 +38,17 @@ This document defines the UX, UI, and technical requirements for the Blu Markets
 13. [Localization](#13-localization)
 14. [Milestones & Sequencing](#14-milestones--sequencing)
 15. [Feature Parity Checklist](#15-feature-parity-checklist)
+
+**Part VI: Business Logic Reference**
+16. [Risk Profiling Algorithm](#16-risk-profiling-algorithm)
+17. [Asset Configuration](#17-asset-configuration)
+18. [HRAM Rebalancing Algorithm](#18-hram-rebalancing-algorithm)
+19. [Boundary Classification](#19-boundary-classification)
+20. [Trading Rules](#20-trading-rules)
+21. [Loan Rules](#21-loan-rules)
+22. [Protection Rules](#22-protection-rules)
+23. [Currency & Pricing](#23-currency--pricing)
+24. [Configuration Constants](#24-configuration-constants)
 
 **Appendices**
 - [A: Existing Design Assets](#appendix-a-existing-design-assets)
@@ -966,6 +977,487 @@ WS     /prices/stream        # Real-time price updates
 | Friction copy (warnings) | ✅ Required | Plain language, contextual |
 | Allocation visualization | ✅ Required | Before/target/after bars |
 | Reset portfolio | ⏸ Deferred | Profile settings only |
+
+---
+
+# Part VI: Business Logic Reference
+
+This section documents all algorithms, formulas, thresholds, and business rules from the web app that must be replicated in the mobile app.
+
+## 16. Risk Profiling Algorithm
+
+### 16.1 Questionnaire Structure
+
+**9 Questions across 4 Dimensions:**
+
+| Dimension | Weight | Questions | Question Weights |
+|-----------|--------|-----------|------------------|
+| **Capacity** | 40% | q_income, q_buffer, q_proportion | 1.0, 1.2, 1.3 |
+| **Willingness** | 35% | q_crash_20, q_tradeoff, q_past_behavior, q_max_loss | 2.0, 1.5, 1.0, 1.5 |
+| **Horizon** | 15% | q_horizon | 1.0 |
+| **Goal** | 10% | q_goal | 1.0 |
+
+### 16.2 Scoring Algorithm
+
+```
+Step 1: Calculate Sub-Scores
+─────────────────────────────
+C (Capacity)   = weighted_avg(q_income, q_buffer, q_proportion)
+W (Willingness) = weighted_avg(q_crash_20, q_tradeoff, q_past_behavior, q_max_loss)
+H (Horizon)    = q_horizon score
+G (Goal)       = q_goal score
+
+Step 2: Apply Conservative Dominance Rule
+─────────────────────────────────────────
+Base Score = min(C, W)
+
+Step 3: Apply Horizon Hard Caps
+───────────────────────────────
+If q_horizon < 1 year  → cap score at 3
+If q_horizon 1-3 years → cap score at 5
+
+Step 4: Check Consistency Penalties
+───────────────────────────────────
+If q_crash_20 ≤ 2 AND q_max_loss ≥ 7 → penalty of -1
+
+Step 5: Detect Pathological Users
+─────────────────────────────────
+PANIC_SELLER:     If detected → hard cap at 3
+GAMBLER:          If detected alone → cap willingness at 7
+GAMBLER + HIGH_PROPORTION: → hard cap at 5
+INEXPERIENCED + GAMBLER:   → hard cap at 5
+
+Step 6: Final Score
+───────────────────
+Clamp to range [1, 10]
+Round to nearest integer
+```
+
+### 16.3 Risk Profiles & Target Allocations
+
+| Score | Profile Name | Foundation | Growth | Upside |
+|-------|--------------|------------|--------|--------|
+| 1-2 | Capital Preservation | 80-85% | 12-15% | 3-5% |
+| 3-4 | Conservative | 65-70% | 25-30% | 5% |
+| 5-6 | Balanced | 50-55% | 35% | 10-15% |
+| 7-8 | Growth | 40-45% | 38-40% | 17-20% |
+| 9-10 | Aggressive | 30-35% | 40% | 25-30% |
+
+### 16.4 Profile → Strategy Mapping (for HRAM)
+
+| User Profile | HRAM Strategy |
+|--------------|---------------|
+| ANXIOUS_NOVICE | CONSERVATIVE |
+| STEADY_BUILDER | BALANCED |
+| AGGRESSIVE_ACCUMULATOR | MOMENTUM_TILT |
+| WEALTH_PRESERVER | MAX_DIVERSIFICATION |
+| SPECULATOR | AGGRESSIVE |
+
+---
+
+## 17. Asset Configuration
+
+### 17.1 Complete Asset Table
+
+| Asset | Layer | Volatility | Layer Weight | Liquidity | Protection Eligible |
+|-------|-------|------------|--------------|-----------|---------------------|
+| USDT | FOUNDATION | 0.01 | 0.40 | 1.00 | ✓ |
+| PAXG | FOUNDATION | 0.12 | 0.30 | 0.85 | ✓ |
+| IRR_FIXED_INCOME | FOUNDATION | 0.05 | 0.30 | 0.70 | ✗ |
+| BTC | GROWTH | 0.45 | 0.25 | 1.00 | ✓ |
+| ETH | GROWTH | 0.55 | 0.20 | 0.98 | ✓ |
+| BNB | GROWTH | 0.50 | 0.15 | 0.90 | ✓ |
+| XRP | GROWTH | 0.60 | 0.10 | 0.88 | ✓ |
+| KAG | GROWTH | 0.18 | 0.15 | 0.75 | ✓ |
+| QQQ | GROWTH | 0.20 | 0.15 | 0.95 | ✓ |
+| SOL | UPSIDE | 0.75 | 0.20 | 0.92 | ✓ |
+| TON | UPSIDE | 0.65 | 0.18 | 0.70 | ✗ |
+| LINK | UPSIDE | 0.60 | 0.18 | 0.85 | ✓ |
+| AVAX | UPSIDE | 0.70 | 0.16 | 0.82 | ✓ |
+| MATIC | UPSIDE | 0.65 | 0.14 | 0.80 | ✗ |
+| ARB | UPSIDE | 0.70 | 0.14 | 0.75 | ✗ |
+
+### 17.2 Layer Constraints
+
+| Layer | Min Target | Max Target | Hard Min | Hard Max | Drift Tolerance |
+|-------|------------|------------|----------|----------|-----------------|
+| FOUNDATION | 40% | 70% | 30% | - | 5% |
+| GROWTH | 20% | 45% | - | - | 5% |
+| UPSIDE | 0% | 20% | - | 25% | 5% |
+
+### 17.3 Default Asset Prices (USD)
+
+```
+USDT:    1.00      PAXG:   2,650     BTC:    97,500
+ETH:     3,200     BNB:    680       XRP:    2.20
+KAG:     30        QQQ:    521       SOL:    185
+TON:     5.20      LINK:   22        AVAX:   35
+MATIC:   0.45      ARB:    0.80
+```
+
+### 17.4 Fixed Income Asset Model
+
+```
+Unit Price:     500,000 IRR
+Annual Rate:    30%
+Interest Type:  Simple interest
+
+Value Calculation:
+  principal = quantity × 500,000
+  accrued   = principal × 0.30 × (daysHeld / 365)
+  total     = principal + accrued
+```
+
+---
+
+## 18. HRAM Rebalancing Algorithm
+
+### 18.1 Four-Factor Model
+
+**Factor 1: Risk Parity Weight**
+```
+volatilityRatio    = 0.30 / assetVolatility
+volatilityAdjust   = 0.85 + (volatilityRatio - 1) × 0.15
+                     // Clamped to [0.85, 1.15]
+riskParityWeight   = baseLayerWeight × volatilityAdjust
+```
+
+**Factor 2: Momentum**
+```
+momentum          = (currentPrice - SMA_50) / SMA_50
+                    // Clamped to [-1, 1]
+momentumFactor    = 1 + (momentum × MOMENTUM_STRENGTH)
+```
+
+**Factor 3: Correlation**
+```
+avgCorrelation    = average absolute correlation with other layer assets
+                    // Window: 60 days
+correlationFactor = 1 - (avgCorrelation × CORRELATION_PENALTY)
+```
+
+**Factor 4: Liquidity**
+```
+liquidityFactor   = 1 + (liquidityScore - 0.80) × LIQUIDITY_BONUS
+```
+
+**Final Weight Calculation:**
+```
+rawWeight[asset]  = riskParityWeight × momentumFactor × correlationFactor × liquidityFactor
+normalized[asset] = rawWeight[asset] / sum(allRawWeights)
+
+// Apply caps (iterative, max 10 iterations)
+MIN_WEIGHT = 5%
+MAX_WEIGHT = 40%
+```
+
+### 18.2 Strategy Presets
+
+| Strategy | Momentum Strength | Correlation Penalty | Min Weight | Max Weight |
+|----------|-------------------|---------------------|------------|------------|
+| EQUAL_WEIGHT | 0 | 0 | 5% | 50% |
+| RISK_PARITY | 0 | 0 | 5% | 40% |
+| MOMENTUM_TILT | 0.5 | 0.1 | 5% | 35% |
+| MAX_DIVERSIFICATION | 0.1 | 0.4 | 10% | 30% |
+| BALANCED | 0.3 | 0.2 | 5% | 40% |
+| CONSERVATIVE | 0.1 | 0.3 | 10% | 35% |
+| AGGRESSIVE | 0.5 | 0.1 | 5% | 50% |
+
+### 18.3 Rebalance Modes
+
+| Mode | Behavior |
+|------|----------|
+| **HOLDINGS_ONLY** | Trade existing holdings only (no cash deployment) |
+| **HOLDINGS_PLUS_CASH** | Deploy all available cash to reach target |
+| **SMART** | HOLDINGS_ONLY first, then optionally deploy cash |
+
+### 18.4 Gap Analysis for Frozen Collateral
+
+```
+1. Calculate frozenByLayer and unfrozenByLayer
+2. For each overweight layer:
+   movableAmount = min(surplus, unfrozenValue)
+3. Simulate HOLDINGS_ONLY result
+4. Calculate cashNeededForPerfectBalance
+5. Determine if cash would help (and by how much)
+6. Calculate residualDrift after rebalance
+```
+
+### 18.5 Residual Drift Display Rules
+
+```
+If residualDrift < 0.5%  → Hide (negligible)
+If residualDrift < 1.0%  → Show 1 decimal (e.g., "0.7%")
+If residualDrift ≥ 1.0%  → Show whole number (e.g., "2%")
+```
+
+---
+
+## 19. Boundary Classification
+
+### 19.1 Portfolio Status Determination
+
+| Status | Condition |
+|--------|-----------|
+| **BALANCED** | All layers within 5% of target |
+| **SLIGHTLY_OFF** | Any layer > 5% drift, no hard limits breached |
+| **ATTENTION_REQUIRED** | Foundation < 30% OR Upside > 25% |
+
+### 19.2 Boundary Classification Matrix
+
+| Before Status | After Status | Boundary | With Stress Mode |
+|---------------|--------------|----------|------------------|
+| BALANCED | BALANCED | SAFE | DRIFT |
+| BALANCED | SLIGHTLY_OFF | DRIFT | STRUCTURAL |
+| BALANCED | ATTENTION_REQUIRED | STRUCTURAL | STRESS |
+| SLIGHTLY_OFF | BALANCED | SAFE | DRIFT |
+| SLIGHTLY_OFF | SLIGHTLY_OFF | DRIFT | STRUCTURAL |
+| SLIGHTLY_OFF | ATTENTION_REQUIRED | STRUCTURAL | STRESS |
+| ATTENTION_REQUIRED | Any | STRUCTURAL | STRESS |
+
+### 19.3 Special Cases
+
+| Action | Boundary Rule |
+|--------|---------------|
+| ADD_FUNDS | Always SAFE |
+| REBALANCE (improved) | SAFE |
+| REBALANCE (failed/constrained) | STRUCTURAL |
+| REPAY | Based on final status |
+
+### 19.4 Friction Copy Templates
+
+| Boundary | Message |
+|----------|---------|
+| **SAFE** | (none) |
+| **DRIFT** | "This moves you slightly away from your target. You can rebalance later." |
+| **STRUCTURAL** | "This is a bigger move from your target. Please review before confirming." |
+| **STRESS** | "This is a significant change. Please confirm you understand the impact." |
+
+**Rebalance-Specific Messages:**
+- Base: "Your portfolio couldn't be fully rebalanced."
+- If hasLockedCollateral: "+ Some assets are locked as collateral for your loans."
+- If insufficientCash: "+ Not enough cash to fully balance all layers."
+- If residualDrift ≥ 0.5%: "+ Remaining drift: X.X% from target."
+- If perfect: "Your portfolio is now on target."
+
+---
+
+## 20. Trading Rules
+
+### 20.1 Spread by Layer
+
+| Layer | Spread | Range |
+|-------|--------|-------|
+| FOUNDATION | 0.15% | 0.1% - 0.2% |
+| GROWTH | 0.30% | 0.2% - 0.4% |
+| UPSIDE | 0.60% | 0.4% - 0.8% |
+
+### 20.2 Validation Rules
+
+**BUY Validation:**
+```
+✓ amount > 0
+✓ cashIRR ≥ amountIRR
+✓ asset exists in universe
+```
+
+**SELL Validation:**
+```
+✓ amount > 0
+✓ asset not frozen (not collateral)
+✓ holdingValue ≥ amountIRR
+```
+
+### 20.3 Minimum Trade Amount
+
+```
+MIN_TRADE_AMOUNT = 1,000,000 IRR
+```
+
+---
+
+## 21. Loan Rules
+
+### 21.1 LTV (Loan-to-Value) by Layer
+
+| Layer | Max LTV | Formula |
+|-------|---------|---------|
+| FOUNDATION | 70% | maxBorrow = holdingValue × 0.70 |
+| GROWTH | 50% | maxBorrow = holdingValue × 0.50 |
+| UPSIDE | 30% | maxBorrow = holdingValue × 0.30 |
+
+### 21.2 Interest Calculation
+
+```
+ANNUAL_RATE = 30% (0.30)
+
+totalInterest = principal × 0.30 × (durationMonths / 12)
+
+Example (3-month, 30M IRR):
+  interest = 30,000,000 × 0.30 × (3/12) = 2,250,000 IRR
+  totalDue = 32,250,000 IRR
+```
+
+### 21.3 Installment Calculation
+
+```
+INSTALLMENT_COUNT = 6 (always, regardless of duration)
+
+daysPerInstallment = (durationMonths × 30) / 6
+principalPerInst   = floor(principal / 6)
+interestPerInst    = floor(totalInterest / 6)
+lastInstallment    = gets rounding remainder
+
+Due dates: Every (daysPerInstallment) days from loan creation
+Status: PENDING → PAID or PARTIAL
+```
+
+### 21.4 Global Loan Cap
+
+```
+MAX_PORTFOLIO_LOAN_PCT = 25%
+
+maxTotalLoans = (cashIRR + holdingsValue) × 0.25
+remainingCapacity = maxTotalLoans - existingLoansTotal
+
+Validation: existingLoans + newLoan ≤ maxTotalLoans
+Error: EXCEEDS_PORTFOLIO_LOAN_LIMIT
+```
+
+### 21.5 Liquidation Threshold
+
+```
+liquidationIRR = principal (loan amount at creation)
+
+Trigger: collateralValue < liquidationIRR
+Note: Accrued interest NOT included in liquidation check
+```
+
+### 21.6 Accrued Interest (Daily)
+
+```
+dailyRate = 0.30 / 365 = 0.000822
+accruedInterest = principal × dailyRate × daysElapsed
+```
+
+### 21.7 Collateral Rules
+
+```
+On loan creation:  holding.frozen = true
+On full repayment: holding.frozen = false
+While frozen:      Cannot sell, cannot use as collateral again
+```
+
+---
+
+## 22. Protection Rules
+
+### 22.1 Premium Rates (Monthly)
+
+| Layer | Rate | Annual Equivalent |
+|-------|------|-------------------|
+| FOUNDATION | 0.4% (0.004) | 4.8% |
+| GROWTH | 0.8% (0.008) | 9.6% |
+| UPSIDE | 1.2% (0.012) | 14.4% |
+
+### 22.2 Premium Calculation
+
+```
+premiumIRR = notionalIRR × monthlyRate × durationMonths
+
+Example (BTC in GROWTH, 50M IRR, 3 months):
+  premium = 50,000,000 × 0.008 × 3 = 1,200,000 IRR
+```
+
+### 22.3 Duration Options
+
+```
+MIN_DURATION = 1 month
+MAX_DURATION = 6 months
+STEP = 1 month
+Options: [1, 2, 3, 4, 5, 6]
+```
+
+### 22.4 Eligibility
+
+**Eligible (11 assets):**
+USDT, PAXG, BTC, ETH, BNB, XRP, KAG, QQQ, SOL, LINK, AVAX
+
+**Not Eligible (4 assets):**
+- TON, MATIC, ARB (no liquid derivatives market)
+- IRR_FIXED_INCOME (internal asset)
+
+### 22.5 Validation Rules
+
+```
+✓ Asset exists in holdings
+✓ Asset is protection-eligible
+✓ Duration in [1, 6]
+✓ notionalIRR > 0
+✓ No existing active protection on asset
+✓ cashIRR ≥ premiumIRR
+```
+
+---
+
+## 23. Currency & Pricing
+
+### 23.1 FX Rate
+
+```
+DEFAULT_FX_RATE = 1,456,000 IRR per USD
+```
+
+### 23.2 Value Calculation
+
+```
+For crypto/ETF assets:
+  valueIRR = quantity × priceUSD × FX_RATE
+
+For IRR_FIXED_INCOME:
+  valueIRR = quantity × 500,000 + accruedInterest
+```
+
+### 23.3 Holdings Model (v10)
+
+```
+Holdings stored as QUANTITY (not value)
+
+Decimal precision:
+  BTC:           8 decimals
+  ETH:           6 decimals
+  Stables/Gold:  2-4 decimals
+  Altcoins:      2-4 decimals
+  Fixed Income:  0 decimals (whole units only)
+```
+
+---
+
+## 24. Configuration Constants
+
+### 24.1 Thresholds
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| MIN_TRADE_AMOUNT | 1,000,000 IRR | Minimum for any trade |
+| MIN_REBALANCE_TRADE | 100,000 IRR | Minimum per-asset rebalance trade |
+| DRIFT_TOLERANCE | 5% | Threshold for SLIGHTLY_OFF status |
+| EMERGENCY_DRIFT | 10% | Bypasses time requirement for rebalance |
+| MIN_REBALANCE_INTERVAL | 1 day | Between normal rebalances |
+| MAX_ACTION_LOG_SIZE | 50 | Maximum entries in action log |
+| FX_RATE | 1,456,000 | IRR per USD |
+| LOAN_INTEREST_RATE | 0.30 | 30% annual |
+| MAX_LOAN_PCT | 0.25 | 25% of portfolio |
+| FIXED_INCOME_UNIT | 500,000 | IRR per unit |
+| FIXED_INCOME_RATE | 0.30 | 30% annual |
+
+### 24.2 Time Windows (for HRAM)
+
+| Window | Duration | Used For |
+|--------|----------|----------|
+| Volatility | 30 days | Risk parity calculation |
+| Momentum | 50 days | SMA for momentum factor |
+| Correlation | 60 days | Cross-asset correlation |
 
 ---
 
