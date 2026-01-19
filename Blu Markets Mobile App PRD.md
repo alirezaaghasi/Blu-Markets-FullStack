@@ -1,6 +1,6 @@
 # Blu Markets: Native Mobile App PRD
 
-**Version:** 3.0
+**Version:** 3.1
 **Date:** January 2026
 **Status:** Draft
 
@@ -49,6 +49,13 @@ This document defines the UX, UI, and technical requirements for the Blu Markets
 22. [Protection Rules](#22-protection-rules)
 23. [Currency & Pricing](#23-currency--pricing)
 24. [Configuration Constants](#24-configuration-constants)
+25. [Portfolio Creation Algorithm](#25-portfolio-creation-algorithm)
+26. [Validation & Error Codes](#26-validation--error-codes)
+27. [Ledger Entry Types](#27-ledger-entry-types)
+28. [Performance Optimizations](#28-performance-optimizations)
+29. [Onboarding Rules](#29-onboarding-rules)
+30. [Per-Asset LTV Details](#30-per-asset-ltv-details)
+31. [Key Business Invariants](#31-key-business-invariants)
 
 **Appendices**
 - [A: Existing Design Assets](#appendix-a-existing-design-assets)
@@ -1458,6 +1465,265 @@ Decimal precision:
 | Volatility | 30 days | Risk parity calculation |
 | Momentum | 50 days | SMA for momentum factor |
 | Correlation | 60 days | Cross-asset correlation |
+
+---
+
+## 25. Portfolio Creation Algorithm
+
+### 25.1 Two-Phase Construction
+
+**Phase 1: Initial Allocation**
+```
+For each layer:
+  targetLayerIRR = round(investmentIRR × targetPct)
+
+  For each asset in layer:
+    assetAmountIRR = round(targetLayerIRR × layerWeight[asset])
+
+    If asset == IRR_FIXED_INCOME:
+      quantity = assetAmountIRR / 500,000
+    Else:
+      quantity = assetAmountIRR / (priceUSD × fxRate)
+```
+
+**Phase 2: Reconciliation**
+```
+For each layer:
+  actualLayerIRR = sum of asset values after phase 1
+  gap = targetLayerIRR - actualLayerIRR
+
+  If |gap| > 1 IRR:
+    Adjust last non-fixed-income asset by gap amount
+```
+
+### 25.2 Risk Tier Mapping
+
+| Risk Score | Tier | Foundation | Growth | Upside |
+|------------|------|------------|--------|--------|
+| < 5 | LOW | 65% | 30% | 5% |
+| 5-10 | MEDIUM | 50% | 35% | 15% |
+| > 10 | HIGH | 40% | 40% | 20% |
+
+---
+
+## 26. Validation & Error Codes
+
+### 26.1 Error Code Reference
+
+| Code | Condition | User Message |
+|------|-----------|--------------|
+| INVALID_AMOUNT | Non-finite or ≤ 0 | "Please enter a valid amount." |
+| INVALID_ASSET | Asset not found | "Invalid asset selected." |
+| INSUFFICIENT_CASH | Buy amount > cash | "Not enough cash available." |
+| INSUFFICIENT_ASSET_VALUE | Sell amount > holding | "Not enough of this asset." |
+| ASSET_FROZEN | Selling frozen collateral | "Asset locked as collateral." |
+| ASSET_ALREADY_PROTECTED | Duplicate protection | "Already protected." |
+| INSUFFICIENT_CASH_FOR_PREMIUM | Premium > cash | "Not enough cash for premium." |
+| EXCEEDS_MAX_BORROW | Loan > LTV limit | "Exceeds borrowing limit." |
+| EXCEEDS_PORTFOLIO_LOAN_LIMIT | Total loans > 25% | "Loan cap exceeded." |
+| NO_ACTIVE_LOAN | Repaying non-existent loan | "No active loan." |
+| NO_CASH | Cash = 0 | "No cash available." |
+
+### 26.2 Validation Meta Fields
+
+```typescript
+ValidationResult {
+  ok: boolean
+  errors: string[]
+  meta: {
+    required?: number        // Amount needed
+    available?: number       // Amount available
+    maxBorrow?: number       // Max borrowable for asset
+    maxLtv?: number          // LTV percentage
+    maxTotalLoans?: number   // Global cap (25%)
+    existingLoans?: number   // Current total loans
+    remainingCapacity?: number
+    notionalIRR?: number     // Protection value
+    holdingValueIRR?: number // Current holding value
+  }
+}
+```
+
+---
+
+## 27. Ledger Entry Types
+
+### 27.1 Entry Type Reference
+
+| Type | Trigger | Key Payload Fields |
+|------|---------|-------------------|
+| PORTFOLIO_CREATED_COMMIT | Initial creation | amountIRR, targetLayerPct |
+| ADD_FUNDS_COMMIT | Add funds confirmed | amountIRR |
+| TRADE_COMMIT | Trade confirmed | side, assetId, amountIRR |
+| PROTECT_COMMIT | Protection confirmed | assetId, months, notionalIRR, premiumIRR |
+| BORROW_COMMIT | Loan confirmed | assetId, amountIRR, durationMonths |
+| REPAY_COMMIT | Repayment confirmed | loanId, amountIRR, installmentsPaid, isSettlement |
+| REBALANCE_COMMIT | Rebalance confirmed | mode, trades[], cashDeployed, residualDrift |
+| PROTECTION_CANCELLED_COMMIT | Protection cancelled | protectionId, assetId |
+
+### 27.2 Ledger Entry Structure
+
+```typescript
+LedgerEntry {
+  id: string                    // UUID
+  tsISO: string                 // ISO timestamp
+  tsDateLabel: string           // Pre-computed: "Jan 15, 2024"
+  type: LedgerEntryType
+  details: {
+    kind: ActionKind
+    payload: ActionPayload
+    before: PortfolioSnapshot   // State before action
+    after: PortfolioSnapshot    // State after action
+    boundary: Boundary          // SAFE/DRIFT/STRUCTURAL/STRESS
+    validation: ValidationResult
+    frictionCopy: string[]      // User-facing warnings
+    rebalanceMeta?: {           // Only for rebalance
+      hasLockedCollateral: boolean
+      insufficientCash: boolean
+      residualDrift: number
+      trades: RebalanceTrade[]
+      cashDeployed: number
+      intraLayerWeights: Record<Layer, IntraLayerWeightResult>
+      strategy: string
+    }
+  }
+}
+```
+
+---
+
+## 28. Performance Optimizations
+
+### 28.1 Caching Strategy
+
+| Cache | Key Format | Max Size | Eviction |
+|-------|------------|----------|----------|
+| Holding Values | `assetId:quantity:priceUSD` | 100 | LRU |
+| Date Labels | `tsISO` | Inline | N/A |
+| Protection Status | `endTimeMs` | Inline | N/A |
+
+### 28.2 Pre-computation Rules
+
+| Field | Pre-computed When | Purpose |
+|-------|-------------------|---------|
+| tsDateLabel | Ledger entry creation | O(1) date grouping |
+| startTimeMs | Protection creation | O(1) active check |
+| endTimeMs | Protection creation | O(1) expiry check |
+
+### 28.3 Limits
+
+| Limit | Value | Purpose |
+|-------|-------|---------|
+| MAX_ACTION_LOG_SIZE | 50 | Prevent memory growth |
+| MIN_TRADE_VALUE_IRR | 100,000 | Skip dust trades in rebalance |
+| LRU_CACHE_SIZE | 100 | Bound holding value cache |
+
+### 28.4 Price Polling Parameters
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| BASE_INTERVAL_MS | 30,000 | Normal polling interval |
+| MAX_BACKOFF_MS | 300,000 | Max retry delay (5 min) |
+| HEARTBEAT_MS | 5,000 | Health check interval |
+| BACKOFF_MULTIPLIER | 1.5 | Exponential backoff factor |
+
+---
+
+## 29. Onboarding Rules
+
+### 29.1 Phone Validation
+
+```
+Format: +989XXXXXXXXX
+Length: 13 characters total
+Prefix: +989
+Remaining: 9 digits
+```
+
+### 29.2 Questionnaire Flow
+
+```
+9 questions total
+Progress: index / 9 (0-based index)
+Layer highlighting: Questions 5 & 8 show gradient
+Back navigation: GO_BACK_QUESTION (index - 1)
+Completion: index reaches 9 → proceed to result
+```
+
+### 29.3 Consent Requirements
+
+Three mandatory checkboxes (all required):
+1. **riskAcknowledged**: "I understand this involves risk"
+2. **lossAcknowledged**: "I may lose some or all of my investment"
+3. **noGuaranteeAcknowledged**: "Returns are not guaranteed"
+
+### 29.4 Investment Constraints
+
+| Constraint | Value |
+|------------|-------|
+| Minimum | 1,000,000 IRR |
+| Maximum | None |
+| Input | Numeric keypad, no decimals |
+
+---
+
+## 30. Per-Asset LTV Details
+
+### 30.1 Granular LTV by Asset
+
+| Asset | Layer | Base LTV | Notes |
+|-------|-------|----------|-------|
+| USDT | FOUNDATION | 90% | Highest (stablecoin) |
+| PAXG | FOUNDATION | 70% | Gold-backed |
+| IRR_FIXED_INCOME | FOUNDATION | 0% | Cannot borrow against |
+| BTC | GROWTH | 50% | Standard |
+| ETH | GROWTH | 50% | Standard |
+| BNB | GROWTH | 50% | Standard |
+| XRP | GROWTH | 45% | Slightly lower (volatility) |
+| KAG | GROWTH | 60% | Precious metal (stable) |
+| QQQ | GROWTH | 60% | ETF (regulated) |
+| SOL | UPSIDE | 30% | High volatility |
+| TON | UPSIDE | 30% | High volatility |
+| LINK | UPSIDE | 35% | Slightly higher (utility) |
+| AVAX | UPSIDE | 30% | High volatility |
+| MATIC | UPSIDE | 30% | High volatility |
+| ARB | UPSIDE | 30% | High volatility |
+
+### 30.2 LTV Calculation
+
+```
+maxBorrowAsset = floor(holdingValueIRR × assetLTV)
+maxBorrowGlobal = floor(totalPortfolioIRR × 0.25)
+maxBorrow = min(maxBorrowAsset, maxBorrowGlobal - existingLoansIRR)
+```
+
+---
+
+## 31. Key Business Invariants
+
+### 31.1 Core Rules
+
+| # | Invariant | Enforcement |
+|---|-----------|-------------|
+| 1 | Holdings stored as quantity (not value) | v10 data model |
+| 2 | Layer % calculated from holdings only | Cash excluded |
+| 3 | Protection premium non-refundable | No cancel refund |
+| 4 | Collateral frozen until full repayment | Cannot sell |
+| 5 | Fixed income accrues daily (simple) | No compounding |
+| 6 | Loan interest is 30% annual fixed | Not variable |
+| 7 | Rebalancing is deterministic | Same input = same output |
+| 8 | All IRR calculations use floor() | Round down |
+
+### 31.2 Edge Case Handling
+
+| Edge Case | Handling |
+|-----------|----------|
+| Zero holdings | Return early with defaults |
+| Frozen collateral | Exclude from rebalance sells |
+| Negative quantities | Floor to 0 |
+| Dust trades | Skip if < 100,000 IRR |
+| Rounding gaps | Phase 2 reconciliation |
+| Division by zero | Guard checks on liquidationIRR |
 
 ---
 
