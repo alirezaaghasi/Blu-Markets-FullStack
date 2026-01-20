@@ -7,11 +7,15 @@ import {
   TouchableOpacity,
   SafeAreaView,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { OnboardingStackParamList } from '../../navigation/types';
 import { colors, typography, spacing, borderRadius } from '../../constants/theme';
+import { useAppDispatch } from '../../hooks/useStore';
+import { setAuthToken } from '../../store/slices/authSlice';
+import { authApi, ApiError } from '../../services/api';
 
 type OTPVerifyScreenProps = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'OTPVerify'>;
@@ -24,10 +28,13 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
   navigation,
   route,
 }) => {
+  const dispatch = useAppDispatch();
   const { phone } = route.params;
   const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [error, setError] = useState('');
   const [resendTimer, setResendTimer] = useState(60);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
   useEffect(() => {
@@ -68,22 +75,62 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
     }
   };
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     const code = otp.join('');
     if (code.length !== OTP_LENGTH) {
       setError('Please enter the complete code');
       return;
     }
 
-    // For demo, accept any 6-digit code
-    // In production, verify with backend
-    navigation.navigate('Questionnaire');
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const response = await authApi.verifyOtp(phone, code);
+
+      // Store auth token in Redux
+      dispatch(setAuthToken(response.tokens.accessToken));
+
+      // Navigate based on onboarding status
+      if (response.onboardingComplete) {
+        // User already completed onboarding - go to main app
+        // The RootNavigator will handle this based on isAuthenticated
+      } else {
+        // New user or incomplete onboarding - continue to questionnaire
+        navigation.navigate('Questionnaire');
+      }
+    } catch (err) {
+      const apiError = err as ApiError;
+      if (apiError.code === 'OTP_INVALID') {
+        setError('Invalid code. Please try again.');
+      } else if (apiError.code === 'OTP_EXPIRED') {
+        setError('Code expired. Please request a new one.');
+      } else if (apiError.code === 'OTP_MAX_ATTEMPTS') {
+        setError('Too many attempts. Please request a new code.');
+      } else {
+        setError(apiError.message || 'Verification failed. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleResend = () => {
-    if (resendTimer === 0) {
+  const handleResend = async () => {
+    if (resendTimer > 0 || isResending) return;
+
+    setIsResending(true);
+    setError('');
+
+    try {
+      await authApi.sendOtp(phone);
       setResendTimer(60);
-      // Trigger resend OTP API
+      setOtp(Array(OTP_LENGTH).fill(''));
+      inputRefs.current[0]?.focus();
+    } catch (err) {
+      const apiError = err as ApiError;
+      setError(apiError.message || 'Failed to resend code.');
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -141,23 +188,36 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
             <Text style={styles.resendTimer}>
               Resend code in {resendTimer}s
             </Text>
+          ) : isResending ? (
+            <ActivityIndicator size="small" color={colors.primary} />
           ) : (
             <TouchableOpacity onPress={handleResend}>
               <Text style={styles.resendButton}>Resend code</Text>
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Dev mode hint */}
+        {__DEV__ && (
+          <Text style={styles.devHint}>
+            Dev mode: Use 999999 as OTP
+          </Text>
+        )}
       </View>
 
       {/* CTA Button */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.button, !isComplete && styles.buttonDisabled]}
+          style={[styles.button, (!isComplete || isLoading) && styles.buttonDisabled]}
           onPress={handleVerify}
           activeOpacity={0.8}
-          disabled={!isComplete}
+          disabled={!isComplete || isLoading}
         >
-          <Text style={styles.buttonText}>Verify</Text>
+          {isLoading ? (
+            <ActivityIndicator color={colors.textPrimaryDark} />
+          ) : (
+            <Text style={styles.buttonText}>Verify</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -234,6 +294,13 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
+  },
+  devHint: {
+    color: colors.textMuted,
+    fontSize: typography.fontSize.xs,
+    textAlign: 'center',
+    marginTop: spacing[4],
+    fontStyle: 'italic',
   },
   footer: {
     paddingHorizontal: spacing[6],

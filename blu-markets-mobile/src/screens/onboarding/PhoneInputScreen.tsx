@@ -10,13 +10,15 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/types';
 import { colors, typography, spacing, borderRadius } from '../../constants/theme';
 import { useAppDispatch } from '../../hooks/useStore';
 import { setPhone } from '../../store/slices/onboardingSlice';
-import { IRAN_PHONE_PREFIX, IRAN_PHONE_LENGTH } from '../../constants/business';
+import { IRAN_PHONE_PREFIX } from '../../constants/business';
+import { authApi, ApiError } from '../../services/api';
 
 type PhoneInputScreenProps = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'PhoneInput'>;
@@ -26,6 +28,7 @@ const PhoneInputScreen: React.FC<PhoneInputScreenProps> = ({ navigation }) => {
   const dispatch = useAppDispatch();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const formatPhoneDisplay = (value: string) => {
     // Format: 9XX XXX XXXX
@@ -53,12 +56,27 @@ const PhoneInputScreen: React.FC<PhoneInputScreenProps> = ({ navigation }) => {
     return true;
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!validatePhone()) return;
 
     const fullPhone = `${IRAN_PHONE_PREFIX}${phoneNumber.slice(1)}`;
-    dispatch(setPhone(fullPhone));
-    navigation.navigate('OTPVerify', { phone: fullPhone });
+    setIsLoading(true);
+    setError('');
+
+    try {
+      await authApi.sendOtp(fullPhone);
+      dispatch(setPhone(fullPhone));
+      navigation.navigate('OTPVerify', { phone: fullPhone });
+    } catch (err) {
+      const apiError = err as ApiError;
+      if (apiError.code === 'RATE_LIMITED') {
+        setError('Too many requests. Please wait a few minutes.');
+      } else {
+        setError(apiError.message || 'Failed to send OTP. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const isValid = phoneNumber.length === 10 && phoneNumber.startsWith('9');
@@ -111,12 +129,16 @@ const PhoneInputScreen: React.FC<PhoneInputScreenProps> = ({ navigation }) => {
         {/* CTA Button */}
         <View style={styles.footer}>
           <TouchableOpacity
-            style={[styles.button, !isValid && styles.buttonDisabled]}
+            style={[styles.button, (!isValid || isLoading) && styles.buttonDisabled]}
             onPress={handleContinue}
             activeOpacity={0.8}
-            disabled={!isValid}
+            disabled={!isValid || isLoading}
           >
-            <Text style={styles.buttonText}>Send OTP</Text>
+            {isLoading ? (
+              <ActivityIndicator color={colors.textPrimaryDark} />
+            ) : (
+              <Text style={styles.buttonText}>Send OTP</Text>
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

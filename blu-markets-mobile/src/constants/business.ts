@@ -82,6 +82,11 @@ export const PRICE_MAX_BACKOFF_MS = 300_000; // 5 minutes
 export const PRICE_BACKOFF_MULTIPLIER = 1.5;
 export const PRICE_HEARTBEAT_MS = 5_000; // 5 seconds
 
+// API Configuration
+export const API_BASE_URL = __DEV__
+  ? 'http://localhost:3000'
+  : 'https://api.blumarkets.ir';
+
 // WebSocket Configuration
 export const WEBSOCKET_URL = __DEV__
   ? 'ws://localhost:3000/api/v1/prices/stream'
