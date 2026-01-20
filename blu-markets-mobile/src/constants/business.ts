@@ -76,11 +76,18 @@ export const PROTECTION_MAX_DURATION = 6; // months
 // Activity Log
 export const MAX_ACTION_LOG_SIZE = 50;
 
-// Price Polling
+// Price Polling (fallback when WebSocket unavailable)
 export const PRICE_POLLING_INTERVAL_MS = 30_000; // 30 seconds
 export const PRICE_MAX_BACKOFF_MS = 300_000; // 5 minutes
 export const PRICE_BACKOFF_MULTIPLIER = 1.5;
 export const PRICE_HEARTBEAT_MS = 5_000; // 5 seconds
+
+// WebSocket Configuration
+export const WEBSOCKET_URL = __DEV__
+  ? 'ws://localhost:3000/api/v1/prices/stream'
+  : 'wss://api.blumarkets.ir/api/v1/prices/stream';
+export const WEBSOCKET_RECONNECT_INTERVAL_MS = 3_000; // 3 seconds
+export const WEBSOCKET_ENABLED = true;
 
 // Risk Profile Allocations by Score
 export const RISK_PROFILE_ALLOCATIONS: Record<number, TargetLayerPct> = {

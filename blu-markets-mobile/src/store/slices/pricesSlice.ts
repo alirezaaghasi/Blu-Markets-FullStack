@@ -2,14 +2,24 @@
 import { createSlice, PayloadAction, createAsyncThunk } from '@reduxjs/toolkit';
 import { PriceState, AssetId } from '../../types';
 import { DEFAULT_FX_RATE } from '../../constants/business';
+import { ConnectionStatus } from '../../services/priceWebSocket';
 
-const initialState: PriceState = {
+interface ExtendedPriceState extends PriceState {
+  connectionStatus: ConnectionStatus;
+  pricesIrr: Record<AssetId, number>;
+  change24h: Record<AssetId, number | undefined>;
+}
+
+const initialState: ExtendedPriceState = {
   prices: {} as Record<AssetId, number>,
+  pricesIrr: {} as Record<AssetId, number>,
+  change24h: {} as Record<AssetId, number | undefined>,
   fxRate: DEFAULT_FX_RATE,
   fxSource: 'fallback',
   updatedAt: '',
   isLoading: false,
   error: null,
+  connectionStatus: 'disconnected',
 };
 
 // Default prices (fallback)
@@ -148,6 +158,62 @@ const pricesSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    // WebSocket-specific reducers
+    setConnectionStatus: (state, action: PayloadAction<ConnectionStatus>) => {
+      state.connectionStatus = action.payload;
+    },
+    updatePriceFromWebSocket: (
+      state,
+      action: PayloadAction<{
+        assetId: AssetId;
+        priceUsd: number;
+        priceIrr: number;
+        change24hPct?: number;
+        timestamp: string;
+      }>
+    ) => {
+      const { assetId, priceUsd, priceIrr, change24hPct, timestamp } = action.payload;
+      state.prices[assetId] = priceUsd;
+      state.pricesIrr[assetId] = priceIrr;
+      if (change24hPct !== undefined) {
+        state.change24h[assetId] = change24hPct;
+      }
+      state.updatedAt = timestamp;
+    },
+    updateAllPricesFromWebSocket: (
+      state,
+      action: PayloadAction<{
+        prices: Array<{
+          assetId: string;
+          priceUsd: number;
+          priceIrr: number;
+          change24hPct?: number;
+        }>;
+        timestamp: string;
+      }>
+    ) => {
+      const { prices, timestamp } = action.payload;
+      prices.forEach((p) => {
+        const assetId = p.assetId as AssetId;
+        state.prices[assetId] = p.priceUsd;
+        state.pricesIrr[assetId] = p.priceIrr;
+        if (p.change24hPct !== undefined) {
+          state.change24h[assetId] = p.change24hPct;
+        }
+      });
+      state.updatedAt = timestamp;
+    },
+    updateFxFromWebSocket: (
+      state,
+      action: PayloadAction<{
+        usdIrr: number;
+        source: string;
+        timestamp: string;
+      }>
+    ) => {
+      state.fxRate = action.payload.usdIrr;
+      state.fxSource = action.payload.source as 'bonbast' | 'fallback';
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -179,6 +245,10 @@ export const {
   setFxRate,
   setDefaultPrices,
   clearError,
+  setConnectionStatus,
+  updatePriceFromWebSocket,
+  updateAllPricesFromWebSocket,
+  updateFxFromWebSocket,
 } = pricesSlice.actions;
 
 export default pricesSlice.reducer;

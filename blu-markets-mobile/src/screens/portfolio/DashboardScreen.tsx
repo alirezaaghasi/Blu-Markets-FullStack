@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../../constants/theme';
 import { useAppSelector, useAppDispatch } from '../../hooks/useStore';
+import usePriceWebSocket from '../../hooks/usePriceWebSocket';
 import { Layer, Holding, PortfolioStatus, AssetId } from '../../types';
 import { ASSETS, getAssetsByLayer, LAYER_COLORS, LAYER_NAMES } from '../../constants/assets';
 import { DEFAULT_FX_RATE, FIXED_INCOME_UNIT_PRICE } from '../../constants/business';
@@ -58,6 +59,30 @@ const StatusBadge: React.FC<{ status: PortfolioStatus }> = ({ status }) => {
   );
 };
 
+// Connection indicator component
+const ConnectionIndicator: React.FC<{ isConnected: boolean; updatedAt: string }> = ({
+  isConnected,
+  updatedAt,
+}) => {
+  const lastUpdate = updatedAt
+    ? new Date(updatedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    : '--:--';
+
+  return (
+    <View style={styles.connectionIndicator}>
+      <View
+        style={[
+          styles.connectionDot,
+          { backgroundColor: isConnected ? colors.success : colors.textSecondary },
+        ]}
+      />
+      <Text style={styles.connectionText}>
+        {isConnected ? 'Live' : 'Offline'} · {lastUpdate}
+      </Text>
+    </View>
+  );
+};
+
 const DashboardScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const [refreshing, setRefreshing] = useState(false);
@@ -66,6 +91,9 @@ const DashboardScreen: React.FC = () => {
   const [showRebalanceSheet, setShowRebalanceSheet] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState<AssetId>('BTC');
   const [tradeSide, setTradeSide] = useState<'BUY' | 'SELL'>('BUY');
+
+  // Use WebSocket for real-time price updates
+  const { isConnected, updatedAt, refresh: refreshPrices } = usePriceWebSocket();
 
   const { holdings, cashIRR, targetLayerPct, actionLog, status } = useAppSelector(
     (state) => state.portfolio
@@ -106,8 +134,13 @@ const DashboardScreen: React.FC = () => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    // TODO: Fetch latest prices and portfolio state
-    setTimeout(() => setRefreshing(false), 1000);
+    try {
+      await refreshPrices();
+    } catch (error) {
+      console.error('Failed to refresh prices:', error);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const showRebalanceButton = status !== 'BALANCED';
@@ -145,7 +178,10 @@ const DashboardScreen: React.FC = () => {
             <View style={styles.logoCircle}>
               <Text style={styles.logoText}>B</Text>
             </View>
-            <Text style={styles.headerTitle}>Blu Markets</Text>
+            <View>
+              <Text style={styles.headerTitle}>Blu Markets</Text>
+              <ConnectionIndicator isConnected={isConnected} updatedAt={updatedAt} />
+            </View>
           </View>
           <StatusBadge status={status} />
         </View>
@@ -521,6 +557,21 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.bold,
     color: colors.textPrimaryDark,
+  },
+  connectionIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  connectionDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 4,
+  },
+  connectionText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textSecondary,
   },
 });
 
