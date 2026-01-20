@@ -34,6 +34,15 @@ const envSchema = z.object({
   // Price polling
   PRICE_POLL_INTERVAL_MS: z.string().default('30000').transform(Number), // 30 seconds default
   PRICE_POLL_ENABLED: z.string().default('true').transform((v) => v === 'true'),
+
+  // Background jobs
+  ENABLE_BACKGROUND_JOBS: z.string().default('true').transform((v) => v === 'true'),
+  LOAN_CHECK_INTERVAL_MS: z.string().default('300000').transform(Number), // 5 minutes default
+  PROTECTION_CHECK_INTERVAL_MS: z.string().default('3600000').transform(Number), // 1 hour default
+
+  // Portfolio metrics worker
+  ENABLE_PORTFOLIO_METRICS: z.string().default('true').transform((v) => v === 'true'),
+  PORTFOLIO_METRICS_INTERVAL_MS: z.string().default('60000').transform(Number), // 1 minute default
 });
 
 export type Env = z.infer<typeof envSchema>;

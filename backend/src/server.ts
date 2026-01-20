@@ -3,6 +3,8 @@ import { buildApp } from './app.js';
 import { env } from './config/env.js';
 import { connectDatabase, disconnectDatabase } from './config/database.js';
 import { startPricePolling, stopPricePolling } from './services/price-polling.service.js';
+import { startBackgroundJobs, stopBackgroundJobs } from './services/background-jobs.service.js';
+import { startPortfolioMetricsWorker, stopPortfolioMetricsWorker } from './services/portfolio-metrics.service.js';
 
 async function main() {
   // Connect to database
@@ -17,6 +19,8 @@ async function main() {
     process.on(signal, async () => {
       app.log.info(`Received ${signal}, shutting down gracefully...`);
       stopPricePolling();
+      stopBackgroundJobs();
+      stopPortfolioMetricsWorker();
       await app.close();
       await disconnectDatabase();
       process.exit(0);
@@ -34,6 +38,14 @@ async function main() {
       startPricePolling();
       app.log.info('📡 WebSocket price streaming enabled');
     }
+
+    // Start background jobs (loan checks, protection expiry)
+    startBackgroundJobs();
+    app.log.info('⚙️  Background jobs started');
+
+    // Start portfolio metrics worker
+    startPortfolioMetricsWorker();
+    app.log.info('📊 Portfolio metrics worker started');
   } catch (error) {
     app.log.error(error);
     process.exit(1);

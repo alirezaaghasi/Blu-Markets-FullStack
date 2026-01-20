@@ -15,8 +15,9 @@ import {
 } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../constants/theme';
 import { useAppDispatch, useAppSelector } from '../hooks/useStore';
-import { addFunds } from '../store/slices/portfolioSlice';
+import { updateCash, logAction } from '../store/slices/portfolioSlice';
 import { MIN_INVESTMENT_AMOUNT } from '../constants/business';
+import { portfolioApi } from '../services/api';
 
 interface AddFundsSheetProps {
   visible: boolean;
@@ -77,15 +78,26 @@ export const AddFundsSheet: React.FC<AddFundsSheetProps> = ({
 
     setIsSubmitting(true);
     try {
-      dispatch(addFunds({ amountIRR }));
+      // Call backend API
+      const result = await portfolioApi.addFunds(amountIRR);
+
+      // Update Redux with new cash balance
+      dispatch(updateCash(result.newCashIrr));
+      dispatch(logAction({
+        type: 'ADD_FUNDS',
+        boundary: 'SAFE',
+        message: `Added ${formatNumber(amountIRR)} IRR to portfolio`,
+        amountIRR,
+      }));
+
       Alert.alert(
         'Funds Added',
         `Successfully added ${formatNumber(amountIRR)} IRR to your portfolio.`,
         [{ text: 'OK', onPress: onClose }]
       );
       setAmountInput('');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to add funds. Please try again.');
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to add funds. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

@@ -1,6 +1,6 @@
 // Protection Screen
 // Based on PRD Section 9.3 - Protection Tab
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Alert,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../../constants/theme';
 import { useAppSelector, useAppDispatch } from '../../hooks/useStore';
@@ -17,22 +19,56 @@ import { ASSETS, LAYER_COLORS, LAYER_NAMES } from '../../constants/assets';
 import { PROTECTION_PREMIUM_BY_LAYER } from '../../constants/business';
 import { removeProtection } from '../../store/slices/portfolioSlice';
 import ProtectionSheet from '../../components/ProtectionSheet';
+import { protectionApi, ProtectionResponse, EligibleProtectionAsset } from '../../services/api';
 
 const ProtectionScreen: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { protections, holdings } = useAppSelector((state) => state.portfolio);
+  const { holdings } = useAppSelector((state) => state.portfolio);
   const { prices, fxRate } = useAppSelector((state) => state.prices);
 
   const [showProtectionSheet, setShowProtectionSheet] = useState(false);
   const [selectedHolding, setSelectedHolding] = useState<Holding | null>(null);
   const [showEducation, setShowEducation] = useState(true);
 
-  // Get eligible holdings for protection
+  // Backend data
+  const [protections, setProtections] = useState<ProtectionResponse[]>([]);
+  const [eligibleAssets, setEligibleAssets] = useState<EligibleProtectionAsset[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch data from backend
+  const fetchData = useCallback(async (showRefreshing = false) => {
+    if (showRefreshing) setIsRefreshing(true);
+    else setIsLoading(true);
+    setError(null);
+
+    try {
+      const [protectionsRes, eligibleRes] = await Promise.all([
+        protectionApi.getProtections(),
+        protectionApi.getEligible(),
+      ]);
+      setProtections(protectionsRes);
+      setEligibleAssets(eligibleRes);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to load protection data');
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const onRefresh = () => fetchData(true);
+
+  // Get eligible holdings for protection (combine local and backend data)
   const eligibleHoldings = holdings.filter((h) => {
     const asset = ASSETS[h.assetId];
-    // Not already protected and asset is protection eligible
-    const alreadyProtected = protections.some((p) => p.assetId === h.assetId);
-    return asset.protectionEligible && !alreadyProtected && h.quantity > 0;
+    const eligible = eligibleAssets.find((e) => e.assetId === h.assetId);
+    return asset.protectionEligible && eligible && !eligible.alreadyProtected && h.quantity > 0;
   });
 
   // Calculate days remaining for a protection
@@ -54,17 +90,25 @@ const ProtectionScreen: React.FC = () => {
   };
 
   // Handle cancel protection
-  const handleCancelProtection = (protection: Protection) => {
+  const handleCancelProtection = (protection: ProtectionResponse) => {
     Alert.alert(
       'Cancel Protection',
-      `Are you sure you want to cancel protection for ${ASSETS[protection.assetId].name}? The remaining premium will not be refunded.`,
+      `Are you sure you want to cancel protection for ${ASSETS[protection.assetId as keyof typeof ASSETS]?.name || protection.assetId}? The remaining premium will not be refunded.`,
       [
         { text: 'Keep Protection', style: 'cancel' },
         {
           text: 'Cancel Protection',
           style: 'destructive',
-          onPress: () => {
-            dispatch(removeProtection(protection.id));
+          onPress: async () => {
+            try {
+              await protectionApi.cancel(protection.id);
+              dispatch(removeProtection(protection.id));
+              // Refresh data
+              fetchData();
+              Alert.alert('Success', 'Protection cancelled successfully.');
+            } catch (err: any) {
+              Alert.alert('Error', err?.message || 'Failed to cancel protection');
+            }
           },
         },
       ]
@@ -87,9 +131,29 @@ const ProtectionScreen: React.FC = () => {
         </Text>
       </View>
 
+      {isLoading ? (
+        <View style={styles.loadingState}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading protections...</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.errorState}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => fetchData()}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+          />
+        }
       >
         {/* Education Card (Collapsible) */}
         {showEducation && (
@@ -125,9 +189,9 @@ const ProtectionScreen: React.FC = () => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Active Protections</Text>
             {protections.map((protection) => {
-              const asset = ASSETS[protection.assetId];
-              const daysRemaining = getDaysRemaining(protection.endISO);
-              const progress = getProgressPercentage(protection.startISO, protection.endISO);
+              const asset = ASSETS[protection.assetId as keyof typeof ASSETS];
+              const daysRemaining = protection.daysRemaining ?? getDaysRemaining(protection.endDate);
+              const progress = getProgressPercentage(protection.startDate, protection.endDate);
 
               return (
                 <View key={protection.id} style={styles.protectionCard}>
@@ -136,15 +200,16 @@ const ProtectionScreen: React.FC = () => {
                       <View
                         style={[
                           styles.assetIcon,
-                          { backgroundColor: `${LAYER_COLORS[asset.layer]}20` },
+                          { backgroundColor: asset ? `${LAYER_COLORS[asset.layer]}20` : colors.surfaceDark },
                         ]}
                       >
                         <Text style={styles.assetIconText}>
-                          {asset.symbol.slice(0, 2)}
+                          {asset?.symbol?.slice(0, 2) || protection.assetId.slice(0, 2)}
                         </Text>
                       </View>
                       <View>
-                        <Text style={styles.assetName}>{asset.name}</Text>
+                        <Text style={styles.assetName}>{asset?.name || protection.assetId}</Text>
+                        {asset && (
                         <View
                           style={[
                             styles.layerBadge,
@@ -160,12 +225,13 @@ const ProtectionScreen: React.FC = () => {
                             {LAYER_NAMES[asset.layer]}
                           </Text>
                         </View>
+                        )}
                       </View>
                     </View>
                     <View style={styles.protectionValue}>
                       <Text style={styles.protectionValueLabel}>Covered</Text>
                       <Text style={styles.protectionValueAmount}>
-                        {protection.notionalIRR.toLocaleString()} IRR
+                        {protection.notionalIrr.toLocaleString()} IRR
                       </Text>
                     </View>
                   </View>
@@ -186,7 +252,7 @@ const ProtectionScreen: React.FC = () => {
                   <View style={styles.premiumInfo}>
                     <Text style={styles.premiumInfoLabel}>Premium paid</Text>
                     <Text style={styles.premiumInfoValue}>
-                      {protection.premiumIRR.toLocaleString()} IRR
+                      {protection.premiumIrr.toLocaleString()} IRR
                     </Text>
                   </View>
 
@@ -259,6 +325,7 @@ const ProtectionScreen: React.FC = () => {
           </View>
         )}
       </ScrollView>
+      )}
 
       {/* Protection Sheet */}
       {selectedHolding && (
@@ -301,6 +368,40 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: spacing[4],
     paddingBottom: spacing[8],
+  },
+  loadingState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing[8],
+  },
+  loadingText: {
+    marginTop: spacing[3],
+    fontSize: typography.fontSize.base,
+    color: colors.textSecondary,
+  },
+  errorState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing[8],
+  },
+  errorText: {
+    fontSize: typography.fontSize.base,
+    color: colors.error,
+    textAlign: 'center',
+    marginBottom: spacing[4],
+  },
+  retryButton: {
+    backgroundColor: colors.surfaceDark,
+    paddingHorizontal: spacing[6],
+    paddingVertical: spacing[3],
+    borderRadius: borderRadius.full,
+  },
+  retryButtonText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.primary,
   },
   educationCard: {
     backgroundColor: colors.cardDark,

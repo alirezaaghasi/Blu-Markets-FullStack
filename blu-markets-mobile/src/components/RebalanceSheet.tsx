@@ -1,6 +1,6 @@
 // Rebalance Bottom Sheet
 // Based on PRD Section 6.3 - Rebalance Flow
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,249 +8,30 @@ import {
   Modal,
   TouchableOpacity,
   ScrollView,
-  Animated,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../constants/theme';
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
-import { Layer, Holding, AssetId, Boundary, RebalanceTrade } from '../types';
-import { ASSETS, LAYER_COLORS, LAYER_NAMES, getAssetsByLayer } from '../constants/assets';
+import { Layer, Boundary } from '../types';
+import { ASSETS, LAYER_COLORS, LAYER_NAMES } from '../constants/assets';
+import { BOUNDARY_MESSAGES } from '../constants/business';
+import { setStatus, setHoldings, updateCash, logAction } from '../store/slices/portfolioSlice';
 import {
-  MIN_REBALANCE_TRADE,
-  DRIFT_TOLERANCE,
-  SPREAD_BY_LAYER,
-  FIXED_INCOME_UNIT_PRICE,
-  BOUNDARY_MESSAGES,
-} from '../constants/business';
-import { executeRebalance } from '../store/slices/portfolioSlice';
+  rebalanceApi,
+  RebalancePreviewResponse,
+  RebalanceMode,
+  portfolioApi,
+} from '../services/api';
 
 interface RebalanceSheetProps {
   visible: boolean;
   onClose: () => void;
 }
 
-type RebalanceMode = 'HOLDINGS_ONLY' | 'HOLDINGS_PLUS_CASH' | 'SMART';
-
 // Format number with commas
 const formatNumber = (num: number): string => {
   return Math.round(num).toLocaleString('en-US');
-};
-
-// Calculate holding value
-const calculateHoldingValue = (
-  holding: Holding,
-  prices: Record<string, number>,
-  fxRate: number
-): number => {
-  if (holding.assetId === 'IRR_FIXED_INCOME') {
-    return holding.quantity * FIXED_INCOME_UNIT_PRICE;
-  }
-  const priceUSD = prices[holding.assetId] || 0;
-  return holding.quantity * priceUSD * fxRate;
-};
-
-// Calculate rebalance trades
-interface RebalanceResult {
-  trades: RebalanceTrade[];
-  beforeAllocation: Record<Layer, number>;
-  afterAllocation: Record<Layer, number>;
-  residualDrift: number;
-  hasLockedCollateral: boolean;
-  cashDeployed: number;
-  boundary: Boundary;
-  canExecute: boolean;
-  message: string;
-}
-
-const calculateRebalance = (
-  holdings: Holding[],
-  cashIRR: number,
-  targetLayerPct: Record<Layer, number>,
-  prices: Record<string, number>,
-  fxRate: number,
-  mode: RebalanceMode
-): RebalanceResult => {
-  const trades: RebalanceTrade[] = [];
-
-  // Calculate current values by layer
-  const layerValues: Record<Layer, number> = { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
-  const frozenByLayer: Record<Layer, number> = { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
-  const unfrozenByLayer: Record<Layer, number> = { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
-
-  holdings.forEach((h) => {
-    const value = calculateHoldingValue(h, prices, fxRate);
-    layerValues[h.layer] += value;
-    if (h.frozen) {
-      frozenByLayer[h.layer] += value;
-    } else {
-      unfrozenByLayer[h.layer] += value;
-    }
-  });
-
-  const totalHoldingsValue = Object.values(layerValues).reduce((a, b) => a + b, 0);
-  const hasLockedCollateral = Object.values(frozenByLayer).some(v => v > 0);
-
-  // Calculate before allocation
-  const beforeAllocation: Record<Layer, number> = {
-    FOUNDATION: totalHoldingsValue > 0 ? layerValues.FOUNDATION / totalHoldingsValue : 0,
-    GROWTH: totalHoldingsValue > 0 ? layerValues.GROWTH / totalHoldingsValue : 0,
-    UPSIDE: totalHoldingsValue > 0 ? layerValues.UPSIDE / totalHoldingsValue : 0,
-  };
-
-  // Determine pool to rebalance
-  let rebalancePool = totalHoldingsValue;
-  let cashToUse = 0;
-
-  if (mode === 'HOLDINGS_PLUS_CASH') {
-    rebalancePool = totalHoldingsValue + cashIRR;
-    cashToUse = cashIRR;
-  } else if (mode === 'SMART' && cashIRR > 0) {
-    // SMART mode: Use cash only if it helps achieve balance
-    rebalancePool = totalHoldingsValue + cashIRR;
-    cashToUse = cashIRR;
-  }
-
-  // Target values
-  const targetValues: Record<Layer, number> = {
-    FOUNDATION: rebalancePool * targetLayerPct.FOUNDATION,
-    GROWTH: rebalancePool * targetLayerPct.GROWTH,
-    UPSIDE: rebalancePool * targetLayerPct.UPSIDE,
-  };
-
-  // Calculate differences (positive = need to buy, negative = need to sell)
-  const diffs: Record<Layer, number> = {
-    FOUNDATION: targetValues.FOUNDATION - layerValues.FOUNDATION,
-    GROWTH: targetValues.GROWTH - layerValues.GROWTH,
-    UPSIDE: targetValues.UPSIDE - layerValues.UPSIDE,
-  };
-
-  // Determine sells (from layers with surplus)
-  const layers: Layer[] = ['FOUNDATION', 'GROWTH', 'UPSIDE'];
-  let totalSellAmount = 0;
-
-  layers.forEach((layer) => {
-    if (diffs[layer] < -MIN_REBALANCE_TRADE) {
-      // Need to sell from this layer
-      const sellAmount = Math.min(Math.abs(diffs[layer]), unfrozenByLayer[layer]);
-      if (sellAmount >= MIN_REBALANCE_TRADE) {
-        // Find best asset to sell (prefer largest holding)
-        const layerHoldings = holdings
-          .filter(h => h.layer === layer && !h.frozen)
-          .sort((a, b) => {
-            const valueA = calculateHoldingValue(a, prices, fxRate);
-            const valueB = calculateHoldingValue(b, prices, fxRate);
-            return valueB - valueA;
-          });
-
-        let remainingToSell = sellAmount;
-        layerHoldings.forEach((holding) => {
-          if (remainingToSell < MIN_REBALANCE_TRADE) return;
-          const holdingValue = calculateHoldingValue(holding, prices, fxRate);
-          const sellFromHolding = Math.min(remainingToSell, holdingValue);
-
-          if (sellFromHolding >= MIN_REBALANCE_TRADE) {
-            trades.push({
-              side: 'SELL',
-              assetId: holding.assetId,
-              amountIRR: sellFromHolding,
-              layer,
-            });
-            totalSellAmount += sellFromHolding;
-            remainingToSell -= sellFromHolding;
-          }
-        });
-      }
-    }
-  });
-
-  // Determine buys (for layers with deficit)
-  const totalBuyBudget = totalSellAmount + cashToUse;
-  let remainingBudget = totalBuyBudget;
-
-  // Sort layers by deficit (largest deficit first)
-  const deficitLayers = layers
-    .filter(layer => diffs[layer] > MIN_REBALANCE_TRADE)
-    .sort((a, b) => diffs[b] - diffs[a]);
-
-  deficitLayers.forEach((layer) => {
-    if (remainingBudget < MIN_REBALANCE_TRADE) return;
-
-    const buyAmount = Math.min(diffs[layer], remainingBudget);
-    if (buyAmount >= MIN_REBALANCE_TRADE) {
-      // Find best asset to buy (prefer most liquid)
-      const layerAssets = getAssetsByLayer(layer)
-        .filter(a => a.id !== 'IRR_FIXED_INCOME')
-        .sort((a, b) => b.liquidity - a.liquidity);
-
-      if (layerAssets.length > 0) {
-        trades.push({
-          side: 'BUY',
-          assetId: layerAssets[0].id,
-          amountIRR: buyAmount,
-          layer,
-        });
-        remainingBudget -= buyAmount;
-      }
-    }
-  });
-
-  // Calculate after allocation
-  const afterLayerValues = { ...layerValues };
-  trades.forEach((trade) => {
-    if (trade.side === 'SELL') {
-      afterLayerValues[trade.layer] -= trade.amountIRR;
-    } else {
-      // Account for spread on buys
-      const netAmount = trade.amountIRR * (1 - SPREAD_BY_LAYER[trade.layer]);
-      afterLayerValues[trade.layer] += netAmount;
-    }
-  });
-
-  // Add deployed cash to appropriate layers
-  if (cashToUse > 0) {
-    // Cash is added via buy trades, already counted above
-  }
-
-  const totalAfterValue = Object.values(afterLayerValues).reduce((a, b) => a + b, 0);
-  const afterAllocation: Record<Layer, number> = {
-    FOUNDATION: totalAfterValue > 0 ? afterLayerValues.FOUNDATION / totalAfterValue : 0,
-    GROWTH: totalAfterValue > 0 ? afterLayerValues.GROWTH / totalAfterValue : 0,
-    UPSIDE: totalAfterValue > 0 ? afterLayerValues.UPSIDE / totalAfterValue : 0,
-  };
-
-  // Calculate residual drift
-  const driftCalc = layers.map(layer =>
-    Math.abs(afterAllocation[layer] - targetLayerPct[layer])
-  );
-  const residualDrift = Math.max(...driftCalc);
-
-  // Determine boundary
-  let boundary: Boundary = 'SAFE';
-  let message = 'Your portfolio is now on target.';
-
-  if (residualDrift > DRIFT_TOLERANCE) {
-    boundary = 'STRUCTURAL';
-    message = "Your portfolio couldn't be fully rebalanced.";
-    if (hasLockedCollateral) {
-      message += ' Some assets are locked as collateral for your loans.';
-    }
-    if (residualDrift >= 0.005) {
-      message += ` Remaining drift: ${(residualDrift * 100).toFixed(1)}% from target.`;
-    }
-  }
-
-  const canExecute = trades.length > 0;
-
-  return {
-    trades,
-    beforeAllocation,
-    afterAllocation,
-    residualDrift,
-    hasLockedCollateral,
-    cashDeployed: mode === 'HOLDINGS_ONLY' ? 0 : cashToUse,
-    boundary,
-    canExecute,
-    message,
-  };
 };
 
 const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => {
@@ -258,40 +39,89 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
   const [mode, setMode] = useState<RebalanceMode>('HOLDINGS_ONLY');
   const [showTrades, setShowTrades] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [preview, setPreview] = useState<RebalancePreviewResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const { holdings, cashIRR, targetLayerPct } = useAppSelector(
-    (state) => state.portfolio
-  );
-  const { prices, fxRate } = useAppSelector((state) => state.prices);
+  const { cashIRR, targetLayerPct } = useAppSelector((state) => state.portfolio);
 
-  // Calculate rebalance preview
-  const result = useMemo(() => {
-    return calculateRebalance(holdings, cashIRR, targetLayerPct, prices, fxRate, mode);
-  }, [holdings, cashIRR, targetLayerPct, prices, fxRate, mode]);
+  // Fetch preview from backend when mode changes or sheet opens
+  const fetchPreview = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await rebalanceApi.preview(mode);
+      setPreview(result);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to load rebalance preview');
+      setPreview(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    if (visible) {
+      fetchPreview();
+    }
+  }, [visible, mode, fetchPreview]);
 
   const handleConfirm = async () => {
-    if (!result.canExecute) return;
+    if (!preview || preview.trades.length === 0) return;
 
     setIsExecuting(true);
+    try {
+      // Execute rebalance via backend
+      const result = await rebalanceApi.execute(mode, true);
 
-    // Execute rebalance
-    dispatch(executeRebalance({
-      trades: result.trades,
-      mode,
-      cashDeployed: result.cashDeployed,
-      boundary: result.boundary,
-      prices,
-      fxRate,
-    }));
+      // Refresh portfolio data from backend
+      const [summary, holdings] = await Promise.all([
+        portfolioApi.getSummary(),
+        portfolioApi.getHoldings(),
+      ]);
 
-    setTimeout(() => {
+      // Update Redux state
+      dispatch(updateCash(summary.cashIrr));
+      dispatch(setStatus(summary.status));
+      dispatch(setHoldings(holdings.map(h => ({
+        assetId: h.assetId as any,
+        quantity: h.quantity,
+        frozen: h.frozen,
+        layer: h.layer,
+      }))));
+
+      dispatch(logAction({
+        type: 'REBALANCE',
+        boundary: result.boundary,
+        message: `Rebalanced portfolio (${result.tradesExecuted} trades)`,
+      }));
+
+      Alert.alert(
+        'Rebalance Complete',
+        `Successfully executed ${result.tradesExecuted} trades.`,
+        [{ text: 'OK', onPress: onClose }]
+      );
+    } catch (err: any) {
+      Alert.alert('Rebalance Failed', err?.message || 'Unable to rebalance. Please try again.');
+    } finally {
       setIsExecuting(false);
-      onClose();
-    }, 500);
+    }
   };
 
-  const sellTrades = result.trades.filter(t => t.side === 'SELL');
-  const buyTrades = result.trades.filter(t => t.side === 'BUY');
+  // Convert API response to component-friendly format
+  const beforeAllocation = preview?.currentAllocation || { foundation: 0, growth: 0, upside: 0 };
+  const targetAllocation = preview?.targetAllocation || {
+    foundation: targetLayerPct.FOUNDATION * 100,
+    growth: targetLayerPct.GROWTH * 100,
+    upside: targetLayerPct.UPSIDE * 100,
+  };
+  const afterAllocation = preview?.afterAllocation || { foundation: 0, growth: 0, upside: 0 };
+  const trades = preview?.trades || [];
+  const sellTrades = trades.filter(t => t.side === 'SELL');
+  const buyTrades = trades.filter(t => t.side === 'BUY');
+  const canExecute = trades.length > 0;
+  const hasLockedCollateral = preview?.hasLockedCollateral || false;
+  const residualDrift = preview?.residualDrift || 0;
 
   return (
     <Modal
@@ -314,7 +144,26 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
           </View>
 
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            {/* Loading State */}
+            {isLoading && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={styles.loadingText}>Calculating rebalance...</Text>
+              </View>
+            )}
+
+            {/* Error State */}
+            {error && !isLoading && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{error}</Text>
+                <TouchableOpacity style={styles.retryButton} onPress={fetchPreview}>
+                  <Text style={styles.retryButtonText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             {/* Allocation Preview */}
+            {!isLoading && !error && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Allocation</Text>
 
@@ -324,15 +173,15 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
                 <View style={styles.allocationBarContainer}>
                   <View style={styles.allocationBar}>
                     <View style={[styles.barSegment, {
-                      flex: result.beforeAllocation.FOUNDATION * 100,
+                      flex: beforeAllocation.foundation || 1,
                       backgroundColor: LAYER_COLORS.FOUNDATION
                     }]} />
                     <View style={[styles.barSegment, {
-                      flex: result.beforeAllocation.GROWTH * 100,
+                      flex: beforeAllocation.growth || 1,
                       backgroundColor: LAYER_COLORS.GROWTH
                     }]} />
                     <View style={[styles.barSegment, {
-                      flex: result.beforeAllocation.UPSIDE * 100,
+                      flex: beforeAllocation.upside || 1,
                       backgroundColor: LAYER_COLORS.UPSIDE
                     }]} />
                   </View>
@@ -344,17 +193,17 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
                 <View style={styles.allocationBarContainer}>
                   <View style={styles.allocationBar}>
                     <View style={[styles.barSegment, {
-                      flex: targetLayerPct.FOUNDATION * 100,
+                      flex: targetAllocation.foundation || 1,
                       backgroundColor: LAYER_COLORS.FOUNDATION,
                       opacity: 0.5
                     }]} />
                     <View style={[styles.barSegment, {
-                      flex: targetLayerPct.GROWTH * 100,
+                      flex: targetAllocation.growth || 1,
                       backgroundColor: LAYER_COLORS.GROWTH,
                       opacity: 0.5
                     }]} />
                     <View style={[styles.barSegment, {
-                      flex: targetLayerPct.UPSIDE * 100,
+                      flex: targetAllocation.upside || 1,
                       backgroundColor: LAYER_COLORS.UPSIDE,
                       opacity: 0.5
                     }]} />
@@ -367,15 +216,15 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
                 <View style={styles.allocationBarContainer}>
                   <View style={styles.allocationBar}>
                     <View style={[styles.barSegment, {
-                      flex: result.afterAllocation.FOUNDATION * 100,
+                      flex: afterAllocation.foundation || 1,
                       backgroundColor: LAYER_COLORS.FOUNDATION
                     }]} />
                     <View style={[styles.barSegment, {
-                      flex: result.afterAllocation.GROWTH * 100,
+                      flex: afterAllocation.growth || 1,
                       backgroundColor: LAYER_COLORS.GROWTH
                     }]} />
                     <View style={[styles.barSegment, {
-                      flex: result.afterAllocation.UPSIDE * 100,
+                      flex: afterAllocation.upside || 1,
                       backgroundColor: LAYER_COLORS.UPSIDE
                     }]} />
                   </View>
@@ -384,19 +233,20 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
 
               {/* Legend */}
               <View style={styles.legend}>
-                {(['FOUNDATION', 'GROWTH', 'UPSIDE'] as Layer[]).map((layer) => (
+                {(['FOUNDATION', 'GROWTH', 'UPSIDE'] as const).map((layer) => (
                   <View key={layer} style={styles.legendItem}>
                     <View style={[styles.legendDot, { backgroundColor: LAYER_COLORS[layer] }]} />
                     <Text style={styles.legendText}>
-                      {LAYER_NAMES[layer]} {Math.round(result.afterAllocation[layer] * 100)}%
+                      {LAYER_NAMES[layer]} {Math.round(afterAllocation[layer.toLowerCase() as keyof typeof afterAllocation] * 100)}%
                     </Text>
                   </View>
                 ))}
               </View>
             </View>
+            )}
 
             {/* Mode Selection */}
-            {cashIRR > 0 && (
+            {!isLoading && !error && cashIRR > 0 && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Rebalance Mode</Text>
                 <View style={styles.modeOptions}>
@@ -428,6 +278,7 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
             )}
 
             {/* Trade Summary */}
+            {!isLoading && !error && (
             <View style={styles.section}>
               <TouchableOpacity
                 style={styles.summaryHeader}
@@ -446,9 +297,9 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
                 <Text style={styles.summaryValue}>{buyTrades.length} assets</Text>
               </View>
 
-              {showTrades && result.trades.length > 0 && (
+              {showTrades && trades.length > 0 && (
                 <View style={styles.tradeList}>
-                  {result.trades.map((trade, index) => (
+                  {trades.map((trade, index) => (
                     <View key={index} style={styles.tradeItem}>
                       <View style={styles.tradeLeft}>
                         <Text style={[
@@ -458,20 +309,21 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
                           {trade.side}
                         </Text>
                         <Text style={styles.tradeAsset}>
-                          {ASSETS[trade.assetId]?.symbol || trade.assetId}
+                          {ASSETS[trade.assetId as keyof typeof ASSETS]?.symbol || trade.assetId}
                         </Text>
                       </View>
                       <Text style={styles.tradeAmount}>
-                        {formatNumber(trade.amountIRR)} IRR
+                        {formatNumber(trade.amountIrr)} IRR
                       </Text>
                     </View>
                   ))}
                 </View>
               )}
             </View>
+            )}
 
             {/* Warnings */}
-            {result.hasLockedCollateral && (
+            {!isLoading && !error && hasLockedCollateral && (
               <View style={styles.warningBox}>
                 <Text style={styles.warningIcon}>🔒</Text>
                 <Text style={styles.warningText}>
@@ -480,16 +332,16 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
               </View>
             )}
 
-            {result.boundary !== 'SAFE' && (
+            {!isLoading && !error && residualDrift > 2 && (
               <View style={[styles.warningBox, { borderColor: colors.warning }]}>
                 <Text style={styles.warningIcon}>⚠️</Text>
                 <Text style={styles.warningText}>
-                  {BOUNDARY_MESSAGES[result.boundary] || result.message}
+                  {`Remaining drift: ${residualDrift.toFixed(1)}% from target.`}
                 </Text>
               </View>
             )}
 
-            {!result.canExecute && (
+            {!isLoading && !error && !canExecute && (
               <View style={styles.infoBox}>
                 <Text style={styles.infoText}>
                   Your portfolio is already balanced or no trades are needed.
@@ -503,13 +355,13 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
             <TouchableOpacity
               style={[
                 styles.confirmButton,
-                !result.canExecute && styles.confirmButtonDisabled
+                (!canExecute || isLoading) && styles.confirmButtonDisabled
               ]}
               onPress={handleConfirm}
-              disabled={!result.canExecute || isExecuting}
+              disabled={!canExecute || isExecuting || isLoading}
             >
               <Text style={styles.confirmButtonText}>
-                {isExecuting ? 'Rebalancing...' : 'Confirm Rebalance'}
+                {isExecuting ? 'Rebalancing...' : isLoading ? 'Loading...' : 'Confirm Rebalance'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -562,6 +414,36 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing[4],
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing[8],
+  },
+  loadingText: {
+    marginTop: spacing[3],
+    fontSize: typography.fontSize.base,
+    color: colors.textSecondary,
+  },
+  errorContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing[6],
+  },
+  errorText: {
+    fontSize: typography.fontSize.base,
+    color: colors.error,
+    textAlign: 'center',
+    marginBottom: spacing[4],
+  },
+  retryButton: {
+    backgroundColor: colors.surfaceDark,
+    paddingHorizontal: spacing[6],
+    paddingVertical: spacing[3],
+    borderRadius: borderRadius.full,
+  },
+  retryButtonText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.primary,
   },
   section: {
     marginBottom: spacing[6],

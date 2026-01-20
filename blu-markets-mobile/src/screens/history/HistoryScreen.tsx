@@ -1,6 +1,6 @@
 // History Screen
 // Based on PRD Section 9.5 - History Tab
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,12 @@ import {
   SafeAreaView,
   Alert,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../../constants/theme';
-import { useAppSelector } from '../../hooks/useStore';
-import { ActionLogEntry, Boundary, ActionType } from '../../types';
+import { Boundary, ActionType, AssetId, ActionLogEntry } from '../../types';
 import { exportToCSV } from '../../utils/csvExport';
+import { historyApi, ActivityLogEntry as ApiActivityLogEntry } from '../../services/api';
 
 // Boundary indicator colors and icons
 const BOUNDARY_CONFIG: Record<Boundary, { color: string; icon: string }> = {
@@ -84,9 +85,45 @@ const groupByDate = (entries: ActionLogEntry[]): Map<string, ActionLogEntry[]> =
 };
 
 const HistoryScreen: React.FC = () => {
-  const { actionLog } = useAppSelector((state) => state.portfolio);
+  const [actionLog, setActionLog] = useState<ActionLogEntry[]>([]);
   const [expandedEntries, setExpandedEntries] = useState<Set<number>>(new Set());
   const [isExporting, setIsExporting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch activity from backend
+  const fetchActivity = useCallback(async (showRefreshing = false) => {
+    if (showRefreshing) setIsRefreshing(true);
+    else setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await historyApi.getActivity();
+      // Convert API response to local format
+      const entries: ActionLogEntry[] = response.map((item) => ({
+        id: parseInt(item.id, 10) || Date.now(),
+        timestamp: item.createdAt,
+        type: item.actionType as ActionType,
+        boundary: (item.boundary || 'SAFE') as Boundary,
+        message: item.message,
+        amountIRR: item.amountIrr,
+        assetId: item.assetId as AssetId | undefined,
+      }));
+      setActionLog(entries);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to load activity');
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchActivity();
+  }, [fetchActivity]);
+
+  const onRefresh = () => fetchActivity(true);
 
   const toggleExpand = (entryId: number) => {
     setExpandedEntries((prev) => {
@@ -139,7 +176,19 @@ const HistoryScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {actionLog.length === 0 ? (
+      {isLoading ? (
+        <View style={styles.loadingState}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading history...</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.errorState}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => fetchActivity()}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : actionLog.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>📜</Text>
           <Text style={styles.emptyTitle}>No activity yet</Text>
@@ -151,6 +200,13 @@ const HistoryScreen: React.FC = () => {
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+            />
+          }
         >
           {Array.from(groupedEntries.entries()).map(([dateKey, entries]) => (
             <View key={dateKey} style={styles.dateSection}>
@@ -279,6 +335,40 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: spacing[4],
+  },
+  loadingState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing[8],
+  },
+  loadingText: {
+    marginTop: spacing[3],
+    fontSize: typography.fontSize.base,
+    color: colors.textSecondary,
+  },
+  errorState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing[8],
+  },
+  errorText: {
+    fontSize: typography.fontSize.base,
+    color: colors.error,
+    textAlign: 'center',
+    marginBottom: spacing[4],
+  },
+  retryButton: {
+    backgroundColor: colors.surfaceDark,
+    paddingHorizontal: spacing[6],
+    paddingVertical: spacing[3],
+    borderRadius: borderRadius.full,
+  },
+  retryButtonText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.primary,
   },
   emptyState: {
     flex: 1,
