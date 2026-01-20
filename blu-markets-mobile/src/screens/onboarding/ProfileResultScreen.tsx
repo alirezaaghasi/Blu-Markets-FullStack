@@ -1,6 +1,6 @@
 // Profile Result Screen
 // Based on PRD Section 5 - Shows risk profile with donut chart visualization
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,13 +8,16 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/types';
 import { colors, typography, spacing, borderRadius } from '../../constants/theme';
 import { useAppDispatch, useAppSelector } from '../../hooks/useStore';
 import { setRiskProfile } from '../../store/slices/onboardingSlice';
-import { calculateRiskProfile, formatAllocation } from '../../utils/riskProfile';
+import { formatAllocation } from '../../utils/riskProfile';
+import { onboardingApi, QuestionnaireAnswer, ApiError } from '../../services/api';
+import { QUESTIONS } from '../../constants/questionnaire';
 
 const { width } = Dimensions.get('window');
 
@@ -26,21 +29,87 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation })
   const dispatch = useAppDispatch();
   const answers = useAppSelector((state) => state.onboarding.answers);
   const riskProfile = useAppSelector((state) => state.onboarding.riskProfile);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Calculate risk profile from answers
-    const profile = calculateRiskProfile(answers);
-    dispatch(setRiskProfile(profile));
+    // Submit questionnaire to backend
+    const submitQuestionnaire = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // Transform answers to backend format
+        const apiAnswers: QuestionnaireAnswer[] = QUESTIONS.map((question) => {
+          const optionIndex = answers[question.id] ?? 0;
+          const option = question.options[optionIndex];
+          return {
+            questionId: question.id,
+            answerId: String(optionIndex),
+            value: option?.score ?? 5,
+          };
+        });
+
+        const response = await onboardingApi.submitQuestionnaire(apiAnswers);
+
+        // Map backend response to local format
+        const profile = {
+          score: response.riskScore,
+          profileName: response.profileName,
+          profileNameFarsi: getProfileNameFarsi(response.riskScore),
+          targetAllocation: {
+            FOUNDATION: response.targetAllocation.foundation,
+            GROWTH: response.targetAllocation.growth,
+            UPSIDE: response.targetAllocation.upside,
+          },
+        };
+
+        dispatch(setRiskProfile(profile));
+      } catch (err) {
+        const apiError = err as ApiError;
+        setError(apiError.message || 'Failed to calculate profile');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    submitQuestionnaire();
   }, [answers, dispatch]);
 
-  if (!riskProfile) {
+  if (isLoading || !riskProfile) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Calculating your profile...</Text>
         </View>
       </SafeAreaView>
     );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.retryButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Helper to get Farsi profile name
+  function getProfileNameFarsi(score: number): string {
+    if (score <= 2) return 'محافظه‌کار';
+    if (score <= 4) return 'محتاط';
+    if (score <= 6) return 'متعادل';
+    if (score <= 8) return 'رشدگرا';
+    return 'جسور';
   }
 
   const allocation = formatAllocation(riskProfile.targetAllocation);
@@ -192,6 +261,24 @@ const styles = StyleSheet.create({
   loadingText: {
     color: colors.textSecondary,
     fontSize: typography.fontSize.lg,
+    marginTop: spacing[4],
+  },
+  errorText: {
+    color: colors.error,
+    fontSize: typography.fontSize.base,
+    textAlign: 'center',
+    marginBottom: spacing[4],
+  },
+  retryButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing[6],
+    paddingVertical: spacing[3],
+    borderRadius: borderRadius.full,
+  },
+  retryButtonText: {
+    color: colors.textPrimaryDark,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
   },
   backButton: {
     paddingHorizontal: spacing[6],

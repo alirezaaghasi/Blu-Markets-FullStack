@@ -13,7 +13,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/types';
 import { colors, typography, spacing, borderRadius } from '../../constants/theme';
 import { useAppDispatch, useAppSelector } from '../../hooks/useStore';
-import { setAuthToken } from '../../store/slices/authSlice';
 import { initializePortfolio, logAction } from '../../store/slices/portfolioSlice';
 import { resetOnboarding } from '../../store/slices/onboardingSlice';
 
@@ -58,16 +57,16 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
   };
 
   const handleGoToDashboard = () => {
-    // Initialize portfolio with the investment
+    // Initialize local portfolio state (portfolio already created on backend)
     dispatch(
       initializePortfolio({
-        cashIRR: 0, // All invested
-        holdings: [], // Will be populated by portfolio creation logic
+        cashIRR: initialInvestment, // Cash from initial funding
+        holdings: [], // Will be fetched from backend
         targetLayerPct: allocation,
       })
     );
 
-    // Log the portfolio creation action
+    // Log the portfolio creation action locally
     dispatch(
       logAction({
         type: 'PORTFOLIO_CREATED',
@@ -77,10 +76,8 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
       })
     );
 
-    // Set auth token (in real app, this would come from backend)
-    dispatch(setAuthToken('demo-token-' + Date.now()));
-
-    // Reset onboarding state
+    // Auth token is already set from OTP verification
+    // Reset onboarding state - this triggers navigation to main app
     dispatch(resetOnboarding());
   };
 

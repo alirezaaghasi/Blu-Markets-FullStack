@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/types';
@@ -15,6 +16,7 @@ import { colors, typography, spacing, borderRadius } from '../../constants/theme
 import { useAppDispatch, useAppSelector } from '../../hooks/useStore';
 import { setInitialInvestment } from '../../store/slices/onboardingSlice';
 import { MIN_INVESTMENT_AMOUNT } from '../../constants/business';
+import { onboardingApi, ApiError } from '../../services/api';
 
 type InitialFundingScreenProps = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'InitialFunding'>;
@@ -44,6 +46,8 @@ const InitialFundingScreen: React.FC<InitialFundingScreenProps> = ({
   const dispatch = useAppDispatch();
   const riskProfile = useAppSelector((state) => state.onboarding.riskProfile);
   const [amount, setAmount] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const numericAmount = parseNumber(amount);
   const isValid = numericAmount >= MIN_INVESTMENT_AMOUNT;
@@ -53,16 +57,30 @@ const InitialFundingScreen: React.FC<InitialFundingScreenProps> = ({
     const cleaned = value.replace(/[^0-9]/g, '');
     const num = parseInt(cleaned, 10) || 0;
     setAmount(num > 0 ? formatNumber(num) : '');
+    setError(null);
   };
 
   const handleQuickAmount = (value: number) => {
     setAmount(formatNumber(value));
+    setError(null);
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!isValid) return;
-    dispatch(setInitialInvestment(numericAmount));
-    navigation.navigate('Success');
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await onboardingApi.createPortfolio(numericAmount);
+      dispatch(setInitialInvestment(numericAmount));
+      navigation.navigate('Success');
+    } catch (err) {
+      const apiError = err as ApiError;
+      setError(apiError.message || 'Failed to create portfolio');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Calculate allocation preview
@@ -113,6 +131,9 @@ const InitialFundingScreen: React.FC<InitialFundingScreenProps> = ({
         <Text style={styles.hint}>
           Minimum: {formatNumber(MIN_INVESTMENT_AMOUNT)} IRR
         </Text>
+
+        {/* Error message */}
+        {error && <Text style={styles.errorText}>{error}</Text>}
 
         {/* Quick amount chips */}
         <View style={styles.quickAmounts}>
@@ -199,12 +220,16 @@ const InitialFundingScreen: React.FC<InitialFundingScreenProps> = ({
       {/* CTA Button */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.button, !isValid && styles.buttonDisabled]}
+          style={[styles.button, (!isValid || isLoading) && styles.buttonDisabled]}
           onPress={handleContinue}
           activeOpacity={0.8}
-          disabled={!isValid}
+          disabled={!isValid || isLoading}
         >
-          <Text style={styles.buttonText}>Create My Portfolio</Text>
+          {isLoading ? (
+            <ActivityIndicator color={colors.textPrimaryDark} />
+          ) : (
+            <Text style={styles.buttonText}>Create My Portfolio</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -280,7 +305,12 @@ const styles = StyleSheet.create({
   hint: {
     fontSize: typography.fontSize.sm,
     color: colors.textSecondary,
-    marginBottom: spacing[6],
+    marginBottom: spacing[2],
+  },
+  errorText: {
+    color: colors.error,
+    fontSize: typography.fontSize.sm,
+    marginBottom: spacing[4],
   },
   quickAmounts: {
     flexDirection: 'row',

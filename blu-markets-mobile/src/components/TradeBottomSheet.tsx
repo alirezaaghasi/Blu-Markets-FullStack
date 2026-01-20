@@ -19,13 +19,14 @@ import { AssetId, Boundary, Holding, TradePreview } from '../types';
 import { ASSETS, LAYER_COLORS, LAYER_NAMES } from '../constants/assets';
 import { MIN_TRADE_AMOUNT, SPREAD_BY_LAYER } from '../constants/business';
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
-import { executeTrade } from '../store/slices/portfolioSlice';
+import { updateHoldingFromTrade, updateCash } from '../store/slices/portfolioSlice';
 import {
   validateBuyTrade,
   validateSellTrade,
   generateTradePreview,
 } from '../utils/tradeValidation';
 import AllocationBar from './AllocationBar';
+import { tradeApi, ApiError } from '../services/api';
 
 interface TradeBottomSheetProps {
   visible: boolean;
@@ -169,29 +170,33 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
           {
             text: 'Proceed',
             style: preview.boundary === 'STRESS' ? 'destructive' : 'default',
-            onPress: executeTradeFn,
+            onPress: () => executeTradeFn(true), // acknowledgedWarning = true
           },
         ]
       );
     } else {
-      executeTradeFn();
+      executeTradeFn(false);
     }
   };
 
-  const executeTradeFn = async () => {
+  const executeTradeFn = async (acknowledgedWarning = false) => {
     setIsSubmitting(true);
     try {
-      dispatch(executeTrade({
-        side,
+      const response = await tradeApi.execute(side, assetId, amountIRR, acknowledgedWarning);
+
+      // Update local state with trade result
+      dispatch(updateHoldingFromTrade({
         assetId,
-        amountIRR,
-        priceUSD,
-        fxRate,
+        quantity: response.newBalance.holdingQuantity,
+        side,
       }));
+      dispatch(updateCash(response.newBalance.cashIrr));
+
       onClose();
       setAmountInput('');
     } catch (error) {
-      Alert.alert('Error', 'Failed to execute trade. Please try again.');
+      const apiError = error as ApiError;
+      Alert.alert('Trade Failed', apiError.message || 'Failed to execute trade. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

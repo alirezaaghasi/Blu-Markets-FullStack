@@ -1,18 +1,20 @@
 // Consent Screen
 // Based on PRD Section 14.3 - Consent Sentences in Farsi
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/types';
 import { colors, typography, spacing, borderRadius } from '../../constants/theme';
 import { useAppDispatch, useAppSelector } from '../../hooks/useStore';
 import { setConsent } from '../../store/slices/onboardingSlice';
+import { onboardingApi, ApiError } from '../../services/api';
 
 type ConsentScreenProps = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'Consent'>;
@@ -40,9 +42,26 @@ const CONSENT_ITEMS = [
 const ConsentScreen: React.FC<ConsentScreenProps> = ({ navigation }) => {
   const dispatch = useAppDispatch();
   const consents = useAppSelector((state) => state.onboarding.consents);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleToggleConsent = (key: keyof typeof consents) => {
     dispatch(setConsent({ key, value: !consents[key] }));
+  };
+
+  const handleContinue = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await onboardingApi.recordConsent();
+      navigation.navigate('InitialFunding');
+    } catch (err) {
+      const apiError = err as ApiError;
+      setError(apiError.message || 'Failed to record consent');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const allConsented =
@@ -106,6 +125,9 @@ const ConsentScreen: React.FC<ConsentScreenProps> = ({ navigation }) => {
 
       {/* CTA Button */}
       <View style={styles.footer}>
+        {/* Error message */}
+        {error && <Text style={styles.errorText}>{error}</Text>}
+
         {/* Final confirmation in Farsi */}
         {allConsented && (
           <Text style={styles.finalConsentFarsi}>
@@ -113,12 +135,16 @@ const ConsentScreen: React.FC<ConsentScreenProps> = ({ navigation }) => {
           </Text>
         )}
         <TouchableOpacity
-          style={[styles.button, !allConsented && styles.buttonDisabled]}
-          onPress={() => navigation.navigate('InitialFunding')}
+          style={[styles.button, (!allConsented || isLoading) && styles.buttonDisabled]}
+          onPress={handleContinue}
           activeOpacity={0.8}
-          disabled={!allConsented}
+          disabled={!allConsented || isLoading}
         >
-          <Text style={styles.buttonText}>I understand</Text>
+          {isLoading ? (
+            <ActivityIndicator color={colors.textPrimaryDark} />
+          ) : (
+            <Text style={styles.buttonText}>I understand</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -221,6 +247,12 @@ const styles = StyleSheet.create({
   footer: {
     paddingHorizontal: spacing[6],
     paddingBottom: spacing[8],
+  },
+  errorText: {
+    color: colors.error,
+    fontSize: typography.fontSize.sm,
+    textAlign: 'center',
+    marginBottom: spacing[3],
   },
   finalConsentFarsi: {
     fontSize: typography.fontSize.sm,

@@ -141,4 +141,186 @@ export const authApi = {
   },
 };
 
+// Onboarding API
+export interface QuestionnaireAnswer {
+  questionId: string;
+  answerId: string;
+  value: number;
+}
+
+export interface RiskProfileResponse {
+  riskScore: number;
+  riskTier: 'LOW' | 'MEDIUM' | 'HIGH';
+  profileName: string;
+  targetAllocation: {
+    foundation: number;
+    growth: number;
+    upside: number;
+  };
+}
+
+export interface InitialFundingResponse {
+  portfolioId: string;
+  cashIrr: number;
+  targetAllocation: {
+    foundation: number;
+    growth: number;
+    upside: number;
+  };
+}
+
+export const onboardingApi = {
+  // Submit questionnaire answers
+  async submitQuestionnaire(answers: QuestionnaireAnswer[]): Promise<RiskProfileResponse> {
+    return apiFetch<RiskProfileResponse>('/api/v1/onboarding/questionnaire', {
+      method: 'POST',
+      body: JSON.stringify({ answers }),
+    });
+  },
+
+  // Record user consents
+  async recordConsent(): Promise<{ success: boolean }> {
+    return apiFetch<{ success: boolean }>('/api/v1/onboarding/consent', {
+      method: 'POST',
+      body: JSON.stringify({
+        consentRisk: true,
+        consentLoss: true,
+        consentNoGuarantee: true,
+      }),
+    });
+  },
+
+  // Create portfolio with initial funding
+  async createPortfolio(amountIrr: number): Promise<InitialFundingResponse> {
+    return apiFetch<InitialFundingResponse>('/api/v1/onboarding/initial-funding', {
+      method: 'POST',
+      body: JSON.stringify({ amountIrr }),
+    });
+  },
+};
+
+// Portfolio API
+export interface PortfolioSummary {
+  id: string;
+  cashIrr: number;
+  totalValueIrr: number;
+  holdingsValueIrr: number;
+  allocation: {
+    foundation: number;
+    growth: number;
+    upside: number;
+  };
+  targetAllocation: {
+    foundation: number;
+    growth: number;
+    upside: number;
+  };
+  status: 'BALANCED' | 'SLIGHTLY_OFF' | 'ATTENTION_REQUIRED';
+  driftPct: number;
+  holdingsCount: number;
+  activeLoansCount: number;
+  activeProtectionsCount: number;
+}
+
+export interface HoldingResponse {
+  assetId: string;
+  name: string;
+  quantity: number;
+  layer: 'FOUNDATION' | 'GROWTH' | 'UPSIDE';
+  frozen: boolean;
+  valueIrr: number;
+  valueUsd: number;
+  priceUsd: number;
+  priceIrr: number;
+  change24hPct: number;
+  pctOfPortfolio: number;
+}
+
+export const portfolioApi = {
+  // Get portfolio summary
+  async getSummary(): Promise<PortfolioSummary> {
+    return apiFetch<PortfolioSummary>('/api/v1/portfolio');
+  },
+
+  // Get holdings
+  async getHoldings(): Promise<HoldingResponse[]> {
+    return apiFetch<HoldingResponse[]>('/api/v1/portfolio/holdings');
+  },
+
+  // Add funds
+  async addFunds(amountIrr: number): Promise<{ newCashIrr: number; ledgerEntryId: string }> {
+    return apiFetch<{ newCashIrr: number; ledgerEntryId: string }>('/api/v1/portfolio/add-funds', {
+      method: 'POST',
+      body: JSON.stringify({ amountIrr }),
+    });
+  },
+};
+
+// Trade API
+export interface TradePreviewResponse {
+  valid: boolean;
+  preview: {
+    action: 'BUY' | 'SELL';
+    assetId: string;
+    quantity: number;
+    amountIrr: number;
+    priceIrr: number;
+    spread: number;
+    spreadAmountIrr: number;
+  };
+  allocation: {
+    before: { foundation: number; growth: number; upside: number };
+    target: { foundation: number; growth: number; upside: number };
+    after: { foundation: number; growth: number; upside: number };
+  };
+  boundary: 'SAFE' | 'DRIFT' | 'STRUCTURAL' | 'STRESS';
+  frictionCopy: string;
+  movesToward: boolean;
+  error?: string;
+}
+
+export interface TradeExecuteResponse {
+  success: boolean;
+  trade: {
+    action: 'BUY' | 'SELL';
+    assetId: string;
+    quantity: number;
+    amountIrr: number;
+    priceIrr: number;
+  };
+  newBalance: {
+    cashIrr: number;
+    holdingQuantity: number;
+  };
+  boundary: 'SAFE' | 'DRIFT' | 'STRUCTURAL' | 'STRESS';
+  ledgerEntryId: string;
+}
+
+export const tradeApi = {
+  // Preview trade
+  async preview(
+    action: 'BUY' | 'SELL',
+    assetId: string,
+    amountIrr: number
+  ): Promise<TradePreviewResponse> {
+    return apiFetch<TradePreviewResponse>('/api/v1/trade/preview', {
+      method: 'POST',
+      body: JSON.stringify({ action, assetId, amountIrr }),
+    });
+  },
+
+  // Execute trade
+  async execute(
+    action: 'BUY' | 'SELL',
+    assetId: string,
+    amountIrr: number,
+    acknowledgedWarning?: boolean
+  ): Promise<TradeExecuteResponse> {
+    return apiFetch<TradeExecuteResponse>('/api/v1/trade/execute', {
+      method: 'POST',
+      body: JSON.stringify({ action, assetId, amountIrr, acknowledgedWarning }),
+    });
+  },
+};
+
 export default authApi;

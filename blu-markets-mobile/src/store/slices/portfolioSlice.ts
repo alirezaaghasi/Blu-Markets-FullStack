@@ -58,6 +58,9 @@ const portfolioSlice = createSlice({
     setCash: (state, action: PayloadAction<number>) => {
       state.cashIRR = action.payload;
     },
+    updateCash: (state, action: PayloadAction<number>) => {
+      state.cashIRR = action.payload;
+    },
     addCash: (state, action: PayloadAction<number>) => {
       state.cashIRR += action.payload;
     },
@@ -94,6 +97,52 @@ const portfolioSlice = createSlice({
       state.holdings = state.holdings.filter(
         (h) => h.assetId !== action.payload
       );
+    },
+    // Update holding from backend trade result
+    updateHoldingFromTrade: (
+      state,
+      action: PayloadAction<{
+        assetId: AssetId;
+        quantity: number;
+        side: 'BUY' | 'SELL';
+      }>
+    ) => {
+      const { assetId, quantity, side } = action.payload;
+      const asset = ASSETS[assetId];
+
+      if (quantity <= 0.00000001) {
+        // Remove holding if quantity is effectively zero
+        state.holdings = state.holdings.filter((h) => h.assetId !== assetId);
+      } else {
+        const existingIndex = state.holdings.findIndex(
+          (h) => h.assetId === assetId
+        );
+        if (existingIndex >= 0) {
+          state.holdings[existingIndex].quantity = quantity;
+        } else if (side === 'BUY') {
+          // Add new holding on buy
+          state.holdings.push({
+            assetId,
+            quantity,
+            frozen: false,
+            layer: asset.layer,
+          });
+        }
+      }
+
+      // Log the action
+      const entry: ActionLogEntry = {
+        id: Date.now(),
+        timestamp: new Date().toISOString(),
+        type: 'TRADE',
+        boundary: 'SAFE',
+        message: `${side === 'BUY' ? 'Bought' : 'Sold'} ${asset.symbol}`,
+        assetId,
+      };
+      state.actionLog.unshift(entry);
+      if (state.actionLog.length > MAX_ACTION_LOG_SIZE) {
+        state.actionLog = state.actionLog.slice(0, MAX_ACTION_LOG_SIZE);
+      }
     },
     freezeHolding: (state, action: PayloadAction<AssetId>) => {
       const holding = state.holdings.find(
@@ -395,11 +444,13 @@ const portfolioSlice = createSlice({
 export const {
   initializePortfolio,
   setCash,
+  updateCash,
   addCash,
   subtractCash,
   setHoldings,
   addHolding,
   updateHolding,
+  updateHoldingFromTrade,
   removeHolding,
   freezeHolding,
   unfreezeHolding,
