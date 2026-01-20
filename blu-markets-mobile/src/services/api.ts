@@ -323,4 +323,278 @@ export const tradeApi = {
   },
 };
 
+// Rebalance API
+export interface RebalanceStatusResponse {
+  currentAllocation: { foundation: number; growth: number; upside: number };
+  targetAllocation: { foundation: number; growth: number; upside: number };
+  driftPct: number;
+  status: 'BALANCED' | 'SLIGHTLY_OFF' | 'ATTENTION_REQUIRED';
+  canRebalance: boolean;
+  needsRebalance: boolean;
+  lastRebalanceAt: string | null;
+  hoursSinceRebalance: number | null;
+  hoursRemaining: number | null;
+}
+
+export interface RebalanceTrade {
+  side: 'BUY' | 'SELL';
+  assetId: string;
+  amountIrr: number;
+  layer: string;
+}
+
+export interface RebalancePreviewResponse {
+  trades: RebalanceTrade[];
+  currentAllocation: { foundation: number; growth: number; upside: number };
+  targetAllocation: { foundation: number; growth: number; upside: number };
+  afterAllocation: { foundation: number; growth: number; upside: number };
+  totalBuyIrr: number;
+  totalSellIrr: number;
+  canFullyRebalance: boolean;
+  residualDrift?: number;
+  hasLockedCollateral?: boolean;
+}
+
+export interface RebalanceExecuteResponse {
+  success: boolean;
+  tradesExecuted: number;
+  newAllocation: { foundation: number; growth: number; upside: number };
+  ledgerEntryId: string;
+  boundary: 'SAFE' | 'DRIFT' | 'STRUCTURAL' | 'STRESS';
+}
+
+export type RebalanceMode = 'HOLDINGS_ONLY' | 'HOLDINGS_PLUS_CASH' | 'SMART';
+
+export const rebalanceApi = {
+  // Get rebalance status
+  async getStatus(): Promise<RebalanceStatusResponse> {
+    return apiFetch<RebalanceStatusResponse>('/api/v1/rebalance/status');
+  },
+
+  // Preview rebalance
+  async preview(mode: RebalanceMode = 'HOLDINGS_ONLY'): Promise<RebalancePreviewResponse> {
+    return apiFetch<RebalancePreviewResponse>(`/api/v1/rebalance/preview?mode=${mode}`);
+  },
+
+  // Execute rebalance
+  async execute(
+    mode: RebalanceMode = 'HOLDINGS_ONLY',
+    acknowledgedWarning = false
+  ): Promise<RebalanceExecuteResponse> {
+    return apiFetch<RebalanceExecuteResponse>('/api/v1/rebalance/execute', {
+      method: 'POST',
+      body: JSON.stringify({ mode, acknowledgedWarning }),
+    });
+  },
+};
+
+// History API
+export interface ActivityLogEntry {
+  id: string;
+  actionType: string;
+  boundary?: 'SAFE' | 'DRIFT' | 'STRUCTURAL' | 'STRESS';
+  message: string;
+  amountIrr?: number;
+  assetId?: string;
+  createdAt: string;
+}
+
+export interface HistoryEntry {
+  id: string;
+  entryType: string;
+  assetId?: string;
+  quantity?: number;
+  amountIrr?: number;
+  boundary?: 'SAFE' | 'DRIFT' | 'STRUCTURAL' | 'STRESS';
+  message: string;
+  createdAt: string;
+  beforeSnapshot?: {
+    cashIrr: number;
+    totalValueIrr: number;
+    allocation: { foundation: number; growth: number; upside: number };
+  };
+  afterSnapshot?: {
+    cashIrr: number;
+    totalValueIrr: number;
+    allocation: { foundation: number; growth: number; upside: number };
+  };
+}
+
+export const historyApi = {
+  // Get activity feed (recent actions)
+  async getActivity(): Promise<ActivityLogEntry[]> {
+    return apiFetch<ActivityLogEntry[]>('/api/v1/history/activity');
+  },
+
+  // Get paginated history
+  async getHistory(params?: {
+    page?: number;
+    limit?: number;
+    type?: string;
+    from?: string;
+    to?: string;
+  }): Promise<{ entries: HistoryEntry[]; total: number; page: number; limit: number }> {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.set('page', String(params.page));
+    if (params?.limit) queryParams.set('limit', String(params.limit));
+    if (params?.type) queryParams.set('type', params.type);
+    if (params?.from) queryParams.set('from', params.from);
+    if (params?.to) queryParams.set('to', params.to);
+
+    const query = queryParams.toString();
+    return apiFetch<{ entries: HistoryEntry[]; total: number; page: number; limit: number }>(
+      `/api/v1/history${query ? `?${query}` : ''}`
+    );
+  },
+
+  // Get single entry details
+  async getEntry(id: string): Promise<HistoryEntry> {
+    return apiFetch<HistoryEntry>(`/api/v1/history/${id}`);
+  },
+};
+
+// Protection API
+export interface ProtectionResponse {
+  id: string;
+  assetId: string;
+  notionalIrr: number;
+  premiumIrr: number;
+  durationMonths: number;
+  startDate: string;
+  endDate: string;
+  status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED';
+  daysRemaining?: number;
+}
+
+export interface EligibleProtectionAsset {
+  assetId: string;
+  layer: 'FOUNDATION' | 'GROWTH' | 'UPSIDE';
+  holdingValueIrr: number;
+  monthlyRate: number;
+  alreadyProtected: boolean;
+}
+
+export const protectionApi = {
+  // Get active protections
+  async getProtections(): Promise<ProtectionResponse[]> {
+    return apiFetch<ProtectionResponse[]>('/api/v1/protection');
+  },
+
+  // Get eligible assets for protection
+  async getEligible(): Promise<EligibleProtectionAsset[]> {
+    return apiFetch<EligibleProtectionAsset[]>('/api/v1/protection/eligible');
+  },
+
+  // Purchase protection
+  async purchase(
+    assetId: string,
+    notionalIrr: number,
+    durationMonths: 1 | 2 | 3 | 4 | 5 | 6
+  ): Promise<ProtectionResponse> {
+    return apiFetch<ProtectionResponse>('/api/v1/protection', {
+      method: 'POST',
+      body: JSON.stringify({ assetId, notionalIrr, durationMonths }),
+    });
+  },
+
+  // Cancel protection
+  async cancel(id: string): Promise<{ success: boolean }> {
+    return apiFetch<{ success: boolean }>(`/api/v1/protection/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// Loans API
+export interface LoanInstallment {
+  number: number;
+  dueDate: string;
+  totalIrr: number;
+  paidIrr: number;
+  status: 'PENDING' | 'PARTIAL' | 'PAID';
+}
+
+export interface LoanResponse {
+  id: string;
+  collateralAssetId: string;
+  collateralQuantity: number;
+  collateralValueIrr: number;
+  principalIrr: number;
+  interestRate: number;
+  totalInterestIrr: number;
+  totalDueIrr: number;
+  durationMonths: number;
+  startDate: string;
+  dueDate: string;
+  installments: LoanInstallment[];
+  paidIrr: number;
+  remainingIrr: number;
+  ltv: number;
+  status: 'ACTIVE' | 'REPAID' | 'LIQUIDATED';
+}
+
+export interface LoanCapacityAsset {
+  assetId: string;
+  layer: 'FOUNDATION' | 'GROWTH' | 'UPSIDE';
+  maxLtv: number;
+  holdingValueIrr: number;
+  maxLoanIrr: number;
+  existingLoanIrr: number;
+  availableLoanIrr: number;
+  frozen: boolean;
+}
+
+export interface LoanCapacityResponse {
+  maxPortfolioLoanIrr: number;
+  currentLoansIrr: number;
+  availableIrr: number;
+  perAsset: LoanCapacityAsset[];
+}
+
+export interface RepayLoanResponse {
+  success: boolean;
+  amountApplied: number;
+  remainingDue: number;
+  installmentsPaid: number;
+  isFullySettled: boolean;
+  collateralUnfrozen: boolean;
+}
+
+export const loansApi = {
+  // Get all loans
+  async getLoans(): Promise<LoanResponse[]> {
+    return apiFetch<LoanResponse[]>('/api/v1/loans');
+  },
+
+  // Get loan capacity
+  async getCapacity(): Promise<LoanCapacityResponse> {
+    return apiFetch<LoanCapacityResponse>('/api/v1/loans/capacity');
+  },
+
+  // Get single loan details
+  async getLoan(id: string): Promise<LoanResponse> {
+    return apiFetch<LoanResponse>(`/api/v1/loans/${id}`);
+  },
+
+  // Create new loan
+  async create(
+    collateralAssetId: string,
+    amountIrr: number,
+    durationMonths: 3 | 6
+  ): Promise<LoanResponse> {
+    return apiFetch<LoanResponse>('/api/v1/loans', {
+      method: 'POST',
+      body: JSON.stringify({ collateralAssetId, amountIrr, durationMonths }),
+    });
+  },
+
+  // Repay loan
+  async repay(id: string, amountIrr: number): Promise<RepayLoanResponse> {
+    return apiFetch<RepayLoanResponse>(`/api/v1/loans/${id}/repay`, {
+      method: 'POST',
+      body: JSON.stringify({ amountIrr }),
+    });
+  },
+};
+
 export default authApi;

@@ -163,17 +163,27 @@ export interface TradeExecuteResponse {
 // REBALANCE
 // ============================================================================
 
-export type RebalanceMode = 'CONSERVATIVE' | 'BALANCED' | 'AGGRESSIVE';
+export type RebalanceMode = 'HOLDINGS_ONLY' | 'HOLDINGS_PLUS_CASH' | 'SMART';
 
 export interface RebalancePreviewRequest {
   mode?: RebalanceMode;
 }
 
 export interface RebalanceTrade {
-  action: TradeAction;
-  assetId: AssetId;
-  quantity: number;
+  side: 'BUY' | 'SELL';
+  assetId: string;
   amountIrr: number;
+  layer: string;
+}
+
+export interface GapAnalysis {
+  layer: string;
+  current: number;
+  target: number;
+  gap: number;
+  gapIrr: number;
+  sellableIrr?: number;
+  frozenIrr?: number;
 }
 
 export interface RebalancePreviewResponse {
@@ -184,19 +194,22 @@ export interface RebalancePreviewResponse {
   totalBuyIrr: number;
   totalSellIrr: number;
   canFullyRebalance: boolean;
-  frozenCollateralWarning?: string;
-  gapAnalysis: {
-    layer: Layer;
-    current: number;
-    target: number;
-    gap: number;
-    gapIrr: number;
-  }[];
+  residualDrift?: number;
+  hasLockedCollateral?: boolean;
+  gapAnalysis: GapAnalysis[];
 }
 
 export interface RebalanceExecuteRequest {
   mode?: RebalanceMode;
   acknowledgedWarning?: boolean;
+}
+
+export interface RebalanceExecuteResponse {
+  success: boolean;
+  tradesExecuted: number;
+  newAllocation: TargetAllocation;
+  ledgerEntryId: string;
+  boundary: Boundary;
 }
 
 // ============================================================================
@@ -384,6 +397,10 @@ export type ErrorCode =
   | 'PROTECTION_EXISTS'
   | 'PROTECTION_NOT_ELIGIBLE'
   | 'REBALANCE_TOO_SOON'
+  | 'REBALANCE_COOLDOWN'
+  | 'NO_REBALANCE_NEEDED'
+  | 'NO_TRADES'
+  | 'ACKNOWLEDGMENT_REQUIRED'
   | 'RATE_LIMITED'
   | 'OTP_EXPIRED'
   | 'OTP_INVALID'

@@ -1,8 +1,13 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { authenticate } from '../../middleware/auth.js';
-import { prisma } from '../../config/database.js';
 import { getPortfolioSnapshot } from '../portfolio/portfolio.service.js';
-import type { RebalancePreviewResponse } from '../../types/api.js';
+import {
+  checkRebalanceCooldown,
+  previewRebalance,
+  executeRebalance,
+  RebalanceMode,
+} from './rebalance.service.js';
+import type { RebalancePreviewResponse, RebalanceExecuteResponse } from '../../types/api.js';
 
 export const rebalanceRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   app.addHook('preHandler', authenticate);
@@ -10,30 +15,24 @@ export const rebalanceRoutes: FastifyPluginAsync = async (app: FastifyInstance) 
   // GET /api/v1/rebalance/status
   app.get('/status', {
     schema: {
-      description: 'Check portfolio drift status',
+      description: 'Check portfolio drift status and rebalance eligibility',
       tags: ['Rebalance'],
       security: [{ bearerAuth: [] }],
     },
     handler: async (request, reply) => {
       const snapshot = await getPortfolioSnapshot(request.userId);
-
-      const lastRebalance = await prisma.portfolio.findUnique({
-        where: { userId: request.userId },
-        select: { lastRebalanceAt: true },
-      });
-
-      const hoursSinceRebalance = lastRebalance?.lastRebalanceAt
-        ? (Date.now() - lastRebalance.lastRebalanceAt.getTime()) / (1000 * 60 * 60)
-        : null;
+      const cooldown = await checkRebalanceCooldown(request.userId);
 
       return {
         currentAllocation: snapshot.allocation,
         targetAllocation: snapshot.targetAllocation,
         driftPct: snapshot.driftPct,
         status: snapshot.status,
-        canRebalance: !hoursSinceRebalance || hoursSinceRebalance >= 24,
-        lastRebalanceAt: lastRebalance?.lastRebalanceAt?.toISOString() || null,
-        hoursSinceRebalance: hoursSinceRebalance ? Math.floor(hoursSinceRebalance) : null,
+        canRebalance: cooldown.canRebalance && snapshot.driftPct >= 1,
+        needsRebalance: snapshot.driftPct >= 5,
+        lastRebalanceAt: cooldown.lastRebalanceAt?.toISOString() || null,
+        hoursSinceRebalance: cooldown.hoursSinceRebalance,
+        hoursRemaining: cooldown.hoursRemaining,
       };
     },
   });
@@ -47,73 +46,45 @@ export const rebalanceRoutes: FastifyPluginAsync = async (app: FastifyInstance) 
       querystring: {
         type: 'object',
         properties: {
-          mode: { type: 'string', enum: ['CONSERVATIVE', 'BALANCED', 'AGGRESSIVE'] },
+          mode: {
+            type: 'string',
+            enum: ['HOLDINGS_ONLY', 'HOLDINGS_PLUS_CASH', 'SMART'],
+            default: 'HOLDINGS_ONLY',
+          },
         },
       },
     },
     handler: async (request, reply) => {
-      const snapshot = await getPortfolioSnapshot(request.userId);
-
-      // Placeholder - full HRAM algorithm implementation
-      const response: RebalancePreviewResponse = {
-        trades: [],
-        currentAllocation: snapshot.allocation,
-        targetAllocation: snapshot.targetAllocation,
-        afterAllocation: snapshot.targetAllocation, // Would be calculated
-        totalBuyIrr: 0,
-        totalSellIrr: 0,
-        canFullyRebalance: true,
-        gapAnalysis: [
-          {
-            layer: 'FOUNDATION',
-            current: snapshot.allocation.foundation,
-            target: snapshot.targetAllocation.foundation,
-            gap: snapshot.targetAllocation.foundation - snapshot.allocation.foundation,
-            gapIrr: 0,
-          },
-          {
-            layer: 'GROWTH',
-            current: snapshot.allocation.growth,
-            target: snapshot.targetAllocation.growth,
-            gap: snapshot.targetAllocation.growth - snapshot.allocation.growth,
-            gapIrr: 0,
-          },
-          {
-            layer: 'UPSIDE',
-            current: snapshot.allocation.upside,
-            target: snapshot.targetAllocation.upside,
-            gap: snapshot.targetAllocation.upside - snapshot.allocation.upside,
-            gapIrr: 0,
-          },
-        ],
-      };
-
-      return response;
+      const mode = (request.query.mode as RebalanceMode) || 'HOLDINGS_ONLY';
+      const preview = await previewRebalance(request.userId, mode);
+      return preview;
     },
   });
 
   // POST /api/v1/rebalance/execute
   app.post<{ Body: { mode?: string; acknowledgedWarning?: boolean } }>('/execute', {
     schema: {
-      description: 'Execute rebalance',
+      description: 'Execute rebalance trades',
       tags: ['Rebalance'],
       security: [{ bearerAuth: [] }],
       body: {
         type: 'object',
         properties: {
-          mode: { type: 'string', enum: ['CONSERVATIVE', 'BALANCED', 'AGGRESSIVE'] },
-          acknowledgedWarning: { type: 'boolean' },
+          mode: {
+            type: 'string',
+            enum: ['HOLDINGS_ONLY', 'HOLDINGS_PLUS_CASH', 'SMART'],
+            default: 'HOLDINGS_ONLY',
+          },
+          acknowledgedWarning: { type: 'boolean', default: false },
         },
       },
     },
     handler: async (request, reply) => {
-      // Placeholder - full implementation would execute trades
-      return {
-        success: true,
-        tradesExecuted: 0,
-        newAllocation: {},
-        ledgerEntryId: '',
-      };
+      const mode = (request.body.mode as RebalanceMode) || 'HOLDINGS_ONLY';
+      const acknowledgedWarning = request.body.acknowledgedWarning || false;
+
+      const result = await executeRebalance(request.userId, mode, acknowledgedWarning);
+      return result;
     },
   });
 };
