@@ -27,6 +27,7 @@ replit.nix
 *.md
 !README.md
 !MIGRATION_PLAN.md
+!BACKEND_DATABASE_PLAN.md
 screenshots*/
 claude-code-prompt.md
 
