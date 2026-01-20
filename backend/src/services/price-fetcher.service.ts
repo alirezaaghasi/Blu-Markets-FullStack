@@ -1,6 +1,7 @@
 import { prisma } from '../config/database.js';
 import { env } from '../config/env.js';
 import { FALLBACK_FX_RATE, type AssetId } from '../types/domain.js';
+import { priceBroadcaster } from './price-broadcaster.service.js';
 
 // Asset configuration per PRD
 const COINGECKO_ASSETS: Record<string, AssetId> = {
@@ -169,6 +170,10 @@ export async function updateAllPrices(): Promise<void> {
 
   const allPrices = [...cryptoPrices, ...stockPrices, ...getInternalPrices()];
   const fetchedAt = new Date();
+  const timestamp = fetchedAt.toISOString();
+
+  // Collect all price updates for broadcasting
+  const priceUpdates = new Map<AssetId, { priceUsd: number; priceIrr: number; change24hPct?: number; source: string; timestamp: string }>();
 
   // Upsert prices
   for (const price of allPrices) {
@@ -199,10 +204,38 @@ export async function updateAllPrices(): Promise<void> {
         change24hPct: price.change24hPct,
       },
     });
+
+    // Collect for broadcast
+    priceUpdates.set(price.assetId, {
+      priceUsd: price.priceUsd,
+      priceIrr,
+      change24hPct: price.change24hPct,
+      source: price.source,
+      timestamp,
+    });
+
+    // Broadcast individual price update
+    priceBroadcaster.broadcastPriceUpdate(price.assetId, {
+      priceUsd: price.priceUsd,
+      priceIrr,
+      change24hPct: price.change24hPct,
+      source: price.source,
+      timestamp,
+    });
   }
 
+  // Broadcast FX rate update
+  priceBroadcaster.broadcastFxUpdate({
+    usdIrr: fxRate.usdIrr,
+    source: fxRate.source,
+    timestamp,
+  });
+
+  // Broadcast all prices together
+  priceBroadcaster.broadcastAllPrices(priceUpdates);
+
   const duration = Date.now() - startTime;
-  console.log(`✅ Updated ${allPrices.length} prices in ${duration}ms`);
+  console.log(`✅ Updated ${allPrices.length} prices in ${duration}ms (broadcast sent)`);
 }
 
 // Get current prices from database

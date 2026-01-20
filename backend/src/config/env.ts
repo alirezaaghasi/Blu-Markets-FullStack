@@ -30,6 +30,10 @@ const envSchema = z.object({
   // Features
   ENABLE_PRICE_WEBSOCKET: z.string().default('true').transform((v) => v === 'true'),
   ENABLE_PUSH_NOTIFICATIONS: z.string().default('false').transform((v) => v === 'true'),
+
+  // Price polling
+  PRICE_POLL_INTERVAL_MS: z.string().default('30000').transform(Number), // 30 seconds default
+  PRICE_POLL_ENABLED: z.string().default('true').transform((v) => v === 'true'),
 });
 
 export type Env = z.infer<typeof envSchema>;

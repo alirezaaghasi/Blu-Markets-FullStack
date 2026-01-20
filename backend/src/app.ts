@@ -5,6 +5,7 @@ import jwt from '@fastify/jwt';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
+import websocket from '@fastify/websocket';
 
 import { env } from './config/env.js';
 import { errorHandler } from './middleware/error-handler.js';
@@ -19,6 +20,7 @@ import { loansRoutes } from './modules/loans/loans.routes.js';
 import { protectionRoutes } from './modules/protection/protection.routes.js';
 import { historyRoutes } from './modules/history/history.routes.js';
 import { pricesRoutes } from './modules/prices/prices.routes.js';
+import { registerPriceWebSocket } from './modules/prices/prices.websocket.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -64,6 +66,9 @@ export async function buildApp(): Promise<FastifyInstance> {
     secret: env.JWT_ACCESS_SECRET,
     sign: { expiresIn: env.JWT_ACCESS_EXPIRY },
   });
+
+  // WebSocket support
+  await app.register(websocket);
 
   // Swagger documentation
   await app.register(swagger, {
@@ -117,6 +122,11 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(protectionRoutes, { prefix: '/api/v1/protection' });
   await app.register(historyRoutes, { prefix: '/api/v1/history' });
   await app.register(pricesRoutes, { prefix: '/api/v1/prices' });
+
+  // WebSocket routes for real-time price streaming
+  await app.register(async (fastify) => {
+    await registerPriceWebSocket(fastify);
+  }, { prefix: '/api/v1/prices' });
 
   return app;
 }
