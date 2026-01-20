@@ -1,0 +1,427 @@
+import { prisma } from '../../config/database.js';
+import { AppError } from '../../middleware/error-handler.js';
+import { getAssetPrice, getCurrentFxRate } from '../../services/price-fetcher.service.js';
+import {
+  getPortfolioSnapshot,
+  getAssetLayer,
+  classifyBoundary,
+} from '../portfolio/portfolio.service.js';
+import type {
+  AssetId,
+  TradeAction,
+  Boundary,
+  TargetAllocation,
+  MIN_TRADE_IRR,
+} from '../../types/domain.js';
+import type { TradePreviewResponse, TradeExecuteResponse } from '../../types/api.js';
+
+// Spread rates per PRD (0.30%)
+const DEFAULT_SPREAD = 0.003;
+
+// Friction copy per boundary type
+const FRICTION_COPY: Record<Boundary, string> = {
+  SAFE: '',
+  DRIFT: 'This moves you slightly away from your target. You can rebalance later.',
+  STRUCTURAL: 'This significantly impacts your portfolio balance. Consider the implications.',
+  STRESS: 'Warning: This trade pushes your portfolio into a concerning state. Are you sure?',
+};
+
+export async function previewTrade(
+  userId: string,
+  action: TradeAction,
+  assetId: AssetId,
+  amountIrr: number
+): Promise<TradePreviewResponse> {
+  // Get current portfolio state
+  const snapshot = await getPortfolioSnapshot(userId);
+
+  // Validate minimum trade
+  if (amountIrr < 1000000) {
+    return {
+      valid: false,
+      preview: { action, assetId, quantity: 0, amountIrr, priceIrr: 0, spread: 0, spreadAmountIrr: 0 },
+      allocation: {
+        before: snapshot.allocation,
+        target: snapshot.targetAllocation,
+        after: snapshot.allocation,
+      },
+      boundary: 'SAFE',
+      movesToward: false,
+      error: 'Minimum trade amount is 1,000,000 IRR',
+    };
+  }
+
+  // Get asset price
+  const price = await getAssetPrice(assetId);
+  if (!price) {
+    return {
+      valid: false,
+      preview: { action, assetId, quantity: 0, amountIrr, priceIrr: 0, spread: 0, spreadAmountIrr: 0 },
+      allocation: {
+        before: snapshot.allocation,
+        target: snapshot.targetAllocation,
+        after: snapshot.allocation,
+      },
+      boundary: 'SAFE',
+      movesToward: false,
+      error: 'Price not available for this asset',
+    };
+  }
+
+  // Calculate trade details
+  const spreadAmountIrr = amountIrr * DEFAULT_SPREAD;
+  const effectiveAmountIrr = action === 'BUY' ? amountIrr - spreadAmountIrr : amountIrr;
+  const quantity = effectiveAmountIrr / price.priceIrr;
+
+  // Validate sufficient funds/holdings
+  if (action === 'BUY' && amountIrr > snapshot.cashIrr) {
+    return {
+      valid: false,
+      preview: {
+        action,
+        assetId,
+        quantity,
+        amountIrr,
+        priceIrr: price.priceIrr,
+        spread: DEFAULT_SPREAD,
+        spreadAmountIrr,
+      },
+      allocation: {
+        before: snapshot.allocation,
+        target: snapshot.targetAllocation,
+        after: snapshot.allocation,
+      },
+      boundary: 'SAFE',
+      movesToward: false,
+      error: 'Insufficient cash balance',
+    };
+  }
+
+  if (action === 'SELL') {
+    const holding = snapshot.holdings.find((h) => h.assetId === assetId);
+    if (!holding || holding.quantity < quantity) {
+      return {
+        valid: false,
+        preview: {
+          action,
+          assetId,
+          quantity,
+          amountIrr,
+          priceIrr: price.priceIrr,
+          spread: DEFAULT_SPREAD,
+          spreadAmountIrr,
+        },
+        allocation: {
+          before: snapshot.allocation,
+          target: snapshot.targetAllocation,
+          after: snapshot.allocation,
+        },
+        boundary: 'SAFE',
+        movesToward: false,
+        error: 'Insufficient holdings',
+      };
+    }
+
+    // Check if asset is frozen (collateral)
+    if (holding.frozen) {
+      return {
+        valid: false,
+        preview: {
+          action,
+          assetId,
+          quantity,
+          amountIrr,
+          priceIrr: price.priceIrr,
+          spread: DEFAULT_SPREAD,
+          spreadAmountIrr,
+        },
+        allocation: {
+          before: snapshot.allocation,
+          target: snapshot.targetAllocation,
+          after: snapshot.allocation,
+        },
+        boundary: 'SAFE',
+        movesToward: false,
+        error: 'Asset is frozen as loan collateral',
+      };
+    }
+  }
+
+  // Calculate after allocation
+  const afterAllocation = calculateAfterAllocation(
+    snapshot,
+    action,
+    assetId,
+    amountIrr,
+    price.priceIrr
+  );
+
+  // Determine if moving toward target
+  const movesToward = isMovingTowardTarget(
+    snapshot.allocation,
+    afterAllocation,
+    snapshot.targetAllocation
+  );
+
+  // Classify boundary
+  const beforeStatus = determineStatusFromAllocation(snapshot.allocation, snapshot.targetAllocation);
+  const afterStatus = determineStatusFromAllocation(afterAllocation, snapshot.targetAllocation);
+  const boundary = classifyBoundary(beforeStatus, afterStatus, movesToward);
+
+  return {
+    valid: true,
+    preview: {
+      action,
+      assetId,
+      quantity,
+      amountIrr,
+      priceIrr: price.priceIrr,
+      spread: DEFAULT_SPREAD,
+      spreadAmountIrr,
+    },
+    allocation: {
+      before: snapshot.allocation,
+      target: snapshot.targetAllocation,
+      after: afterAllocation,
+    },
+    boundary,
+    frictionCopy: FRICTION_COPY[boundary] || undefined,
+    movesToward,
+  };
+}
+
+export async function executeTrade(
+  userId: string,
+  action: TradeAction,
+  assetId: AssetId,
+  amountIrr: number,
+  acknowledgedWarning: boolean = false
+): Promise<TradeExecuteResponse> {
+  // Preview first to validate
+  const preview = await previewTrade(userId, action, assetId, amountIrr);
+
+  if (!preview.valid) {
+    throw new AppError('VALIDATION_ERROR', preview.error || 'Trade not valid', 400);
+  }
+
+  // Require acknowledgment for high-risk trades
+  if ((preview.boundary === 'STRUCTURAL' || preview.boundary === 'STRESS') && !acknowledgedWarning) {
+    throw new AppError(
+      'VALIDATION_ERROR',
+      'Please acknowledge the warning before proceeding',
+      400,
+      { boundary: preview.boundary, frictionCopy: preview.frictionCopy }
+    );
+  }
+
+  // Get portfolio
+  const portfolio = await prisma.portfolio.findUnique({
+    where: { userId },
+    include: { holdings: true },
+  });
+
+  if (!portfolio) {
+    throw new AppError('NOT_FOUND', 'Portfolio not found', 404);
+  }
+
+  const { quantity, priceIrr, spreadAmountIrr } = preview.preview;
+  const layer = getAssetLayer(assetId);
+
+  // Execute trade within transaction
+  const result = await prisma.$transaction(async (tx) => {
+    let newCashIrr: number;
+    let holdingQuantity: number;
+
+    if (action === 'BUY') {
+      // Deduct cash (including spread)
+      newCashIrr = Number(portfolio.cashIrr) - amountIrr;
+
+      await tx.portfolio.update({
+        where: { id: portfolio.id },
+        data: { cashIrr: newCashIrr },
+      });
+
+      // Add or update holding
+      const existingHolding = portfolio.holdings.find((h) => h.assetId === assetId);
+
+      if (existingHolding) {
+        const updatedHolding = await tx.holding.update({
+          where: { id: existingHolding.id },
+          data: { quantity: { increment: quantity } },
+        });
+        holdingQuantity = Number(updatedHolding.quantity);
+      } else {
+        const newHolding = await tx.holding.create({
+          data: {
+            portfolioId: portfolio.id,
+            assetId,
+            quantity,
+            layer,
+            purchaseDate: new Date(),
+          },
+        });
+        holdingQuantity = quantity;
+      }
+    } else {
+      // SELL
+      // Add cash (minus spread)
+      const cashReceived = amountIrr - spreadAmountIrr;
+      newCashIrr = Number(portfolio.cashIrr) + cashReceived;
+
+      await tx.portfolio.update({
+        where: { id: portfolio.id },
+        data: { cashIrr: newCashIrr },
+      });
+
+      // Reduce holding
+      const existingHolding = portfolio.holdings.find((h) => h.assetId === assetId);
+      if (!existingHolding) {
+        throw new AppError('NOT_FOUND', 'Holding not found', 404);
+      }
+
+      const newQuantity = Number(existingHolding.quantity) - quantity;
+
+      if (newQuantity <= 0.00000001) {
+        // Remove holding if negligible
+        await tx.holding.delete({ where: { id: existingHolding.id } });
+        holdingQuantity = 0;
+      } else {
+        const updatedHolding = await tx.holding.update({
+          where: { id: existingHolding.id },
+          data: { quantity: newQuantity },
+        });
+        holdingQuantity = newQuantity;
+      }
+    }
+
+    // Create ledger entry
+    const ledgerEntry = await tx.ledgerEntry.create({
+      data: {
+        portfolioId: portfolio.id,
+        entryType: action === 'BUY' ? 'TRADE_BUY' : 'TRADE_SELL',
+        beforeSnapshot: {
+          cashIrr: Number(portfolio.cashIrr),
+          foundation: preview.allocation.before.foundation,
+          growth: preview.allocation.before.growth,
+          upside: preview.allocation.before.upside,
+        },
+        afterSnapshot: {
+          cashIrr: newCashIrr,
+          foundation: preview.allocation.after.foundation,
+          growth: preview.allocation.after.growth,
+          upside: preview.allocation.after.upside,
+        },
+        assetId,
+        quantity,
+        amountIrr,
+        boundary: preview.boundary,
+        message: `${action === 'BUY' ? 'Bought' : 'Sold'} ${assetId} (${formatIrr(amountIrr)})`,
+      },
+    });
+
+    // Create action log
+    await tx.actionLog.create({
+      data: {
+        portfolioId: portfolio.id,
+        actionType: action === 'BUY' ? 'TRADE_BUY' : 'TRADE_SELL',
+        boundary: preview.boundary,
+        message: `${action === 'BUY' ? 'Bought' : 'Sold'} ${assetId} (${formatIrr(amountIrr)})`,
+        amountIrr,
+        assetId,
+      },
+    });
+
+    return {
+      success: true,
+      trade: {
+        action,
+        assetId,
+        quantity,
+        amountIrr,
+        priceIrr,
+      },
+      newBalance: {
+        cashIrr: newCashIrr,
+        holdingQuantity,
+      },
+      boundary: preview.boundary,
+      ledgerEntryId: ledgerEntry.id,
+    };
+  });
+
+  return result;
+}
+
+function calculateAfterAllocation(
+  snapshot: { allocation: TargetAllocation; totalValueIrr: number; holdings: { assetId: string; valueIrr?: number }[] },
+  action: TradeAction,
+  assetId: AssetId,
+  amountIrr: number,
+  priceIrr: number
+): TargetAllocation {
+  const layer = getAssetLayer(assetId);
+  const totalValue = snapshot.totalValueIrr;
+
+  // Clone current allocation
+  const newAllocation = { ...snapshot.allocation };
+
+  // Calculate value change for the layer
+  const valueChange = action === 'BUY' ? amountIrr : -amountIrr;
+  const layerPctChange = (valueChange / totalValue) * 100;
+
+  // Adjust allocation
+  if (layer === 'FOUNDATION') {
+    newAllocation.foundation += layerPctChange;
+  } else if (layer === 'GROWTH') {
+    newAllocation.growth += layerPctChange;
+  } else {
+    newAllocation.upside += layerPctChange;
+  }
+
+  // Normalize (ensure sums to ~100%)
+  const total = newAllocation.foundation + newAllocation.growth + newAllocation.upside;
+  if (total > 0) {
+    newAllocation.foundation = (newAllocation.foundation / total) * 100;
+    newAllocation.growth = (newAllocation.growth / total) * 100;
+    newAllocation.upside = (newAllocation.upside / total) * 100;
+  }
+
+  return newAllocation;
+}
+
+function isMovingTowardTarget(
+  before: TargetAllocation,
+  after: TargetAllocation,
+  target: TargetAllocation
+): boolean {
+  const beforeDrift =
+    Math.abs(before.foundation - target.foundation) +
+    Math.abs(before.growth - target.growth) +
+    Math.abs(before.upside - target.upside);
+
+  const afterDrift =
+    Math.abs(after.foundation - target.foundation) +
+    Math.abs(after.growth - target.growth) +
+    Math.abs(after.upside - target.upside);
+
+  return afterDrift < beforeDrift;
+}
+
+function determineStatusFromAllocation(
+  allocation: TargetAllocation,
+  target: TargetAllocation
+): 'BALANCED' | 'SLIGHTLY_OFF' | 'ATTENTION_REQUIRED' {
+  const maxDrift = Math.max(
+    Math.abs(allocation.foundation - target.foundation),
+    Math.abs(allocation.growth - target.growth),
+    Math.abs(allocation.upside - target.upside)
+  );
+
+  if (maxDrift <= 5) return 'BALANCED';
+  if (maxDrift <= 10) return 'SLIGHTLY_OFF';
+  return 'ATTENTION_REQUIRED';
+}
+
+function formatIrr(amount: number): string {
+  return new Intl.NumberFormat('en-US').format(amount) + ' IRR';
+}
