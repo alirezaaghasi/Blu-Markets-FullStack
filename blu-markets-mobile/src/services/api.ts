@@ -53,10 +53,76 @@ export interface VerifyOtpResponse {
   onboardingComplete: boolean;
 }
 
-// Generic fetch wrapper with error handling
+// Track if we're currently refreshing to avoid multiple refresh calls
+let isRefreshing = false;
+let refreshPromise: Promise<AuthTokens> | null = null;
+
+// Retry configuration
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 1000;
+
+// Check if device is online
+async function isOnline(): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    await fetch(`${API_BASE_URL}/api/v1/prices`, {
+      method: 'HEAD',
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Sleep helper for retry delays
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Refresh token helper
+async function refreshAccessToken(): Promise<AuthTokens> {
+  if (isRefreshing && refreshPromise) {
+    return refreshPromise;
+  }
+
+  isRefreshing = true;
+  refreshPromise = (async () => {
+    try {
+      const { refreshToken } = await getTokens();
+      if (!refreshToken) {
+        throw { code: 'NO_REFRESH_TOKEN', message: 'No refresh token available', statusCode: 401 };
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (!response.ok) {
+        // Refresh failed - clear tokens and throw
+        await clearTokens();
+        throw { code: 'REFRESH_FAILED', message: 'Session expired. Please login again.', statusCode: 401 };
+      }
+
+      const data = await response.json();
+      await storeTokens(data.accessToken, data.refreshToken);
+      return data;
+    } finally {
+      isRefreshing = false;
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
+// Generic fetch wrapper with error handling, token refresh, and retry logic
 async function apiFetch<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  retryCount = 0
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
 
@@ -71,23 +137,50 @@ async function apiFetch<T>(
     headers['Authorization'] = `Bearer ${accessToken}`;
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
 
-  const data = await response.json();
+    // Handle 401 - try to refresh token
+    if (response.status === 401 && accessToken && !endpoint.includes('/auth/')) {
+      try {
+        await refreshAccessToken();
+        // Retry the original request with new token
+        return apiFetch<T>(endpoint, options, retryCount);
+      } catch (refreshError) {
+        throw refreshError;
+      }
+    }
 
-  if (!response.ok) {
-    const error: ApiError = {
-      code: data.error?.code || 'UNKNOWN_ERROR',
-      message: data.error?.message || 'An unexpected error occurred',
-      statusCode: response.status,
-    };
+    const data = await response.json();
+
+    if (!response.ok) {
+      const error: ApiError = {
+        code: data.error?.code || 'UNKNOWN_ERROR',
+        message: data.error?.message || 'An unexpected error occurred',
+        statusCode: response.status,
+      };
+      throw error;
+    }
+
+    return data;
+  } catch (error: unknown) {
+    // Handle network errors with retry
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      if (retryCount < MAX_RETRIES) {
+        await sleep(RETRY_DELAY_MS * (retryCount + 1));
+        return apiFetch<T>(endpoint, options, retryCount + 1);
+      }
+      throw {
+        code: 'NETWORK_ERROR',
+        message: 'Unable to connect to server. Please check your internet connection.',
+        statusCode: 0,
+      } as ApiError;
+    }
     throw error;
   }
-
-  return data;
 }
 
 // Auth API
@@ -596,5 +689,8 @@ export const loansApi = {
     });
   },
 };
+
+// Export utility functions
+export { isOnline };
 
 export default authApi;
