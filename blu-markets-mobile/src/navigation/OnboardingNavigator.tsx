@@ -25,7 +25,7 @@ export const OnboardingNavigator: React.FC = () => {
         contentStyle: {
           backgroundColor: COLORS.background.primary,
         },
-        animation: 'slide_from_right',
+        animation: 'none',
       }}
     >
       <Stack.Screen name="Welcome" component={WelcomeScreen} />

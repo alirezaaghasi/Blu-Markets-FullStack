@@ -34,11 +34,15 @@ const navigationTheme = {
 };
 
 function AppContent() {
-  // Initialize persistence (load saved state)
-  usePersistence();
+  // Only enable persistence and price polling after onboarding is complete
+  // to avoid performance issues during questionnaire
+  const isOnboardingComplete = store.getState().auth.onboardingComplete;
 
-  // Initialize price polling (will auto-start when authenticated)
-  usePricePolling({ enabled: true });
+  // Initialize persistence (disabled during onboarding for performance)
+  // usePersistence();
+
+  // Initialize price polling (disabled during onboarding)
+  usePricePolling({ enabled: isOnboardingComplete });
 
   useEffect(() => {
     // Initialize default prices on app start
