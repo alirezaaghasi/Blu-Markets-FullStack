@@ -231,10 +231,14 @@ export const OTPInput: React.FC<OTPInputProps> = ({
 }) => {
   const inputRef = useRef<TextInput>(null);
   const [isFocused, setIsFocused] = useState(false);
+  const hasCompletedRef = useRef(false);
 
   useEffect(() => {
-    if (value.length === length && onComplete) {
+    if (value.length === length && onComplete && !hasCompletedRef.current) {
+      hasCompletedRef.current = true;
       onComplete(value);
+    } else if (value.length < length) {
+      hasCompletedRef.current = false;
     }
   }, [value, length, onComplete]);
 

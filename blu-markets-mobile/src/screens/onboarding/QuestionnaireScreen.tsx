@@ -1,13 +1,13 @@
 /**
- * QuestionnaireScreen - Fixed state management to avoid infinite loops
+ * QuestionnaireScreen - Simplified for performance
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  Pressable,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -18,119 +18,72 @@ type Props = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'Questionnaire'>;
 };
 
-// Combined state to ensure atomic updates
-interface QuestionnaireState {
-  currentIndex: number;
-  answers: number[];
-  isNavigating: boolean;
-}
-
 const QuestionnaireScreen: React.FC<Props> = ({ navigation }) => {
-  const [state, setState] = useState<QuestionnaireState>({
-    currentIndex: 0,
-    answers: [],
-    isNavigating: false,
-  });
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [answers, setAnswers] = useState<number[]>([]);
+  const [isNavigating, setIsNavigating] = useState(false);
 
-  // Ref to prevent double-processing during rapid taps
-  const processingRef = useRef(false);
-
-  // Debug: Log when component mounts/remounts
   useEffect(() => {
     console.log('[Questionnaire] Component MOUNTED');
     return () => console.log('[Questionnaire] Component UNMOUNTED');
   }, []);
 
-  const question = QUESTIONS[state.currentIndex];
+  const question = QUESTIONS[currentIndex];
 
-  const handleOption = useCallback((optionIdx: number) => {
-    // Prevent multiple taps or processing
-    if (state.isNavigating || processingRef.current) {
-      console.log('[Questionnaire] Ignoring tap - already processing');
-      return;
+  const handleOption = (optionIdx: number) => {
+    if (isNavigating) return;
+
+    console.log(`[Questionnaire] Selected option ${optionIdx} for question ${currentIndex + 1}/${QUESTIONS.length}`);
+
+    const newAnswers = [...answers, optionIdx];
+    setAnswers(newAnswers);
+
+    if (currentIndex >= QUESTIONS.length - 1) {
+      // Last question
+      setIsNavigating(true);
+      console.log('[Questionnaire] Last question answered, navigating...');
+
+      const answersObj: Record<string, number> = {};
+      QUESTIONS.forEach((q, i) => {
+        answersObj[q.id] = newAnswers[i] ?? 0;
+      });
+
+      navigation.replace('ProfileResult', { answers: answersObj });
+    } else {
+      setCurrentIndex(currentIndex + 1);
     }
+  };
 
-    processingRef.current = true;
+  const handleBack = () => {
+    if (currentIndex > 0 && !isNavigating) {
+      setCurrentIndex(currentIndex - 1);
+      setAnswers(answers.slice(0, -1));
+    }
+  };
 
-    setState(prev => {
-      const newAnswers = [...prev.answers, optionIdx];
-      const newIndex = prev.currentIndex + 1;
-
-      console.log(`[Questionnaire] Selected option ${optionIdx} for question ${prev.currentIndex + 1}/${QUESTIONS.length}`);
-
-      if (prev.currentIndex >= QUESTIONS.length - 1) {
-        // Last question - will navigate after state update
-        console.log('[Questionnaire] Last question answered, preparing navigation...');
-
-        // Build answers object
-        const answersObj: Record<string, number> = {};
-        QUESTIONS.forEach((q, i) => {
-          answersObj[q.id] = newAnswers[i] ?? 0;
-        });
-
-        // Schedule navigation after state update (outside setState)
-        setTimeout(() => {
-          console.log('[Questionnaire] Navigating to ProfileResult...');
-          navigation.replace('ProfileResult', { answers: answersObj });
-        }, 0);
-
-        return {
-          ...prev,
-          answers: newAnswers,
-          isNavigating: true,
-        };
-      } else {
-        // Reset processing flag after a short delay
-        setTimeout(() => { processingRef.current = false; }, 100);
-
-        return {
-          ...prev,
-          currentIndex: newIndex,
-          answers: newAnswers,
-        };
-      }
-    });
-  }, [state.isNavigating, navigation]);
-
-  const handleBack = useCallback(() => {
-    if (processingRef.current) return;
-
-    setState(prev => {
-      if (prev.currentIndex > 0) {
-        return {
-          ...prev,
-          currentIndex: prev.currentIndex - 1,
-          answers: prev.answers.slice(0, -1),
-        };
-      }
-      return prev;
-    });
-  }, []);
-
-  if (!question) {
-    return null;
-  }
+  if (!question) return null;
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.progress}>{state.currentIndex + 1} / {QUESTIONS.length}</Text>
+      <Text style={styles.progress}>{currentIndex + 1} / {QUESTIONS.length}</Text>
       <Text style={styles.question}>{question.question}</Text>
 
       {question.options.map((opt, i) => (
-        <Pressable
+        <TouchableOpacity
           key={i}
           style={styles.option}
           onPress={() => handleOption(i)}
-          disabled={state.isNavigating}
+          activeOpacity={0.7}
+          disabled={isNavigating}
         >
           <Text style={styles.optionText}>{opt.label}</Text>
-        </Pressable>
+        </TouchableOpacity>
       ))}
 
-      {state.currentIndex > 0 && (
-        <Pressable style={styles.back} onPress={handleBack} disabled={state.isNavigating}>
+      {currentIndex > 0 && (
+        <TouchableOpacity style={styles.back} onPress={handleBack} disabled={isNavigating}>
           <Text style={styles.backText}>بازگشت - Back</Text>
-        </Pressable>
+        </TouchableOpacity>
       )}
     </SafeAreaView>
   );

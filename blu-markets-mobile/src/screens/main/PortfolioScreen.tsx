@@ -7,9 +7,9 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../../constants/colors';
 import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING, RADIUS } from '../../constants/spacing';
@@ -37,9 +37,10 @@ const PortfolioScreen: React.FC = () => {
     UPSIDE: true,
   });
 
-  const { holdings, cashIRR, targetLayerPct } = useAppSelector(
-    (state) => state.portfolio
-  );
+  const portfolioState = useAppSelector((state) => state.portfolio);
+  const holdings = portfolioState?.holdings || [];
+  const cashIRR = portfolioState?.cashIRR || 0;
+  const targetLayerPct = portfolioState?.targetLayerPct || { FOUNDATION: 0.5, GROWTH: 0.35, UPSIDE: 0.15 };
   const { prices, fxRate } = useAppSelector((state) => state.prices);
 
   // Group holdings by layer

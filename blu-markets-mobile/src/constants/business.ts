@@ -5,7 +5,7 @@ import { Layer, TargetLayerPct } from '../types';
 
 // Currency & Pricing
 export const DEFAULT_FX_RATE = 1_456_000; // IRR per USD
-export const FIXED_INCOME_UNIT_PRICE = 1_000_000; // IRR per unit (1M IRR)
+export const FIXED_INCOME_UNIT_PRICE = 500_000; // IRR per unit (500K IRR per PRD Section 25)
 export const FIXED_INCOME_ANNUAL_RATE = 0.30; // 30% annual
 
 // Trading
@@ -159,7 +159,7 @@ export const LOAN_HEALTH_THRESHOLDS = {
 };
 
 // Investment Constraints
-export const MIN_INVESTMENT_AMOUNT = 10_000_000; // IRR (10M minimum per backend)
+export const MIN_INVESTMENT_AMOUNT = 1_000_000; // IRR (1M minimum per PRD Section 13.2)
 
 // Phone Validation
 export const IRAN_PHONE_PREFIX = '+989';

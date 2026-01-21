@@ -4,16 +4,24 @@
 import { apiClient } from './client';
 import type { ProtectionsResponse, EligibleAssetsResponse, Protection, AssetId } from './types';
 
+// Type for raw API responses (interceptor unwraps .data)
+type ApiResponse<T> = T;
+
 export const protection = {
-  getActive: (): Promise<ProtectionsResponse> =>
-    apiClient.get('/protection'),
+  getActive: async (): Promise<ProtectionsResponse> => {
+    const data = await apiClient.get('/protection') as unknown as ApiResponse<{ protections?: Protection[] }>;
+    return { protections: data?.protections || [] };
+  },
 
-  getEligible: (): Promise<EligibleAssetsResponse> =>
-    apiClient.get('/protection/eligible'),
+  getEligible: async (): Promise<EligibleAssetsResponse> => {
+    const data = await apiClient.get('/protection/eligible') as unknown as ApiResponse<EligibleAssetsResponse>;
+    return { assets: data?.assets || [] };
+  },
 
-  purchase: (assetId: AssetId, notionalIrr: number, durationMonths: number): Promise<Protection> =>
-    apiClient.post('/protection', { assetId, notionalIrr, durationMonths }),
+  // The hook calls with (assetId, durationMonths) - backend calculates notional from holdings
+  purchase: (assetId: AssetId, durationMonths: number): Promise<Protection> =>
+    apiClient.post('/protection', { assetId, durationMonths }) as unknown as Promise<Protection>,
 
   cancel: (protectionId: string): Promise<{ success: boolean }> =>
-    apiClient.delete(`/protection/${protectionId}`),
+    apiClient.delete(`/protection/${protectionId}`) as unknown as Promise<{ success: boolean }>,
 };

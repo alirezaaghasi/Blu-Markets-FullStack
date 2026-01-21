@@ -2,7 +2,8 @@
 // Based on UI Restructure Specification Section 3
 
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LoansTab } from './LoansTab';
 import { ProtectionTab } from './ProtectionTab';
 import { COLORS } from '../../constants/colors';

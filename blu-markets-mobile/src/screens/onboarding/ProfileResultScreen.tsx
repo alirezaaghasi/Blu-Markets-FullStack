@@ -113,7 +113,7 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation, r
           UPSIDE: normalizeValue(allocation.UPSIDE ?? allocation.upside),
         };
 
-        const riskScore = (response as any).riskScore ?? response.score ?? 5;
+        const riskScore = (response as any).riskScore ?? (response as any).score ?? 5;
         const profileName = (response as any).profileName ?? 'Balanced';
 
         const profileData: RiskProfileData = {

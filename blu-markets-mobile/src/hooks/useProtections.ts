@@ -40,8 +40,8 @@ export function useProtections(): UseProtectionsResult {
         protectionApi.getEligible(),
       ]);
 
-      setProtections(activeResponse.protections);
-      setEligibleAssets(eligibleResponse.assets);
+      setProtections(activeResponse?.protections || []);
+      setEligibleAssets(eligibleResponse?.assets || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load protections');
     } finally {

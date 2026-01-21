@@ -57,31 +57,32 @@ export interface RiskProfile {
 }
 
 // Risk profile names per PRD
+// Risk profile names per PRD Section 3.2
 export const RISK_PROFILE_NAMES: Record<number, string> = {
   1: 'Capital Preservation',
   2: 'Capital Preservation',
   3: 'Conservative',
-  4: 'Moderate Conservative',
+  4: 'Conservative',
   5: 'Balanced',
-  6: 'Moderate Growth',
+  6: 'Balanced',
   7: 'Growth',
-  8: 'Aggressive Growth',
-  9: 'High Growth',
-  10: 'Maximum Growth',
+  8: 'Growth',
+  9: 'Aggressive',
+  10: 'Aggressive',
 };
 
-// Target allocations per risk score (from PRD Section 17)
+// Target allocations per risk score (from PRD Section 3.2)
 export const TARGET_ALLOCATIONS: Record<number, TargetAllocation> = {
-  1: { foundation: 80, growth: 15, upside: 5 },
-  2: { foundation: 70, growth: 22, upside: 8 },
-  3: { foundation: 60, growth: 28, upside: 12 },
-  4: { foundation: 50, growth: 35, upside: 15 },
-  5: { foundation: 40, growth: 40, upside: 20 },
-  6: { foundation: 30, growth: 45, upside: 25 },
-  7: { foundation: 25, growth: 45, upside: 30 },
-  8: { foundation: 20, growth: 45, upside: 35 },
-  9: { foundation: 15, growth: 40, upside: 45 },
-  10: { foundation: 10, growth: 35, upside: 55 },
+  1: { foundation: 85, growth: 12, upside: 3 },
+  2: { foundation: 80, growth: 15, upside: 5 },
+  3: { foundation: 70, growth: 25, upside: 5 },
+  4: { foundation: 65, growth: 30, upside: 5 },
+  5: { foundation: 55, growth: 35, upside: 10 },
+  6: { foundation: 50, growth: 35, upside: 15 },
+  7: { foundation: 45, growth: 38, upside: 17 },
+  8: { foundation: 40, growth: 40, upside: 20 },
+  9: { foundation: 35, growth: 40, upside: 25 },
+  10: { foundation: 30, growth: 40, upside: 30 },
 };
 
 // ============================================================================

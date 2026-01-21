@@ -62,34 +62,35 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
       return;
     }
 
+    // Prevent multiple submissions
+    if (isLoading) {
+      console.log('[OTP] Already verifying, ignoring');
+      return;
+    }
+
     setIsLoading(true);
     setError('');
 
     try {
+      console.log('[OTP] Starting verification...');
       const response = await auth.verifyOtp(phone, verifyCode);
+      console.log('[OTP] Verification successful, onboardingComplete:', response.onboardingComplete);
 
-      // Get tokens - handle both direct and nested response formats
-      // Backend returns { tokens: { accessToken, refreshToken } }, mock returns { accessToken, refreshToken }
-      const responseAny = response as any;
-      const accessToken = responseAny.tokens?.accessToken || response.accessToken;
-      const refreshToken = responseAny.tokens?.refreshToken || response.refreshToken;
-
-      // Store auth tokens in AsyncStorage (for API client)
-      if (accessToken && refreshToken) {
-        await setAuthTokens(accessToken, refreshToken);
-      }
-
-      // Store auth token in Redux (for app state)
-      dispatch(setAuthToken(accessToken));
+      // Store auth token in Redux (for app state) - triggers RootNavigator update
+      dispatch(setAuthToken(response.accessToken));
 
       // Navigate based on onboarding status
       if (!response.onboardingComplete) {
-        // New user or incomplete onboarding - continue to questionnaire
+        console.log('[OTP] Navigating to Questionnaire');
         navigation.navigate('Questionnaire');
+      } else {
+        // Mark onboarding complete to trigger navigation to main app
+        console.log('[OTP] User already completed onboarding, marking complete');
+        const { completeOnboarding } = await import('../../store/slices/authSlice');
+        dispatch(completeOnboarding());
       }
-      // If onboarding complete, RootNavigator handles navigation
     } catch (err: unknown) {
-      // Handle different error formats (Error instance, API error object, or unknown)
+      console.error('[OTP] Verification error:', err);
       let errorMessage = 'Verification failed. Please try again.';
       if (err instanceof Error) {
         errorMessage = err.message;

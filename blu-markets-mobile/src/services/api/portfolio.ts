@@ -43,12 +43,12 @@ function normalizePortfolioResponse(data: any): PortfolioResponse {
 
 export const portfolio = {
   get: async (): Promise<PortfolioResponse> => {
-    const data = await apiClient.get('/portfolio');
+    const data = await apiClient.get('/portfolio') as unknown as Record<string, unknown>;
     return normalizePortfolioResponse(data);
   },
 
   addFunds: async (amountIrr: number): Promise<PortfolioResponse> => {
-    const data = await apiClient.post('/portfolio/add-funds', { amountIrr });
+    const data = await apiClient.post('/portfolio/add-funds', { amountIrr }) as unknown as Record<string, unknown>;
     // Backend may return partial response, so fetch full portfolio after add-funds
     if (!data.holdings) {
       // Fetch full portfolio data
@@ -63,5 +63,10 @@ export const portfolio = {
     valueIrr: number;
     changePercent24h: number;
   }> =>
-    apiClient.get(`/portfolio/asset/${assetId}`),
+    apiClient.get(`/portfolio/asset/${assetId}`) as unknown as Promise<{
+      holding: Holding;
+      currentPriceUsd: number;
+      valueIrr: number;
+      changePercent24h: number;
+    }>,
 };

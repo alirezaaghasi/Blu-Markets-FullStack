@@ -9,10 +9,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS } from '../../constants/colors';
 import { TYPOGRAPHY } from '../../constants/typography';
@@ -94,9 +94,11 @@ const HomeScreen: React.FC = () => {
   } = useActivityFeed(5);
 
   // Keep using Redux for portfolio data (will be updated with usePortfolio in future)
-  const { holdings, cashIRR, targetLayerPct, loans } = useAppSelector(
-    (state) => state.portfolio
-  );
+  const portfolioState = useAppSelector((state) => state.portfolio);
+  const holdings = portfolioState?.holdings || [];
+  const cashIRR = portfolioState?.cashIRR || 0;
+  const targetLayerPct = portfolioState?.targetLayerPct || { FOUNDATION: 0.5, GROWTH: 0.35, UPSIDE: 0.15 };
+  const loans = portfolioState?.loans || [];
   const { prices, fxRate } = useAppSelector((state) => state.prices);
   const { phone } = useAppSelector((state) => state.auth);
 

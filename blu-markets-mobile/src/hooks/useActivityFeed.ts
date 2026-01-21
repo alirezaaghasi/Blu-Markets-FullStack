@@ -34,9 +34,9 @@ export function useActivityFeed(initialLimit = 10): UseActivityFeedResult {
       setError(null);
 
       const response = await activity.getRecent(initialLimit);
-      setActivities(response.activities);
-      setHasMore(response.hasMore);
-      setCursor(response.nextCursor);
+      setActivities(response?.activities || []);
+      setHasMore(response?.hasMore || false);
+      setCursor(response?.nextCursor);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load activities');
     } finally {

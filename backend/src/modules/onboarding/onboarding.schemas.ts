@@ -4,6 +4,7 @@ export const questionnaireAnswerSchema = z.object({
   questionId: z.string().min(1),
   answerId: z.string().min(1),
   value: z.number().min(1).max(10),
+  flag: z.string().optional(), // For pathological user detection (panic_seller, gambler, etc.)
 });
 
 export const submitQuestionnaireSchema = z.object({
@@ -28,7 +29,7 @@ export const recordConsentSchema = z.object({
 export const initialFundingSchema = z.object({
   amountIrr: z
     .number()
-    .min(10000000, 'Minimum initial funding is 10,000,000 IRR')
+    .min(1000000, 'Minimum initial funding is 1,000,000 IRR')  // Per PRD Section 13.2
     .max(100000000000, 'Maximum initial funding is 100,000,000,000 IRR'),
 });
 

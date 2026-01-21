@@ -40,7 +40,7 @@ export function useLoans(): UseLoansResult {
         loansApi.getCapacity(),
       ]);
 
-      setLoans(loansResponse.loans);
+      setLoans(loansResponse?.loans || []);
       setCapacity(capacityResponse);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load loans');

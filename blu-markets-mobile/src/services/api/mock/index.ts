@@ -440,7 +440,7 @@ export const trade = {
       success: true,
       tradeId: `trade_${Date.now()}`,
       assetId,
-      action,
+      side: action,
       amountIrr,
       quantity: holding?.quantity || 0,
       boundary: 'SAFE',
@@ -614,7 +614,8 @@ export const protection = {
     return { assets: eligibleAssets };
   },
 
-  purchase: async (assetId: AssetId, notionalIrr: number, durationMonths: number): Promise<Protection> => {
+  // Hook calls with (assetId, durationMonths) - we calculate notional from holdings
+  purchase: async (assetId: AssetId, durationMonths: number): Promise<Protection> => {
     await delay(MOCK_DELAY);
 
     const state = getState();
@@ -626,6 +627,12 @@ export const protection = {
     }
 
     const asset = ASSETS[assetId];
+
+    // Calculate notional from holding value
+    const priceUsd = prices[assetId] || 0;
+    const notionalIrr = assetId === 'IRR_FIXED_INCOME'
+      ? holding.quantity * FIXED_INCOME_UNIT_PRICE
+      : holding.quantity * priceUsd * fxRate;
 
     const premiumRate = asset?.layer === 'FOUNDATION' ? 0.004 : asset?.layer === 'GROWTH' ? 0.008 : 0.012;
     const premiumIrr = notionalIrr * premiumRate * durationMonths;
@@ -705,22 +712,33 @@ export const loans = {
     };
   },
 
-  create: async (collateralAssetId: string, amountIrr: number, durationMonths: 3 | 6): Promise<Loan> => {
+  // Hook calls with (amountIrr, durationMonths) - we auto-select best collateral
+  create: async (amountIrr: number, durationMonths: 3 | 6): Promise<Loan> => {
     await delay(MOCK_DELAY);
 
     const state = getState();
     const { holdings } = state.portfolio;
+    const { prices, fxRate } = state.prices;
 
-    // Find the specified collateral holding
-    const collateralHolding = holdings.find((h) => h.assetId === collateralAssetId);
+    // Auto-select the best collateral (highest value unfrozen holding)
+    const availableHoldings = holdings
+      .filter((h) => !h.frozen && h.quantity > 0)
+      .map((h) => {
+        const priceUsd = prices[h.assetId] || 0;
+        const valueIrr = h.assetId === 'IRR_FIXED_INCOME'
+          ? h.quantity * FIXED_INCOME_UNIT_PRICE
+          : h.quantity * priceUsd * fxRate;
+        return { ...h, valueIrr };
+      })
+      .sort((a, b) => b.valueIrr - a.valueIrr);
+
+    const collateralHolding = availableHoldings[0];
 
     if (!collateralHolding) {
-      throw new Error(`Collateral asset ${collateralAssetId} not found`);
+      throw new Error('No available collateral found');
     }
 
-    if (collateralHolding.frozen) {
-      throw new Error('Asset is already used as collateral');
-    }
+    const collateralAssetId = collateralHolding.assetId;
 
     const interestRate = 0.30;
     const monthlyRate = interestRate / 12;
