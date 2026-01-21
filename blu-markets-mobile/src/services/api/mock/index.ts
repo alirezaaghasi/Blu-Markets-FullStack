@@ -327,13 +327,14 @@ export const portfolio = {
 
 // Trade APIs
 export const trade = {
-  preview: async (assetId: AssetId, side: 'BUY' | 'SELL', amountIrr: number): Promise<TradePreview> => {
+  preview: async (assetId: AssetId, action: 'BUY' | 'SELL', amountIrr: number): Promise<TradePreview> => {
     await delay(MOCK_DELAY);
 
     const state = getState();
     const { prices, fxRate } = state.prices;
     const { holdings, targetLayerPct, cashIRR } = state.portfolio;
     const asset = ASSETS[assetId];
+    const side = action; // Use action as side internally for compatibility
 
     if (!asset) {
       throw new Error(`Unknown asset: ${assetId}`);
@@ -418,14 +419,14 @@ export const trade = {
     };
   },
 
-  execute: async (assetId: AssetId, side: 'BUY' | 'SELL', amountIrr: number): Promise<TradeExecuteResponse> => {
+  execute: async (assetId: AssetId, action: 'BUY' | 'SELL', amountIrr: number): Promise<TradeExecuteResponse> => {
     await delay(MOCK_DELAY);
 
     const state = getState();
     const { prices, fxRate } = state.prices;
 
     store.dispatch(executeTradeAction({
-      side,
+      side: action,
       assetId,
       amountIRR: amountIrr,
       priceUSD: prices[assetId] || 0,
@@ -439,7 +440,7 @@ export const trade = {
       success: true,
       tradeId: `trade_${Date.now()}`,
       assetId,
-      side,
+      action,
       amountIrr,
       quantity: holding?.quantity || 0,
       boundary: 'SAFE',
@@ -613,7 +614,7 @@ export const protection = {
     return { assets: eligibleAssets };
   },
 
-  purchase: async (assetId: AssetId, durationMonths: number): Promise<Protection> => {
+  purchase: async (assetId: AssetId, notionalIrr: number, durationMonths: number): Promise<Protection> => {
     await delay(MOCK_DELAY);
 
     const state = getState();
@@ -625,10 +626,6 @@ export const protection = {
     }
 
     const asset = ASSETS[assetId];
-    const priceUsd = prices[assetId] || 0;
-    const notionalIrr = assetId === 'IRR_FIXED_INCOME'
-      ? holding.quantity * FIXED_INCOME_UNIT_PRICE
-      : holding.quantity * priceUsd * fxRate;
 
     const premiumRate = asset?.layer === 'FOUNDATION' ? 0.004 : asset?.layer === 'GROWTH' ? 0.008 : 0.012;
     const premiumIrr = notionalIrr * premiumRate * durationMonths;
@@ -708,34 +705,33 @@ export const loans = {
     };
   },
 
-  create: async (amountIrr: number, termMonths: 3 | 6): Promise<Loan> => {
+  create: async (collateralAssetId: string, amountIrr: number, durationMonths: 3 | 6): Promise<Loan> => {
     await delay(MOCK_DELAY);
 
     const state = getState();
     const { holdings } = state.portfolio;
 
-    const collateralHolding = holdings.find((h) => {
-      const asset = ASSETS[h.assetId];
-      return asset?.layer === 'GROWTH' && asset.ltv > 0 && !h.frozen;
-    }) || holdings.find((h) => {
-      const asset = ASSETS[h.assetId];
-      return asset?.ltv > 0 && !h.frozen;
-    });
+    // Find the specified collateral holding
+    const collateralHolding = holdings.find((h) => h.assetId === collateralAssetId);
 
     if (!collateralHolding) {
-      throw new Error('No eligible collateral available');
+      throw new Error(`Collateral asset ${collateralAssetId} not found`);
+    }
+
+    if (collateralHolding.frozen) {
+      throw new Error('Asset is already used as collateral');
     }
 
     const interestRate = 0.30;
     const monthlyRate = interestRate / 12;
     const now = new Date();
     const dueDate = new Date(now);
-    dueDate.setMonth(dueDate.getMonth() + termMonths);
+    dueDate.setMonth(dueDate.getMonth() + durationMonths);
 
     const installments: LoanInstallment[] = [];
-    const principalPerInstallment = amountIrr / termMonths;
+    const principalPerInstallment = amountIrr / durationMonths;
 
-    for (let i = 1; i <= termMonths; i++) {
+    for (let i = 1; i <= durationMonths; i++) {
       const installmentDate = new Date(now);
       installmentDate.setMonth(installmentDate.getMonth() + i);
 
@@ -755,11 +751,11 @@ export const loans = {
 
     const newLoan: Loan = {
       id: `loan_${Date.now()}`,
-      collateralAssetId: collateralHolding.assetId,
+      collateralAssetId,
       collateralQuantity: collateralHolding.quantity * 0.5,
       amountIRR: amountIrr,
       interestRate,
-      durationMonths: termMonths,
+      durationMonths,
       startISO: now.toISOString(),
       dueISO: dueDate.toISOString(),
       status: 'ACTIVE',

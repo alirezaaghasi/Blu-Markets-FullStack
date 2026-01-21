@@ -16,7 +16,7 @@ export const RootNavigator: React.FC = () => {
   const showMainApp = isAuthenticated && onboardingComplete;
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, animation: 'none' }}>
       {showMainApp ? (
         <Stack.Screen name="Main" component={MainTabNavigator} />
       ) : (

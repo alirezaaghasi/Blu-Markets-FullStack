@@ -11,8 +11,8 @@ export const protection = {
   getEligible: (): Promise<EligibleAssetsResponse> =>
     apiClient.get('/protection/eligible'),
 
-  purchase: (assetId: AssetId, durationMonths: number): Promise<Protection> =>
-    apiClient.post('/protection', { assetId, durationMonths }),
+  purchase: (assetId: AssetId, notionalIrr: number, durationMonths: number): Promise<Protection> =>
+    apiClient.post('/protection', { assetId, notionalIrr, durationMonths }),
 
   cancel: (protectionId: string): Promise<{ success: boolean }> =>
     apiClient.delete(`/protection/${protectionId}`),

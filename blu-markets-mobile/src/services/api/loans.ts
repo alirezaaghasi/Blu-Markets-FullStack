@@ -11,8 +11,8 @@ export const loans = {
   getCapacity: (): Promise<LoanCapacityResponse> =>
     apiClient.get('/loans/capacity'),
 
-  create: (amountIrr: number, termMonths: 3 | 6): Promise<Loan> =>
-    apiClient.post('/loans', { amountIrr, termMonths }),
+  create: (collateralAssetId: string, amountIrr: number, durationMonths: 3 | 6): Promise<Loan> =>
+    apiClient.post('/loans', { collateralAssetId, amountIrr, durationMonths }),
 
   repay: (loanId: string, amountIrr: number): Promise<{
     success: boolean;

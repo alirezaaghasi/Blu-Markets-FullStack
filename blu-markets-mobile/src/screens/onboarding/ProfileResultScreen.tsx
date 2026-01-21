@@ -62,71 +62,77 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation, r
 
   useEffect(() => {
     // Prevent double submission
-    if (hasSubmittedRef.current) return;
+    if (hasSubmittedRef.current) {
+      console.log('[ProfileResult] Already submitted, skipping');
+      return;
+    }
+
+    if (!answersFromParams) {
+      console.log('[ProfileResult] No answers from params');
+      setError('No questionnaire answers found');
+      setIsLoading(false);
+      return;
+    }
+
     hasSubmittedRef.current = true;
 
     const submitQuestionnaire = async () => {
-      setIsLoading(true);
-      setError(null);
-
       try {
-        // Use answers from route params (avoids Redux entirely)
-        const answers = answersFromParams || {};
+        console.log('[ProfileResult] Starting questionnaire submission...');
 
-        // Transform answers to backend format (array of { questionId, answerId, value })
-        const apiAnswers = QUESTIONS.map((question) => {
-          const optionIndex = answers[question.id] ?? 0;
-          const option = question.options[optionIndex];
+        // Format answers for backend API
+        // Use score from options (scores are 1-10 range, satisfies backend's value >= 1 requirement)
+        const formattedAnswers = QUESTIONS.map((q) => {
+          const optionIndex = answersFromParams[q.id] ?? 0;
+          const option = q.options[optionIndex];
           return {
-            questionId: question.id,
+            questionId: q.id,
             answerId: `option_${optionIndex}`,
-            value: option?.score ?? 5,
+            value: option?.score ?? 1, // Use score, fallback to 1 if undefined
           };
         });
 
-        const response = await onboarding.submitQuestionnaire(apiAnswers);
+        console.log('[ProfileResult] Calling API...');
+        const response = await onboarding.submitQuestionnaire(formattedAnswers);
+        console.log('[ProfileResult] API response received:', JSON.stringify(response).substring(0, 100));
 
-        // Build profile data (handle both mock and real API response formats)
-        // Backend returns lowercase keys with integer percentages (30, 45, 25)
-        // Mock returns UPPERCASE keys with decimals (0.30, 0.45, 0.25)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const allocation = response.targetAllocation as any;
+        // Normalize backend response:
+        // - Backend uses lowercase keys (foundation, growth, upside)
+        // - Backend uses integer percentages (85, 12, 3)
+        // - Frontend expects UPPERCASE keys and decimal fractions (0.85, 0.12, 0.03)
+        const allocation = (response as any).targetAllocation || {};
+        const normalizeValue = (val: number | undefined): number => {
+          if (val === undefined) return 0;
+          return val > 1 ? val / 100 : val; // Convert integers to decimals
+        };
 
-        // Get raw values (prefer UPPERCASE from mock, fallback to lowercase from backend)
-        let foundation = allocation.FOUNDATION ?? allocation.foundation ?? 50;
-        let growth = allocation.GROWTH ?? allocation.growth ?? 35;
-        let upside = allocation.UPSIDE ?? allocation.upside ?? 15;
+        const normalizedAllocation = {
+          FOUNDATION: normalizeValue(allocation.FOUNDATION ?? allocation.foundation),
+          GROWTH: normalizeValue(allocation.GROWTH ?? allocation.growth),
+          UPSIDE: normalizeValue(allocation.UPSIDE ?? allocation.upside),
+        };
 
-        // Normalize to decimals if values are > 1 (backend sends integers like 30, 45, 25)
-        if (foundation > 1) foundation = foundation / 100;
-        if (growth > 1) growth = growth / 100;
-        if (upside > 1) upside = upside / 100;
+        const riskScore = (response as any).riskScore ?? response.score ?? 5;
+        const profileName = (response as any).profileName ?? 'Balanced';
 
         const profileData: RiskProfileData = {
-          score: response.riskScore,
-          profileName: response.profileName || response.riskProfile?.name || 'Balanced',
-          profileNameFarsi: response.riskProfile?.nameFa || getProfileNameFarsi(response.riskScore),
-          targetAllocation: {
-            FOUNDATION: foundation,
-            GROWTH: growth,
-            UPSIDE: upside,
-          },
+          score: riskScore,
+          profileName: profileName,
+          profileNameFarsi: getProfileNameFarsi(riskScore),
+          targetAllocation: normalizedAllocation,
         };
+
+        console.log('[ProfileResult] Normalized profile:', profileData);
+
+        // Store in Redux
+        store.dispatch(setRiskProfile(profileData));
 
         // Update local state
         setProfile(profileData);
-
-        // Also save to Redux for later use
-        store.dispatch(setRiskProfile(profileData));
-      } catch (err: unknown) {
-        let errorMessage = 'Failed to calculate profile';
-        if (err instanceof Error) {
-          errorMessage = err.message;
-        } else if (err && typeof err === 'object' && 'message' in err) {
-          errorMessage = String((err as { message: unknown }).message);
-        }
-        setError(errorMessage);
-      } finally {
+        setIsLoading(false);
+      } catch (err) {
+        console.error('[ProfileResult] API error:', err);
+        setError('Failed to calculate profile. Please try again.');
         setIsLoading(false);
       }
     };

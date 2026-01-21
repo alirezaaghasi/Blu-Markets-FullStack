@@ -1,3 +1,4 @@
+import { randomInt } from 'crypto';
 import { prisma } from '../../config/database.js';
 import { env } from '../../config/env.js';
 import { AppError } from '../../middleware/error-handler.js';
@@ -11,9 +12,7 @@ const OTP_RATE_LIMIT_WINDOW_MINUTES = 5;
 
 function generateOtp(): string {
   // Generate cryptographically random 6-digit code
-  const min = 100000;
-  const max = 999999;
-  return String(Math.floor(min + Math.random() * (max - min + 1)));
+  return String(randomInt(100000, 1000000));
 }
 
 export async function sendOtp(phone: string): Promise<{ expiresIn: number }> {

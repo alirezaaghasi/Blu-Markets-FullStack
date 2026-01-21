@@ -1,8 +1,8 @@
 /**
- * QuestionnaireScreen - Simple state-based version
+ * QuestionnaireScreen - Fixed state management to avoid infinite loops
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,45 +18,94 @@ type Props = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'Questionnaire'>;
 };
 
-const QuestionnaireScreen: React.FC<Props> = ({ navigation }) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<number[]>([]);
-  const [isNavigating, setIsNavigating] = useState(false);
+// Combined state to ensure atomic updates
+interface QuestionnaireState {
+  currentIndex: number;
+  answers: number[];
+  isNavigating: boolean;
+}
 
-  const question = QUESTIONS[currentIndex];
+const QuestionnaireScreen: React.FC<Props> = ({ navigation }) => {
+  const [state, setState] = useState<QuestionnaireState>({
+    currentIndex: 0,
+    answers: [],
+    isNavigating: false,
+  });
+
+  // Ref to prevent double-processing during rapid taps
+  const processingRef = useRef(false);
+
+  // Debug: Log when component mounts/remounts
+  useEffect(() => {
+    console.log('[Questionnaire] Component MOUNTED');
+    return () => console.log('[Questionnaire] Component UNMOUNTED');
+  }, []);
+
+  const question = QUESTIONS[state.currentIndex];
 
   const handleOption = useCallback((optionIdx: number) => {
-    // Prevent multiple taps
-    if (isNavigating) return;
-
-    const newAnswers = [...answers, optionIdx];
-    setAnswers(newAnswers);
-
-    if (currentIndex >= QUESTIONS.length - 1) {
-      // Last question - navigate to ProfileResult
-      setIsNavigating(true);
-
-      // Build answers object
-      const answersObj: Record<string, number> = {};
-      QUESTIONS.forEach((q, i) => {
-        answersObj[q.id] = newAnswers[i] ?? 0;
-      });
-
-      // Use requestAnimationFrame to ensure state updates complete before navigation
-      requestAnimationFrame(() => {
-        navigation.navigate('ProfileResult', { answers: answersObj });
-      });
-    } else {
-      setCurrentIndex(currentIndex + 1);
+    // Prevent multiple taps or processing
+    if (state.isNavigating || processingRef.current) {
+      console.log('[Questionnaire] Ignoring tap - already processing');
+      return;
     }
-  }, [currentIndex, answers, isNavigating, navigation]);
+
+    processingRef.current = true;
+
+    setState(prev => {
+      const newAnswers = [...prev.answers, optionIdx];
+      const newIndex = prev.currentIndex + 1;
+
+      console.log(`[Questionnaire] Selected option ${optionIdx} for question ${prev.currentIndex + 1}/${QUESTIONS.length}`);
+
+      if (prev.currentIndex >= QUESTIONS.length - 1) {
+        // Last question - will navigate after state update
+        console.log('[Questionnaire] Last question answered, preparing navigation...');
+
+        // Build answers object
+        const answersObj: Record<string, number> = {};
+        QUESTIONS.forEach((q, i) => {
+          answersObj[q.id] = newAnswers[i] ?? 0;
+        });
+
+        // Schedule navigation after state update (outside setState)
+        setTimeout(() => {
+          console.log('[Questionnaire] Navigating to ProfileResult...');
+          navigation.replace('ProfileResult', { answers: answersObj });
+        }, 0);
+
+        return {
+          ...prev,
+          answers: newAnswers,
+          isNavigating: true,
+        };
+      } else {
+        // Reset processing flag after a short delay
+        setTimeout(() => { processingRef.current = false; }, 100);
+
+        return {
+          ...prev,
+          currentIndex: newIndex,
+          answers: newAnswers,
+        };
+      }
+    });
+  }, [state.isNavigating, navigation]);
 
   const handleBack = useCallback(() => {
-    if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
-      setAnswers(answers.slice(0, -1));
-    }
-  }, [currentIndex, answers]);
+    if (processingRef.current) return;
+
+    setState(prev => {
+      if (prev.currentIndex > 0) {
+        return {
+          ...prev,
+          currentIndex: prev.currentIndex - 1,
+          answers: prev.answers.slice(0, -1),
+        };
+      }
+      return prev;
+    });
+  }, []);
 
   if (!question) {
     return null;
@@ -64,7 +113,7 @@ const QuestionnaireScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.progress}>{currentIndex + 1} / {QUESTIONS.length}</Text>
+      <Text style={styles.progress}>{state.currentIndex + 1} / {QUESTIONS.length}</Text>
       <Text style={styles.question}>{question.question}</Text>
 
       {question.options.map((opt, i) => (
@@ -72,14 +121,14 @@ const QuestionnaireScreen: React.FC<Props> = ({ navigation }) => {
           key={i}
           style={styles.option}
           onPress={() => handleOption(i)}
-          disabled={isNavigating}
+          disabled={state.isNavigating}
         >
           <Text style={styles.optionText}>{opt.label}</Text>
         </Pressable>
       ))}
 
-      {currentIndex > 0 && (
-        <Pressable style={styles.back} onPress={handleBack} disabled={isNavigating}>
+      {state.currentIndex > 0 && (
+        <Pressable style={styles.back} onPress={handleBack} disabled={state.isNavigating}>
           <Text style={styles.backText}>بازگشت - Back</Text>
         </Pressable>
       )}
