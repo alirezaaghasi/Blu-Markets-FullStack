@@ -37,7 +37,7 @@ import {
   generateTradePreview,
 } from '../utils/tradeValidation';
 import AllocationBar from './AllocationBar';
-import { tradeApi, ApiError } from '../services/api';
+import { trade } from '../services/api';
 import { ConfirmTradeModal } from './ConfirmTradeModal';
 import { TradeSuccessModal } from './TradeSuccessModal';
 import { TradeErrorModal } from './TradeErrorModal';
@@ -200,17 +200,18 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
 
     setIsSubmitting(true);
     try {
-      // Acknowledge warning for non-SAFE trades
-      const acknowledgedWarning = preview.boundary !== 'SAFE';
-      const response = await tradeApi.execute(side, assetId, amountIRR, acknowledgedWarning);
+      // Execute trade via API
+      const response = await trade.execute(assetId, side, amountIRR);
 
       // Update local state with trade result
       dispatch(updateHoldingFromTrade({
         assetId,
-        quantity: response.newBalance.holdingQuantity,
+        quantity: response.newHoldingQuantity,
         side,
       }));
-      dispatch(updateCash(response.newBalance.cashIrr));
+      // Update cash - for BUY we subtract, for SELL we add
+      const cashChange = side === 'BUY' ? -amountIRR : amountIRR;
+      dispatch(updateCash(cashIRR + cashChange));
 
       // Log action to activity feed
       dispatch(logAction({
@@ -226,16 +227,16 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
         assetId,
         amountIRR,
         quantity: preview.quantity,
-        newCashBalance: response.newBalance.cashIrr,
-        newHoldingQuantity: response.newBalance.holdingQuantity,
+        newCashBalance: cashIRR + cashChange,
+        newHoldingQuantity: response.newHoldingQuantity,
       });
 
       // Close confirm modal, show success modal
       setShowConfirmModal(false);
       setShowSuccessModal(true);
     } catch (error) {
-      const apiError = error as ApiError;
-      setErrorMessage(apiError.message || 'Failed to execute trade. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to execute trade. Please try again.';
+      setErrorMessage(errorMessage);
 
       // Close confirm modal, show error modal
       setShowConfirmModal(false);

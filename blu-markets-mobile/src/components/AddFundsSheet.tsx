@@ -17,7 +17,7 @@ import { colors, typography, spacing, borderRadius } from '../constants/theme';
 import { useAppDispatch, useAppSelector } from '../hooks/useStore';
 import { updateCash, logAction } from '../store/slices/portfolioSlice';
 import { MIN_INVESTMENT_AMOUNT } from '../constants/business';
-import { portfolioApi } from '../services/api';
+import { portfolio } from '../services/api';
 
 interface AddFundsSheetProps {
   visible: boolean;
@@ -79,10 +79,10 @@ export const AddFundsSheet: React.FC<AddFundsSheetProps> = ({
     setIsSubmitting(true);
     try {
       // Call backend API
-      const result = await portfolioApi.addFunds(amountIRR);
+      const result = await portfolio.addFunds(amountIRR);
 
       // Update Redux with new cash balance
-      dispatch(updateCash(result.newCashIrr));
+      dispatch(updateCash(result.cashIrr));
       dispatch(logAction({
         type: 'ADD_FUNDS',
         boundary: 'SAFE',

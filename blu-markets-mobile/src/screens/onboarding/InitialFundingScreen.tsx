@@ -26,7 +26,7 @@ import { Button, NumericKeypad, AmountDisplay, QuickAmountChips } from '../../co
 import { useAppDispatch, useAppSelector } from '../../hooks/useStore';
 import { setInitialInvestment } from '../../store/slices/onboardingSlice';
 import { MIN_INVESTMENT_AMOUNT } from '../../constants/business';
-import { onboardingApi, ApiError } from '../../services/api';
+import { onboarding } from '../../services/api';
 
 type InitialFundingScreenProps = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'InitialFunding'>;
@@ -81,12 +81,12 @@ const InitialFundingScreen: React.FC<InitialFundingScreenProps> = ({
     setError(null);
 
     try {
-      await onboardingApi.createPortfolio(amount);
+      await onboarding.createPortfolio(amount);
       dispatch(setInitialInvestment(amount));
       navigation.navigate('Success');
     } catch (err) {
-      const apiError = err as ApiError;
-      setError(apiError.message || 'Failed to create portfolio');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create portfolio';
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

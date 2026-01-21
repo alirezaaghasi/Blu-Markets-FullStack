@@ -19,7 +19,7 @@ import { ASSETS, LAYER_COLORS, LAYER_NAMES } from '../../constants/assets';
 import { PROTECTION_PREMIUM_BY_LAYER } from '../../constants/business';
 import { removeProtection } from '../../store/slices/portfolioSlice';
 import ProtectionSheet from '../../components/ProtectionSheet';
-import { protectionApi, ProtectionResponse, EligibleProtectionAsset } from '../../services/api';
+import { protection as protectionApi, ProtectionsResponse, EligibleAssetsResponse } from '../../services/api';
 
 const ProtectionScreen: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -31,8 +31,8 @@ const ProtectionScreen: React.FC = () => {
   const [showEducation, setShowEducation] = useState(true);
 
   // Backend data
-  const [protections, setProtections] = useState<ProtectionResponse[]>([]);
-  const [eligibleAssets, setEligibleAssets] = useState<EligibleProtectionAsset[]>([]);
+  const [protections, setProtections] = useState<Protection[]>([]);
+  const [eligibleAssets, setEligibleAssets] = useState<EligibleAssetsResponse['assets']>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,11 +45,11 @@ const ProtectionScreen: React.FC = () => {
 
     try {
       const [protectionsRes, eligibleRes] = await Promise.all([
-        protectionApi.getProtections(),
+        protectionApi.getActive(),
         protectionApi.getEligible(),
       ]);
-      setProtections(protectionsRes);
-      setEligibleAssets(eligibleRes);
+      setProtections(protectionsRes.protections);
+      setEligibleAssets(eligibleRes.assets);
     } catch (err: any) {
       setError(err?.message || 'Failed to load protection data');
     } finally {
@@ -65,10 +65,12 @@ const ProtectionScreen: React.FC = () => {
   const onRefresh = () => fetchData(true);
 
   // Get eligible holdings for protection (combine local and backend data)
+  // Filter out assets that already have active protections
+  const protectedAssetIds = new Set(protections.map((p) => p.assetId));
   const eligibleHoldings = holdings.filter((h) => {
     const asset = ASSETS[h.assetId];
     const eligible = eligibleAssets.find((e) => e.assetId === h.assetId);
-    return asset.protectionEligible && eligible && !eligible.alreadyProtected && h.quantity > 0;
+    return asset?.protectionEligible && eligible && !protectedAssetIds.has(h.assetId) && h.quantity > 0;
   });
 
   // Calculate days remaining for a protection
@@ -90,7 +92,7 @@ const ProtectionScreen: React.FC = () => {
   };
 
   // Handle cancel protection
-  const handleCancelProtection = (protection: ProtectionResponse) => {
+  const handleCancelProtection = (protection: Protection) => {
     Alert.alert(
       'Cancel Protection',
       `Are you sure you want to cancel protection for ${ASSETS[protection.assetId as keyof typeof ASSETS]?.name || protection.assetId}? The remaining premium will not be refunded.`,
@@ -190,8 +192,8 @@ const ProtectionScreen: React.FC = () => {
             <Text style={styles.sectionTitle}>Active Protections</Text>
             {protections.map((protection) => {
               const asset = ASSETS[protection.assetId as keyof typeof ASSETS];
-              const daysRemaining = protection.daysRemaining ?? getDaysRemaining(protection.endDate);
-              const progress = getProgressPercentage(protection.startDate, protection.endDate);
+              const daysRemaining = getDaysRemaining(protection.endISO);
+              const progress = getProgressPercentage(protection.startISO, protection.endISO);
 
               return (
                 <View key={protection.id} style={styles.protectionCard}>
@@ -231,7 +233,7 @@ const ProtectionScreen: React.FC = () => {
                     <View style={styles.protectionValue}>
                       <Text style={styles.protectionValueLabel}>Covered</Text>
                       <Text style={styles.protectionValueAmount}>
-                        {protection.notionalIrr.toLocaleString()} IRR
+                        {protection.notionalIRR.toLocaleString()} IRR
                       </Text>
                     </View>
                   </View>
@@ -252,7 +254,7 @@ const ProtectionScreen: React.FC = () => {
                   <View style={styles.premiumInfo}>
                     <Text style={styles.premiumInfoLabel}>Premium paid</Text>
                     <Text style={styles.premiumInfoValue}>
-                      {protection.premiumIrr.toLocaleString()} IRR
+                      {protection.premiumIRR.toLocaleString()} IRR
                     </Text>
                   </View>
 

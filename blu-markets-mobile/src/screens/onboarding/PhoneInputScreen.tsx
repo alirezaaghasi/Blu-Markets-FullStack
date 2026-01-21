@@ -27,7 +27,7 @@ import { Button, Input } from '../../components/common';
 import { useAppDispatch } from '../../hooks/useStore';
 import { setPhone } from '../../store/slices/onboardingSlice';
 import { IRAN_PHONE_PREFIX } from '../../constants/business';
-import { authApi, ApiError } from '../../services/api';
+import { auth } from '../../services/api';
 
 type PhoneInputScreenProps = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'PhoneInput'>;
@@ -64,16 +64,12 @@ const PhoneInputScreen: React.FC<PhoneInputScreenProps> = ({ navigation }) => {
     setError('');
 
     try {
-      await authApi.sendOtp(fullPhone);
+      await auth.sendOtp(fullPhone);
       dispatch(setPhone(fullPhone));
       navigation.navigate('OTPVerify', { phone: fullPhone });
     } catch (err) {
-      const apiError = err as ApiError;
-      if (apiError.code === 'RATE_LIMITED') {
-        setError('Too many requests. Please wait a few minutes.');
-      } else {
-        setError(apiError.message || 'Failed to send OTP. Please try again.');
-      }
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send OTP. Please try again.';
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

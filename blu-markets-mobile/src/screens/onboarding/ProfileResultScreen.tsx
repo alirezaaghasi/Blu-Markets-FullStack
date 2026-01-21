@@ -28,7 +28,7 @@ import { Button, Card } from '../../components/common';
 import { useAppDispatch, useAppSelector } from '../../hooks/useStore';
 import { setRiskProfile } from '../../store/slices/onboardingSlice';
 import { formatAllocation } from '../../utils/riskProfile';
-import { onboardingApi, QuestionnaireAnswer, ApiError } from '../../services/api';
+import { onboarding } from '../../services/api';
 import { QUESTIONS } from '../../constants/questionnaire';
 
 const { width } = Dimensions.get('window');
@@ -51,35 +51,32 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation })
       setError(null);
 
       try {
-        // Transform answers to backend format
-        const apiAnswers: QuestionnaireAnswer[] = QUESTIONS.map((question) => {
+        // Transform answers to backend format - Record<string, number> of scores
+        const apiAnswers: Record<string, number> = {};
+        QUESTIONS.forEach((question) => {
           const optionIndex = answers[question.id] ?? 0;
           const option = question.options[optionIndex];
-          return {
-            questionId: question.id,
-            answerId: String(optionIndex),
-            value: option?.score ?? 5,
-          };
+          apiAnswers[question.id] = option?.score ?? 5;
         });
 
-        const response = await onboardingApi.submitQuestionnaire(apiAnswers);
+        const response = await onboarding.submitQuestionnaire(apiAnswers);
 
         // Map backend response to local format
         const profile = {
           score: response.riskScore,
-          profileName: response.profileName,
-          profileNameFarsi: getProfileNameFarsi(response.riskScore),
+          profileName: response.riskProfile.name,
+          profileNameFarsi: response.riskProfile.nameFa || getProfileNameFarsi(response.riskScore),
           targetAllocation: {
-            FOUNDATION: response.targetAllocation.foundation,
-            GROWTH: response.targetAllocation.growth,
-            UPSIDE: response.targetAllocation.upside,
+            FOUNDATION: response.targetAllocation.FOUNDATION,
+            GROWTH: response.targetAllocation.GROWTH,
+            UPSIDE: response.targetAllocation.UPSIDE,
           },
         };
 
         dispatch(setRiskProfile(profile));
       } catch (err) {
-        const apiError = err as ApiError;
-        setError(apiError.message || 'Failed to calculate profile');
+        const errorMessage = err instanceof Error ? err.message : 'Failed to calculate profile';
+        setError(errorMessage);
       } finally {
         setIsLoading(false);
       }

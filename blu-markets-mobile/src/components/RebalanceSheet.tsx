@@ -13,16 +13,11 @@ import {
 } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../constants/theme';
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
-import { Layer, Boundary } from '../types';
+import { Layer, Boundary, RebalancePreview, RebalanceMode, Holding } from '../types';
 import { ASSETS, LAYER_COLORS, LAYER_NAMES } from '../constants/assets';
 import { BOUNDARY_MESSAGES } from '../constants/business';
 import { setStatus, setHoldings, updateCash, logAction } from '../store/slices/portfolioSlice';
-import {
-  rebalanceApi,
-  RebalancePreviewResponse,
-  RebalanceMode,
-  portfolioApi,
-} from '../services/api';
+import { rebalance, portfolio } from '../services/api';
 
 interface RebalanceSheetProps {
   visible: boolean;
@@ -40,7 +35,7 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
   const [showTrades, setShowTrades] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [preview, setPreview] = useState<RebalancePreviewResponse | null>(null);
+  const [preview, setPreview] = useState<RebalancePreview | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const { cashIRR, targetLayerPct } = useAppSelector((state) => state.portfolio);
@@ -50,7 +45,7 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
     setIsLoading(true);
     setError(null);
     try {
-      const result = await rebalanceApi.preview(mode);
+      const result = await rebalance.preview();
       setPreview(result);
     } catch (err: any) {
       setError(err?.message || 'Failed to load rebalance preview');
@@ -72,19 +67,16 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
     setIsExecuting(true);
     try {
       // Execute rebalance via backend
-      const result = await rebalanceApi.execute(mode, true);
+      const result = await rebalance.execute();
 
       // Refresh portfolio data from backend
-      const [summary, holdings] = await Promise.all([
-        portfolioApi.getSummary(),
-        portfolioApi.getHoldings(),
-      ]);
+      const portfolioData = await portfolio.get();
 
       // Update Redux state
-      dispatch(updateCash(summary.cashIrr));
-      dispatch(setStatus(summary.status));
-      dispatch(setHoldings(holdings.map(h => ({
-        assetId: h.assetId as any,
+      dispatch(updateCash(portfolioData.cashIrr));
+      dispatch(setStatus(portfolioData.status));
+      dispatch(setHoldings(portfolioData.holdings.map((h: Holding) => ({
+        assetId: h.assetId,
         quantity: h.quantity,
         frozen: h.frozen,
         layer: h.layer,
@@ -92,7 +84,7 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
 
       dispatch(logAction({
         type: 'REBALANCE',
-        boundary: result.boundary,
+        boundary: 'SAFE',
         message: `Rebalanced portfolio (${result.tradesExecuted} trades)`,
       }));
 
@@ -108,14 +100,26 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
     }
   };
 
-  // Convert API response to component-friendly format
-  const beforeAllocation = preview?.currentAllocation || { foundation: 0, growth: 0, upside: 0 };
-  const targetAllocation = preview?.targetAllocation || {
+  // Convert API response to component-friendly format (uppercase to lowercase, fractions to percentages)
+  const beforeAllocation = preview?.before ? {
+    foundation: preview.before.FOUNDATION * 100,
+    growth: preview.before.GROWTH * 100,
+    upside: preview.before.UPSIDE * 100,
+  } : { foundation: 0, growth: 0, upside: 0 };
+  const targetAllocationDisplay = preview?.target ? {
+    foundation: preview.target.FOUNDATION * 100,
+    growth: preview.target.GROWTH * 100,
+    upside: preview.target.UPSIDE * 100,
+  } : {
     foundation: targetLayerPct.FOUNDATION * 100,
     growth: targetLayerPct.GROWTH * 100,
     upside: targetLayerPct.UPSIDE * 100,
   };
-  const afterAllocation = preview?.afterAllocation || { foundation: 0, growth: 0, upside: 0 };
+  const afterAllocation = preview?.after ? {
+    foundation: preview.after.FOUNDATION * 100,
+    growth: preview.after.GROWTH * 100,
+    upside: preview.after.UPSIDE * 100,
+  } : { foundation: 0, growth: 0, upside: 0 };
   const trades = preview?.trades || [];
   const sellTrades = trades.filter(t => t.side === 'SELL');
   const buyTrades = trades.filter(t => t.side === 'BUY');
@@ -193,17 +197,17 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
                 <View style={styles.allocationBarContainer}>
                   <View style={styles.allocationBar}>
                     <View style={[styles.barSegment, {
-                      flex: targetAllocation.foundation || 1,
+                      flex: targetAllocationDisplay.foundation || 1,
                       backgroundColor: LAYER_COLORS.FOUNDATION,
                       opacity: 0.5
                     }]} />
                     <View style={[styles.barSegment, {
-                      flex: targetAllocation.growth || 1,
+                      flex: targetAllocationDisplay.growth || 1,
                       backgroundColor: LAYER_COLORS.GROWTH,
                       opacity: 0.5
                     }]} />
                     <View style={[styles.barSegment, {
-                      flex: targetAllocation.upside || 1,
+                      flex: targetAllocationDisplay.upside || 1,
                       backgroundColor: LAYER_COLORS.UPSIDE,
                       opacity: 0.5
                     }]} />
@@ -313,7 +317,7 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
                         </Text>
                       </View>
                       <Text style={styles.tradeAmount}>
-                        {formatNumber(trade.amountIrr)} IRR
+                        {formatNumber(trade.amountIRR)} IRR
                       </Text>
                     </View>
                   ))}

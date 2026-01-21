@@ -26,7 +26,7 @@ import { LAYOUT } from '../../constants/layout';
 import { Button, OTPInput } from '../../components/common';
 import { useAppDispatch } from '../../hooks/useStore';
 import { setAuthToken } from '../../store/slices/authSlice';
-import { authApi, ApiError } from '../../services/api';
+import { auth } from '../../services/api';
 
 type OTPVerifyScreenProps = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'OTPVerify'>;
@@ -65,10 +65,10 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
     setError('');
 
     try {
-      const response = await authApi.verifyOtp(phone, verifyCode);
+      const response = await auth.verifyOtp(phone, verifyCode);
 
       // Store auth token in Redux
-      dispatch(setAuthToken(response.tokens.accessToken));
+      dispatch(setAuthToken(response.accessToken));
 
       // Navigate based on onboarding status
       if (!response.onboardingComplete) {
@@ -77,16 +77,8 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
       }
       // If onboarding complete, RootNavigator handles navigation
     } catch (err) {
-      const apiError = err as ApiError;
-      if (apiError.code === 'OTP_INVALID') {
-        setError('Invalid code. Please try again.');
-      } else if (apiError.code === 'OTP_EXPIRED') {
-        setError('Code expired. Please request a new one.');
-      } else if (apiError.code === 'OTP_MAX_ATTEMPTS') {
-        setError('Too many attempts. Please request a new code.');
-      } else {
-        setError(apiError.message || 'Verification failed. Please try again.');
-      }
+      const errorMessage = err instanceof Error ? err.message : 'Verification failed. Please try again.';
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -99,12 +91,12 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
     setError('');
 
     try {
-      await authApi.sendOtp(phone);
+      await auth.sendOtp(phone);
       setResendTimer(60);
       setOtp('');
     } catch (err) {
-      const apiError = err as ApiError;
-      setError(apiError.message || 'Failed to resend code.');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to resend code.';
+      setError(errorMessage);
     } finally {
       setIsResending(false);
     }

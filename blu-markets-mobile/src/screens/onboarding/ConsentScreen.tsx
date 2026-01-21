@@ -25,7 +25,7 @@ import { LAYOUT } from '../../constants/layout';
 import { Button } from '../../components/common';
 import { useAppDispatch, useAppSelector } from '../../hooks/useStore';
 import { setConsent } from '../../store/slices/onboardingSlice';
-import { onboardingApi, ApiError } from '../../services/api';
+import { onboarding } from '../../services/api';
 
 type ConsentScreenProps = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'Consent'>;
@@ -69,11 +69,11 @@ const ConsentScreen: React.FC<ConsentScreenProps> = ({ navigation }) => {
     setError(null);
 
     try {
-      await onboardingApi.recordConsent();
+      await onboarding.recordConsent();
       navigation.navigate('InitialFunding');
     } catch (err) {
-      const apiError = err as ApiError;
-      setError(apiError.message || 'Failed to record consent');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to record consent';
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
