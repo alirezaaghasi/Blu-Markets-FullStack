@@ -141,9 +141,19 @@ const DashboardScreen: React.FC = () => {
   };
 
   // Calculate portfolio status based on allocation drift
+  // PRD Section 20.1:
+  // - BALANCED: All layers within 5% of target
+  // - SLIGHTLY_OFF: Any layer > 5% drift, no hard limits breached
+  // - ATTENTION_REQUIRED: Foundation < 30% OR Upside > 25%
   const getPortfolioStatus = (): PortfolioStatus => {
     if (holdingsValueIRR === 0) return 'BALANCED';
 
+    // Check hard limits first (PRD: Foundation < 30% OR Upside > 25%)
+    if (currentAllocation.FOUNDATION < 0.30 || currentAllocation.UPSIDE > 0.25) {
+      return 'ATTENTION_REQUIRED';
+    }
+
+    // Check drift from target
     const drifts = [
       Math.abs(currentAllocation.FOUNDATION - targetLayerPct.FOUNDATION),
       Math.abs(currentAllocation.GROWTH - targetLayerPct.GROWTH),
@@ -151,7 +161,6 @@ const DashboardScreen: React.FC = () => {
     ];
     const maxDrift = Math.max(...drifts);
 
-    if (maxDrift > 0.10) return 'ATTENTION_REQUIRED'; // >10% drift
     if (maxDrift > 0.05) return 'SLIGHTLY_OFF'; // >5% drift
     return 'BALANCED';
   };

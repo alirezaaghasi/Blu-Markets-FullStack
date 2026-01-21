@@ -20,11 +20,10 @@ export type OnboardingStackParamList = {
   Success: undefined;
 };
 
-// Main Tab Navigator (5 tabs per handoff)
+// Main Tab Navigator (4 tabs per PRD - no Market in MVP)
 export type MainTabParamList = {
   Home: undefined;
   Portfolio: undefined;
-  Market: undefined;
   History: undefined;
   Profile: undefined;
 };

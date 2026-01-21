@@ -5,6 +5,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../constants/theme';
 import { Holding, AssetId } from '../types';
 import { ASSETS, LAYER_COLORS } from '../constants/assets';
+import { FIXED_INCOME_UNIT_PRICE } from '../constants/business';
 
 interface HoldingCardProps {
   holding: Holding;
@@ -48,7 +49,10 @@ export const HoldingCard: React.FC<HoldingCardProps> = ({
   onPress,
 }) => {
   const asset = ASSETS[holding.assetId];
-  const valueIRR = holding.quantity * priceUSD * fxRate;
+  // Fixed Income uses fixed IRR price, not USD conversion
+  const valueIRR = holding.assetId === 'IRR_FIXED_INCOME'
+    ? holding.quantity * FIXED_INCOME_UNIT_PRICE
+    : holding.quantity * priceUSD * fxRate;
 
   return (
     <TouchableOpacity
@@ -87,9 +91,13 @@ export const HoldingCard: React.FC<HoldingCardProps> = ({
       {/* Value */}
       <View style={styles.rightSection}>
         <Text style={styles.valueIRR}>{formatNumber(valueIRR)} IRR</Text>
-        <Text style={styles.valueUSD}>
-          ${formatNumber(holding.quantity * priceUSD)}
-        </Text>
+        {holding.assetId === 'IRR_FIXED_INCOME' ? (
+          <Text style={styles.valueUSD}>Fixed Income</Text>
+        ) : (
+          <Text style={styles.valueUSD}>
+            ${formatNumber(holding.quantity * priceUSD)}
+          </Text>
+        )}
       </View>
     </TouchableOpacity>
   );

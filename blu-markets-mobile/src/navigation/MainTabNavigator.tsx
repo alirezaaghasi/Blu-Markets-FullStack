@@ -1,5 +1,5 @@
 // Main Tab Navigator
-// Based on CLAUDE_CODE_HANDOFF.md Section 7 - Navigation Architecture
+// Based on PRD Section 7 - Navigation Architecture (4 tabs)
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet } from 'react-native';
@@ -10,15 +10,13 @@ import { SIZES } from '../constants/spacing';
 // Import screens
 import DashboardScreen from '../screens/main/DashboardScreen';
 import PortfolioScreen from '../screens/main/PortfolioScreen';
-import MarketScreen from '../screens/main/MarketScreen';
 import HistoryScreen from '../screens/main/HistoryScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 
-// Tab configuration per handoff
+// Tab configuration per PRD (4 tabs - no Market tab in MVP)
 const TABS = [
   { name: 'Home', icon: '🏠', screen: DashboardScreen },
   { name: 'Portfolio', icon: '📊', screen: PortfolioScreen },
-  { name: 'Market', icon: '📈', screen: MarketScreen },
   { name: 'History', icon: '🕐', screen: HistoryScreen },
   { name: 'Profile', icon: '👤', screen: ProfileScreen },
 ] as const;
@@ -55,13 +53,6 @@ export const MainTabNavigator: React.FC = () => {
         component={PortfolioScreen}
         options={{
           tabBarIcon: ({ focused }) => <TabIcon icon="📊" focused={focused} />,
-        }}
-      />
-      <Tab.Screen
-        name="Market"
-        component={MarketScreen}
-        options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="📈" focused={focused} />,
         }}
       />
       <Tab.Screen
