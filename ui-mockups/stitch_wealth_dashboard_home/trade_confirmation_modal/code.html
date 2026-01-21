@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Trade Confirmation Modal</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1fc75c",
+                        "background-light": "#f6f8f7",
+                        "background-dark": "#122017",
+                        "modal-bg": "#1C2433",
+                        "card-bg": "#151C28",
+                        "text-secondary": "#94a3b8",
+                        "overlay": "#0E1420",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "2xl": "2rem", "full": "9999px" },
+                    boxShadow: {
+                        'modal': '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        /* Custom scrollbar for better aesthetic if needed */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 2px;
+        }
+        /* Glassmorphism utility */
+        .glass-panel {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-white antialiased selection:bg-primary/30">
+<!-- Screen Container -->
+<div class="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-[url('https://images.unsplash.com/photo-1639322537228-f710d846310a?auto=format&amp;fit=crop&amp;q=80&amp;w=1000')] bg-cover bg-center" data-alt="Dark abstract financial data background pattern">
+<!-- Overlay -->
+<div class="absolute inset-0 bg-overlay/80 backdrop-blur-sm z-10"></div>
+<!-- Modal Wrapper -->
+<div class="relative z-20 w-full max-w-[400px] px-4 py-8 animate-in fade-in zoom-in duration-300">
+<!-- Modal Card -->
+<div class="bg-white dark:bg-modal-bg rounded-[24px] shadow-modal overflow-hidden flex flex-col w-full border border-white/5">
+<!-- Header -->
+<div class="flex items-center justify-between p-6 pb-2">
+<h2 class="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Confirm Purchase</h2>
+<button class="p-2 -mr-2 text-slate-400 hover:text-slate-600 dark:text-slate-400 dark:hover:text-white transition-colors rounded-full hover:bg-slate-100 dark:hover:bg-slate-700/50">
+<span class="material-symbols-outlined !text-[24px]">close</span>
+</button>
+</div>
+<!-- Scrollable Content Area -->
+<div class="flex-1 overflow-y-auto px-6 pt-4 pb-2">
+<!-- Asset Header -->
+<div class="flex flex-col items-center gap-3 mb-6">
+<div class="relative">
+<div class="w-16 h-16 rounded-full bg-[#F7931A] flex items-center justify-center shadow-lg shadow-orange-500/20">
+<!-- Bitcoin SVG Icon replacement using material symbol or pure css, here just using a clear placeholder image style -->
+<img alt="Bitcoin Logo" class="w-10 h-10 object-contain" data-alt="Bitcoin cryptocurrency orange logo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCKFYe2DOhhgEZaX0tP1Um-9cfyIRaSkanFPsULqmoR79dWP2gBz9GX9J53Y-q2dpX9GS0Rqq5a3A8w0hVa89LOQz7AwcE2Vwg-iqfYM17Gc5GT3_lOT-Tme76Hl3ySOtNXjeqIjnI0oGsoWvAsseBZ1ynX1iPAQORrZ04u4E_8hDUmNbQ0tv6LfTtMl9o7ob-Hmk0BO6686g4VEMN0vXwk6KN_RQcBBOXkxouxPBpAiudpKIBiANHfB3owdACEH6RnZl--z7r9l559"/>
+</div>
+<!-- Badge could go here overlaid, but distinct row is cleaner -->
+</div>
+<div class="text-center">
+<h3 class="text-2xl font-bold text-slate-900 dark:text-white leading-none mb-1">Bitcoin (BTC)</h3>
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-500/10 border border-purple-500/20">
+<span class="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+<span class="text-xs font-semibold text-purple-400 tracking-wide uppercase">Growth Layer</span>
+</div>
+</div>
+</div>
+<!-- Order Details Card -->
+<div class="bg-slate-50 dark:bg-card-bg rounded-xl p-4 space-y-3 mb-5 border border-slate-200 dark:border-white/5">
+<!-- Row -->
+<div class="flex justify-between items-center text-sm">
+<span class="text-slate-500 dark:text-text-secondary">Order Type</span>
+<span class="text-primary font-bold">Buy</span>
+</div>
+<!-- Row -->
+<div class="flex justify-between items-center text-sm">
+<span class="text-slate-500 dark:text-text-secondary">Amount</span>
+<span class="text-slate-900 dark:text-white font-medium tabular-nums">2,500,000 IRR</span>
+</div>
+<!-- Row -->
+<div class="flex justify-between items-center text-sm">
+<span class="text-slate-500 dark:text-text-secondary">Quantity</span>
+<span class="text-slate-900 dark:text-white font-medium tabular-nums">≈ 0.00018 BTC</span>
+</div>
+<!-- Row -->
+<div class="flex justify-between items-center text-sm">
+<span class="text-slate-500 dark:text-text-secondary">Price</span>
+<span class="text-slate-900 dark:text-white font-medium tabular-nums">13,925,000,000 IRR</span>
+</div>
+<!-- Row -->
+<div class="flex justify-between items-center text-sm pb-3 border-b border-dashed border-slate-200 dark:border-slate-700/50">
+<span class="text-slate-500 dark:text-text-secondary">Spread &amp; Fee</span>
+<span class="text-slate-900 dark:text-white font-medium tabular-nums">7,500 IRR</span>
+</div>
+<!-- Total Row -->
+<div class="flex justify-between items-end pt-1">
+<span class="text-slate-500 dark:text-text-secondary text-sm font-medium pb-1">Total Pay</span>
+<span class="text-slate-900 dark:text-white text-xl font-bold tabular-nums tracking-tight">2,507,500 IRR</span>
+</div>
+</div>
+<!-- Portfolio Impact Widget -->
+<div class="bg-slate-50 dark:bg-card-bg rounded-xl p-4 mb-4 border border-slate-200 dark:border-white/5">
+<div class="flex items-center justify-between mb-3">
+<span class="text-xs font-semibold text-slate-500 dark:text-text-secondary uppercase tracking-wider">Portfolio Impact</span>
+<div class="flex items-center gap-1 text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded text-center">
+<span>MOVES TOWARD TARGET</span>
+<span class="material-symbols-outlined text-[12px] font-bold">check</span>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden relative">
+<!-- Base progress -->
+<div class="absolute left-0 top-0 bottom-0 bg-slate-400/30 w-[35%]"></div>
+<!-- Added progress -->
+<div class="absolute left-[35%] top-0 bottom-0 bg-primary w-[2%] shadow-[0_0_10px_rgba(31,199,92,0.6)]"></div>
+</div>
+<div class="text-xs font-medium text-slate-900 dark:text-white whitespace-nowrap tabular-nums">
+<span class="text-slate-400">35%</span>
+<span class="mx-1 text-slate-600 dark:text-slate-500">→</span>
+<span class="text-primary font-bold">37%</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer / Action Area -->
+<div class="p-6 pt-2 bg-white dark:bg-modal-bg border-t border-transparent relative z-10">
+<!-- Disclaimer / Timer -->
+<div class="flex justify-between items-center mb-4 px-1">
+<span class="text-xs text-slate-400 dark:text-slate-500 font-medium">Quote updates in</span>
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-amber-500 text-[16px] animate-pulse">timer</span>
+<span class="text-sm font-mono font-bold text-slate-700 dark:text-slate-300 tabular-nums">0:27</span>
+</div>
+</div>
+<!-- Buttons -->
+<div class="grid grid-cols-2 gap-3">
+<button class="flex items-center justify-center h-12 rounded-xl border border-slate-300 dark:border-slate-600 bg-transparent text-slate-700 dark:text-slate-300 font-bold text-sm hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            Cancel
+                        </button>
+<button class="flex items-center justify-center h-12 rounded-xl bg-primary text-white font-bold text-sm shadow-lg shadow-primary/25 hover:bg-primary/90 active:scale-[0.98] transition-all">
+                            Confirm Buy
+                        </button>
+</div>
+<!-- Safe Area Spacer for iOS Home Indicator -->
+<div class="h-2"></div>
+</div>
+</div>
+</div>
+</div>
+</body></html>

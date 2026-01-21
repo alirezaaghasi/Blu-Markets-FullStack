@@ -1,20 +1,32 @@
-// Success Screen
-// Based on PRD Section 5 - Portfolio creation success
-import React, { useEffect } from 'react';
+/**
+ * SuccessScreen
+ * Design System: Blu Markets
+ * Target: iPhone 16 Pro (393 x 852)
+ *
+ * Portfolio creation success with celebration animation
+ */
+
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   SafeAreaView,
   Animated,
+  Easing,
+  StatusBar,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/types';
-import { colors, typography, spacing, borderRadius } from '../../constants/theme';
+import { COLORS } from '../../constants/colors';
+import { TYPOGRAPHY } from '../../constants/typography';
+import { SPACING, RADIUS } from '../../constants/spacing';
+import { LAYOUT } from '../../constants/layout';
+import { Button } from '../../components/common';
 import { useAppDispatch, useAppSelector } from '../../hooks/useStore';
 import { initializePortfolio, logAction } from '../../store/slices/portfolioSlice';
 import { resetOnboarding } from '../../store/slices/onboardingSlice';
+import { completeOnboarding } from '../../store/slices/authSlice';
 
 type SuccessScreenProps = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'Success'>;
@@ -25,16 +37,87 @@ const formatNumber = (num: number): string => {
   return num.toLocaleString('en-US');
 };
 
+// Confetti particle component
+const ConfettiParticle: React.FC<{
+  delay: number;
+  color: string;
+  startX: number;
+}> = ({ delay, color, startX }) => {
+  const translateY = useRef(new Animated.Value(-50)).current;
+  const translateX = useRef(new Animated.Value(startX)).current;
+  const rotate = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const animation = Animated.sequence([
+      Animated.delay(delay),
+      Animated.parallel([
+        Animated.timing(translateY, {
+          toValue: 500,
+          duration: 2000,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateX, {
+          toValue: startX + (Math.random() - 0.5) * 100,
+          duration: 2000,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(rotate, {
+          toValue: 360 * (Math.random() > 0.5 ? 1 : -1),
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.delay(1500),
+          Animated.timing(opacity, {
+            toValue: 0,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]),
+    ]);
+
+    animation.start();
+  }, []);
+
+  return (
+    <Animated.View
+      style={[
+        styles.confettiParticle,
+        {
+          backgroundColor: color,
+          opacity,
+          transform: [
+            { translateY },
+            { translateX },
+            {
+              rotate: rotate.interpolate({
+                inputRange: [0, 360],
+                outputRange: ['0deg', '360deg'],
+              }),
+            },
+          ],
+        },
+      ]}
+    />
+  );
+};
+
 const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
   const dispatch = useAppDispatch();
   const { riskProfile, initialInvestment, phone } = useAppSelector(
     (state) => state.onboarding
   );
-  const scaleAnim = React.useRef(new Animated.Value(0)).current;
-  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+
+  const scaleAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const checkScale = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Animate success icon
+    // Animate success icon with bounce
     Animated.sequence([
       Animated.spring(scaleAnim, {
         toValue: 1,
@@ -42,11 +125,19 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
         friction: 3,
         useNativeDriver: true,
       }),
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.spring(checkScale, {
+          toValue: 1,
+          tension: 100,
+          friction: 5,
+          useNativeDriver: true,
+        }),
+      ]),
     ]).start();
   }, []);
 
@@ -76,22 +167,63 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
       })
     );
 
-    // Auth token is already set from OTP verification
-    // Reset onboarding state - this triggers navigation to main app
+    // Mark onboarding as complete - this triggers navigation to main app
+    dispatch(completeOnboarding());
+
+    // Reset onboarding state for fresh start if user logs out
     dispatch(resetOnboarding());
   };
 
+  // Generate confetti particles
+  const confettiColors = [
+    COLORS.layers.foundation,
+    COLORS.layers.growth,
+    COLORS.layers.upside,
+    COLORS.brand.primary,
+    COLORS.semantic.success,
+  ];
+
+  const confettiParticles = Array.from({ length: 30 }).map((_, i) => ({
+    id: i,
+    color: confettiColors[i % confettiColors.length],
+    startX: (i / 30) * 393 - 50,
+    delay: Math.random() * 500,
+  }));
+
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.background.primary} />
+
+      {/* Confetti */}
+      <View style={styles.confettiContainer} pointerEvents="none">
+        {confettiParticles.map((particle) => (
+          <ConfettiParticle
+            key={particle.id}
+            color={particle.color}
+            startX={particle.startX}
+            delay={particle.delay}
+          />
+        ))}
+      </View>
+
       <View style={styles.content}>
-        {/* Success icon */}
+        {/* Success icon with checkmark */}
         <Animated.View
           style={[
             styles.successIconContainer,
             { transform: [{ scale: scaleAnim }] },
           ]}
         >
-          <Text style={styles.successIcon}>🎉</Text>
+          <View style={styles.successCircle}>
+            <Animated.Text
+              style={[
+                styles.checkmark,
+                { transform: [{ scale: checkScale }] },
+              ]}
+            >
+              ✓
+            </Animated.Text>
+          </View>
         </Animated.View>
 
         {/* Success message */}
@@ -114,14 +246,14 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
           <View style={styles.divider} />
 
           <View style={styles.allocationSection}>
-            <Text style={styles.allocationTitle}>Allocation</Text>
+            <Text style={styles.allocationTitle}>Your allocation</Text>
             <View style={styles.allocationBar}>
               <View
                 style={[
                   styles.allocationSegment,
                   {
                     flex: allocation.FOUNDATION,
-                    backgroundColor: colors.layerFoundation,
+                    backgroundColor: COLORS.layers.foundation,
                   },
                 ]}
               />
@@ -130,7 +262,7 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
                   styles.allocationSegment,
                   {
                     flex: allocation.GROWTH,
-                    backgroundColor: colors.layerGrowth,
+                    backgroundColor: COLORS.layers.growth,
                   },
                 ]}
               />
@@ -139,7 +271,7 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
                   styles.allocationSegment,
                   {
                     flex: allocation.UPSIDE,
-                    backgroundColor: colors.layerUpside,
+                    backgroundColor: COLORS.layers.upside,
                   },
                 ]}
               />
@@ -148,50 +280,55 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
               <AllocationLabel
                 label="Foundation"
                 percentage={Math.round(allocation.FOUNDATION * 100)}
-                color={colors.layerFoundation}
+                color={COLORS.layers.foundation}
               />
               <AllocationLabel
                 label="Growth"
                 percentage={Math.round(allocation.GROWTH * 100)}
-                color={colors.layerGrowth}
+                color={COLORS.layers.growth}
               />
               <AllocationLabel
                 label="Upside"
                 percentage={Math.round(allocation.UPSIDE * 100)}
-                color={colors.layerUpside}
+                color={COLORS.layers.upside}
               />
             </View>
           </View>
         </Animated.View>
 
-        {/* Activity Feed preview */}
+        {/* First activity preview */}
         <Animated.View style={[styles.activityPreview, { opacity: fadeAnim }]}>
-          <Text style={styles.activityTitle}>Activity</Text>
+          <Text style={styles.activityTitle}>First activity</Text>
           <View style={styles.activityItem}>
-            <View style={[styles.activityDot, { backgroundColor: colors.boundarySafe }]} />
-            <Text style={styles.activityText}>Just now</Text>
-            <Text style={styles.activityMessage}>
-              Started with {formatNumber(initialInvestment)} IRR
-            </Text>
-            <Text style={styles.activityIndicator}>🟢</Text>
+            <View style={[styles.activityDot, { backgroundColor: COLORS.boundary.safe }]} />
+            <View style={styles.activityContent}>
+              <Text style={styles.activityMessage}>
+                Portfolio created with {formatNumber(initialInvestment)} IRR
+              </Text>
+              <Text style={styles.activityTime}>Just now</Text>
+            </View>
+            <Text style={styles.activityBadge}>SAFE</Text>
           </View>
         </Animated.View>
       </View>
 
       {/* CTA Button */}
       <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.button}
+        <Button
+          label="Go to Dashboard"
+          variant="primary"
+          size="lg"
+          fullWidth
           onPress={handleGoToDashboard}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.buttonText}>Go to Dashboard</Text>
-        </TouchableOpacity>
+          icon={<Text style={styles.arrowIcon}>→</Text>}
+          iconPosition="right"
+        />
       </View>
     </SafeAreaView>
   );
 };
 
+// Allocation Label Component
 const AllocationLabel: React.FC<{
   label: string;
   percentage: number;
@@ -200,7 +337,7 @@ const AllocationLabel: React.FC<{
   <View style={styles.allocationLabelItem}>
     <View style={[styles.labelDot, { backgroundColor: color }]} />
     <Text style={styles.labelText}>
-      {label} {percentage}%
+      {label} <Text style={[styles.labelPercentage, { color }]}>{percentage}%</Text>
     </Text>
   </View>
 );
@@ -208,41 +345,70 @@ const AllocationLabel: React.FC<{
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bgDark,
+    backgroundColor: COLORS.background.primary,
+  },
+  confettiContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden',
+  },
+  confettiParticle: {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    borderRadius: 2,
   },
   content: {
     flex: 1,
-    paddingHorizontal: spacing[6],
+    paddingHorizontal: LAYOUT.screenPaddingH,
     justifyContent: 'center',
   },
   successIconContainer: {
     alignItems: 'center',
-    marginBottom: spacing[6],
+    marginBottom: SPACING[6],
   },
-  successIcon: {
-    fontSize: 80,
+  successCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: COLORS.semantic.success,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: COLORS.semantic.success,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  checkmark: {
+    fontSize: 48,
+    color: COLORS.text.inverse,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
   },
   messageContainer: {
     alignItems: 'center',
-    marginBottom: spacing[8],
+    marginBottom: SPACING[6],
   },
   title: {
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
-    marginBottom: spacing[2],
+    fontSize: TYPOGRAPHY.fontSize['2xl'],
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text.primary,
+    marginBottom: SPACING[2],
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: typography.fontSize.base,
-    color: colors.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.text.secondary,
     textAlign: 'center',
   },
   summaryCard: {
-    backgroundColor: colors.cardDark,
-    borderRadius: borderRadius.lg,
-    padding: spacing[5],
-    marginBottom: spacing[4],
+    backgroundColor: COLORS.background.elevated,
+    borderRadius: RADIUS.xl,
+    padding: SPACING[5],
+    marginBottom: SPACING[4],
   },
   summaryRow: {
     flexDirection: 'row',
@@ -250,31 +416,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   summaryLabel: {
-    fontSize: typography.fontSize.base,
-    color: colors.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.text.secondary,
   },
   summaryValue: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text.primary,
   },
   divider: {
     height: 1,
-    backgroundColor: colors.borderDark,
-    marginVertical: spacing[4],
+    backgroundColor: COLORS.border,
+    marginVertical: SPACING[4],
   },
   allocationSection: {},
   allocationTitle: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    marginBottom: spacing[3],
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
+    marginBottom: SPACING[3],
   },
   allocationBar: {
     height: 12,
     borderRadius: 6,
     flexDirection: 'row',
     overflow: 'hidden',
-    marginBottom: spacing[3],
+    marginBottom: SPACING[3],
   },
   allocationSegment: {
     height: '100%',
@@ -291,21 +457,24 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginRight: spacing[1],
+    marginRight: SPACING[1],
   },
   labelText: {
-    fontSize: typography.fontSize.xs,
-    color: colors.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.text.secondary,
+  },
+  labelPercentage: {
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
   },
   activityPreview: {
-    backgroundColor: colors.cardDark,
-    borderRadius: borderRadius.lg,
-    padding: spacing[4],
+    backgroundColor: COLORS.background.elevated,
+    borderRadius: RADIUS.xl,
+    padding: SPACING[4],
   },
   activityTitle: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    marginBottom: spacing[3],
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
+    marginBottom: SPACING[3],
   },
   activityItem: {
     flexDirection: 'row',
@@ -315,36 +484,37 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginRight: spacing[2],
+    marginRight: SPACING[3],
   },
-  activityText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    marginRight: spacing[2],
+  activityContent: {
+    flex: 1,
   },
   activityMessage: {
-    flex: 1,
-    fontSize: typography.fontSize.sm,
-    color: colors.textPrimaryDark,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.primary,
+    marginBottom: 2,
   },
-  activityIndicator: {
-    fontSize: 12,
+  activityTime: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.text.muted,
+  },
+  activityBadge: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.boundary.safe,
+    backgroundColor: `${COLORS.boundary.safe}15`,
+    paddingHorizontal: SPACING[2],
+    paddingVertical: SPACING[1],
+    borderRadius: RADIUS.sm,
   },
   footer: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[8],
+    paddingHorizontal: LAYOUT.screenPaddingH,
+    paddingBottom: LAYOUT.totalBottomSpace,
+    paddingTop: SPACING[4],
   },
-  button: {
-    backgroundColor: colors.primary,
-    height: 56,
-    borderRadius: borderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  buttonText: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
+  arrowIcon: {
+    fontSize: 18,
+    color: COLORS.text.inverse,
   },
 });
 

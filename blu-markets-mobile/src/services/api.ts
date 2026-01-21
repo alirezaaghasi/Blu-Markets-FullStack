@@ -1,29 +1,58 @@
 // API Service
 // Connects to Blu Markets backend
-import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import { API_BASE_URL } from '../constants/business';
 
 // Token storage keys
 const ACCESS_TOKEN_KEY = 'blu_access_token';
 const REFRESH_TOKEN_KEY = 'blu_refresh_token';
 
+// Cross-platform secure storage
+// Uses localStorage on web, SecureStore on native
+const storage = {
+  async setItem(key: string, value: string): Promise<void> {
+    if (Platform.OS === 'web') {
+      localStorage.setItem(key, value);
+    } else {
+      const SecureStore = await import('expo-secure-store');
+      await SecureStore.setItemAsync(key, value);
+    }
+  },
+  async getItem(key: string): Promise<string | null> {
+    if (Platform.OS === 'web') {
+      return localStorage.getItem(key);
+    } else {
+      const SecureStore = await import('expo-secure-store');
+      return await SecureStore.getItemAsync(key);
+    }
+  },
+  async removeItem(key: string): Promise<void> {
+    if (Platform.OS === 'web') {
+      localStorage.removeItem(key);
+    } else {
+      const SecureStore = await import('expo-secure-store');
+      await SecureStore.deleteItemAsync(key);
+    }
+  },
+};
+
 // Store tokens securely
 export async function storeTokens(accessToken: string, refreshToken: string): Promise<void> {
-  await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken);
-  await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
+  await storage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  await storage.setItem(REFRESH_TOKEN_KEY, refreshToken);
 }
 
 // Get stored tokens
 export async function getTokens(): Promise<{ accessToken: string | null; refreshToken: string | null }> {
-  const accessToken = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
-  const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+  const accessToken = await storage.getItem(ACCESS_TOKEN_KEY);
+  const refreshToken = await storage.getItem(REFRESH_TOKEN_KEY);
   return { accessToken, refreshToken };
 }
 
 // Clear tokens on logout
 export async function clearTokens(): Promise<void> {
-  await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
-  await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+  await storage.removeItem(ACCESS_TOKEN_KEY);
+  await storage.removeItem(REFRESH_TOKEN_KEY);
 }
 
 // API Error type

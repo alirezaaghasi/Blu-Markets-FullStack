@@ -1,5 +1,11 @@
-// Welcome Screen
-// Based on PRD Section 5 - End-to-End User Journey
+/**
+ * WelcomeScreen
+ * Design System: Blu Markets
+ * Target: iPhone 16 Pro (393 x 852)
+ *
+ * Hero screen with shield logo, tagline, features, and CTA
+ */
+
 import React from 'react';
 import {
   View,
@@ -11,38 +17,50 @@ import {
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/types';
-import { colors, typography, spacing, borderRadius } from '../../constants/theme';
+import { COLORS } from '../../constants/colors';
+import { TYPOGRAPHY } from '../../constants/typography';
+import { SPACING, RADIUS } from '../../constants/spacing';
+import { LAYOUT } from '../../constants/layout';
+import { Button } from '../../components/common';
+import { useAppDispatch } from '../../hooks/useStore';
+import { enableDemoMode } from '../../store/slices/authSlice';
+import { loadDemoData } from '../../store/slices/portfolioSlice';
+import { setDefaultPrices } from '../../store/slices/pricesSlice';
 
 type WelcomeScreenProps = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'Welcome'>;
 };
 
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
+  const dispatch = useAppDispatch();
+
+  const handleDemoMode = () => {
+    // Load demo data into Redux store
+    dispatch(setDefaultPrices()); // Set sample prices
+    dispatch(loadDemoData()); // Set sample portfolio
+    dispatch(enableDemoMode()); // Skip auth and mark onboarding complete
+    // RootNavigator will automatically show MainTabNavigator
+  };
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.bgDark} />
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.background.primary} />
 
       <View style={styles.content}>
-        {/* Logo and branding */}
+        {/* Logo with glow effect */}
         <View style={styles.logoContainer}>
-          <View style={styles.logoCircle}>
-            <Text style={styles.logoText}>B</Text>
+          <View style={styles.logoGlow}>
+            <View style={styles.logoCircle}>
+              <Text style={styles.shieldIcon}>🛡️</Text>
+            </View>
           </View>
           <Text style={styles.brandName}>Blu Markets</Text>
-        </View>
-
-        {/* Tagline */}
-        <View style={styles.taglineContainer}>
           <Text style={styles.tagline}>Markets, but mindful</Text>
-          <Text style={styles.subtitle}>
-            Grow your wealth without gambling it away
-          </Text>
         </View>
 
         {/* Features */}
         <View style={styles.featuresContainer}>
           <FeatureItem
-            icon="🛡️"
+            icon="🎯"
             title="Risk-first design"
             description="Every feature protects your future options"
           />
@@ -59,27 +77,51 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
         </View>
       </View>
 
-      {/* CTA Button */}
+      {/* Footer with CTA */}
       <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.button}
+        <Button
+          label="Get Started"
+          variant="primary"
+          size="lg"
+          fullWidth
           onPress={() => navigation.navigate('PhoneInput')}
-          activeOpacity={0.8}
+          icon={<Text style={styles.arrowIcon}>→</Text>}
+          iconPosition="right"
+        />
+
+        {/* Demo Mode Button - for testing */}
+        <TouchableOpacity
+          style={styles.demoButton}
+          onPress={handleDemoMode}
         >
-          <Text style={styles.buttonText}>Continue</Text>
+          <Text style={styles.demoButtonText}>Try Demo</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.signInLink}
+          onPress={() => navigation.navigate('PhoneInput')}
+        >
+          <Text style={styles.signInText}>
+            Already have an account?{' '}
+            <Text style={styles.signInHighlight}>Sign in</Text>
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 };
 
-const FeatureItem: React.FC<{
+interface FeatureItemProps {
   icon: string;
   title: string;
   description: string;
-}> = ({ icon, title, description }) => (
+}
+
+const FeatureItem: React.FC<FeatureItemProps> = ({ icon, title, description }) => (
   <View style={styles.featureItem}>
-    <Text style={styles.featureIcon}>{icon}</Text>
+    <View style={styles.featureIconContainer}>
+      <Text style={styles.featureIcon}>{icon}</Text>
+    </View>
     <View style={styles.featureTextContainer}>
       <Text style={styles.featureTitle}>{title}</Text>
       <Text style={styles.featureDescription}>{description}</Text>
@@ -90,93 +132,129 @@ const FeatureItem: React.FC<{
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bgDark,
+    backgroundColor: COLORS.background.primary,
   },
   content: {
     flex: 1,
-    paddingHorizontal: spacing[6],
+    paddingHorizontal: LAYOUT.screenPaddingH,
     justifyContent: 'center',
   },
+
+  // Logo Section
   logoContainer: {
     alignItems: 'center',
-    marginBottom: spacing[8],
+    marginBottom: SPACING[10],
+  },
+  logoGlow: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: `${COLORS.brand.primary}15`,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING[5],
+    // Outer glow ring
+    shadowColor: COLORS.brand.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
   },
   logoCircle: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: colors.primary,
+    backgroundColor: COLORS.brand.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing[4],
   },
-  logoText: {
+  shieldIcon: {
     fontSize: 40,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
   },
   brandName: {
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
-  },
-  taglineContainer: {
-    alignItems: 'center',
-    marginBottom: spacing[8],
+    fontSize: 32,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text.primary,
+    marginBottom: SPACING[2],
   },
   tagline: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textPrimaryDark,
-    marginBottom: spacing[2],
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    color: COLORS.text.secondary,
   },
-  subtitle: {
-    fontSize: typography.fontSize.base,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
+
+  // Features Section
   featuresContainer: {
-    gap: spacing[4],
+    gap: SPACING[3],
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: colors.cardDark,
-    padding: spacing[4],
-    borderRadius: borderRadius.default,
+    backgroundColor: COLORS.background.elevated,
+    padding: SPACING[4],
+    borderRadius: RADIUS.lg,
+  },
+  featureIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.background.input,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING[3],
   },
   featureIcon: {
     fontSize: 24,
-    marginRight: spacing[3],
   },
   featureTextContainer: {
     flex: 1,
   },
   featureTitle: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textPrimaryDark,
-    marginBottom: spacing[1],
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.primary,
+    marginBottom: SPACING[1],
   },
   featureDescription: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
+    lineHeight: TYPOGRAPHY.fontSize.sm * 1.4,
   },
+
+  // Footer Section
   footer: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[8],
+    paddingHorizontal: LAYOUT.screenPaddingH,
+    paddingBottom: LAYOUT.totalBottomSpace,
+    paddingTop: SPACING[4],
   },
-  button: {
-    backgroundColor: colors.primary,
-    height: 56,
-    borderRadius: borderRadius.full,
-    justifyContent: 'center',
+  arrowIcon: {
+    fontSize: 18,
+    color: COLORS.text.inverse,
+  },
+  demoButton: {
+    marginTop: SPACING[3],
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[6],
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     alignItems: 'center',
   },
-  buttonText: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
+  demoButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
+    color: COLORS.text.secondary,
+  },
+  signInLink: {
+    alignItems: 'center',
+    paddingVertical: SPACING[4],
+  },
+  signInText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.muted,
+  },
+  signInHighlight: {
+    color: COLORS.brand.primary,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
   },
 });
 

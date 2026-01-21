@@ -1,5 +1,12 @@
-// Dashboard Screen
-// Based on PRD Section 9.1 - Dashboard Screen
+/**
+ * DashboardScreen
+ * Design System: Blu Markets
+ * Target: iPhone 16 Pro (393 x 852)
+ *
+ * Main portfolio dashboard with Activity Feed as HERO element
+ * Uses Foundation/Growth/Upside layer naming
+ */
+
 import React, { useState } from 'react';
 import {
   View,
@@ -9,8 +16,13 @@ import {
   TouchableOpacity,
   SafeAreaView,
   RefreshControl,
+  StatusBar,
 } from 'react-native';
-import { colors, typography, spacing, borderRadius } from '../../constants/theme';
+import { COLORS, BOUNDARY_BG } from '../../constants/colors';
+import { TYPOGRAPHY } from '../../constants/typography';
+import { SPACING, RADIUS } from '../../constants/spacing';
+import { LAYOUT, DEVICE } from '../../constants/layout';
+import { Button, Badge, Card } from '../../components/common';
 import { useAppSelector, useAppDispatch } from '../../hooks/useStore';
 import usePriceWebSocket from '../../hooks/usePriceWebSocket';
 import { Layer, Holding, PortfolioStatus, AssetId } from '../../types';
@@ -41,21 +53,22 @@ const calculateHoldingValue = (
   return holding.quantity * priceUSD * fxRate;
 };
 
-// Status badge component
+// Status badge component using design system
 const StatusBadge: React.FC<{ status: PortfolioStatus }> = ({ status }) => {
-  const statusConfig = {
-    BALANCED: { text: 'Balanced', color: colors.success, icon: '✓' },
-    SLIGHTLY_OFF: { text: 'Rebalance needed', color: colors.warning, icon: '⚠' },
-    ATTENTION_REQUIRED: { text: 'Attention required', color: colors.error, icon: '!' },
+  const badgeVariant = {
+    BALANCED: 'boundary-safe' as const,
+    SLIGHTLY_OFF: 'boundary-drift' as const,
+    ATTENTION_REQUIRED: 'boundary-stress' as const,
   };
 
-  const config = statusConfig[status];
+  const statusText = {
+    BALANCED: 'Balanced',
+    SLIGHTLY_OFF: 'Rebalance needed',
+    ATTENTION_REQUIRED: 'Attention required',
+  };
 
   return (
-    <View style={[styles.statusBadge, { backgroundColor: `${config.color}20` }]}>
-      <Text style={styles.statusIcon}>{config.icon}</Text>
-      <Text style={[styles.statusText, { color: config.color }]}>{config.text}</Text>
-    </View>
+    <Badge variant={badgeVariant[status]} size="md" label={statusText[status]} />
   );
 };
 
@@ -73,7 +86,7 @@ const ConnectionIndicator: React.FC<{ isConnected: boolean; updatedAt: string }>
       <View
         style={[
           styles.connectionDot,
-          { backgroundColor: isConnected ? colors.success : colors.textSecondary },
+          { backgroundColor: isConnected ? COLORS.semantic.success : COLORS.text.muted },
         ]}
       />
       <Text style={styles.connectionText}>
@@ -161,6 +174,7 @@ const DashboardScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.background.primary} />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -168,7 +182,7 @@ const DashboardScreen: React.FC = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.primary}
+            tintColor={COLORS.brand.primary}
           />
         }
       >
@@ -186,7 +200,12 @@ const DashboardScreen: React.FC = () => {
           <StatusBadge status={status} />
         </View>
 
-        {/* Hero - Total Value */}
+        {/* Activity Feed - HERO element (40% above fold, first visible content) */}
+        <View style={styles.activitySection}>
+          <ActivityFeed entries={actionLog} maxEntries={5} />
+        </View>
+
+        {/* Portfolio Value */}
         <View style={styles.heroContainer}>
           <Text style={styles.heroLabel}>Total Portfolio Value</Text>
           <Text style={styles.heroValue}>{formatNumber(totalValueIRR)} IRR</Text>
@@ -213,11 +232,6 @@ const DashboardScreen: React.FC = () => {
             </Text>
           </View>
         )}
-
-        {/* Activity Feed */}
-        <View style={styles.section}>
-          <ActivityFeed entries={actionLog} maxEntries={5} />
-        </View>
 
         {/* Holdings by Layer */}
         {(['FOUNDATION', 'GROWTH', 'UPSIDE'] as Layer[]).map((layer) => {
@@ -252,27 +266,20 @@ const DashboardScreen: React.FC = () => {
 
       {/* Sticky Footer */}
       <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.secondaryButton}
+        <Button
+          label="Add Funds"
+          variant="secondary"
+          size="lg"
           onPress={() => setShowAddFundsSheet(true)}
-        >
-          <Text style={styles.secondaryButtonText}>Add Funds</Text>
-        </TouchableOpacity>
-        {showRebalanceButton ? (
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={() => setShowRebalanceSheet(true)}
-          >
-            <Text style={styles.primaryButtonText}>Rebalance</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={() => handleTrade(undefined, 'BUY')}
-          >
-            <Text style={styles.primaryButtonText}>Trade</Text>
-          </TouchableOpacity>
-        )}
+          style={styles.footerButton}
+        />
+        <Button
+          label={showRebalanceButton ? 'Rebalance' : 'Trade'}
+          variant="primary"
+          size="lg"
+          onPress={() => showRebalanceButton ? setShowRebalanceSheet(true) : handleTrade(undefined, 'BUY')}
+          style={styles.footerButton}
+        />
       </View>
 
       {/* Trade Bottom Sheet */}
@@ -299,7 +306,7 @@ const DashboardScreen: React.FC = () => {
 };
 
 // Layer Accordion Component
-const LayerAccordion: React.FC<{
+interface LayerAccordionProps {
   layer: Layer;
   holdings: Holding[];
   totalValue: number;
@@ -307,8 +314,25 @@ const LayerAccordion: React.FC<{
   prices: Record<string, number>;
   fxRate: number;
   onHoldingPress?: (holding: Holding) => void;
-}> = ({ layer, holdings, totalValue, percentage, prices, fxRate, onHoldingPress }) => {
+}
+
+const LayerAccordion: React.FC<LayerAccordionProps> = ({
+  layer,
+  holdings,
+  totalValue,
+  percentage,
+  prices,
+  fxRate,
+  onHoldingPress,
+}) => {
   const [expanded, setExpanded] = React.useState(true);
+
+  // Get layer color from design system
+  const layerColorMap: Record<Layer, string> = {
+    FOUNDATION: COLORS.layers.foundation,
+    GROWTH: COLORS.layers.growth,
+    UPSIDE: COLORS.layers.upside,
+  };
 
   return (
     <View style={styles.layerSection}>
@@ -321,11 +345,11 @@ const LayerAccordion: React.FC<{
           <View
             style={[
               styles.layerDot,
-              { backgroundColor: LAYER_COLORS[layer] },
+              { backgroundColor: layerColorMap[layer] },
             ]}
           />
           <Text style={styles.layerName}>{LAYER_NAMES[layer]}</Text>
-          <Text style={styles.layerPercentage}>
+          <Text style={[styles.layerPercentage, { color: layerColorMap[layer] }]}>
             {Math.round(percentage * 100)}%
           </Text>
         </View>
@@ -355,110 +379,104 @@ const LayerAccordion: React.FC<{
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bgDark,
+    backgroundColor: COLORS.background.primary,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: spacing[4],
-    paddingBottom: 120,
+    paddingHorizontal: LAYOUT.screenPaddingH,
+    paddingTop: SPACING[4],
+    paddingBottom: LAYOUT.totalBottomSpace + 80, // Extra space for footer
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing[6],
+    marginBottom: SPACING[6],
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   logoCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.primary,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.brand.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing[2],
+    marginRight: SPACING[3],
   },
   logoText: {
-    fontSize: 18,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
+    fontSize: 20,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text.inverse,
   },
   headerTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing[3],
-    paddingVertical: spacing[1],
-    borderRadius: borderRadius.full,
-  },
-  statusIcon: {
-    fontSize: 12,
-    marginRight: spacing[1],
-  },
-  statusText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text.primary,
   },
   heroContainer: {
     alignItems: 'center',
-    marginBottom: spacing[6],
+    marginBottom: SPACING[6],
+    padding: SPACING[5],
+    backgroundColor: COLORS.background.elevated,
+    borderRadius: RADIUS.xl,
   },
   heroLabel: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    marginBottom: spacing[1],
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
+    marginBottom: SPACING[1],
   },
   heroValue: {
-    fontSize: typography.fontSize['4xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
+    fontSize: 36,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text.primary,
   },
   cashLabel: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    marginTop: spacing[1],
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.muted,
+    marginTop: SPACING[1],
   },
   section: {
-    marginBottom: spacing[4],
+    marginBottom: SPACING[4],
+  },
+  activitySection: {
+    marginBottom: SPACING[4],
+    // Activity Feed is HERO - prominent placement
   },
   alertBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: `${colors.warning}15`,
-    borderRadius: borderRadius.default,
-    padding: spacing[3],
-    marginBottom: spacing[4],
+    backgroundColor: BOUNDARY_BG.drift,
+    borderRadius: RADIUS.lg,
+    padding: SPACING[4],
+    marginBottom: SPACING[4],
     borderWidth: 1,
-    borderColor: `${colors.warning}30`,
+    borderColor: `${COLORS.boundary.drift}30`,
   },
   alertIcon: {
     fontSize: 16,
-    marginRight: spacing[2],
+    marginRight: SPACING[2],
   },
   alertText: {
     flex: 1,
-    fontSize: typography.fontSize.sm,
-    color: colors.warning,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.boundary.drift,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
   },
   layerSection: {
-    marginBottom: spacing[4],
+    marginBottom: SPACING[4],
   },
   layerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: colors.cardDark,
-    borderRadius: borderRadius.default,
-    padding: spacing[4],
+    backgroundColor: COLORS.background.elevated,
+    borderRadius: RADIUS.lg,
+    padding: SPACING[4],
   },
   layerHeaderLeft: {
     flexDirection: 'row',
@@ -468,53 +486,56 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    marginRight: spacing[2],
+    marginRight: SPACING[2],
   },
   layerName: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textPrimaryDark,
-    marginRight: spacing[2],
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.primary,
+    marginRight: SPACING[2],
   },
   layerPercentage: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
   },
   layerHeaderRight: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   layerValue: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textPrimaryDark,
-    marginRight: spacing[2],
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.primary,
+    marginRight: SPACING[2],
   },
   expandIcon: {
     fontSize: 12,
-    color: colors.textSecondary,
+    color: COLORS.text.muted,
   },
   holdingsList: {
-    marginTop: spacing[2],
-    gap: spacing[2],
+    marginTop: SPACING[2],
+    gap: SPACING[2],
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: spacing[8],
+    paddingVertical: SPACING[10],
+    paddingHorizontal: SPACING[6],
+    backgroundColor: COLORS.background.elevated,
+    borderRadius: RADIUS.xl,
   },
   emptyIcon: {
     fontSize: 48,
-    marginBottom: spacing[4],
+    marginBottom: SPACING[4],
   },
   emptyTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textPrimaryDark,
-    marginBottom: spacing[2],
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.primary,
+    marginBottom: SPACING[2],
   },
   emptySubtitle: {
-    fontSize: typography.fontSize.base,
-    color: colors.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.text.secondary,
     textAlign: 'center',
   },
   footer: {
@@ -523,40 +544,16 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: 'row',
-    padding: spacing[4],
-    paddingBottom: spacing[8],
-    backgroundColor: colors.bgDark,
+    paddingHorizontal: LAYOUT.screenPaddingH,
+    paddingTop: SPACING[3],
+    paddingBottom: LAYOUT.totalBottomSpace,
+    backgroundColor: COLORS.background.primary,
     borderTopWidth: 1,
-    borderTopColor: colors.borderDark,
-    gap: spacing[3],
+    borderTopColor: COLORS.border,
+    gap: SPACING[3],
   },
-  secondaryButton: {
+  footerButton: {
     flex: 1,
-    height: 56,
-    backgroundColor: colors.surfaceDark,
-    borderRadius: borderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.borderDark,
-  },
-  secondaryButtonText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
-  },
-  primaryButton: {
-    flex: 1,
-    height: 56,
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
   },
   connectionIndicator: {
     flexDirection: 'row',
@@ -570,8 +567,8 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   connectionText: {
-    fontSize: typography.fontSize.xs,
-    color: colors.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.text.muted,
   },
 });
 

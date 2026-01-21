@@ -1,5 +1,12 @@
-// Profile Result Screen
-// Based on PRD Section 5 - Shows risk profile with donut chart visualization
+/**
+ * ProfileResultScreen
+ * Design System: Blu Markets
+ * Target: iPhone 16 Pro (393 x 852)
+ *
+ * Shows calculated risk profile with donut chart visualization
+ * Uses Foundation/Growth/Upside layer naming
+ */
+
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -9,10 +16,15 @@ import {
   SafeAreaView,
   Dimensions,
   ActivityIndicator,
+  StatusBar,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/types';
-import { colors, typography, spacing, borderRadius } from '../../constants/theme';
+import { COLORS } from '../../constants/colors';
+import { TYPOGRAPHY } from '../../constants/typography';
+import { SPACING, RADIUS } from '../../constants/spacing';
+import { LAYOUT, DEVICE } from '../../constants/layout';
+import { Button, Card } from '../../components/common';
 import { useAppDispatch, useAppSelector } from '../../hooks/useStore';
 import { setRiskProfile } from '../../store/slices/onboardingSlice';
 import { formatAllocation } from '../../utils/riskProfile';
@@ -76,11 +88,21 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation })
     submitQuestionnaire();
   }, [answers, dispatch]);
 
+  // Helper to get Farsi profile name
+  function getProfileNameFarsi(score: number): string {
+    if (score <= 2) return 'حفظ سرمایه';
+    if (score <= 4) return 'محتاط';
+    if (score <= 6) return 'متعادل';
+    if (score <= 8) return 'رشدگرا';
+    return 'جسور';
+  }
+
   if (isLoading || !riskProfile) {
     return (
       <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.background.primary} />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={COLORS.brand.primary} />
           <Text style={styles.loadingText}>Calculating your profile...</Text>
         </View>
       </SafeAreaView>
@@ -90,43 +112,40 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation })
   if (error) {
     return (
       <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.background.primary} />
         <View style={styles.loadingContainer}>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity
-            style={styles.retryButton}
+          <Button
+            label="Go Back"
+            variant="primary"
+            size="md"
             onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.retryButtonText}>Go Back</Text>
-          </TouchableOpacity>
+          />
         </View>
       </SafeAreaView>
     );
-  }
-
-  // Helper to get Farsi profile name
-  function getProfileNameFarsi(score: number): string {
-    if (score <= 2) return 'محافظه‌کار';
-    if (score <= 4) return 'محتاط';
-    if (score <= 6) return 'متعادل';
-    if (score <= 8) return 'رشدگرا';
-    return 'جسور';
   }
 
   const allocation = formatAllocation(riskProfile.targetAllocation);
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Back button */}
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => navigation.goBack()}
-      >
-        <Text style={styles.backButtonText}>← Back</Text>
-      </TouchableOpacity>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.background.primary} />
+
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          <Text style={styles.backIcon}>←</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.content}>
-        {/* Profile title in Farsi */}
-        <View style={styles.header}>
+        {/* Profile title */}
+        <View style={styles.titleContainer}>
           <Text style={styles.profileLabelFarsi}>
             شما یک سرمایه‌گذار {riskProfile.profileNameFarsi} هستید
           </Text>
@@ -135,16 +154,16 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation })
           </Text>
         </View>
 
-        {/* Donut chart visualization */}
+        {/* Chart and score */}
         <View style={styles.chartContainer}>
-          <DonutChart
+          <AllocationBar
             foundation={riskProfile.targetAllocation.FOUNDATION}
             growth={riskProfile.targetAllocation.GROWTH}
             upside={riskProfile.targetAllocation.UPSIDE}
           />
-          <View style={styles.chartCenter}>
-            <Text style={styles.chartCenterScore}>{riskProfile.score}</Text>
-            <Text style={styles.chartCenterLabel}>Risk Score</Text>
+          <View style={styles.scoreContainer}>
+            <Text style={styles.scoreValue}>{riskProfile.score}</Text>
+            <Text style={styles.scoreLabel}>Risk Score</Text>
           </View>
         </View>
 
@@ -154,94 +173,109 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation })
             label="Foundation"
             labelFa="پایه"
             percentage={allocation.foundation}
-            color={colors.layerFoundation}
+            color={COLORS.layers.foundation}
             description="Stable assets for security"
           />
           <AllocationItem
             label="Growth"
             labelFa="رشد"
             percentage={allocation.growth}
-            color={colors.layerGrowth}
+            color={COLORS.layers.growth}
             description="Balanced growth potential"
           />
           <AllocationItem
             label="Upside"
             labelFa="صعود"
             percentage={allocation.upside}
-            color={colors.layerUpside}
+            color={COLORS.layers.upside}
             description="High-risk, high-reward"
           />
         </View>
       </View>
 
-      {/* CTA Button */}
+      {/* Footer */}
       <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.button}
+        <Button
+          label="This looks right"
+          variant="primary"
+          size="lg"
+          fullWidth
           onPress={() => navigation.navigate('Consent')}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.buttonText}>This looks right</Text>
-        </TouchableOpacity>
+          icon={<Text style={styles.arrowIcon}>→</Text>}
+          iconPosition="right"
+        />
       </View>
     </SafeAreaView>
   );
 };
 
-// Simple Donut Chart using Views
-const DonutChart: React.FC<{
+// Allocation Bar Component
+interface AllocationBarProps {
   foundation: number;
   growth: number;
   upside: number;
-}> = ({ foundation, growth, upside }) => {
-  const size = width * 0.6;
-  const strokeWidth = 24;
+}
 
-  // Calculate angles
-  const foundationAngle = foundation * 360;
-  const growthAngle = growth * 360;
-  const upsideAngle = upside * 360;
-
+const AllocationBar: React.FC<AllocationBarProps> = ({ foundation, growth, upside }) => {
   return (
-    <View style={[styles.donutContainer, { width: size, height: size }]}>
-      {/* Foundation segment */}
-      <View
-        style={[
-          styles.donutSegment,
-          {
-            width: size,
-            height: size,
-            borderWidth: strokeWidth,
-            borderColor: colors.layerFoundation,
-            borderRightColor: 'transparent',
-            borderBottomColor: foundation > 0.25 ? colors.layerFoundation : 'transparent',
-            transform: [{ rotate: '-45deg' }],
-          },
-        ]}
-      />
-      {/* Simplified visualization with stacked bar */}
-      <View style={styles.donutOverlay}>
-        <View style={[styles.donutBar, { backgroundColor: colors.layerFoundation, flex: foundation }]} />
-        <View style={[styles.donutBar, { backgroundColor: colors.layerGrowth, flex: growth }]} />
-        <View style={[styles.donutBar, { backgroundColor: colors.layerUpside, flex: upside }]} />
+    <View style={styles.barContainer}>
+      <View style={styles.barOuter}>
+        <View
+          style={[
+            styles.barSegment,
+            { backgroundColor: COLORS.layers.foundation, flex: foundation },
+          ]}
+        />
+        <View
+          style={[
+            styles.barSegment,
+            { backgroundColor: COLORS.layers.growth, flex: growth },
+          ]}
+        />
+        <View
+          style={[
+            styles.barSegment,
+            { backgroundColor: COLORS.layers.upside, flex: upside },
+          ]}
+        />
+      </View>
+      <View style={styles.barLabels}>
+        <Text style={[styles.barLabel, { color: COLORS.layers.foundation }]}>
+          {Math.round(foundation * 100)}%
+        </Text>
+        <Text style={[styles.barLabel, { color: COLORS.layers.growth }]}>
+          {Math.round(growth * 100)}%
+        </Text>
+        <Text style={[styles.barLabel, { color: COLORS.layers.upside }]}>
+          {Math.round(upside * 100)}%
+        </Text>
       </View>
     </View>
   );
 };
 
-const AllocationItem: React.FC<{
+// Allocation Item Component
+interface AllocationItemProps {
   label: string;
   labelFa: string;
   percentage: string;
   color: string;
   description: string;
-}> = ({ label, labelFa, percentage, color, description }) => (
+}
+
+const AllocationItem: React.FC<AllocationItemProps> = ({
+  label,
+  labelFa,
+  percentage,
+  color,
+  description,
+}) => (
   <View style={styles.allocationItem}>
     <View style={[styles.allocationDot, { backgroundColor: color }]} />
     <View style={styles.allocationTextContainer}>
       <View style={styles.allocationHeader}>
         <Text style={styles.allocationLabel}>{label}</Text>
-        <Text style={styles.allocationPercentage}>{percentage}</Text>
+        <Text style={[styles.allocationPercentage, { color }]}>{percentage}</Text>
       </View>
       <Text style={styles.allocationDescription}>{description}</Text>
     </View>
@@ -251,117 +285,120 @@ const AllocationItem: React.FC<{
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bgDark,
+    backgroundColor: COLORS.background.primary,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: LAYOUT.screenPaddingH,
   },
   loadingText: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.lg,
-    marginTop: spacing[4],
+    color: COLORS.text.secondary,
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    marginTop: SPACING[4],
   },
   errorText: {
-    color: colors.error,
-    fontSize: typography.fontSize.base,
+    color: COLORS.semantic.error,
+    fontSize: TYPOGRAPHY.fontSize.base,
     textAlign: 'center',
-    marginBottom: spacing[4],
+    marginBottom: SPACING[4],
   },
-  retryButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing[6],
-    paddingVertical: spacing[3],
-    borderRadius: borderRadius.full,
-  },
-  retryButtonText: {
-    color: colors.textPrimaryDark,
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
+  header: {
+    paddingHorizontal: LAYOUT.screenPaddingH,
+    paddingTop: SPACING[2],
+    paddingBottom: SPACING[4],
   },
   backButton: {
-    paddingHorizontal: spacing[6],
-    paddingVertical: spacing[4],
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.background.elevated,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  backButtonText: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.base,
+  backIcon: {
+    fontSize: 20,
+    color: COLORS.text.primary,
   },
   content: {
     flex: 1,
-    paddingHorizontal: spacing[6],
+    paddingHorizontal: LAYOUT.screenPaddingH,
   },
-  header: {
+  titleContainer: {
     alignItems: 'center',
-    marginBottom: spacing[8],
+    marginBottom: SPACING[6],
   },
   profileLabelFarsi: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text.primary,
     textAlign: 'center',
     writingDirection: 'rtl',
-    marginBottom: spacing[2],
+    marginBottom: SPACING[2],
   },
   profileLabelEn: {
-    fontSize: typography.fontSize.base,
-    color: colors.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.text.secondary,
     textAlign: 'center',
   },
   chartContainer: {
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing[8],
-    position: 'relative',
+    marginBottom: SPACING[6],
+    padding: SPACING[5],
+    backgroundColor: COLORS.background.elevated,
+    borderRadius: RADIUS.xl,
   },
-  donutContainer: {
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
+  barContainer: {
+    width: '100%',
+    marginBottom: SPACING[4],
   },
-  donutSegment: {
-    position: 'absolute',
-    borderRadius: 9999,
-  },
-  donutOverlay: {
-    width: '80%',
-    height: 16,
-    borderRadius: 8,
+  barOuter: {
+    height: 24,
+    borderRadius: RADIUS.md,
     flexDirection: 'row',
     overflow: 'hidden',
+    marginBottom: SPACING[2],
   },
-  donutBar: {
+  barSegment: {
     height: '100%',
   },
-  chartCenter: {
-    position: 'absolute',
+  barLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  barLabel: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+  },
+  scoreContainer: {
     alignItems: 'center',
+    marginTop: SPACING[2],
   },
-  chartCenterScore: {
-    fontSize: typography.fontSize['4xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
+  scoreValue: {
+    fontSize: 48,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text.primary,
   },
-  chartCenterLabel: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+  scoreLabel: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.muted,
   },
   allocationContainer: {
-    gap: spacing[4],
+    gap: SPACING[3],
   },
   allocationItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: colors.cardDark,
-    padding: spacing[4],
-    borderRadius: borderRadius.default,
+    backgroundColor: COLORS.background.elevated,
+    padding: SPACING[4],
+    borderRadius: RADIUS.lg,
   },
   allocationDot: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    marginRight: spacing[3],
+    marginRight: SPACING[3],
     marginTop: 4,
   },
   allocationTextContainer: {
@@ -371,37 +408,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing[1],
+    marginBottom: SPACING[1],
   },
   allocationLabel: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textPrimaryDark,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.primary,
   },
   allocationPercentage: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
   },
   allocationDescription: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
   },
   footer: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[8],
+    paddingHorizontal: LAYOUT.screenPaddingH,
+    paddingBottom: LAYOUT.totalBottomSpace,
+    paddingTop: SPACING[4],
   },
-  button: {
-    backgroundColor: colors.primary,
-    height: 56,
-    borderRadius: borderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  buttonText: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
+  arrowIcon: {
+    fontSize: 18,
+    color: COLORS.text.inverse,
   },
 });
 

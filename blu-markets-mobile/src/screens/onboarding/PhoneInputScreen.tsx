@@ -1,5 +1,11 @@
-// Phone Input Screen
-// Based on PRD Section 30 - Onboarding Rules
+/**
+ * PhoneInputScreen
+ * Design System: Blu Markets
+ * Target: iPhone 16 Pro (393 x 852)
+ *
+ * Phone number entry with +98 prefix
+ */
+
 import React, { useState } from 'react';
 import {
   View,
@@ -7,14 +13,17 @@ import {
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
-  TextInput,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
+  StatusBar,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/types';
-import { colors, typography, spacing, borderRadius } from '../../constants/theme';
+import { COLORS } from '../../constants/colors';
+import { TYPOGRAPHY } from '../../constants/typography';
+import { SPACING, RADIUS } from '../../constants/spacing';
+import { LAYOUT, DEVICE } from '../../constants/layout';
+import { Button, Input } from '../../components/common';
 import { useAppDispatch } from '../../hooks/useStore';
 import { setPhone } from '../../store/slices/onboardingSlice';
 import { IRAN_PHONE_PREFIX } from '../../constants/business';
@@ -30,17 +39,8 @@ const PhoneInputScreen: React.FC<PhoneInputScreenProps> = ({ navigation }) => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const formatPhoneDisplay = (value: string) => {
-    // Format: 9XX XXX XXXX
-    const cleaned = value.replace(/\D/g, '');
-    if (cleaned.length <= 3) return cleaned;
-    if (cleaned.length <= 6) return `${cleaned.slice(0, 3)} ${cleaned.slice(3)}`;
-    return `${cleaned.slice(0, 3)} ${cleaned.slice(3, 6)} ${cleaned.slice(6, 10)}`;
-  };
-
   const handlePhoneChange = (value: string) => {
-    const cleaned = value.replace(/\D/g, '').slice(0, 10);
-    setPhoneNumber(cleaned);
+    setPhoneNumber(value);
     setError('');
   };
 
@@ -83,63 +83,53 @@ const PhoneInputScreen: React.FC<PhoneInputScreenProps> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.background.primary} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        {/* Back button */}
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>← Back</Text>
-        </TouchableOpacity>
+        {/* Header with back button */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Text style={styles.backIcon}>←</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.content}>
-          {/* Header */}
-          <View style={styles.header}>
+          {/* Title */}
+          <View style={styles.titleContainer}>
             <Text style={styles.title}>Enter your phone number</Text>
             <Text style={styles.subtitle}>
               We'll send you a verification code
             </Text>
           </View>
 
-          {/* Phone input */}
-          <View style={styles.inputContainer}>
-            <View style={styles.prefixContainer}>
-              <Text style={styles.flag}>🇮🇷</Text>
-              <Text style={styles.prefix}>+98</Text>
-            </View>
-            <TextInput
-              style={styles.input}
-              value={formatPhoneDisplay(phoneNumber)}
-              onChangeText={handlePhoneChange}
-              placeholder="9XX XXX XXXX"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="phone-pad"
-              maxLength={12}
-              autoFocus
-            />
-          </View>
-
-          {/* Error message */}
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {/* Phone input using design system */}
+          <Input
+            variant="phone"
+            value={phoneNumber}
+            onChangeText={handlePhoneChange}
+            placeholder="912 345 6789"
+            error={error}
+            autoFocus
+          />
         </View>
 
-        {/* CTA Button */}
+        {/* Footer with CTA */}
         <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.button, (!isValid || isLoading) && styles.buttonDisabled]}
+          <Button
+            label="Send OTP"
+            variant="primary"
+            size="lg"
+            fullWidth
             onPress={handleContinue}
-            activeOpacity={0.8}
-            disabled={!isValid || isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color={colors.textPrimaryDark} />
-            ) : (
-              <Text style={styles.buttonText}>Send OTP</Text>
-            )}
-          </TouchableOpacity>
+            loading={isLoading}
+            disabled={!isValid}
+          />
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -149,92 +139,49 @@ const PhoneInputScreen: React.FC<PhoneInputScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bgDark,
+    backgroundColor: COLORS.background.primary,
   },
   keyboardView: {
     flex: 1,
   },
-  backButton: {
-    paddingHorizontal: spacing[6],
-    paddingVertical: spacing[4],
-  },
-  backButtonText: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.base,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: spacing[6],
-  },
   header: {
-    marginBottom: spacing[8],
+    paddingHorizontal: LAYOUT.screenPaddingH,
+    paddingTop: SPACING[2],
+    paddingBottom: SPACING[4],
   },
-  title: {
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
-    marginBottom: spacing[2],
-  },
-  subtitle: {
-    fontSize: typography.fontSize.base,
-    color: colors.textSecondary,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.cardDark,
-    borderRadius: borderRadius.default,
-    paddingHorizontal: spacing[4],
-    borderWidth: 1,
-    borderColor: colors.borderDark,
-  },
-  prefixContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingRight: spacing[3],
-    borderRightWidth: 1,
-    borderRightColor: colors.borderDark,
-    marginRight: spacing[3],
-  },
-  flag: {
-    fontSize: 20,
-    marginRight: spacing[2],
-  },
-  prefix: {
-    fontSize: typography.fontSize.lg,
-    color: colors.textPrimaryDark,
-    fontWeight: typography.fontWeight.medium,
-  },
-  input: {
-    flex: 1,
-    height: 56,
-    fontSize: typography.fontSize.lg,
-    color: colors.textPrimaryDark,
-    fontWeight: typography.fontWeight.medium,
-  },
-  errorText: {
-    color: colors.error,
-    fontSize: typography.fontSize.sm,
-    marginTop: spacing[2],
-  },
-  footer: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[8],
-  },
-  button: {
-    backgroundColor: colors.primary,
-    height: 56,
-    borderRadius: borderRadius.full,
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.background.elevated,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  buttonDisabled: {
-    backgroundColor: colors.surfaceDark,
+  backIcon: {
+    fontSize: 20,
+    color: COLORS.text.primary,
   },
-  buttonText: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
+  content: {
+    flex: 1,
+    paddingHorizontal: LAYOUT.screenPaddingH,
+  },
+  titleContainer: {
+    marginBottom: SPACING[8],
+  },
+  title: {
+    fontSize: TYPOGRAPHY.fontSize['2xl'],
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text.primary,
+    marginBottom: SPACING[2],
+  },
+  subtitle: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.text.secondary,
+  },
+  footer: {
+    paddingHorizontal: LAYOUT.screenPaddingH,
+    paddingBottom: LAYOUT.totalBottomSpace,
+    paddingTop: SPACING[4],
   },
 });
 

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>History Empty State</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&amp;family=Noto+Sans:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#6FAAF8",
+                        "background-light": "#f5f7f8",
+                        "background-dark": "#0E1420",
+                        "muted-gray": "#9AA4B2",
+                        "surface-dark": "#18212F",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "Noto Sans", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .icon-filled {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-white overflow-hidden">
+<div class="relative flex h-full min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+<!-- Top Navigation -->
+<header class="flex items-center justify-between px-4 pt-12 pb-4 bg-background-light dark:bg-background-dark sticky top-0 z-10">
+<button class="flex items-center justify-center size-10 rounded-full hover:bg-surface-dark transition-colors">
+<span class="material-symbols-outlined text-white text-2xl">arrow_back</span>
+</button>
+<h2 class="text-white text-[20px] font-bold leading-tight tracking-[-0.015em] text-center">Your History</h2>
+<button class="flex items-center justify-end px-2" disabled="">
+<p class="text-muted-gray/50 text-base font-bold leading-normal tracking-[0.015em] shrink-0">Export CSV</p>
+</button>
+</header>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col items-center justify-center px-6 pb-24 overflow-y-auto">
+<!-- Empty State Illustration & Text -->
+<div class="flex flex-col items-center gap-6 mb-10 w-full max-w-[320px]">
+<div class="flex items-center justify-center size-[100px] rounded-full bg-primary/5 mb-2">
+<span class="material-symbols-outlined text-primary/40 text-[64px]" style="font-size: 64px;">schedule</span>
+</div>
+<div class="flex flex-col items-center gap-3 text-center">
+<h3 class="text-white text-[20px] font-bold leading-tight">No Activity Yet</h3>
+<p class="text-muted-gray text-[15px] font-normal leading-relaxed">
+                        Your trades, deposits, protections, and other activities will appear here.
+                    </p>
+</div>
+</div>
+<!-- Educational List -->
+<div class="w-full max-w-[320px] flex flex-col gap-3">
+<!-- List Item 1 -->
+<div class="flex items-center gap-3 py-1">
+<div class="flex items-center justify-center rounded-full bg-surface-dark shrink-0 size-8 text-muted-gray">
+<span class="material-symbols-outlined text-[18px]">swap_horiz</span>
+</div>
+<p class="text-muted-gray text-[13px] font-medium leading-normal">Trades &amp; swaps</p>
+</div>
+<!-- List Item 2 -->
+<div class="flex items-center gap-3 py-1">
+<div class="flex items-center justify-center rounded-full bg-surface-dark shrink-0 size-8 text-muted-gray">
+<span class="material-symbols-outlined text-[18px]">account_balance_wallet</span>
+</div>
+<p class="text-muted-gray text-[13px] font-medium leading-normal">Deposits &amp; withdrawals</p>
+</div>
+<!-- List Item 3 -->
+<div class="flex items-center gap-3 py-1">
+<div class="flex items-center justify-center rounded-full bg-surface-dark shrink-0 size-8 text-muted-gray">
+<span class="material-symbols-outlined text-[18px]">balance</span>
+</div>
+<p class="text-muted-gray text-[13px] font-medium leading-normal">Rebalances</p>
+</div>
+<!-- List Item 4 -->
+<div class="flex items-center gap-3 py-1">
+<div class="flex items-center justify-center rounded-full bg-surface-dark shrink-0 size-8 text-muted-gray">
+<span class="material-symbols-outlined text-[18px]">verified_user</span>
+</div>
+<p class="text-muted-gray text-[13px] font-medium leading-normal">Protection purchases</p>
+</div>
+</div>
+<!-- CTA Button -->
+<div class="w-full max-w-[320px] mt-10">
+<button class="w-full bg-primary hover:bg-primary/90 text-[#0E1420] text-base font-bold h-12 rounded-full transition-all active:scale-[0.98]">
+                    Make Your First Trade
+                </button>
+</div>
+</main>
+<!-- Bottom Navigation -->
+<nav class="bg-[#0E1420]/95 backdrop-blur-md border-t border-white/5 pb-6 pt-2 px-2 fixed bottom-0 w-full z-50">
+<div class="grid grid-cols-5 items-center">
+<!-- Home -->
+<a class="flex flex-col items-center gap-1 p-2 group" href="#">
+<span class="material-symbols-outlined text-muted-gray group-hover:text-white transition-colors">home</span>
+<span class="text-[10px] font-medium text-muted-gray group-hover:text-white">Home</span>
+</a>
+<!-- Portfolio -->
+<a class="flex flex-col items-center gap-1 p-2 group" href="#">
+<span class="material-symbols-outlined text-muted-gray group-hover:text-white transition-colors">pie_chart</span>
+<span class="text-[10px] font-medium text-muted-gray group-hover:text-white">Portfolio</span>
+</a>
+<!-- Market -->
+<a class="flex flex-col items-center gap-1 p-2 group" href="#">
+<span class="material-symbols-outlined text-muted-gray group-hover:text-white transition-colors">show_chart</span>
+<span class="text-[10px] font-medium text-muted-gray group-hover:text-white">Market</span>
+</a>
+<!-- History (Active) -->
+<a class="flex flex-col items-center gap-1 p-2" href="#">
+<span class="material-symbols-outlined text-primary icon-filled">history</span>
+<span class="text-[10px] font-bold text-primary">History</span>
+</a>
+<!-- Profile -->
+<a class="flex flex-col items-center gap-1 p-2 group" href="#">
+<span class="material-symbols-outlined text-muted-gray group-hover:text-white transition-colors">person</span>
+<span class="text-[10px] font-medium text-muted-gray group-hover:text-white">Profile</span>
+</a>
+</div>
+</nav>
+</div>
+</body></html>

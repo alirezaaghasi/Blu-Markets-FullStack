@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Withdraw Funds</title>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Font: Manrope -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Theme Configuration -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#6da9f8",
+                        "background-light": "#f5f7f8",
+                        "background-dark": "#101822",
+                        "sheet-bg": "#1C2433",
+                        "card-bg": "#151C28",
+                        "cta-blue": "#6FAAF8",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "2xl": "1rem", "3xl": "1.5rem", "full": "9999px"},
+                    animation: {
+                        'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        /* Custom scrollbar hide for cleaner UI */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display antialiased overflow-hidden selection:bg-primary/30 selection:text-white h-screen w-full relative">
+<!-- Background App Content (Simulated Dashboard underneath) -->
+<div aria-hidden="true" class="flex flex-col h-full w-full opacity-30 pointer-events-none">
+<div class="px-6 pt-12 pb-6 flex justify-between items-center">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-slate-700" data-alt="User avatar placeholder" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDb4wwbXkRT1c5dhgqGUYEHS_7vxxILe9SdsLiQDtToohsWFJIPuhkZhJOws0mHv7gpKgVOwD-oaKzewT6UuF2MstC8swU7mz8-zb-9ZPZsSZT_u0r-JpOZ5seJbsUzk00bz7idAXh52Up1W1xZRtYE6a68jyoL5IVJ_ZSXkBUBkRnP48vxglnRdO8Mor9EphHQHAJoA6ayNBMoMtQKUI1ux-Y4w_O61dprpHyvjCcuDOgzyi8BKnvms7EC-O0lqeIpSMFYAL8rcfpG')"></div>
+<div>
+<div class="h-4 w-24 bg-slate-700 rounded mb-1"></div>
+<div class="h-3 w-16 bg-slate-700/60 rounded"></div>
+</div>
+</div>
+<span class="material-symbols-outlined text-white">notifications</span>
+</div>
+<div class="px-6">
+<div class="h-48 w-full bg-slate-800 rounded-2xl mb-6"></div>
+<div class="flex gap-4 mb-6">
+<div class="h-24 flex-1 bg-slate-800 rounded-xl"></div>
+<div class="h-24 flex-1 bg-slate-800 rounded-xl"></div>
+</div>
+<div class="h-64 w-full bg-slate-800 rounded-2xl"></div>
+</div>
+</div>
+<!-- Backdrop -->
+<div class="fixed inset-0 bg-[#0f151e]/80 backdrop-blur-sm z-40 transition-opacity"></div>
+<!-- Bottom Sheet -->
+<div class="fixed bottom-0 left-0 right-0 z-50 flex flex-col h-[85vh] md:h-[800px] md:max-h-[90vh] bg-sheet-bg rounded-t-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.5)] transform transition-transform duration-300 ease-out translate-y-0 pb-safe">
+<!-- Sheet Handle -->
+<div class="w-full flex justify-center pt-3 pb-2 flex-shrink-0 cursor-grab active:cursor-grabbing">
+<div class="h-1.5 w-12 rounded-full bg-slate-600/50"></div>
+</div>
+<!-- Header -->
+<div class="flex items-center justify-between px-6 pb-4 flex-shrink-0">
+<h2 class="text-[22px] font-bold text-white tracking-tight">Withdraw Funds</h2>
+<button class="flex items-center justify-center w-8 h-8 rounded-full bg-slate-700/30 hover:bg-slate-700/50 text-slate-400 transition-colors">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+<!-- Scrollable Content Area -->
+<div class="flex-1 overflow-y-auto no-scrollbar flex flex-col px-6">
+<!-- Available Balance Card -->
+<div class="bg-card-bg rounded-xl p-5 mb-8 border border-white/5 shadow-lg">
+<div class="flex flex-col gap-1">
+<p class="text-slate-400 text-sm font-medium">Available to withdraw</p>
+<p class="text-white text-2xl font-bold tracking-tight">7,450,000 IRR</p>
+</div>
+</div>
+<!-- Amount Input -->
+<div class="flex flex-col items-center justify-center mb-6">
+<div class="flex items-baseline justify-center gap-2">
+<span class="text-4xl md:text-5xl font-extrabold text-white tracking-tight">5,000,000</span>
+<span class="text-2xl font-medium text-slate-500">IRR</span>
+<div class="w-[3px] h-8 md:h-10 bg-primary rounded-full animate-pulse-fast self-center ml-0.5"></div>
+</div>
+</div>
+<!-- Quick Chips -->
+<div class="flex items-center justify-center gap-3 mb-8">
+<button class="h-9 px-5 rounded-lg border border-slate-600/50 bg-transparent text-slate-300 text-sm font-medium hover:bg-slate-700/30 transition-colors">
+                    1M
+                </button>
+<button class="h-9 px-5 rounded-lg border border-primary bg-primary/10 text-primary text-sm font-bold shadow-[0_0_15px_rgba(109,169,248,0.15)] transition-colors">
+                    5M
+                </button>
+<button class="h-9 px-5 rounded-lg bg-slate-700 text-white text-sm font-medium hover:bg-slate-600 transition-colors">
+                    All
+                </button>
+</div>
+<!-- Warning Card -->
+<div class="rounded-xl bg-amber-500/10 border border-amber-500/20 p-4 mb-6 flex gap-3 items-start">
+<span class="material-symbols-outlined text-amber-500 mt-0.5 shrink-0 text-xl">warning</span>
+<p class="text-amber-500 text-sm leading-snug font-medium">
+                    Withdrawing this amount will leave insufficient funds for your next loan payment of <span class="font-bold">4,583,333 IRR</span> due Jan 28.
+                </p>
+</div>
+<!-- Destination -->
+<div class="flex items-center justify-between py-2 mb-4 group cursor-pointer">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-white shrink-0">
+<span class="material-symbols-outlined">account_balance</span>
+</div>
+<div class="flex flex-col">
+<span class="text-white font-semibold text-sm">Bank Account ****4523</span>
+<span class="text-slate-500 text-xs">Processing time: 1-2 business days</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-slate-500 group-hover:text-white transition-colors">chevron_right</span>
+</div>
+<div class="flex-grow"></div>
+<!-- Keypad -->
+<div class="grid grid-cols-3 gap-y-6 mb-6 px-4">
+<button class="text-2xl text-white font-medium hover:bg-white/5 rounded-full py-2 transition-colors">1</button>
+<button class="text-2xl text-white font-medium hover:bg-white/5 rounded-full py-2 transition-colors">2</button>
+<button class="text-2xl text-white font-medium hover:bg-white/5 rounded-full py-2 transition-colors">3</button>
+<button class="text-2xl text-white font-medium hover:bg-white/5 rounded-full py-2 transition-colors">4</button>
+<button class="text-2xl text-white font-medium hover:bg-white/5 rounded-full py-2 transition-colors">5</button>
+<button class="text-2xl text-white font-medium hover:bg-white/5 rounded-full py-2 transition-colors">6</button>
+<button class="text-2xl text-white font-medium hover:bg-white/5 rounded-full py-2 transition-colors">7</button>
+<button class="text-2xl text-white font-medium hover:bg-white/5 rounded-full py-2 transition-colors">8</button>
+<button class="text-2xl text-white font-medium hover:bg-white/5 rounded-full py-2 transition-colors">9</button>
+<button class="text-2xl text-white font-medium hover:bg-white/5 rounded-full py-2 transition-colors opacity-0 pointer-events-none">.</button>
+<button class="text-2xl text-white font-medium hover:bg-white/5 rounded-full py-2 transition-colors">0</button>
+<button class="flex items-center justify-center text-white hover:bg-white/5 rounded-full py-2 transition-colors">
+<span class="material-symbols-outlined text-[26px]">backspace</span>
+</button>
+</div>
+<!-- Footer Actions -->
+<div class="flex flex-col gap-3 pb-8 md:pb-6">
+<button class="w-full h-14 bg-cta-blue hover:bg-blue-400 text-slate-900 text-lg font-bold rounded-xl shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-all">
+                    Withdraw 5,000,000 IRR
+                </button>
+<div class="flex items-center justify-center gap-1.5 opacity-90">
+<span class="material-symbols-outlined text-green-400 text-sm">check_circle</span>
+<span class="text-green-400 text-xs font-medium uppercase tracking-wide">No withdrawal fees</span>
+</div>
+</div>
+</div>
+</div>
+</body></html>

@@ -1,18 +1,29 @@
-// OTP Verification Screen
-import React, { useState, useRef, useEffect } from 'react';
+/**
+ * OTPVerifyScreen
+ * Design System: Blu Markets
+ * Target: iPhone 16 Pro (393 x 852)
+ *
+ * 6-digit OTP verification with auto-submit
+ */
+
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
-  TextInput,
   ActivityIndicator,
+  StatusBar,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { OnboardingStackParamList } from '../../navigation/types';
-import { colors, typography, spacing, borderRadius } from '../../constants/theme';
+import { COLORS } from '../../constants/colors';
+import { TYPOGRAPHY } from '../../constants/typography';
+import { SPACING, RADIUS } from '../../constants/spacing';
+import { LAYOUT } from '../../constants/layout';
+import { Button, OTPInput } from '../../components/common';
 import { useAppDispatch } from '../../hooks/useStore';
 import { setAuthToken } from '../../store/slices/authSlice';
 import { authApi, ApiError } from '../../services/api';
@@ -30,12 +41,11 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
 }) => {
   const dispatch = useAppDispatch();
   const { phone } = route.params;
-  const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''));
+  const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [resendTimer, setResendTimer] = useState(60);
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
-  const inputRefs = useRef<(TextInput | null)[]>([]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -44,40 +54,9 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  const handleOtpChange = (value: string, index: number) => {
-    if (value.length > 1) {
-      // Handle paste
-      const pastedCode = value.slice(0, OTP_LENGTH).split('');
-      const newOtp = [...otp];
-      pastedCode.forEach((digit, i) => {
-        if (index + i < OTP_LENGTH) {
-          newOtp[index + i] = digit;
-        }
-      });
-      setOtp(newOtp);
-      const lastIndex = Math.min(index + pastedCode.length, OTP_LENGTH - 1);
-      inputRefs.current[lastIndex]?.focus();
-    } else {
-      const newOtp = [...otp];
-      newOtp[index] = value;
-      setOtp(newOtp);
-      setError('');
-
-      if (value && index < OTP_LENGTH - 1) {
-        inputRefs.current[index + 1]?.focus();
-      }
-    }
-  };
-
-  const handleKeyPress = (key: string, index: number) => {
-    if (key === 'Backspace' && !otp[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const handleVerify = async () => {
-    const code = otp.join('');
-    if (code.length !== OTP_LENGTH) {
+  const handleVerify = async (code?: string) => {
+    const verifyCode = code || otp;
+    if (verifyCode.length !== OTP_LENGTH) {
       setError('Please enter the complete code');
       return;
     }
@@ -86,19 +65,17 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
     setError('');
 
     try {
-      const response = await authApi.verifyOtp(phone, code);
+      const response = await authApi.verifyOtp(phone, verifyCode);
 
       // Store auth token in Redux
       dispatch(setAuthToken(response.tokens.accessToken));
 
       // Navigate based on onboarding status
-      if (response.onboardingComplete) {
-        // User already completed onboarding - go to main app
-        // The RootNavigator will handle this based on isAuthenticated
-      } else {
+      if (!response.onboardingComplete) {
         // New user or incomplete onboarding - continue to questionnaire
         navigation.navigate('Questionnaire');
       }
+      // If onboarding complete, RootNavigator handles navigation
     } catch (err) {
       const apiError = err as ApiError;
       if (apiError.code === 'OTP_INVALID') {
@@ -124,8 +101,7 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
     try {
       await authApi.sendOtp(phone);
       setResendTimer(60);
-      setOtp(Array(OTP_LENGTH).fill(''));
-      inputRefs.current[0]?.focus();
+      setOtp('');
     } catch (err) {
       const apiError = err as ApiError;
       setError(apiError.message || 'Failed to resend code.');
@@ -134,53 +110,62 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
     }
   };
 
-  const isComplete = otp.every((digit) => digit !== '');
+  const handleOtpChange = (value: string) => {
+    setOtp(value);
+    setError('');
+  };
+
+  const handleOtpComplete = (value: string) => {
+    // Auto-submit on complete
+    handleVerify(value);
+  };
+
+  // Format phone for display
+  const formatPhoneDisplay = (phoneNumber: string) => {
+    // +989123456789 -> +98 912 345 6789
+    if (phoneNumber.startsWith('+98')) {
+      const digits = phoneNumber.slice(3);
+      return `+98 ${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
+    }
+    return phoneNumber;
+  };
+
+  const isComplete = otp.length === OTP_LENGTH;
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Back button */}
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => navigation.goBack()}
-      >
-        <Text style={styles.backButtonText}>← Back</Text>
-      </TouchableOpacity>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.background.primary} />
+
+      {/* Header with back button */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          <Text style={styles.backIcon}>←</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.content}>
-        {/* Header */}
-        <View style={styles.header}>
+        {/* Title */}
+        <View style={styles.titleContainer}>
           <Text style={styles.title}>Enter verification code</Text>
           <Text style={styles.subtitle}>
-            We sent a 6-digit code to {phone}
+            We sent a 6-digit code to{'\n'}
+            <Text style={styles.phoneHighlight}>{formatPhoneDisplay(phone)}</Text>
           </Text>
         </View>
 
-        {/* OTP Input */}
-        <View style={styles.otpContainer}>
-          {otp.map((digit, index) => (
-            <TextInput
-              key={index}
-              ref={(ref) => { inputRefs.current[index] = ref; }}
-              style={[
-                styles.otpInput,
-                digit && styles.otpInputFilled,
-                error && styles.otpInputError,
-              ]}
-              value={digit}
-              onChangeText={(value) => handleOtpChange(value, index)}
-              onKeyPress={({ nativeEvent: { key } }) =>
-                handleKeyPress(key, index)
-              }
-              keyboardType="number-pad"
-              maxLength={OTP_LENGTH}
-              selectTextOnFocus
-              autoFocus={index === 0}
-            />
-          ))}
-        </View>
-
-        {/* Error message */}
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {/* OTP Input using design system */}
+        <OTPInput
+          length={OTP_LENGTH}
+          value={otp}
+          onChangeText={handleOtpChange}
+          onComplete={handleOtpComplete}
+          error={error}
+          autoFocus
+        />
 
         {/* Resend */}
         <View style={styles.resendContainer}>
@@ -189,7 +174,7 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
               Resend code in {resendTimer}s
             </Text>
           ) : isResending ? (
-            <ActivityIndicator size="small" color={colors.primary} />
+            <ActivityIndicator size="small" color={COLORS.brand.primary} />
           ) : (
             <TouchableOpacity onPress={handleResend}>
               <Text style={styles.resendButton}>Resend code</Text>
@@ -205,20 +190,17 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
         )}
       </View>
 
-      {/* CTA Button */}
+      {/* Footer with CTA */}
       <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.button, (!isComplete || isLoading) && styles.buttonDisabled]}
-          onPress={handleVerify}
-          activeOpacity={0.8}
-          disabled={!isComplete || isLoading}
-        >
-          {isLoading ? (
-            <ActivityIndicator color={colors.textPrimaryDark} />
-          ) : (
-            <Text style={styles.buttonText}>Verify</Text>
-          )}
-        </TouchableOpacity>
+        <Button
+          label="Verify"
+          variant="primary"
+          size="lg"
+          fullWidth
+          onPress={() => handleVerify()}
+          loading={isLoading}
+          disabled={!isComplete}
+        />
       </View>
     </SafeAreaView>
   );
@@ -227,99 +209,71 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bgDark,
-  },
-  backButton: {
-    paddingHorizontal: spacing[6],
-    paddingVertical: spacing[4],
-  },
-  backButtonText: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.base,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: spacing[6],
+    backgroundColor: COLORS.background.primary,
   },
   header: {
-    marginBottom: spacing[8],
+    paddingHorizontal: LAYOUT.screenPaddingH,
+    paddingTop: SPACING[2],
+    paddingBottom: SPACING[4],
   },
-  title: {
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
-    marginBottom: spacing[2],
-  },
-  subtitle: {
-    fontSize: typography.fontSize.base,
-    color: colors.textSecondary,
-  },
-  otpContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing[4],
-  },
-  otpInput: {
-    width: 48,
-    height: 56,
-    backgroundColor: colors.cardDark,
-    borderRadius: borderRadius.sm,
-    borderWidth: 1,
-    borderColor: colors.borderDark,
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
-    textAlign: 'center',
-  },
-  otpInputFilled: {
-    borderColor: colors.primary,
-  },
-  otpInputError: {
-    borderColor: colors.error,
-  },
-  errorText: {
-    color: colors.error,
-    fontSize: typography.fontSize.sm,
-    textAlign: 'center',
-  },
-  resendContainer: {
-    alignItems: 'center',
-    marginTop: spacing[6],
-  },
-  resendTimer: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.sm,
-  },
-  resendButton: {
-    color: colors.primary,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  devHint: {
-    color: colors.textMuted,
-    fontSize: typography.fontSize.xs,
-    textAlign: 'center',
-    marginTop: spacing[4],
-    fontStyle: 'italic',
-  },
-  footer: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[8],
-  },
-  button: {
-    backgroundColor: colors.primary,
-    height: 56,
-    borderRadius: borderRadius.full,
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.background.elevated,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  buttonDisabled: {
-    backgroundColor: colors.surfaceDark,
+  backIcon: {
+    fontSize: 20,
+    color: COLORS.text.primary,
   },
-  buttonText: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
+  content: {
+    flex: 1,
+    paddingHorizontal: LAYOUT.screenPaddingH,
+  },
+  titleContainer: {
+    marginBottom: SPACING[8],
+  },
+  title: {
+    fontSize: TYPOGRAPHY.fontSize['2xl'],
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text.primary,
+    marginBottom: SPACING[2],
+  },
+  subtitle: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.text.secondary,
+    lineHeight: TYPOGRAPHY.fontSize.base * 1.5,
+  },
+  phoneHighlight: {
+    color: COLORS.text.primary,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
+  },
+  resendContainer: {
+    alignItems: 'center',
+    marginTop: SPACING[8],
+  },
+  resendTimer: {
+    color: COLORS.text.secondary,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+  },
+  resendButton: {
+    color: COLORS.brand.primary,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+  },
+  devHint: {
+    color: COLORS.text.muted,
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    textAlign: 'center',
+    marginTop: SPACING[4],
+    fontStyle: 'italic',
+  },
+  footer: {
+    paddingHorizontal: LAYOUT.screenPaddingH,
+    paddingBottom: LAYOUT.totalBottomSpace,
+    paddingTop: SPACING[4],
   },
 });
 

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#6FAAF8", // User requested blue for CTA, adapting theme primary
+                        "accent-purple": "#a96df8",
+                        "background-light": "#f7f5f8",
+                        "background-dark": "#0E1420",
+                        "surface-dark": "#151C28",
+                        "text-gray": "#9AA4B2"
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .blinking-cursor {
+            width: 2px;
+            height: 40px;
+            background-color: #6FAAF8;
+            display: inline-block;
+            margin-left: 2px;
+            animation: blink 1s step-end infinite;
+            vertical-align: middle;
+        }
+        @keyframes blink {
+            from, to { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        .keypad-button:active {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-white selection:bg-primary/30">
+<!-- Top Navigation -->
+<header class="flex items-center justify-between p-4 sticky top-0 z-50 bg-background-dark">
+<div class="flex size-10 items-center justify-center rounded-full hover:bg-white/5 cursor-pointer">
+<span class="material-symbols-outlined text-white text-2xl">arrow_back</span>
+</div>
+<h2 class="text-white text-xl font-bold leading-tight tracking-tight flex-1 text-center pr-10">Fund Your Portfolio</h2>
+</header>
+<main class="flex flex-col min-h-[calc(100vh-72px)] pb-4">
+<!-- Input Section -->
+<div class="flex flex-col items-center pt-6 px-4">
+<p class="text-text-gray text-base font-normal leading-normal pb-4 text-center">Enter the amount you want to invest</p>
+<div class="flex items-center justify-center gap-2 mb-2">
+<h1 class="text-white tracking-tight text-[40px] font-bold leading-tight text-center">10,000,000</h1>
+<div class="blinking-cursor"></div>
+<span class="text-text-gray text-xl font-medium pt-2 ml-1">IRR</span>
+</div>
+<p class="text-text-gray text-xs mb-6">Minimum investment: 1,000,000 IRR</p>
+<!-- Quick Amount Chips -->
+<div class="flex gap-3 px-4 mb-8 w-full justify-center overflow-x-auto no-scrollbar">
+<button class="flex h-10 shrink-0 items-center justify-center rounded-xl bg-surface-dark border border-white/10 px-6 hover:bg-white/5 transition-colors">
+<p class="text-white text-sm font-medium">5M</p>
+</button>
+<button class="flex h-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 border-2 border-primary px-6 transition-colors">
+<p class="text-primary text-sm font-bold">10M</p>
+</button>
+<button class="flex h-10 shrink-0 items-center justify-center rounded-xl bg-surface-dark border border-white/10 px-6 hover:bg-white/5 transition-colors">
+<p class="text-white text-sm font-medium">25M</p>
+</button>
+<button class="flex h-10 shrink-0 items-center justify-center rounded-xl bg-surface-dark border border-white/10 px-6 hover:bg-white/5 transition-colors">
+<p class="text-white text-sm font-medium">50M</p>
+</button>
+</div>
+</div>
+<!-- Allocation Preview Card -->
+<div class="px-4 mb-6">
+<div class="flex flex-col p-5 rounded-2xl bg-surface-dark border border-white/5 shadow-xl">
+<div class="flex items-center justify-between mb-4">
+<p class="text-white text-lg font-bold tracking-tight">Allocation Preview</p>
+<span class="material-symbols-outlined text-text-gray text-xl cursor-help">info</span>
+</div>
+<!-- Stacked Bar Chart -->
+<div class="flex w-full h-3 rounded-full overflow-hidden mb-6 bg-white/5">
+<div class="h-full bg-primary" style="width: 50%;"></div>
+<div class="h-full bg-accent-purple" style="width: 35%;"></div>
+<div class="h-full bg-[#34D399]" style="width: 15%;"></div>
+</div>
+<!-- Detailed Breakdown -->
+<div class="space-y-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="size-2.5 rounded-full bg-primary"></div>
+<span class="text-white text-sm font-medium">Foundation</span>
+</div>
+<span class="text-white text-sm font-bold">5,000,000 <span class="text-[10px] text-text-gray ml-1">IRR</span></span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="size-2.5 rounded-full bg-accent-purple"></div>
+<span class="text-white text-sm font-medium">Growth</span>
+</div>
+<span class="text-white text-sm font-bold">3,500,000 <span class="text-[10px] text-text-gray ml-1">IRR</span></span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="size-2.5 rounded-full bg-[#34D399]"></div>
+<span class="text-white text-sm font-medium">Upside</span>
+</div>
+<span class="text-white text-sm font-bold">1,500,000 <span class="text-[10px] text-text-gray ml-1">IRR</span></span>
+</div>
+</div>
+</div>
+</div>
+<!-- Spacer to push keypad to bottom if needed on larger screens -->
+<div class="flex-grow"></div>
+<!-- CTA Button -->
+<div class="px-4 pb-4">
+<button class="flex w-full h-14 items-center justify-center gap-2 rounded-xl bg-primary text-background-dark font-bold text-lg hover:brightness-110 active:scale-[0.98] transition-all">
+                Create Portfolio
+                <span class="material-symbols-outlined font-bold">arrow_forward</span>
+</button>
+</div>
+<!-- Custom Numeric Keypad -->
+<div class="grid grid-cols-3 gap-y-1 bg-background-dark/80 backdrop-blur-sm border-t border-white/5 pt-4 pb-8">
+<button class="keypad-button h-16 flex items-center justify-center text-2xl font-semibold text-white">1</button>
+<button class="keypad-button h-16 flex items-center justify-center text-2xl font-semibold text-white">2</button>
+<button class="keypad-button h-16 flex items-center justify-center text-2xl font-semibold text-white">3</button>
+<button class="keypad-button h-16 flex items-center justify-center text-2xl font-semibold text-white">4</button>
+<button class="keypad-button h-16 flex items-center justify-center text-2xl font-semibold text-white">5</button>
+<button class="keypad-button h-16 flex items-center justify-center text-2xl font-semibold text-white">6</button>
+<button class="keypad-button h-16 flex items-center justify-center text-2xl font-semibold text-white">7</button>
+<button class="keypad-button h-16 flex items-center justify-center text-2xl font-semibold text-white">8</button>
+<button class="keypad-button h-16 flex items-center justify-center text-2xl font-semibold text-white">9</button>
+<button class="keypad-button h-16 flex items-center justify-center text-xl font-bold text-text-gray">000</button>
+<button class="keypad-button h-16 flex items-center justify-center text-2xl font-semibold text-white">0</button>
+<button class="keypad-button h-16 flex items-center justify-center">
+<span class="material-symbols-outlined text-2xl text-white">backspace</span>
+</button>
+</div>
+</main>
+</body></html>

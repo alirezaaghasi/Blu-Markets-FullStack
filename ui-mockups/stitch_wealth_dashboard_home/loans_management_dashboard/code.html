@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Mindful Loans Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#0f49bd",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#0E1420",
+                        "card-dark": "#151C28",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        body {
+            font-family: 'Manrope', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            min-height: max(884px, 100dvh);
+        }
+        .segmented-progress {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 6px;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white min-h-screen flex flex-col">
+<header class="sticky top-0 z-10 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md px-4 py-4 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-2xl cursor-pointer">arrow_back_ios</span>
+<h1 class="text-xl font-bold tracking-tight">Loans</h1>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-2xl cursor-pointer">history</span>
+<span class="material-symbols-outlined text-2xl cursor-pointer">settings</span>
+</div>
+</header>
+<main class="flex-1 overflow-y-auto pb-32">
+<section class="px-4 py-6">
+<div class="flex flex-col gap-2">
+<h2 class="text-[#92a4c9] text-sm font-semibold uppercase tracking-wider">Borrowing Power</h2>
+<div class="flex flex-col gap-4 mt-2">
+<div class="flex flex-col gap-1">
+<p class="text-3xl font-extrabold text-white">50,000,000 <span class="text-lg font-medium text-[#92a4c9]">IRR</span></p>
+<p class="text-[#92a4c9] text-sm font-normal leading-normal">Available to borrow</p>
+</div>
+<div class="relative pt-4 pb-2">
+<div class="h-2.5 w-full bg-[#324467]/30 rounded-full overflow-hidden flex">
+<div class="h-full bg-[#3b82f6] rounded-full" style="width: 10%;"></div>
+<div class="h-full bg-slate-500/40" style="width: 15%;"></div>
+</div>
+<div class="absolute top-0 left-[25%] -translate-x-1/2 flex flex-col items-center">
+<div class="w-0.5 h-6 bg-slate-400"></div>
+<span class="text-[10px] text-slate-400 font-bold mt-1 uppercase">Limit</span>
+</div>
+</div>
+<div class="flex justify-between items-center">
+<p class="text-[#92a4c9] text-xs font-medium">10% Used of 25% Limit</p>
+<p class="text-[#92a4c9] text-xs font-medium bg-white/5 px-2 py-1 rounded-md">
+                            Max LTV: 25% of Portfolio
+                        </p>
+</div>
+</div>
+</div>
+</section>
+<section class="px-4 py-4">
+<h3 class="text-white text-lg font-bold leading-tight tracking-tight mb-4">Active Loans</h3>
+<div class="space-y-4">
+<div class="bg-card-dark rounded-lg p-5 shadow-xl border border-white/5">
+<div class="flex justify-between items-start mb-6">
+<div>
+<h4 class="text-white text-lg font-bold tracking-tight">Loan #1024</h4>
+<div class="flex items-center gap-2 mt-1">
+<span class="flex items-center gap-1 text-[10px] bg-emerald-500/10 text-emerald-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide border border-emerald-500/20">
+<span class="w-1 h-1 bg-emerald-500 rounded-full"></span> Active
+                                </span>
+</div>
+</div>
+<button class="bg-primary hover:bg-primary/90 text-white px-5 py-2 rounded-lg text-sm font-bold transition-all shadow-lg shadow-primary/20">
+                            Repay
+                        </button>
+</div>
+<div class="flex items-center justify-between mb-6 bg-background-dark/50 p-3 rounded-lg">
+<div class="flex items-center gap-3">
+<div class="size-10 rounded-full bg-yellow-500/10 flex items-center justify-center">
+<img alt="Bitcoin" class="size-6" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB9g5hc8ppwJ4ePYI6PrvAVGYg5-eYDBJpzF0BKkLOGNSWmy41ql3CR5YA2mroZgc3agHZJDOKw2fjeSgXdGmfLROSE78r2s_KF34CCDefCxQ4DIBc9j1NGQAqbQTlE8_QFf4IZE9yFDAPVhZ1ygb9CzXLuJtg-jT3HHEAl9ctzsTy-PJLw4R_Q7mohEUhhe5Gu2fTEGuxanE0-tf5_XcUW512_VYBGnWwZvI6CBITRcd4mdB1Sz764XWr9TvdUI-94GYSKyzajKURo"/>
+</div>
+<div>
+<p class="text-[#92a4c9] text-xs font-medium">Collateral</p>
+<p class="text-white font-bold">0.5 BTC</p>
+</div>
+</div>
+<div class="flex items-center gap-1.5 bg-blue-400/10 px-3 py-1.5 rounded-full border border-blue-400/20">
+<span class="text-[11px] font-bold text-blue-400 uppercase tracking-wider">FROZEN</span>
+<span class="material-symbols-outlined text-sm text-blue-400">ac_unit</span>
+</div>
+</div>
+<div class="space-y-3">
+<div class="flex justify-between items-end">
+<p class="text-[#92a4c9] text-xs font-medium">Installment 2 of 6</p>
+<p class="text-white text-xs font-bold">33% Paid</p>
+</div>
+<div class="segmented-progress h-2 w-full">
+<div class="bg-[#10b981] rounded-sm shadow-[0_0_8px_rgba(16,185,129,0.2)]"></div>
+<div class="bg-[#10b981] rounded-sm shadow-[0_0_8px_rgba(16,185,129,0.2)]"></div>
+<div class="bg-slate-800 rounded-sm"></div>
+<div class="bg-slate-800 rounded-sm"></div>
+<div class="bg-slate-800 rounded-sm"></div>
+<div class="bg-slate-800 rounded-sm"></div>
+</div>
+</div>
+</div>
+<div class="bg-card-dark/40 border border-white/5 rounded-lg p-5 flex items-center justify-between opacity-80">
+<div class="flex items-center gap-4">
+<div class="size-10 rounded-full bg-slate-700/30 flex items-center justify-center">
+<span class="material-symbols-outlined text-slate-500">lock_clock</span>
+</div>
+<div>
+<p class="text-white font-bold">Loan #1021</p>
+<p class="text-[#92a4c9] text-xs">Completed 2 weeks ago</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-slate-500">chevron_right</span>
+</div>
+</div>
+</section>
+</main>
+<button class="fixed right-6 bottom-24 size-14 bg-primary rounded-full shadow-2xl shadow-primary/40 flex items-center justify-center text-white transition-transform active:scale-90 z-20">
+<span class="material-symbols-outlined text-3xl">add</span>
+</button>
+<nav class="fixed bottom-0 left-0 right-0 bg-background-dark/95 border-t border-white/5 backdrop-blur-xl px-6 pt-3 pb-8 flex justify-between items-center z-10">
+<div class="flex flex-col items-center gap-1 text-slate-500">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-[10px] font-medium">Home</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-primary">
+<span class="material-symbols-outlined font-variation-fill">account_balance_wallet</span>
+<span class="text-[10px] font-bold">Loans</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-slate-500">
+<span class="material-symbols-outlined">swap_horiz</span>
+<span class="text-[10px] font-medium">Trade</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-slate-500">
+<span class="material-symbols-outlined">person</span>
+<span class="text-[10px] font-medium">Profile</span>
+</div>
+</nav>
+<div class="fixed bottom-0 left-0 right-0 h-1 bg-transparent z-20"></div>
+
+</body></html>

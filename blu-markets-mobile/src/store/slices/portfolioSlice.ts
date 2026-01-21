@@ -438,6 +438,70 @@ const portfolioSlice = createSlice({
 
     // Reset
     resetPortfolio: () => initialState,
+
+    // Load demo data for testing
+    loadDemoData: (state) => {
+      // Demo portfolio: 5M IRR cash + BTC, ETH, USDT holdings
+      state.cashIRR = 5_000_000;
+      state.holdings = [
+        { assetId: 'BTC', quantity: 0.05, frozen: false, layer: 'UPSIDE' },
+        { assetId: 'ETH', quantity: 0.5, frozen: false, layer: 'GROWTH' },
+        { assetId: 'USDT', quantity: 1000, frozen: false, layer: 'FOUNDATION' },
+      ];
+      state.targetLayerPct = {
+        FOUNDATION: 0.50,
+        GROWTH: 0.35,
+        UPSIDE: 0.15,
+      };
+      state.status = 'BALANCED';
+      state.lastSyncTimestamp = Date.now();
+
+      // Sample activity feed with different boundaries
+      const now = new Date();
+      state.actionLog = [
+        {
+          id: 1,
+          timestamp: new Date(now.getTime() - 1000 * 60 * 5).toISOString(), // 5 min ago
+          type: 'TRADE',
+          boundary: 'SAFE',
+          message: 'Bought 0.01 BTC',
+          amountIRR: 2_500_000,
+          assetId: 'BTC',
+        },
+        {
+          id: 2,
+          timestamp: new Date(now.getTime() - 1000 * 60 * 30).toISOString(), // 30 min ago
+          type: 'TRADE',
+          boundary: 'DRIFT',
+          message: 'Sold 0.2 ETH',
+          amountIRR: 1_800_000,
+          assetId: 'ETH',
+        },
+        {
+          id: 3,
+          timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
+          type: 'REBALANCE',
+          boundary: 'SAFE',
+          message: 'Rebalanced portfolio (2 sells, 3 buys)',
+        },
+        {
+          id: 4,
+          timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
+          type: 'ADD_FUNDS',
+          boundary: 'SAFE',
+          message: 'Added 10,000,000 IRR cash',
+          amountIRR: 10_000_000,
+        },
+        {
+          id: 5,
+          timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 3).toISOString(), // 3 days ago
+          type: 'PORTFOLIO_CREATED',
+          boundary: 'SAFE',
+          message: 'Started with 25,000,000 IRR',
+          amountIRR: 25_000_000,
+        },
+      ];
+    },
   },
 });
 
@@ -469,6 +533,7 @@ export const {
   addFunds,
   executeTrade,
   executeRebalance,
+  loadDemoData,
 } = portfolioSlice.actions;
 
 export default portfolioSlice.reducer;

@@ -1,4 +1,5 @@
 // Navigation Types
+// Based on CLAUDE_CODE_HANDOFF.md Section 7
 import { NavigatorScreenParams } from '@react-navigation/native';
 
 // Root Stack (Auth vs Main app)
@@ -19,35 +20,31 @@ export type OnboardingStackParamList = {
   Success: undefined;
 };
 
-// Main Tab Navigator
+// Main Tab Navigator (5 tabs per handoff)
 export type MainTabParamList = {
-  Portfolio: NavigatorScreenParams<PortfolioStackParamList>;
-  Protection: NavigatorScreenParams<ProtectionStackParamList>;
-  Loans: NavigatorScreenParams<LoansStackParamList>;
+  Home: undefined;
+  Portfolio: undefined;
+  Market: undefined;
   History: undefined;
   Profile: undefined;
 };
 
-// Portfolio Stack
-export type PortfolioStackParamList = {
-  Dashboard: undefined;
+// Detail Screens (Modal presentation)
+export type DetailStackParamList = {
   AssetDetail: { assetId: string };
-  Trade: { assetId?: string; side?: 'BUY' | 'SELL' };
-  Rebalance: undefined;
-  AddFunds: undefined;
-};
-
-// Protection Stack
-export type ProtectionStackParamList = {
-  ProtectionList: undefined;
-  ProtectionDetail: { protectionId: string };
-  NewProtection: { assetId: string };
-};
-
-// Loans Stack
-export type LoansStackParamList = {
-  LoansList: undefined;
   LoanDetail: { loanId: string };
-  NewLoan: { assetId?: string };
+  Notifications: undefined;
+  ActiveProtections: undefined;
+  LoansDashboard: undefined;
+};
+
+// Sheet params for bottom sheets
+export type SheetParamList = {
+  Trade: { assetId?: string; side?: 'BUY' | 'SELL' };
+  AddFunds: undefined;
+  Withdraw: undefined;
+  Protection: { assetId: string };
+  Borrow: { assetId?: string };
   Repay: { loanId: string };
+  Rebalance: undefined;
 };

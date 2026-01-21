@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Risk Profile Result</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#0f49bd",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#0E1420", // Overridden to match specific request
+                        "surface-dark": "#151C28",
+                        "chart-blue": "#3b82f6",
+                        "chart-purple": "#a855f7",
+                        "chart-emerald": "#10b981",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        @layer utilities {
+            .conic-chart {
+                background: conic-gradient(
+                    #3b82f6 0% 50%,
+                    #a855f7 50% 85%,
+                    #10b981 85% 100%
+                );
+            }
+            /* Hide scrollbar for clean look */
+            .no-scrollbar::-webkit-scrollbar {
+                display: none;
+            }
+            .no-scrollbar {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-[#0E1420] text-white font-display overflow-x-hidden antialiased selection:bg-primary/30">
+<div class="relative flex h-full min-h-screen w-full flex-col justify-between">
+<!-- Main Content Wrapper -->
+<div class="flex-1 flex flex-col pb-24">
+<!-- Header Section -->
+<header class="flex flex-col items-center pt-10 pb-2 px-6 text-center">
+<div class="mb-6 flex w-full justify-between items-center opacity-0">
+<!-- Placeholder for layout balance if needed later -->
+<span class="material-symbols-outlined">arrow_back</span>
+<span class="material-symbols-outlined">share</span>
+</div>
+<h1 class="text-3xl md:text-4xl font-bold tracking-tight text-white mb-2 leading-tight">
+                    You are a <br/>
+<span class="text-white">Steady Builder</span>
+</h1>
+<h2 class="text-gray-400 text-lg font-medium tracking-wide">Balanced Profile</h2>
+</header>
+<!-- Chart Section -->
+<section class="flex justify-center items-center py-8">
+<div class="relative flex items-center justify-center">
+<!-- Donut Chart -->
+<div class="conic-chart w-64 h-64 rounded-full shadow-2xl relative flex items-center justify-center animate-fade-in">
+<!-- Inner Circle (Hole) -->
+<div class="absolute w-[180px] h-[180px] bg-[#0E1420] rounded-full flex flex-col items-center justify-center z-10">
+<span class="text-gray-400 text-sm font-medium uppercase tracking-wider mb-1">Risk Score</span>
+<span class="text-4xl font-bold text-white tracking-tighter">5<span class="text-gray-500 text-2xl font-normal">/10</span></span>
+</div>
+</div>
+<!-- Decorative glow behind chart -->
+<div class="absolute w-56 h-56 bg-primary/20 blur-3xl -z-10 rounded-full"></div>
+</div>
+</section>
+<!-- Legend/Breakdown Section -->
+<section class="flex flex-col gap-3 px-5 mt-4">
+<!-- Row 1: Foundation -->
+<div class="flex items-center justify-between p-4 bg-[#151C28] rounded-xl border border-white/5 active:scale-[0.99] transition-transform duration-200">
+<div class="flex items-center gap-4">
+<div class="flex items-center justify-center shrink-0 size-12 rounded-full bg-blue-500/10 text-[#3b82f6]">
+<span class="material-symbols-outlined text-[28px] leading-none" data-icon="circle" data-size="24px" data-weight="fill">circle</span>
+</div>
+<div class="flex flex-col">
+<p class="text-white text-base font-bold leading-snug">Foundation</p>
+<p class="text-gray-400 text-xs sm:text-sm font-medium leading-normal line-clamp-1 mt-0.5">Stable assets to protect your wealth.</p>
+</div>
+</div>
+<div class="shrink-0 pl-2">
+<span class="text-[#3b82f6] text-lg font-bold font-display">50%</span>
+</div>
+</div>
+<!-- Row 2: Growth -->
+<div class="flex items-center justify-between p-4 bg-[#151C28] rounded-xl border border-white/5 active:scale-[0.99] transition-transform duration-200">
+<div class="flex items-center gap-4">
+<div class="flex items-center justify-center shrink-0 size-12 rounded-full bg-purple-500/10 text-[#a855f7]">
+<span class="material-symbols-outlined text-[28px] leading-none" data-icon="circle" data-size="24px" data-weight="fill">circle</span>
+</div>
+<div class="flex flex-col">
+<p class="text-white text-base font-bold leading-snug">Growth</p>
+<p class="text-gray-400 text-xs sm:text-sm font-medium leading-normal line-clamp-1 mt-0.5">Major cryptos for long-term growth.</p>
+</div>
+</div>
+<div class="shrink-0 pl-2">
+<span class="text-[#a855f7] text-lg font-bold font-display">35%</span>
+</div>
+</div>
+<!-- Row 3: Upside -->
+<div class="flex items-center justify-between p-4 bg-[#151C28] rounded-xl border border-white/5 active:scale-[0.99] transition-transform duration-200">
+<div class="flex items-center gap-4">
+<div class="flex items-center justify-center shrink-0 size-12 rounded-full bg-emerald-500/10 text-[#10b981]">
+<span class="material-symbols-outlined text-[28px] leading-none" data-icon="circle" data-size="24px" data-weight="fill">circle</span>
+</div>
+<div class="flex flex-col">
+<p class="text-white text-base font-bold leading-snug">Upside</p>
+<p class="text-gray-400 text-xs sm:text-sm font-medium leading-normal line-clamp-1 mt-0.5">High risk assets for maximum returns.</p>
+</div>
+</div>
+<div class="shrink-0 pl-2">
+<span class="text-[#10b981] text-lg font-bold font-display">15%</span>
+</div>
+</div>
+</section>
+</div>
+<!-- Sticky Footer CTA -->
+<div class="fixed bottom-0 left-0 w-full p-5 bg-gradient-to-t from-[#0E1420] via-[#0E1420] to-transparent z-50">
+<button class="w-full flex items-center justify-center gap-2 bg-[#0f49bd] hover:bg-blue-700 text-white font-bold h-14 rounded-xl text-lg shadow-lg shadow-blue-900/40 transition-all active:scale-[0.98]">
+                Create My Portfolio
+            </button>
+</div>
+</div>
+</body></html>

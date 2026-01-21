@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Onboarding Complete</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#6da9f8",
+              "background-light": "#f5f7f8", // Not used in this specific design but required by theme
+              "background-dark": "#0E1420", // Custom dark background from request
+              "surface-dark": "#151C28",    // Custom surface color from request
+              "success-green": "#22C55E",
+            },
+            fontFamily: {
+              "display": ["Manrope", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.5rem", "lg": "0.75rem", "xl": "1rem", "full": "9999px"},
+            boxShadow: {
+                "glow": "0 0 40px -10px rgba(109, 169, 248, 0.3)",
+                "glow-success": "0 0 30px -5px rgba(34, 197, 94, 0.4)"
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        /* Custom scrollbar for clean look */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0E1420; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155; 
+            border-radius: 4px;
+        }
+        /* Confetti effect simulation with CSS gradients */
+        .confetti-bg {
+            background-image: 
+                radial-gradient(#6da9f8 1px, transparent 1px),
+                radial-gradient(#a855f7 1px, transparent 1px),
+                radial-gradient(#22c55e 1px, transparent 1px);
+            background-size: 40px 40px;
+            background-position: 0 0, 20px 20px, 10px 30px;
+            opacity: 0.3;
+            mask-image: linear-gradient(to bottom, black 0%, transparent 80%);
+            -webkit-mask-image: linear-gradient(to bottom, black 0%, transparent 80%);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-dark font-display text-white antialiased overflow-hidden">
+<div class="relative flex h-screen w-full flex-col max-w-md mx-auto shadow-2xl overflow-hidden bg-[#0E1420]">
+<!-- Background Elements -->
+<div class="absolute top-0 left-0 w-full h-[40vh] confetti-bg pointer-events-none z-0"></div>
+<div class="absolute top-[15%] left-1/2 -translate-x-1/2 w-64 h-64 bg-primary/20 rounded-full blur-[80px] pointer-events-none z-0"></div>
+<!-- Main Content Scrollable Area -->
+<main class="relative z-10 flex-1 overflow-y-auto px-6 pb-32 pt-12 no-scrollbar">
+<!-- Success Icon Section -->
+<div class="flex flex-col items-center justify-center mb-6">
+<div class="w-[100px] h-[100px] rounded-full bg-[#151C28]/80 backdrop-blur-sm border border-success-green/20 flex items-center justify-center shadow-glow-success relative">
+<div class="absolute inset-0 bg-success-green/10 rounded-full animate-pulse"></div>
+<span class="material-symbols-outlined text-success-green text-[56px]" style="font-variation-settings: 'FILL' 1, 'wght' 600, 'GRAD' 0, 'opsz' 48;">verified_user</span>
+</div>
+</div>
+<!-- Headline Text -->
+<div class="text-center mb-8">
+<h2 class="text-white tracking-tight text-[28px] font-bold leading-tight mb-2">You’re All Set!</h2>
+<p class="text-slate-400 text-base font-medium leading-normal">Welcome to Blu Markets!</p>
+</div>
+<!-- Portfolio Summary Card -->
+<div class="w-full bg-[#151C28] rounded-xl p-6 mb-6 shadow-lg border border-slate-800/50">
+<div class="flex flex-col items-start justify-between mb-5">
+<p class="text-slate-400 text-sm font-semibold tracking-wide uppercase mb-1">Your Portfolio</p>
+<p class="text-white text-2xl font-bold tracking-tight">10,000,000 <span class="text-base text-slate-500 font-medium">IRR</span></p>
+</div>
+<!-- Visual Allocation Bar -->
+<div class="flex w-full h-3 rounded-full overflow-hidden mb-6 bg-slate-800">
+<div class="h-full bg-primary" style="width: 50%"></div>
+<div class="h-full bg-purple-500" style="width: 35%"></div>
+<div class="h-full bg-emerald-500" style="width: 15%"></div>
+</div>
+<!-- Detailed Breakdown -->
+<div class="space-y-4">
+<!-- Item 1 -->
+<div class="flex items-center justify-between border-b border-slate-800 pb-3 last:border-0 last:pb-0">
+<div class="flex items-center gap-3">
+<div class="w-2.5 h-2.5 rounded-full bg-primary shadow-[0_0_8px_rgba(109,169,248,0.5)]"></div>
+<span class="text-slate-300 text-sm font-medium">Blue Layer</span>
+</div>
+<div class="flex items-center gap-3 text-right">
+<span class="text-slate-500 text-xs font-semibold bg-[#1E293B] px-1.5 py-0.5 rounded">50%</span>
+<span class="text-white text-sm font-semibold">5.0M</span>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="flex items-center justify-between border-b border-slate-800 pb-3 last:border-0 last:pb-0">
+<div class="flex items-center gap-3">
+<div class="w-2.5 h-2.5 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]"></div>
+<span class="text-slate-300 text-sm font-medium">Purple Layer</span>
+</div>
+<div class="flex items-center gap-3 text-right">
+<span class="text-slate-500 text-xs font-semibold bg-[#1E293B] px-1.5 py-0.5 rounded">35%</span>
+<span class="text-white text-sm font-semibold">3.5M</span>
+</div>
+</div>
+<!-- Item 3 -->
+<div class="flex items-center justify-between border-b border-slate-800 pb-3 last:border-0 last:pb-0">
+<div class="flex items-center gap-3">
+<div class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+<span class="text-slate-300 text-sm font-medium">Green Layer</span>
+</div>
+<div class="flex items-center gap-3 text-right">
+<span class="text-slate-500 text-xs font-semibold bg-[#1E293B] px-1.5 py-0.5 rounded">15%</span>
+<span class="text-white text-sm font-semibold">1.5M</span>
+</div>
+</div>
+</div>
+</div>
+<!-- What's Next Section -->
+<div class="px-2 space-y-4 mb-8">
+<div class="flex items-center gap-4 text-slate-400">
+<span class="material-symbols-outlined text-[20px]">visibility</span>
+<span class="text-sm font-medium">24/7 Portfolio Monitoring active</span>
+</div>
+<div class="flex items-center gap-4 text-slate-400">
+<span class="material-symbols-outlined text-[20px]">notifications_active</span>
+<span class="text-sm font-medium">Smart Rebalancing Alerts enabled</span>
+</div>
+<div class="flex items-center gap-4 text-slate-400">
+<span class="material-symbols-outlined text-[20px] text-emerald-500/80">security</span>
+<span class="text-sm font-medium">Asset Protection active</span>
+</div>
+</div>
+</main>
+<!-- Fixed Bottom Action Area -->
+<div class="absolute bottom-0 left-0 w-full bg-gradient-to-t from-[#0E1420] via-[#0E1420] to-transparent pt-12 pb-8 px-6 z-20">
+<button class="w-full bg-[#6da9f8] hover:bg-[#5b96e0] active:scale-[0.98] transition-all duration-200 text-[#0E1420] text-lg font-bold py-4 rounded-lg shadow-glow mb-4 flex items-center justify-center gap-2">
+<span>Go to Dashboard</span>
+<span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+</button>
+<div class="text-center">
+<button class="text-[#6da9f8] hover:text-white text-sm font-semibold transition-colors">
+                    Explore protections
+                </button>
+</div>
+</div>
+</div>
+</body></html>

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Blu Markets Welcome Screen</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#6da9f8",
+                        "background-light": "#f5f7f8",
+                        "background-dark": "#0E1420", // Custom deep blue-black as requested
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glow-effect {
+            box-shadow: 0 0 40px 10px rgba(111, 170, 248, 0.15);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-dark font-display text-white">
+<div class="relative flex min-h-screen w-full flex-col items-center justify-between px-6 py-12 overflow-x-hidden">
+<!-- Top Section: Logo and Branding -->
+<div class="flex flex-col items-center mt-12 w-full">
+<!-- Abstract Geometric Shield Logo -->
+<div class="relative mb-8">
+<div class="absolute inset-0 bg-primary/20 blur-3xl rounded-full scale-150"></div>
+<div class="relative flex items-center justify-center w-20 h-20 bg-primary/10 border border-primary/30 rounded-2xl glow-effect">
+<span class="material-symbols-outlined text-primary text-5xl">shield_with_heart</span>
+</div>
+</div>
+<h1 class="text-white tracking-tight text-[32px] font-bold leading-tight text-center pb-2">
+                Blu Markets
+            </h1>
+<p class="text-[#9AA4B2] text-lg font-normal leading-normal text-center">
+                Markets, but mindful
+            </p>
+</div>
+<!-- Middle Section: Feature Highlights -->
+<div class="w-full max-w-xs space-y-6 my-12">
+<!-- Feature 1 -->
+<div class="flex items-center gap-4">
+<div class="flex items-center justify-center rounded-xl bg-primary/10 border border-primary/20 shrink-0 size-12">
+<span class="material-symbols-outlined text-primary">security</span>
+</div>
+<div class="flex flex-col">
+<p class="text-white text-base font-medium leading-none">Risk-managed portfolios</p>
+<p class="text-[#9AA4B2] text-xs mt-1">Smarter exposure, less volatility</p>
+</div>
+</div>
+<!-- Feature 2 -->
+<div class="flex items-center gap-4">
+<div class="flex items-center justify-center rounded-xl bg-primary/10 border border-primary/20 shrink-0 size-12">
+<span class="material-symbols-outlined text-primary">analytics</span>
+</div>
+<div class="flex flex-col">
+<p class="text-white text-base font-medium leading-none">Real-time transparency</p>
+<p class="text-[#9AA4B2] text-xs mt-1">See exactly where your money is</p>
+</div>
+</div>
+<!-- Feature 3 -->
+<div class="flex items-center gap-4">
+<div class="flex items-center justify-center rounded-xl bg-primary/10 border border-primary/20 shrink-0 size-12">
+<span class="material-symbols-outlined text-primary">lock_open</span>
+</div>
+<div class="flex flex-col">
+<p class="text-white text-base font-medium leading-none">Your money, your control</p>
+<p class="text-[#9AA4B2] text-xs mt-1">Withdraw or rebalance instantly</p>
+</div>
+</div>
+</div>
+<!-- Bottom Section: CTA & Sign In -->
+<div class="w-full max-w-md space-y-6 mb-4">
+<!-- Primary Action -->
+<button class="w-full flex items-center justify-between bg-primary hover:bg-[#82b6f9] text-background-dark font-bold py-4 px-6 rounded-xl transition-colors duration-200">
+<span class="text-lg">Get Started</span>
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+<!-- Secondary Link -->
+<div class="text-center">
+<p class="text-[#9AA4B2] text-sm">
+                    Already have an account? 
+                    <a class="text-primary font-semibold hover:underline decoration-primary/50 underline-offset-4 ml-1" href="#">Sign in</a>
+</p>
+</div>
+</div>
+<!-- iOS Home Indicator Spacing -->
+<div class="h-4"></div>
+</div>
+<!-- Decorative background elements for premium feel -->
+<div class="fixed top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px] pointer-events-none"></div>
+<div class="fixed bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-primary/5 rounded-full blur-[120px] pointer-events-none"></div>
+</body></html>

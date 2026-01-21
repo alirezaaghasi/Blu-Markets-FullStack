@@ -1,5 +1,13 @@
-// Trade Bottom Sheet Component
-// Based on PRD Section 9.2 - Trade Bottom Sheet
+/**
+ * TradeBottomSheet
+ * Design System: Blu Markets
+ * Target: iPhone 16 Pro (393 x 852)
+ *
+ * BUY/SELL interface with two-step confirmation flow
+ * Step 1: Enter trade details → Review Trade
+ * Step 2: ConfirmTradeModal → Confirm/Cancel
+ * Result: TradeSuccessModal or TradeErrorModal
+ */
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
@@ -12,14 +20,17 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
-import { colors, typography, spacing, borderRadius } from '../constants/theme';
+import { COLORS, BOUNDARY_BG } from '../constants/colors';
+import { TYPOGRAPHY } from '../constants/typography';
+import { SPACING, RADIUS } from '../constants/spacing';
+import { LAYOUT } from '../constants/layout';
+import { Button } from './common';
 import { AssetId, Boundary, Holding, TradePreview } from '../types';
 import { ASSETS, LAYER_COLORS, LAYER_NAMES } from '../constants/assets';
 import { MIN_TRADE_AMOUNT, SPREAD_BY_LAYER } from '../constants/business';
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
-import { updateHoldingFromTrade, updateCash } from '../store/slices/portfolioSlice';
+import { updateHoldingFromTrade, updateCash, logAction } from '../store/slices/portfolioSlice';
 import {
   validateBuyTrade,
   validateSellTrade,
@@ -27,6 +38,9 @@ import {
 } from '../utils/tradeValidation';
 import AllocationBar from './AllocationBar';
 import { tradeApi, ApiError } from '../services/api';
+import { ConfirmTradeModal } from './ConfirmTradeModal';
+import { TradeSuccessModal } from './TradeSuccessModal';
+import { TradeErrorModal } from './TradeErrorModal';
 
 interface TradeBottomSheetProps {
   visible: boolean;
@@ -45,11 +59,21 @@ const QUICK_AMOUNTS = [
 
 // Boundary indicator colors
 const BOUNDARY_COLORS: Record<Boundary, string> = {
-  SAFE: colors.boundarySafe,
-  DRIFT: colors.boundaryDrift,
-  STRUCTURAL: colors.boundaryStructural,
-  STRESS: colors.boundaryStress,
+  SAFE: COLORS.boundary.safe,
+  DRIFT: COLORS.boundary.drift,
+  STRUCTURAL: COLORS.boundary.structural,
+  STRESS: COLORS.boundary.stress,
 };
+
+// Trade result for success modal
+interface TradeResult {
+  side: 'BUY' | 'SELL';
+  assetId: AssetId;
+  amountIRR: number;
+  quantity: number;
+  newCashBalance: number;
+  newHoldingQuantity: number;
+}
 
 export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
   visible,
@@ -61,11 +85,19 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
   const { holdings, cashIRR, targetLayerPct } = useAppSelector((state) => state.portfolio);
   const { prices, fxRate } = useAppSelector((state) => state.prices);
 
+  // Trade input state
   const [side, setSide] = useState<'BUY' | 'SELL'>(initialSide);
   const [assetId, setAssetId] = useState<AssetId>(initialAssetId);
   const [amountInput, setAmountInput] = useState('');
   const [showAssetPicker, setShowAssetPicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Two-step confirmation flow state
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [tradeResult, setTradeResult] = useState<TradeResult | null>(null);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const asset = ASSETS[assetId];
   const priceUSD = prices[assetId] || 0;
@@ -156,32 +188,20 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
     setAmountInput(formatNumber(amount));
   };
 
-  // Handle trade confirmation
-  const handleConfirm = async () => {
+  // Step 1: Open confirmation modal (Review Trade)
+  const handleReviewTrade = () => {
     if (!validation.ok || !preview) return;
-
-    // Show warning for non-SAFE boundaries
-    if (preview.boundary !== 'SAFE') {
-      Alert.alert(
-        preview.boundary === 'STRESS' ? 'High Risk Trade' : 'Trade Warning',
-        preview.frictionCopy.join('\n\n'),
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Proceed',
-            style: preview.boundary === 'STRESS' ? 'destructive' : 'default',
-            onPress: () => executeTradeFn(true), // acknowledgedWarning = true
-          },
-        ]
-      );
-    } else {
-      executeTradeFn(false);
-    }
+    setShowConfirmModal(true);
   };
 
-  const executeTradeFn = async (acknowledgedWarning = false) => {
+  // Step 2: Execute trade after confirmation
+  const handleConfirmTrade = async () => {
+    if (!preview) return;
+
     setIsSubmitting(true);
     try {
+      // Acknowledge warning for non-SAFE trades
+      const acknowledgedWarning = preview.boundary !== 'SAFE';
       const response = await tradeApi.execute(side, assetId, amountIRR, acknowledgedWarning);
 
       // Update local state with trade result
@@ -192,14 +212,58 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
       }));
       dispatch(updateCash(response.newBalance.cashIrr));
 
-      onClose();
-      setAmountInput('');
+      // Log action to activity feed
+      dispatch(logAction({
+        type: 'TRADE',
+        boundary: preview.boundary,
+        message: `${side === 'BUY' ? 'Bought' : 'Sold'} ${preview.quantity.toFixed(6)} ${asset.symbol}`,
+        amountIRR: amountIRR,
+      }));
+
+      // Set trade result for success modal
+      setTradeResult({
+        side,
+        assetId,
+        amountIRR,
+        quantity: preview.quantity,
+        newCashBalance: response.newBalance.cashIrr,
+        newHoldingQuantity: response.newBalance.holdingQuantity,
+      });
+
+      // Close confirm modal, show success modal
+      setShowConfirmModal(false);
+      setShowSuccessModal(true);
     } catch (error) {
       const apiError = error as ApiError;
-      Alert.alert('Trade Failed', apiError.message || 'Failed to execute trade. Please try again.');
+      setErrorMessage(apiError.message || 'Failed to execute trade. Please try again.');
+
+      // Close confirm modal, show error modal
+      setShowConfirmModal(false);
+      setShowErrorModal(true);
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Handle success modal close
+  const handleSuccessClose = () => {
+    setShowSuccessModal(false);
+    setTradeResult(null);
+    setAmountInput('');
+    onClose(); // Close the entire bottom sheet
+  };
+
+  // Handle error modal close
+  const handleErrorClose = () => {
+    setShowErrorModal(false);
+    setErrorMessage('');
+  };
+
+  // Handle error retry
+  const handleErrorRetry = () => {
+    setShowErrorModal(false);
+    setErrorMessage('');
+    setShowConfirmModal(true); // Re-open confirm modal
   };
 
   // Reset on asset change
@@ -283,7 +347,7 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
                 value={amountInput}
                 onChangeText={handleAmountChange}
                 placeholder="0"
-                placeholderTextColor={colors.textSecondary}
+                placeholderTextColor={COLORS.text.muted}
                 keyboardType="numeric"
                 returnKeyType="done"
               />
@@ -378,19 +442,19 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
             )}
           </ScrollView>
 
-          {/* Confirm Button */}
+          {/* Review Trade Button (Step 1) */}
           <View style={styles.footer}>
             <TouchableOpacity
               style={[
                 styles.confirmButton,
                 side === 'SELL' && styles.confirmButtonSell,
-                (!validation.ok || isSubmitting) && styles.confirmButtonDisabled,
+                !validation.ok && styles.confirmButtonDisabled,
               ]}
-              onPress={handleConfirm}
-              disabled={!validation.ok || isSubmitting}
+              onPress={handleReviewTrade}
+              disabled={!validation.ok}
             >
               <Text style={styles.confirmButtonText}>
-                {isSubmitting ? 'Processing...' : `Confirm ${side === 'BUY' ? 'Buy' : 'Sell'}`}
+                Review Trade
               </Text>
             </TouchableOpacity>
           </View>
@@ -406,6 +470,30 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
           holdings={holdings}
           prices={prices}
           fxRate={fxRate}
+        />
+
+        {/* Step 2: Confirm Trade Modal */}
+        <ConfirmTradeModal
+          visible={showConfirmModal}
+          onClose={() => setShowConfirmModal(false)}
+          onConfirm={handleConfirmTrade}
+          preview={preview}
+          loading={isSubmitting}
+        />
+
+        {/* Success Modal */}
+        <TradeSuccessModal
+          visible={showSuccessModal}
+          onClose={handleSuccessClose}
+          result={tradeResult}
+        />
+
+        {/* Error Modal */}
+        <TradeErrorModal
+          visible={showErrorModal}
+          onClose={handleErrorClose}
+          onRetry={handleErrorRetry}
+          message={errorMessage}
         />
       </SafeAreaView>
     </Modal>
@@ -535,49 +623,49 @@ const AssetPickerModal: React.FC<AssetPickerModalProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bgDark,
+    backgroundColor: COLORS.background.primary,
   },
   keyboardView: {
     flex: 1,
   },
   header: {
     alignItems: 'center',
-    paddingVertical: spacing[3],
+    paddingVertical: SPACING[3],
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderDark,
+    borderBottomColor: COLORS.border,
   },
   dragIndicator: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: colors.borderDark,
-    marginBottom: spacing[2],
+    backgroundColor: COLORS.border,
+    marginBottom: SPACING[2],
   },
   closeButton: {
     position: 'absolute',
-    right: spacing[4],
-    top: spacing[3],
+    right: SPACING[4],
+    top: SPACING[3],
   },
   closeButtonText: {
-    color: colors.primary,
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.medium,
+    color: COLORS.brand.primary,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: spacing[4],
-    paddingBottom: spacing[8],
+    padding: SPACING[4],
+    paddingBottom: SPACING[8],
   },
   assetSelector: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.cardDark,
-    borderRadius: borderRadius.default,
-    padding: spacing[4],
-    marginBottom: spacing[4],
+    backgroundColor: COLORS.background.elevated,
+    borderRadius: RADIUS.lg,
+    padding: SPACING[4],
+    marginBottom: SPACING[4],
   },
   assetInfo: {
     flexDirection: 'row',
@@ -589,304 +677,304 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing[3],
+    marginRight: SPACING[3],
   },
   assetIconText: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text.primary,
   },
   assetName: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textPrimaryDark,
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.primary,
   },
   assetPrice: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
     marginTop: 2,
   },
   assetArrow: {
     fontSize: 24,
-    color: colors.textSecondary,
+    color: COLORS.text.secondary,
   },
   sideToggle: {
     flexDirection: 'row',
-    backgroundColor: colors.cardDark,
-    borderRadius: borderRadius.default,
-    padding: spacing[1],
-    marginBottom: spacing[4],
+    backgroundColor: COLORS.background.elevated,
+    borderRadius: RADIUS.lg,
+    padding: SPACING[1],
+    marginBottom: SPACING[4],
   },
   sideButton: {
     flex: 1,
-    paddingVertical: spacing[3],
-    borderRadius: borderRadius.sm,
+    paddingVertical: SPACING[3],
+    borderRadius: RADIUS.md,
     alignItems: 'center',
   },
   sideButtonActive: {
-    backgroundColor: colors.success,
+    backgroundColor: COLORS.semantic.success,
   },
   sideButtonActiveSell: {
-    backgroundColor: colors.error,
+    backgroundColor: COLORS.semantic.error,
   },
   sideButtonText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.secondary,
   },
   sideButtonTextActive: {
-    color: colors.textPrimaryDark,
+    color: COLORS.text.inverse,
   },
   amountSection: {
-    marginBottom: spacing[4],
+    marginBottom: SPACING[4],
   },
   amountLabel: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    marginBottom: spacing[2],
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
+    marginBottom: SPACING[2],
   },
   amountInput: {
-    backgroundColor: colors.cardDark,
-    borderRadius: borderRadius.default,
-    padding: spacing[4],
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
+    backgroundColor: COLORS.background.elevated,
+    borderRadius: RADIUS.lg,
+    padding: SPACING[4],
+    fontSize: TYPOGRAPHY.fontSize['2xl'],
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text.primary,
     textAlign: 'center',
   },
   availableText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
     textAlign: 'center',
-    marginTop: spacing[2],
+    marginTop: SPACING[2],
   },
   quickAmounts: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: spacing[4],
-    gap: spacing[2],
+    marginBottom: SPACING[4],
+    gap: SPACING[2],
   },
   quickChip: {
     flex: 1,
-    backgroundColor: colors.surfaceDark,
-    borderRadius: borderRadius.full,
-    paddingVertical: spacing[2],
+    backgroundColor: COLORS.background.surface,
+    borderRadius: RADIUS.full,
+    paddingVertical: SPACING[2],
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.borderDark,
+    borderColor: COLORS.border,
   },
   quickChipText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.textPrimaryDark,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
+    color: COLORS.text.primary,
   },
   previewSection: {
-    backgroundColor: colors.cardDark,
-    borderRadius: borderRadius.lg,
-    padding: spacing[4],
-    marginBottom: spacing[4],
+    backgroundColor: COLORS.background.elevated,
+    borderRadius: RADIUS.xl,
+    padding: SPACING[4],
+    marginBottom: SPACING[4],
   },
   previewTitle: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textPrimaryDark,
-    marginBottom: spacing[4],
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.primary,
+    marginBottom: SPACING[4],
   },
   previewRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: spacing[3],
+    marginBottom: SPACING[3],
   },
   previewLabel: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
   },
   previewValue: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.textPrimaryDark,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
+    color: COLORS.text.primary,
   },
   allocationPreview: {
-    marginTop: spacing[4],
-    paddingTop: spacing[4],
+    marginTop: SPACING[4],
+    paddingTop: SPACING[4],
     borderTopWidth: 1,
-    borderTopColor: colors.borderDark,
+    borderTopColor: COLORS.border,
   },
   allocationLabel: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    marginBottom: spacing[3],
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
+    marginBottom: SPACING[3],
   },
   allocationBars: {
-    gap: spacing[2],
+    gap: SPACING[2],
   },
   allocationBarRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing[2],
+    gap: SPACING[2],
   },
   allocationBarLabel: {
     width: 50,
-    fontSize: typography.fontSize.xs,
-    color: colors.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.text.secondary,
   },
   boundaryIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing[3],
-    borderRadius: borderRadius.default,
-    marginTop: spacing[4],
+    padding: SPACING[3],
+    borderRadius: RADIUS.lg,
+    marginTop: SPACING[4],
   },
   boundaryDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginRight: spacing[2],
+    marginRight: SPACING[2],
   },
   boundaryText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
   },
   frictionCopy: {
-    marginTop: spacing[3],
-    padding: spacing[3],
-    backgroundColor: `${colors.warning}15`,
-    borderRadius: borderRadius.default,
+    marginTop: SPACING[3],
+    padding: SPACING[3],
+    backgroundColor: COLORS.semanticBg.warning,
+    borderRadius: RADIUS.lg,
   },
   frictionText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.warning,
-    marginBottom: spacing[1],
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.semantic.warning,
+    marginBottom: SPACING[1],
   },
   errorSection: {
-    backgroundColor: `${colors.error}15`,
-    borderRadius: borderRadius.default,
-    padding: spacing[3],
-    marginBottom: spacing[4],
+    backgroundColor: COLORS.semanticBg.error,
+    borderRadius: RADIUS.lg,
+    padding: SPACING[3],
+    marginBottom: SPACING[4],
   },
   errorText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.error,
-    marginBottom: spacing[1],
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.semantic.error,
+    marginBottom: SPACING[1],
   },
   footer: {
-    padding: spacing[4],
-    paddingBottom: spacing[8],
+    padding: SPACING[4],
+    paddingBottom: LAYOUT.totalBottomSpace,
     borderTopWidth: 1,
-    borderTopColor: colors.borderDark,
+    borderTopColor: COLORS.border,
   },
   confirmButton: {
-    backgroundColor: colors.success,
-    borderRadius: borderRadius.full,
-    padding: spacing[4],
+    backgroundColor: COLORS.semantic.success,
+    borderRadius: RADIUS.full,
+    padding: SPACING[4],
     alignItems: 'center',
   },
   confirmButtonSell: {
-    backgroundColor: colors.error,
+    backgroundColor: COLORS.semantic.error,
   },
   confirmButtonDisabled: {
     opacity: 0.5,
   },
   confirmButtonText: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text.inverse,
   },
   // Asset Picker Styles
   pickerContainer: {
     flex: 1,
-    backgroundColor: colors.bgDark,
+    backgroundColor: COLORS.background.primary,
   },
   pickerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: spacing[4],
+    padding: SPACING[4],
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderDark,
+    borderBottomColor: COLORS.border,
   },
   pickerTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text.primary,
   },
   pickerClose: {
-    fontSize: typography.fontSize.base,
-    color: colors.primary,
-    fontWeight: typography.fontWeight.medium,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.brand.primary,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
   },
   pickerScrollView: {
     flex: 1,
   },
   pickerLayerSection: {
-    padding: spacing[4],
+    padding: SPACING[4],
   },
   pickerLayerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing[3],
+    marginBottom: SPACING[3],
   },
   pickerLayerDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    marginRight: spacing[2],
+    marginRight: SPACING[2],
   },
   pickerLayerName: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.secondary,
     textTransform: 'uppercase',
   },
   pickerAssetRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.cardDark,
-    borderRadius: borderRadius.default,
-    padding: spacing[4],
-    marginBottom: spacing[2],
+    backgroundColor: COLORS.background.elevated,
+    borderRadius: RADIUS.lg,
+    padding: SPACING[4],
+    marginBottom: SPACING[2],
   },
   pickerAssetRowSelected: {
     borderWidth: 2,
-    borderColor: colors.primary,
+    borderColor: COLORS.brand.primary,
   },
   pickerAssetInfo: {
     flex: 1,
   },
   pickerAssetName: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textPrimaryDark,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.primary,
   },
   pickerAssetPrice: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
     marginTop: 2,
   },
   pickerHolding: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    marginRight: spacing[2],
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
+    marginRight: SPACING[2],
   },
   pickerCheckmark: {
-    fontSize: typography.fontSize.lg,
-    color: colors.primary,
-    fontWeight: typography.fontWeight.bold,
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    color: COLORS.brand.primary,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
   },
   pickerEmptyState: {
     alignItems: 'center',
-    padding: spacing[8],
+    padding: SPACING[8],
   },
   pickerEmptyText: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textPrimaryDark,
-    marginBottom: spacing[2],
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.primary,
+    marginBottom: SPACING[2],
   },
   pickerEmptySubtext: {
-    fontSize: typography.fontSize.base,
-    color: colors.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.text.secondary,
     textAlign: 'center',
   },
 });

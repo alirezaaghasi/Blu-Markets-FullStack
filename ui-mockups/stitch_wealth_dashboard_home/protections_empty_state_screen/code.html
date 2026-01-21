@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Protections Empty State</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#6dbcf8", // From theme config
+                        "background-light": "#f5f7f8",
+                        "background-dark": "#0E1420", // Custom dark bg requested by user
+                        "surface-dark": "#151C28", // Custom surface for pills
+                        "text-secondary": "#9AA4B2", // Custom gray text
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Custom glow for the shield illustration */
+        .glow-effect {
+            box-shadow: 0 0 60px -10px rgba(109, 188, 248, 0.15);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display antialiased">
+<div class="relative flex h-screen w-full flex-col overflow-hidden max-w-md mx-auto shadow-2xl">
+<!-- Header -->
+<header class="flex items-center justify-between px-4 py-3 bg-background-light dark:bg-background-dark shrink-0 z-10">
+<button class="flex size-10 items-center justify-center rounded-full text-gray-900 dark:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+<span class="material-symbols-outlined text-[24px]">arrow_back</span>
+</button>
+<h1 class="text-lg font-bold leading-tight tracking-[-0.015em] text-gray-900 dark:text-white text-center flex-1">
+                Protections
+            </h1>
+<button class="flex size-10 items-center justify-center rounded-full text-gray-900 dark:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+<span class="material-symbols-outlined text-[24px]">info</span>
+</button>
+</header>
+<!-- Main Content (Scrollable) -->
+<main class="flex-1 overflow-y-auto flex flex-col items-center justify-center px-6 pb-20">
+<div class="flex flex-col items-center gap-8 w-full max-w-[320px]">
+<!-- Illustration -->
+<div class="relative flex items-center justify-center">
+<!-- Glow Layer -->
+<div class="absolute inset-0 bg-primary/20 blur-[40px] rounded-full size-32 m-auto"></div>
+<!-- Icon -->
+<div class="relative flex items-center justify-center size-[120px] text-primary">
+<span class="material-symbols-outlined !text-[100px] font-light" style="font-variation-settings: 'wght' 200;">shield_lock</span>
+</div>
+</div>
+<!-- Text Block -->
+<div class="flex flex-col items-center gap-3 text-center">
+<h2 class="text-xl font-bold text-gray-900 dark:text-white">
+                        No Active Protections
+                    </h2>
+<p class="text-sm font-medium leading-relaxed text-gray-600 dark:text-text-secondary max-w-[280px]">
+                        Protect your assets from market drops. When prices fall below your entry point, you’re covered.
+                    </p>
+</div>
+<!-- Benefit Pills -->
+<div class="flex flex-wrap items-center justify-center gap-3 w-full mt-2">
+<div class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-gray-100 dark:bg-surface-dark px-4 border border-transparent dark:border-white/5">
+<span class="material-symbols-outlined text-primary text-[18px]">verified_user</span>
+<p class="text-gray-900 dark:text-white text-xs font-semibold leading-normal">Downside coverage</p>
+</div>
+<div class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-gray-100 dark:bg-surface-dark px-4 border border-transparent dark:border-white/5">
+<span class="material-symbols-outlined text-primary text-[18px]">trending_up</span>
+<p class="text-gray-900 dark:text-white text-xs font-semibold leading-normal">Keep upside gains</p>
+</div>
+<div class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-gray-100 dark:bg-surface-dark px-4 border border-transparent dark:border-white/5">
+<span class="material-symbols-outlined text-primary text-[18px]">schedule</span>
+<p class="text-gray-900 dark:text-white text-xs font-semibold leading-normal">Flexible terms</p>
+</div>
+</div>
+<!-- CTA Button -->
+<button class="w-full flex cursor-pointer items-center justify-center rounded-full h-12 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-blue-400 transition-colors shadow-lg shadow-primary/20 mt-4">
+                    Explore Protection
+                </button>
+</div>
+</main>
+<!-- Bottom Navigation -->
+<nav class="shrink-0 flex gap-2 border-t border-gray-200 dark:border-white/10 bg-background-light dark:bg-[#121926] px-4 pb-6 pt-2">
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-gray-500 dark:text-[#90b1cb] hover:text-primary dark:hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[24px]">home</span>
+<p class="text-[10px] font-medium leading-normal tracking-[0.015em]">Home</p>
+</a>
+<!-- Active Tab Indicator Simulation (Usually Protections sits under Portfolio or separate) -->
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-gray-500 dark:text-[#90b1cb] hover:text-primary dark:hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 0;">account_balance_wallet</span>
+<p class="text-[10px] font-medium leading-normal tracking-[0.015em]">Portfolio</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-gray-500 dark:text-[#90b1cb] hover:text-primary dark:hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[24px]">candlestick_chart</span>
+<p class="text-[10px] font-medium leading-normal tracking-[0.015em]">Market</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-gray-500 dark:text-[#90b1cb] hover:text-primary dark:hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[24px]">history</span>
+<p class="text-[10px] font-medium leading-normal tracking-[0.015em]">History</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-gray-500 dark:text-[#90b1cb] hover:text-primary dark:hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[24px]">account_circle</span>
+<p class="text-[10px] font-medium leading-normal tracking-[0.015em]">Profile</p>
+</a>
+</nav>
+</div>
+</body></html>

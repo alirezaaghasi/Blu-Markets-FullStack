@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Loan Repayment Bottom Sheet</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#6da9f8",
+                        "background-light": "#f5f7f8",
+                        "background-dark": "#101822",
+                        "sheet-bg": "#1C2433",
+                        "card-bg": "#151C28",
+                        "success": "#10B981", // Emerald green
+                        "text-secondary": "#90a9cb",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "2xl": "1.75rem",
+                        "3xl": "2rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        .radio-custom:checked + div {
+            border-color: #6da9f8;
+            background-color: rgba(109, 169, 248, 0.05);
+        }
+        .radio-custom:checked + div .radio-indicator {
+            border-color: #6da9f8;
+            background-color: #6da9f8;
+            box-shadow: inset 0 0 0 3px #1C2433;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display min-h-screen flex flex-col justify-end overflow-hidden">
+<!-- Backdrop (Simulated) -->
+<div aria-hidden="true" class="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"></div>
+<!-- Bottom Sheet Container -->
+<div class="relative z-50 w-full max-w-md mx-auto h-[85vh] md:h-[750px] bg-sheet-bg rounded-t-[24px] shadow-2xl flex flex-col overflow-hidden animate-slide-up">
+<!-- Drag Handle -->
+<div class="w-full flex justify-center pt-3 pb-1 cursor-grab active:cursor-grabbing">
+<div class="w-12 h-1.5 bg-[#314968] rounded-full"></div>
+</div>
+<!-- Scrollable Content Area -->
+<div class="flex-1 overflow-y-auto px-5 pb-24 scrollbar-hide">
+<!-- Header Section -->
+<div class="flex items-start justify-between mt-4 mb-6">
+<div>
+<h1 class="text-white text-[22px] font-bold leading-tight">Repay Loan</h1>
+<p class="text-text-secondary text-sm font-medium mt-1">Loan #1024 • BTC Collateral</p>
+</div>
+<button class="text-text-secondary hover:text-white transition-colors p-1 rounded-full hover:bg-white/5">
+<span class="material-symbols-outlined text-2xl">close</span>
+</button>
+</div>
+<!-- Loan Status Card -->
+<div class="bg-card-bg rounded-2xl p-5 mb-6 border border-white/5 shadow-lg relative overflow-hidden group">
+<!-- Abstract gradient background for card -->
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+<div class="flex justify-between items-center mb-1">
+<p class="text-text-secondary text-xs font-medium uppercase tracking-wider">Outstanding Balance</p>
+<div class="flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded-md">
+<span class="material-symbols-outlined text-text-secondary text-xs">calendar_today</span>
+<span class="text-text-secondary text-xs">Due Jan 28, 2026</span>
+</div>
+</div>
+<h2 class="text-white text-3xl font-bold mb-5 tracking-tight">18,500,000 <span class="text-lg font-medium text-text-secondary">IRR</span></h2>
+<!-- Progress Section -->
+<div class="space-y-2">
+<div class="flex justify-between text-sm">
+<span class="text-white font-medium">2 of 6 installments paid</span>
+<span class="text-success font-medium">26%</span>
+</div>
+<div class="h-2 w-full bg-[#314968]/30 rounded-full overflow-hidden">
+<div class="h-full bg-success rounded-full" style="width: 26%;"></div>
+</div>
+</div>
+</div>
+<!-- Payment Options -->
+<div class="space-y-4 mb-8">
+<p class="text-white font-semibold text-lg">Payment Amount</p>
+<!-- Option 1: Next Installment (Active) -->
+<label class="block cursor-pointer group">
+<input checked="" class="radio-custom hidden" name="payment_option" type="radio"/>
+<div class="border-2 border-primary bg-primary/5 rounded-xl p-4 transition-all duration-200 hover:border-primary/70">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="radio-indicator w-5 h-5 rounded-full border-2 border-primary bg-primary shadow-[inset_0_0_0_3px_#1C2433]"></div>
+<div>
+<p class="text-white font-bold text-base">Next Installment</p>
+<p class="text-text-secondary text-sm">Standard monthly payment</p>
+</div>
+</div>
+<span class="text-white font-bold text-lg">4,583,333</span>
+</div>
+</div>
+</label>
+<!-- Option 2: Custom Amount -->
+<label class="block cursor-pointer group">
+<input class="radio-custom hidden" name="payment_option" type="radio"/>
+<div class="border-2 border-white/5 bg-card-bg rounded-xl p-4 transition-all duration-200 hover:border-white/10">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="radio-indicator w-5 h-5 rounded-full border-2 border-text-secondary"></div>
+<p class="text-white font-medium text-base">Custom Amount</p>
+</div>
+<div class="text-right">
+<span class="text-text-secondary opacity-50 font-medium">Enter amount</span>
+</div>
+</div>
+</div>
+</label>
+<!-- Option 3: Pay Off Entire Loan -->
+<label class="block cursor-pointer group">
+<input class="radio-custom hidden" name="payment_option" type="radio"/>
+<div class="border-2 border-white/5 bg-card-bg rounded-xl p-4 relative overflow-hidden transition-all duration-200 hover:border-success/30">
+<!-- Subtle green glow for pay off -->
+<div class="absolute inset-0 bg-success/5 pointer-events-none"></div>
+<div class="flex items-center justify-between relative z-10">
+<div class="flex items-center gap-3">
+<div class="radio-indicator w-5 h-5 rounded-full border-2 border-text-secondary"></div>
+<div>
+<p class="text-white font-bold text-base">Pay Off Entire Loan</p>
+<p class="text-success text-xs font-medium flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[14px]">lock_open</span> 
+                                        Unlocks BTC collateral
+                                    </p>
+</div>
+</div>
+<span class="text-white font-bold text-lg">18,500,000</span>
+</div>
+</div>
+</label>
+</div>
+<!-- Payment Summary Table -->
+<div class="mb-6 border-t border-white/10 pt-6">
+<div class="flex justify-between items-center mb-3">
+<span class="text-text-secondary text-sm">You pay</span>
+<span class="text-white font-semibold">4,583,333 IRR</span>
+</div>
+<div class="flex justify-between items-center mb-3">
+<span class="text-text-secondary text-sm">Remaining after payment</span>
+<span class="text-white font-medium">13,916,667 IRR</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-text-secondary text-sm">Installments left</span>
+<span class="text-white font-medium">3 installments</span>
+</div>
+</div>
+</div>
+<!-- Sticky Footer CTA -->
+<div class="absolute bottom-0 left-0 w-full bg-sheet-bg border-t border-white/5 p-5 pb-8 safe-area-pb">
+<!-- Gradient fade above footer -->
+<div class="absolute bottom-full left-0 w-full h-8 bg-gradient-to-t from-sheet-bg to-transparent pointer-events-none"></div>
+<button class="w-full bg-primary hover:bg-blue-400 active:scale-[0.98] transition-all text-background-dark font-bold text-lg py-4 rounded-xl shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">
+<span>Pay 4,583,333 IRR</span>
+<span class="material-symbols-outlined text-xl">arrow_forward</span>
+</button>
+</div>
+</div>
+</body></html>

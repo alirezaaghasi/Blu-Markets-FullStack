@@ -3,7 +3,7 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from './types';
-import { colors } from '../constants/theme';
+import { COLORS } from '../constants/colors';
 
 // Import screens
 import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
@@ -23,7 +23,7 @@ export const OnboardingNavigator: React.FC = () => {
       screenOptions={{
         headerShown: false,
         contentStyle: {
-          backgroundColor: colors.bgDark,
+          backgroundColor: COLORS.background.primary,
         },
         animation: 'slide_from_right',
       }}

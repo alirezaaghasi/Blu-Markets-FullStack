@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Active Loan View</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#6FAAF8",
+                        "background-dark": "#0E1420",
+                        "card-dark": "#151C28",
+                        "text-secondary": "#90a9cb",
+                        "success": "#4CAF50",
+                        "warning": "#FFC107",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "2xl": "1rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-dark text-white font-display antialiased overflow-x-hidden selection:bg-primary/30">
+<div class="relative flex min-h-screen w-full flex-col pb-32">
+<!-- Header -->
+<header class="sticky top-0 z-40 bg-background-dark/80 backdrop-blur-md border-b border-white/5">
+<div class="flex items-center justify-between px-4 py-3">
+<button class="flex size-10 items-center justify-center rounded-full active:bg-white/10 text-white">
+<span class="material-symbols-outlined text-2xl">arrow_back</span>
+</button>
+<h1 class="text-xl font-bold tracking-tight text-white">Loan #1024</h1>
+<button class="flex size-10 items-center justify-center rounded-full active:bg-white/10 text-white">
+<span class="material-symbols-outlined text-2xl">more_vert</span>
+</button>
+</div>
+<!-- Status Banner -->
+<div class="w-full bg-emerald-500/10 border-y border-emerald-500/20 px-4 py-2 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-emerald-400 text-sm fill-1">check_circle</span>
+<p class="text-emerald-400 text-xs font-bold tracking-wide uppercase">Active • On track</p>
+</div>
+</header>
+<main class="flex flex-col gap-6 p-4">
+<!-- Collateral Card -->
+<section>
+<div class="relative overflow-hidden rounded-xl bg-card-dark border border-white/5 p-4 shadow-lg">
+<div class="absolute top-0 right-0 p-4">
+<div class="flex items-center gap-1 rounded-md bg-blue-900/40 border border-blue-500/30 px-2 py-1 backdrop-blur-sm">
+<span class="material-symbols-outlined text-[16px] text-blue-400">lock</span>
+<span class="text-[10px] font-bold tracking-wider text-blue-300">FROZEN</span>
+</div>
+</div>
+<div class="flex items-start gap-4">
+<div class="flex size-12 shrink-0 items-center justify-center rounded-full bg-[#F7931A]/10">
+<!-- Bitcoin Icon SVG -->
+<svg class="w-7 h-7 text-[#F7931A]" fill="currentColor" viewbox="0 0 24 24">
+<path d="M23.638 14.904c-1.602 6.43-8.113 10.34-14.542 8.736C2.67 22.05-1.244 15.525.362 9.105 1.962 2.67 8.475-1.24 14.9.358c6.43 1.605 10.341 8.115 8.738 14.548v-.002zm-3.961-3.246c.499-3.326-2.03-4.088-5.485-5.043l1.12-4.487-2.731-.681-1.09 4.373c-.718-.18-1.465-.347-2.204-.522l1.1-4.406-2.73-.683-1.129 4.525c-.596-.14-1.192-.265-1.768-.415l.004-.017-3.766-.94-.727 2.914s2.025.464 1.983.492c1.106.276 1.306 1.008 1.272 1.588l-1.274 5.11c.077.196.177.498.177.498-.246-.062-.516-.13-.807-.203l-.91 3.64s-.703.176-1.52.378c.844.21 1.695.42 2.535.632l-1.137 4.555 2.73.682 1.133-4.54c.75.205 1.48.397 2.215.57l-1.127 4.512 2.732.682 1.129-4.524c4.66.882 8.169.526 9.64-3.69.117-.336.216-.697.294-1.077 1.054-4.237-2.13-6.195-2.13-6.195s1.517-.393 2.502-1.928c.036-.064.07-.13.102-.197z"></path>
+</svg>
+</div>
+<div class="flex flex-col gap-1">
+<p class="text-xs font-semibold uppercase tracking-wider text-text-secondary">Collateral Asset</p>
+<h2 class="text-xl font-bold text-white">Bitcoin</h2>
+<div class="flex items-center gap-2 text-sm text-text-secondary">
+<span class="font-medium text-white">0.5 BTC</span>
+<span>•</span>
+<span>≈ 70,000,000 IRR</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Loan Summary Card -->
+<section class="rounded-xl bg-card-dark border border-white/5 p-5 shadow-lg">
+<div class="grid grid-cols-2 gap-y-6 gap-x-4">
+<div class="flex flex-col gap-1">
+<p class="text-xs font-medium text-text-secondary uppercase">Principal</p>
+<p class="text-base font-bold text-white">25M IRR</p>
+</div>
+<div class="flex flex-col gap-1">
+<p class="text-xs font-medium text-text-secondary uppercase">Interest Rate</p>
+<p class="text-base font-bold text-white">30%</p>
+</div>
+<div class="flex flex-col gap-1">
+<p class="text-xs font-medium text-text-secondary uppercase">Total Owed</p>
+<p class="text-base font-bold text-white">35M IRR</p>
+</div>
+<div class="flex flex-col gap-1">
+<p class="text-xs font-medium text-text-secondary uppercase">Amount Paid</p>
+<p class="text-base font-bold text-emerald-400">16.7M IRR</p>
+</div>
+<div class="flex flex-col gap-1">
+<p class="text-xs font-medium text-text-secondary uppercase">Remaining</p>
+<p class="text-lg font-bold text-primary">18.3M IRR</p>
+</div>
+<div class="flex flex-col gap-1">
+<p class="text-xs font-medium text-text-secondary uppercase">Maturity</p>
+<p class="text-base font-bold text-white">Apr 24, 2026</p>
+</div>
+</div>
+</section>
+<!-- LTV Health Meter -->
+<section class="rounded-xl bg-card-dark border border-white/5 p-5 shadow-lg">
+<div class="flex items-center justify-between mb-4">
+<h3 class="text-sm font-semibold text-white">LTV Health</h3>
+<span class="rounded bg-emerald-500/10 px-2 py-0.5 text-xs font-bold text-emerald-400">Safe Zone</span>
+</div>
+<div class="relative w-full h-8 pt-4">
+<!-- Gauge Bar -->
+<div class="flex h-2 w-full overflow-hidden rounded-full">
+<div class="w-[60%] bg-gradient-to-r from-emerald-600 to-emerald-400"></div>
+<div class="w-[25%] bg-yellow-500"></div>
+<div class="w-[15%] bg-red-500"></div>
+</div>
+<!-- Indicator Triangle -->
+<div class="absolute top-2 -ml-1.5 transition-all duration-1000" style="left: 36%">
+<div class="flex flex-col items-center gap-1">
+<div class="size-0 border-x-4 border-x-transparent border-t-4 border-t-white"></div>
+<div class="mt-0.5 rounded px-1.5 py-0.5 bg-white text-[10px] font-bold text-background-dark leading-none">36%</div>
+</div>
+</div>
+</div>
+<div class="mt-4 flex justify-between text-[10px] text-text-secondary font-medium uppercase tracking-wide">
+<span>0%</span>
+<span class="pl-8">60% Warning</span>
+<span>85% Risk</span>
+</div>
+</section>
+<!-- Repayment Progress -->
+<section class="flex flex-col gap-3">
+<div class="flex items-end justify-between px-1">
+<h3 class="text-base font-semibold text-white">Repayment Progress</h3>
+<p class="text-xs font-medium text-text-secondary">Installment 3 of 6</p>
+</div>
+<!-- Segmented Progress Bar -->
+<div class="flex w-full gap-1.5">
+<div class="h-2 flex-1 rounded-full bg-emerald-500"></div>
+<div class="h-2 flex-1 rounded-full bg-emerald-500"></div>
+<div class="h-2 flex-1 rounded-full bg-amber-400 animate-pulse"></div>
+<div class="h-2 flex-1 rounded-full bg-white/10"></div>
+<div class="h-2 flex-1 rounded-full bg-white/10"></div>
+<div class="h-2 flex-1 rounded-full bg-white/10"></div>
+</div>
+</section>
+<!-- Payment Schedule -->
+<section class="flex flex-col gap-4">
+<h3 class="px-1 text-sm font-semibold text-text-secondary uppercase tracking-wider">Payment Schedule</h3>
+<div class="flex flex-col gap-3">
+<!-- Paid Item -->
+<div class="flex items-center gap-4 rounded-xl bg-card-dark border border-white/5 p-3">
+<div class="flex size-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400">
+<span class="material-symbols-outlined text-[20px]">check</span>
+</div>
+<div class="flex flex-1 flex-col">
+<p class="text-sm font-bold text-white">Oct 24, 2024</p>
+<p class="text-xs text-text-secondary">5,560,000 IRR</p>
+</div>
+<span class="rounded bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-400">PAID</span>
+</div>
+<!-- Paid Item -->
+<div class="flex items-center gap-4 rounded-xl bg-card-dark border border-white/5 p-3">
+<div class="flex size-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400">
+<span class="material-symbols-outlined text-[20px]">check</span>
+</div>
+<div class="flex flex-1 flex-col">
+<p class="text-sm font-bold text-white">Nov 24, 2024</p>
+<p class="text-xs text-text-secondary">5,560,000 IRR</p>
+</div>
+<span class="rounded bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-400">PAID</span>
+</div>
+<!-- Due Item -->
+<div class="flex items-center gap-4 rounded-xl bg-card-dark border border-amber-500/30 p-3 shadow-[0_0_15px_-3px_rgba(245,158,11,0.15)]">
+<div class="flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-400">
+<span class="material-symbols-outlined text-[20px] fill-1">schedule</span>
+</div>
+<div class="flex flex-1 flex-col">
+<p class="text-sm font-bold text-white">Dec 24, 2024</p>
+<p class="text-xs text-text-secondary">5,560,000 IRR</p>
+</div>
+<span class="rounded bg-amber-500/10 px-2 py-1 text-[10px] font-bold text-amber-400 whitespace-nowrap">DUE IN 7 DAYS</span>
+</div>
+<!-- Upcoming Item -->
+<div class="flex items-center gap-4 rounded-xl border border-white/5 p-3 opacity-60">
+<div class="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/5 text-text-secondary">
+<span class="material-symbols-outlined text-[20px]">circle</span>
+</div>
+<div class="flex flex-1 flex-col">
+<p class="text-sm font-bold text-white">Jan 24, 2025</p>
+<p class="text-xs text-text-secondary">5,560,000 IRR</p>
+</div>
+<span class="text-[10px] font-bold text-text-secondary">UPCOMING</span>
+</div>
+<!-- Upcoming Item -->
+<div class="flex items-center gap-4 rounded-xl border border-white/5 p-3 opacity-60">
+<div class="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/5 text-text-secondary">
+<span class="material-symbols-outlined text-[20px]">circle</span>
+</div>
+<div class="flex flex-1 flex-col">
+<p class="text-sm font-bold text-white">Feb 24, 2025</p>
+<p class="text-xs text-text-secondary">5,560,000 IRR</p>
+</div>
+<span class="text-[10px] font-bold text-text-secondary">UPCOMING</span>
+</div>
+</div>
+</section>
+</main>
+<!-- Sticky Footer -->
+<div class="fixed bottom-[72px] left-0 w-full bg-gradient-to-t from-background-dark via-background-dark to-transparent pt-8 pb-4 px-4 z-30">
+<div class="flex gap-4">
+<button class="flex-1 rounded-xl border border-white/20 bg-transparent h-12 text-sm font-bold text-white hover:bg-white/5 transition-colors">
+                    Payment History
+                </button>
+<button class="flex-1 rounded-xl bg-primary h-12 text-sm font-bold text-white shadow-[0_0_20px_-5px_#6FAAF8] hover:bg-primary/90 transition-colors">
+                    Make Payment
+                </button>
+</div>
+</div>
+<!-- Bottom Navigation -->
+<nav class="fixed bottom-0 left-0 z-50 w-full bg-card-dark border-t border-white/5 pb-5 pt-3">
+<div class="flex items-center justify-around px-2">
+<button class="flex flex-col items-center gap-1 p-2 text-text-secondary">
+<span class="material-symbols-outlined text-2xl">home</span>
+<span class="text-[10px] font-medium">Home</span>
+</button>
+<button class="flex flex-col items-center gap-1 p-2 text-primary">
+<span class="material-symbols-outlined text-2xl fill-1">account_balance_wallet</span>
+<span class="text-[10px] font-medium">Loans</span>
+</button>
+<button class="flex flex-col items-center gap-1 p-2 text-text-secondary">
+<span class="material-symbols-outlined text-2xl">trending_up</span>
+<span class="text-[10px] font-medium">Invest</span>
+</button>
+<button class="flex flex-col items-center gap-1 p-2 text-text-secondary">
+<span class="material-symbols-outlined text-2xl">notifications</span>
+<span class="text-[10px] font-medium">Alerts</span>
+</button>
+<button class="flex flex-col items-center gap-1 p-2 text-text-secondary">
+<span class="material-symbols-outlined text-2xl">person</span>
+<span class="text-[10px] font-medium">Profile</span>
+</button>
+</div>
+</nav>
+</div>
+</body></html>

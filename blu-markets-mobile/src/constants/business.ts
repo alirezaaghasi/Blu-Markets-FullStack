@@ -83,14 +83,32 @@ export const PRICE_BACKOFF_MULTIPLIER = 1.5;
 export const PRICE_HEARTBEAT_MS = 5_000; // 5 seconds
 
 // API Configuration
-export const API_BASE_URL = __DEV__
-  ? 'http://localhost:3000'
-  : 'https://api.blumarkets.ir';
+// In Codespaces, use the forwarded URL; locally use localhost
+const getApiBaseUrl = () => {
+  if (!__DEV__) return 'https://api.blumarkets.ir';
+
+  // Check if running in Codespaces (browser will have the codespace hostname)
+  if (typeof window !== 'undefined' && window.location.hostname.includes('github.dev')) {
+    // Replace port 8081 with 3000 in the current URL
+    return window.location.origin.replace('-8081.', '-3000.');
+  }
+  return 'http://localhost:3000';
+};
+
+export const API_BASE_URL = getApiBaseUrl();
 
 // WebSocket Configuration
-export const WEBSOCKET_URL = __DEV__
-  ? 'ws://localhost:3000/api/v1/prices/stream'
-  : 'wss://api.blumarkets.ir/api/v1/prices/stream';
+const getWebSocketUrl = () => {
+  if (!__DEV__) return 'wss://api.blumarkets.ir/api/v1/prices/stream';
+
+  if (typeof window !== 'undefined' && window.location.hostname.includes('github.dev')) {
+    const baseUrl = window.location.origin.replace('-8081.', '-3000.').replace('https://', 'wss://');
+    return `${baseUrl}/api/v1/prices/stream`;
+  }
+  return 'ws://localhost:3000/api/v1/prices/stream';
+};
+
+export const WEBSOCKET_URL = getWebSocketUrl();
 export const WEBSOCKET_RECONNECT_INTERVAL_MS = 3_000; // 3 seconds
 export const WEBSOCKET_ENABLED = true;
 

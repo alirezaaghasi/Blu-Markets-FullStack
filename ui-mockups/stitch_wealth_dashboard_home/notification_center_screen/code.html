@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Notification Center</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Icons -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#6da9f8", 
+                        "background-light": "#f5f7f8",
+                        "background-dark": "#0E1420", // Deep dark blue requested
+                        "surface-dark": "#1C2433", // Lighter card background
+                        "text-secondary": "#90a9cb",
+                        "amber-accent": "#FBBC05",
+                        "green-accent": "#34A853",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "1rem", 
+                        "lg": "2rem", 
+                        "xl": "3rem", 
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        /* Custom scrollbar hiding for clean UI */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-white antialiased selection:bg-primary/30">
+<div class="relative flex h-full min-h-screen w-full flex-col overflow-hidden pb-[80px]"> <!-- Added padding bottom for fixed nav -->
+<!-- Header -->
+<header class="sticky top-0 z-20 flex items-center justify-between bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md px-4 py-4 pt-6">
+<button class="flex size-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+<span class="material-symbols-outlined text-[24px]">arrow_back</span>
+</button>
+<h1 class="text-xl font-bold leading-tight tracking-tight flex-1 text-center">Notifications</h1>
+<button class="flex h-10 items-center justify-end px-2">
+<span class="text-primary text-sm font-bold leading-normal tracking-wide">Mark all read</span>
+</button>
+</header>
+<!-- Filter Tabs -->
+<div class="sticky top-[72px] z-10 w-full overflow-x-auto no-scrollbar bg-background-light dark:bg-background-dark pb-4 pt-2 px-4 border-b border-black/5 dark:border-white/5 shadow-sm dark:shadow-none">
+<div class="flex gap-3 min-w-max">
+<button class="flex h-9 min-w-[60px] items-center justify-center rounded-full bg-primary px-5 shadow-lg shadow-primary/20 transition-transform active:scale-95">
+<span class="text-white text-sm font-bold leading-normal">All</span>
+</button>
+<button class="flex h-9 min-w-[60px] items-center justify-center rounded-full bg-white dark:bg-surface-dark border border-transparent dark:border-white/5 px-5 transition-transform active:scale-95">
+<span class="text-slate-600 dark:text-text-secondary text-sm font-medium leading-normal">Alerts</span>
+</button>
+<button class="flex h-9 min-w-[60px] items-center justify-center rounded-full bg-white dark:bg-surface-dark border border-transparent dark:border-white/5 px-5 transition-transform active:scale-95">
+<span class="text-slate-600 dark:text-text-secondary text-sm font-medium leading-normal">Activity</span>
+</button>
+<button class="flex h-9 min-w-[60px] items-center justify-center rounded-full bg-white dark:bg-surface-dark border border-transparent dark:border-white/5 px-5 transition-transform active:scale-95">
+<span class="text-slate-600 dark:text-text-secondary text-sm font-medium leading-normal">News</span>
+</button>
+</div>
+</div>
+<!-- Notification List -->
+<main class="flex flex-col px-4 pt-4 gap-6">
+<!-- Today Section -->
+<section class="flex flex-col gap-3">
+<h3 class="text-slate-500 dark:text-text-secondary text-sm font-bold uppercase tracking-wider pl-1">Today</h3>
+<!-- Unread Alert -->
+<div class="group relative flex items-start gap-4 rounded-2xl bg-white dark:bg-surface-dark p-4 shadow-sm dark:shadow-none transition-all active:scale-[0.98]">
+<div class="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-500">
+<span class="material-symbols-outlined" style="font-size: 24px;">warning</span>
+<!-- Unread Dot attached to icon container for visual focus -->
+<div class="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-primary ring-2 ring-white dark:ring-surface-dark"></div>
+</div>
+<div class="flex flex-1 flex-col gap-1">
+<div class="flex justify-between items-start">
+<h4 class="text-base font-bold leading-tight text-slate-900 dark:text-white pr-2">Rebalance Recommended</h4>
+<span class="text-xs font-medium text-slate-400 dark:text-text-secondary shrink-0 pt-0.5">2m</span>
+</div>
+<p class="text-sm font-medium text-slate-500 dark:text-text-secondary/80 leading-relaxed line-clamp-2">
+                            Portfolio drift exceeds 7.2%. Tap to review recommended actions.
+                        </p>
+</div>
+</div>
+<!-- Unread Success -->
+<div class="relative flex items-start gap-4 rounded-2xl bg-white dark:bg-surface-dark p-4 shadow-sm dark:shadow-none transition-all active:scale-[0.98]">
+<div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-green-500/10 text-green-500">
+<span class="material-symbols-outlined" style="font-size: 24px;">check_circle</span>
+</div>
+<div class="flex flex-1 flex-col gap-1">
+<div class="flex justify-between items-start">
+<h4 class="text-base font-bold leading-tight text-slate-900 dark:text-white pr-2">Trade Executed</h4>
+<span class="text-xs font-medium text-slate-400 dark:text-text-secondary shrink-0 pt-0.5">1h</span>
+</div>
+<p class="text-sm font-medium text-slate-500 dark:text-text-secondary/80 leading-relaxed line-clamp-2">
+                            Purchase of 0.45 BTC at market price completed successfully.
+                        </p>
+</div>
+<!-- Unread Dot floating right -->
+<div class="absolute right-4 top-[50%] -translate-y-[50%] h-2 w-2 rounded-full bg-primary opacity-0 group-hover:opacity-100"></div>
+</div>
+<!-- Read Info -->
+<div class="relative flex items-start gap-4 rounded-2xl bg-white dark:bg-surface-dark p-4 shadow-sm dark:shadow-none transition-all active:scale-[0.98]">
+<div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+<span class="material-symbols-outlined" style="font-size: 24px;">info</span>
+</div>
+<div class="flex flex-1 flex-col gap-1">
+<div class="flex justify-between items-start">
+<h4 class="text-base font-bold leading-tight text-slate-900 dark:text-white pr-2">Protection Expiring Soon</h4>
+<span class="text-xs font-medium text-slate-400 dark:text-text-secondary shrink-0 pt-0.5">4h</span>
+</div>
+<p class="text-sm font-medium text-slate-500 dark:text-text-secondary/80 leading-relaxed line-clamp-2">
+                            Your ETH downside protection options are set to expire in 3 days.
+                        </p>
+</div>
+</div>
+</section>
+<!-- Yesterday Section -->
+<section class="flex flex-col gap-3">
+<h3 class="text-slate-500 dark:text-text-secondary text-sm font-bold uppercase tracking-wider pl-1">Yesterday</h3>
+<!-- Read Alert -->
+<div class="relative flex items-start gap-4 rounded-2xl bg-white dark:bg-surface-dark p-4 shadow-sm dark:shadow-none transition-all active:scale-[0.98] opacity-90">
+<div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-500">
+<span class="material-symbols-outlined" style="font-size: 24px;">payments</span>
+</div>
+<div class="flex flex-1 flex-col gap-1">
+<div class="flex justify-between items-start">
+<h4 class="text-base font-bold leading-tight text-slate-900 dark:text-white pr-2">Loan Payment Due</h4>
+<span class="text-xs font-medium text-slate-400 dark:text-text-secondary shrink-0 pt-0.5">Jan 27</span>
+</div>
+<p class="text-sm font-medium text-slate-500 dark:text-text-secondary/80 leading-relaxed line-clamp-2">
+                            Installment for Jan 28 is due tomorrow. Ensure sufficient balance.
+                        </p>
+</div>
+</div>
+<!-- Read Success -->
+<div class="relative flex items-start gap-4 rounded-2xl bg-white dark:bg-surface-dark p-4 shadow-sm dark:shadow-none transition-all active:scale-[0.98] opacity-90">
+<div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-green-500/10 text-green-500">
+<span class="material-symbols-outlined" style="font-size: 24px;">savings</span>
+</div>
+<div class="flex flex-1 flex-col gap-1">
+<div class="flex justify-between items-start">
+<h4 class="text-base font-bold leading-tight text-slate-900 dark:text-white pr-2">Funds Added</h4>
+<span class="text-xs font-medium text-slate-400 dark:text-text-secondary shrink-0 pt-0.5">Jan 27</span>
+</div>
+<p class="text-sm font-medium text-slate-500 dark:text-text-secondary/80 leading-relaxed line-clamp-2">
+                            Deposit of 5,000,000 IRR received successfully.
+                        </p>
+</div>
+</div>
+<!-- Read Info -->
+<div class="relative flex items-start gap-4 rounded-2xl bg-white dark:bg-surface-dark p-4 shadow-sm dark:shadow-none transition-all active:scale-[0.98] opacity-90">
+<div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+<span class="material-symbols-outlined" style="font-size: 24px;">pie_chart</span>
+</div>
+<div class="flex flex-1 flex-col gap-1">
+<div class="flex justify-between items-start">
+<h4 class="text-base font-bold leading-tight text-slate-900 dark:text-white pr-2">Weekly Portfolio Summary</h4>
+<span class="text-xs font-medium text-slate-400 dark:text-text-secondary shrink-0 pt-0.5">Jan 27</span>
+</div>
+<p class="text-sm font-medium text-slate-500 dark:text-text-secondary/80 leading-relaxed line-clamp-2">
+                            Your portfolio grew by <span class="text-green-500 font-bold">+2.3%</span> this week. Great work!
+                        </p>
+</div>
+</div>
+</section>
+<div class="h-6"></div> <!-- Spacer for bottom nav -->
+</main>
+<!-- Bottom Navigation -->
+<nav class="fixed bottom-0 left-0 z-30 w-full border-t border-black/5 dark:border-white/5 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-lg pb-safe">
+<div class="flex h-[80px] w-full items-center justify-around px-2">
+<button class="flex flex-col items-center justify-center gap-1 p-2 text-slate-400 dark:text-slate-500 hover:text-primary dark:hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[26px]">home</span>
+<span class="text-[10px] font-medium">Home</span>
+</button>
+<button class="flex flex-col items-center justify-center gap-1 p-2 text-slate-400 dark:text-slate-500 hover:text-primary dark:hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[26px]">pie_chart</span>
+<span class="text-[10px] font-medium">Invest</span>
+</button>
+<button class="flex flex-col items-center justify-center gap-1 p-2 text-primary">
+<div class="relative">
+<span class="material-symbols-outlined fill-current text-[26px]" style="font-variation-settings: 'FILL' 1;">notifications</span>
+<span class="absolute right-0 top-0 h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-white dark:ring-background-dark"></span>
+</div>
+<span class="text-[10px] font-bold">Alerts</span>
+</button>
+<button class="flex flex-col items-center justify-center gap-1 p-2 text-slate-400 dark:text-slate-500 hover:text-primary dark:hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[26px]">account_balance_wallet</span>
+<span class="text-[10px] font-medium">Wallet</span>
+</button>
+<button class="flex flex-col items-center justify-center gap-1 p-2 text-slate-400 dark:text-slate-500 hover:text-primary dark:hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[26px]">person</span>
+<span class="text-[10px] font-medium">Profile</span>
+</button>
+</div>
+<!-- iOS Safe Area Bottom Spacer -->
+<div class="h-[env(safe-area-inset-bottom)] w-full"></div>
+</nav>
+</div>
+</body></html>

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Transaction History Ledger</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#0f49bd",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#0E1420",
+                        "surface-dark": "#151C28",
+                        "muted-grey": "#94A3B8"
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+        .status-pill-safe {
+            background-color: rgba(6, 78, 59, 0.4);
+            color: #10b981;
+        }
+        .status-pill-drift {
+            background-color: rgba(120, 53, 15, 0.4);
+            color: #f59e0b;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-white antialiased">
+<div class="relative flex min-h-screen w-full max-w-[430px] mx-auto flex-col bg-background-light dark:bg-background-dark overflow-x-hidden pb-24 shadow-2xl">
+<header class="sticky top-0 z-10 flex items-center bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md p-4 pb-2 justify-between">
+<div class="flex size-12 shrink-0 items-center">
+<span class="material-symbols-outlined text-white cursor-pointer">arrow_back_ios</span>
+</div>
+<h2 class="text-white text-lg font-bold leading-tight tracking-tight flex-1 text-center">Your History</h2>
+<div class="flex w-24 items-center justify-end">
+<button class="px-3 py-1.5 rounded-lg border border-primary/40 text-primary text-xs font-bold leading-normal tracking-wide bg-primary/10 hover:bg-primary/20 transition-colors">
+                    Export CSV
+                </button>
+</div>
+</header>
+<main class="flex-1 px-4">
+<div class="mt-4">
+<h3 class="text-white text-sm font-bold leading-tight tracking-widest uppercase pb-3 pt-4 opacity-60">Today</h3>
+<div class="flex flex-col gap-2">
+<div class="flex items-center gap-3 bg-surface-dark rounded-lg px-4 min-h-[80px] py-3 justify-between border border-white/5 active:bg-white/[0.02] transition-colors cursor-pointer group">
+<div class="flex items-center gap-4 flex-1">
+<div class="text-white flex items-center justify-center rounded-lg bg-[#232f48] shrink-0 size-12">
+<span class="material-symbols-outlined">balance</span>
+</div>
+<div class="flex flex-col justify-center">
+<p class="text-white text-base font-semibold leading-normal line-clamp-1">Rebalanced Portfolio</p>
+<p class="text-muted-grey text-xs font-normal leading-normal line-clamp-2 mt-0.5">10:42 AM · Transaction #8X92</p>
+</div>
+</div>
+<div class="flex items-center gap-2 shrink-0">
+<span class="status-pill-safe px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase">SAFE</span>
+<span class="material-symbols-outlined text-white/20 text-lg">chevron_right</span>
+</div>
+</div>
+<div class="w-full h-px bg-white/5 mx-auto"></div>
+<div class="flex items-center gap-3 bg-surface-dark rounded-lg px-4 min-h-[80px] py-3 justify-between border border-white/5 active:bg-white/[0.02] transition-colors cursor-pointer group">
+<div class="flex items-center gap-4 flex-1">
+<div class="text-white flex items-center justify-center rounded-lg bg-[#232f48] shrink-0 size-12">
+<span class="material-symbols-outlined">add</span>
+</div>
+<div class="flex flex-col justify-center">
+<p class="text-white text-base font-semibold leading-normal line-clamp-1">Bought BTC</p>
+<p class="text-muted-grey text-xs font-normal leading-normal line-clamp-2 mt-0.5">09:15 AM · 2,500,000 IRR</p>
+</div>
+</div>
+<div class="flex items-center gap-2 shrink-0">
+<span class="status-pill-drift px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase">DRIFT</span>
+<span class="material-symbols-outlined text-white/20 text-lg">chevron_right</span>
+</div>
+</div>
+</div>
+</div>
+<div class="mt-8">
+<h3 class="text-white text-sm font-bold leading-tight tracking-widest uppercase pb-3 pt-4 opacity-60">Yesterday</h3>
+<div class="flex flex-col gap-2">
+<div class="flex items-center gap-3 bg-surface-dark rounded-lg px-4 min-h-[80px] py-3 justify-between border border-white/5 active:bg-white/[0.02] transition-colors cursor-pointer group">
+<div class="flex items-center gap-4 flex-1">
+<div class="text-white flex items-center justify-center rounded-lg bg-[#232f48] shrink-0 size-12">
+<span class="material-symbols-outlined">shield_with_heart</span>
+</div>
+<div class="flex flex-col justify-center">
+<p class="text-white text-base font-semibold leading-normal line-clamp-1">Protected ETH (3mo)</p>
+<p class="text-muted-grey text-xs font-normal leading-normal line-clamp-2 mt-0.5">04:20 PM · Premium Paid</p>
+</div>
+</div>
+<div class="flex items-center gap-2 shrink-0">
+<span class="status-pill-safe px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase">SAFE</span>
+<span class="material-symbols-outlined text-white/20 text-lg">chevron_right</span>
+</div>
+</div>
+<div class="w-full h-px bg-white/5 mx-auto"></div>
+<div class="flex items-center gap-3 bg-surface-dark rounded-lg px-4 min-h-[80px] py-3 justify-between border border-white/5 active:bg-white/[0.02] transition-colors cursor-pointer group">
+<div class="flex items-center gap-4 flex-1">
+<div class="text-white flex items-center justify-center rounded-lg bg-[#232f48] shrink-0 size-12">
+<span class="material-symbols-outlined">arrow_upward</span>
+</div>
+<div class="flex flex-col justify-center">
+<p class="text-white text-base font-semibold leading-normal line-clamp-1">Sent USDT</p>
+<p class="text-muted-grey text-xs font-normal leading-normal line-clamp-2 mt-0.5">01:10 PM · To Wallet #0x23...</p>
+</div>
+</div>
+<div class="flex items-center gap-2 shrink-0">
+<span class="status-pill-safe px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase">SAFE</span>
+<span class="material-symbols-outlined text-white/20 text-lg">chevron_right</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<nav class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-surface-dark/90 backdrop-blur-xl border-t border-white/5 px-6 py-4 flex items-center justify-between z-20">
+<div class="flex flex-col items-center gap-1 cursor-pointer opacity-40">
+<span class="material-symbols-outlined text-white">home</span>
+<span class="text-[10px] font-medium text-white">Home</span>
+</div>
+<div class="flex flex-col items-center gap-1 cursor-pointer text-primary">
+<span class="material-symbols-outlined fill-1">history</span>
+<span class="text-[10px] font-bold">History</span>
+<div class="w-1 h-1 bg-primary rounded-full absolute -bottom-1"></div>
+</div>
+<div class="flex flex-col items-center gap-1 cursor-pointer opacity-40">
+<span class="material-symbols-outlined text-white">account_balance_wallet</span>
+<span class="text-[10px] font-medium text-white">Assets</span>
+</div>
+<div class="flex flex-col items-center gap-1 cursor-pointer opacity-40">
+<span class="material-symbols-outlined text-white">person</span>
+<span class="text-[10px] font-medium text-white">Profile</span>
+</div>
+</nav>
+<div class="h-8 bg-transparent"></div>
+</div>
+
+</body></html>

@@ -1,18 +1,28 @@
-// Initial Funding Screen
-// Based on PRD Section 5 - Initial funding with allocation preview
-import React, { useState } from 'react';
+/**
+ * InitialFundingScreen
+ * Design System: Blu Markets
+ * Target: iPhone 16 Pro (393 x 852)
+ *
+ * Initial funding with NumericKeypad and allocation preview
+ */
+
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
-  TextInput,
-  ActivityIndicator,
+  StatusBar,
+  ScrollView,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/types';
-import { colors, typography, spacing, borderRadius } from '../../constants/theme';
+import { COLORS } from '../../constants/colors';
+import { TYPOGRAPHY } from '../../constants/typography';
+import { SPACING, RADIUS } from '../../constants/spacing';
+import { LAYOUT } from '../../constants/layout';
+import { Button, NumericKeypad, AmountDisplay, QuickAmountChips } from '../../components/common';
 import { useAppDispatch, useAppSelector } from '../../hooks/useStore';
 import { setInitialInvestment } from '../../store/slices/onboardingSlice';
 import { MIN_INVESTMENT_AMOUNT } from '../../constants/business';
@@ -23,21 +33,11 @@ type InitialFundingScreenProps = {
 };
 
 // Quick amount options
-const QUICK_AMOUNTS = [
-  { label: '5M', value: 5_000_000 },
-  { label: '10M', value: 10_000_000 },
-  { label: '25M', value: 25_000_000 },
-  { label: '50M', value: 50_000_000 },
-];
+const QUICK_AMOUNTS = [5_000_000, 10_000_000, 25_000_000, 50_000_000];
 
 // Format number with commas
 const formatNumber = (num: number): string => {
   return num.toLocaleString('en-US');
-};
-
-// Parse formatted number
-const parseNumber = (str: string): number => {
-  return parseInt(str.replace(/,/g, ''), 10) || 0;
 };
 
 const InitialFundingScreen: React.FC<InitialFundingScreenProps> = ({
@@ -45,25 +45,34 @@ const InitialFundingScreen: React.FC<InitialFundingScreenProps> = ({
 }) => {
   const dispatch = useAppDispatch();
   const riskProfile = useAppSelector((state) => state.onboarding.riskProfile);
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const numericAmount = parseNumber(amount);
-  const isValid = numericAmount >= MIN_INVESTMENT_AMOUNT;
+  const isValid = amount >= MIN_INVESTMENT_AMOUNT;
 
-  const handleAmountChange = (value: string) => {
-    // Only allow numbers
-    const cleaned = value.replace(/[^0-9]/g, '');
-    const num = parseInt(cleaned, 10) || 0;
-    setAmount(num > 0 ? formatNumber(num) : '');
+  // Handle numeric keypad press
+  const handleKeyPress = useCallback((key: string) => {
+    setAmount((prev) => {
+      const newValue = prev * 10 + parseInt(key, 10);
+      // Max 15 digits (999 trillion)
+      if (newValue > 999_999_999_999_999) return prev;
+      return newValue;
+    });
     setError(null);
-  };
+  }, []);
 
-  const handleQuickAmount = (value: number) => {
-    setAmount(formatNumber(value));
+  // Handle backspace
+  const handleBackspace = useCallback(() => {
+    setAmount((prev) => Math.floor(prev / 10));
     setError(null);
-  };
+  }, []);
+
+  // Handle quick amount selection
+  const handleQuickAmount = useCallback((value: number) => {
+    setAmount(value);
+    setError(null);
+  }, []);
 
   const handleContinue = async () => {
     if (!isValid) return;
@@ -72,8 +81,8 @@ const InitialFundingScreen: React.FC<InitialFundingScreenProps> = ({
     setError(null);
 
     try {
-      await onboardingApi.createPortfolio(numericAmount);
-      dispatch(setInitialInvestment(numericAmount));
+      await onboardingApi.createPortfolio(amount);
+      dispatch(setInitialInvestment(amount));
       navigation.navigate('Success');
     } catch (err) {
       const apiError = err as ApiError;
@@ -90,42 +99,40 @@ const InitialFundingScreen: React.FC<InitialFundingScreenProps> = ({
     UPSIDE: 0.15,
   };
 
-  const foundationAmount = Math.floor(numericAmount * allocation.FOUNDATION);
-  const growthAmount = Math.floor(numericAmount * allocation.GROWTH);
-  const upsideAmount = numericAmount - foundationAmount - growthAmount;
+  const foundationAmount = Math.floor(amount * allocation.FOUNDATION);
+  const growthAmount = Math.floor(amount * allocation.GROWTH);
+  const upsideAmount = amount - foundationAmount - growthAmount;
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Back button */}
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => navigation.goBack()}
-      >
-        <Text style={styles.backButtonText}>← Back</Text>
-      </TouchableOpacity>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.background.primary} />
 
-      <View style={styles.content}>
-        {/* Header */}
-        <View style={styles.header}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          <Text style={styles.backIcon}>←</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Title */}
+        <View style={styles.titleContainer}>
           <Text style={styles.title}>Fund your portfolio</Text>
           <Text style={styles.subtitle}>
             Enter the amount you want to invest
           </Text>
         </View>
 
-        {/* Amount input */}
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            value={amount}
-            onChangeText={handleAmountChange}
-            placeholder="0"
-            placeholderTextColor={colors.textMuted}
-            keyboardType="number-pad"
-            autoFocus
-          />
-          <Text style={styles.currency}>IRR</Text>
-        </View>
+        {/* Amount Display */}
+        <AmountDisplay value={amount} currency="IRR" placeholder="0" />
 
         {/* Minimum amount hint */}
         <Text style={styles.hint}>
@@ -135,53 +142,17 @@ const InitialFundingScreen: React.FC<InitialFundingScreenProps> = ({
         {/* Error message */}
         {error && <Text style={styles.errorText}>{error}</Text>}
 
-        {/* Quick amount chips */}
-        <View style={styles.quickAmounts}>
-          {QUICK_AMOUNTS.map((item) => (
-            <TouchableOpacity
-              key={item.value}
-              style={[
-                styles.quickAmountChip,
-                numericAmount === item.value && styles.quickAmountChipSelected,
-              ]}
-              onPress={() => handleQuickAmount(item.value)}
-            >
-              <Text
-                style={[
-                  styles.quickAmountText,
-                  numericAmount === item.value && styles.quickAmountTextSelected,
-                ]}
-              >
-                {item.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {/* Quick Amount Chips */}
+        <QuickAmountChips
+          amounts={QUICK_AMOUNTS}
+          selectedAmount={amount}
+          onSelect={handleQuickAmount}
+        />
 
         {/* Allocation preview */}
-        {numericAmount > 0 && (
+        {amount > 0 && (
           <View style={styles.previewContainer}>
             <Text style={styles.previewTitle}>How it will be allocated:</Text>
-            <View style={styles.previewItems}>
-              <PreviewItem
-                label="Foundation"
-                amount={foundationAmount}
-                color={colors.layerFoundation}
-                percentage={Math.round(allocation.FOUNDATION * 100)}
-              />
-              <PreviewItem
-                label="Growth"
-                amount={growthAmount}
-                color={colors.layerGrowth}
-                percentage={Math.round(allocation.GROWTH * 100)}
-              />
-              <PreviewItem
-                label="Upside"
-                amount={upsideAmount}
-                color={colors.layerUpside}
-                percentage={Math.round(allocation.UPSIDE * 100)}
-              />
-            </View>
 
             {/* Allocation bar */}
             <View style={styles.allocationBar}>
@@ -190,7 +161,7 @@ const InitialFundingScreen: React.FC<InitialFundingScreenProps> = ({
                   styles.allocationSegment,
                   {
                     flex: allocation.FOUNDATION,
-                    backgroundColor: colors.layerFoundation,
+                    backgroundColor: COLORS.layers.foundation,
                   },
                 ]}
               />
@@ -199,7 +170,7 @@ const InitialFundingScreen: React.FC<InitialFundingScreenProps> = ({
                   styles.allocationSegment,
                   {
                     flex: allocation.GROWTH,
-                    backgroundColor: colors.layerGrowth,
+                    backgroundColor: COLORS.layers.growth,
                   },
                 ]}
               />
@@ -208,45 +179,73 @@ const InitialFundingScreen: React.FC<InitialFundingScreenProps> = ({
                   styles.allocationSegment,
                   {
                     flex: allocation.UPSIDE,
-                    backgroundColor: colors.layerUpside,
+                    backgroundColor: COLORS.layers.upside,
                   },
                 ]}
               />
             </View>
+
+            {/* Allocation breakdown */}
+            <View style={styles.previewItems}>
+              <PreviewItem
+                label="Foundation"
+                amount={foundationAmount}
+                color={COLORS.layers.foundation}
+                percentage={Math.round(allocation.FOUNDATION * 100)}
+              />
+              <PreviewItem
+                label="Growth"
+                amount={growthAmount}
+                color={COLORS.layers.growth}
+                percentage={Math.round(allocation.GROWTH * 100)}
+              />
+              <PreviewItem
+                label="Upside"
+                amount={upsideAmount}
+                color={COLORS.layers.upside}
+                percentage={Math.round(allocation.UPSIDE * 100)}
+              />
+            </View>
           </View>
         )}
-      </View>
+      </ScrollView>
+
+      {/* NumericKeypad */}
+      <NumericKeypad
+        onPress={handleKeyPress}
+        onBackspace={handleBackspace}
+      />
 
       {/* CTA Button */}
       <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.button, (!isValid || isLoading) && styles.buttonDisabled]}
+        <Button
+          label="Create My Portfolio"
+          variant="primary"
+          size="lg"
+          fullWidth
           onPress={handleContinue}
-          activeOpacity={0.8}
-          disabled={!isValid || isLoading}
-        >
-          {isLoading ? (
-            <ActivityIndicator color={colors.textPrimaryDark} />
-          ) : (
-            <Text style={styles.buttonText}>Create My Portfolio</Text>
-          )}
-        </TouchableOpacity>
+          loading={isLoading}
+          disabled={!isValid}
+        />
       </View>
     </SafeAreaView>
   );
 };
 
-const PreviewItem: React.FC<{
+// Preview Item Component
+interface PreviewItemProps {
   label: string;
   amount: number;
   color: string;
   percentage: number;
-}> = ({ label, amount, color, percentage }) => (
+}
+
+const PreviewItem: React.FC<PreviewItemProps> = ({ label, amount, color, percentage }) => (
   <View style={styles.previewItem}>
     <View style={styles.previewItemLeft}>
       <View style={[styles.previewDot, { backgroundColor: color }]} />
       <Text style={styles.previewLabel}>{label}</Text>
-      <Text style={styles.previewPercentage}>({percentage}%)</Text>
+      <Text style={[styles.previewPercentage, { color }]}>({percentage}%)</Text>
     </View>
     <Text style={styles.previewAmount}>{formatNumber(amount)} IRR</Text>
   </View>
@@ -255,100 +254,79 @@ const PreviewItem: React.FC<{
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bgDark,
-  },
-  backButton: {
-    paddingHorizontal: spacing[6],
-    paddingVertical: spacing[4],
-  },
-  backButtonText: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.base,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: spacing[6],
+    backgroundColor: COLORS.background.primary,
   },
   header: {
-    marginBottom: spacing[8],
+    paddingHorizontal: LAYOUT.screenPaddingH,
+    paddingTop: SPACING[2],
+    paddingBottom: SPACING[2],
   },
-  title: {
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
-    marginBottom: spacing[2],
-  },
-  subtitle: {
-    fontSize: typography.fontSize.base,
-    color: colors.textSecondary,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.cardDark,
-    borderRadius: borderRadius.default,
-    paddingHorizontal: spacing[4],
-    marginBottom: spacing[2],
-  },
-  input: {
-    flex: 1,
-    height: 64,
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
-  },
-  currency: {
-    fontSize: typography.fontSize.lg,
-    color: colors.textSecondary,
-    fontWeight: typography.fontWeight.medium,
-  },
-  hint: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    marginBottom: spacing[2],
-  },
-  errorText: {
-    color: colors.error,
-    fontSize: typography.fontSize.sm,
-    marginBottom: spacing[4],
-  },
-  quickAmounts: {
-    flexDirection: 'row',
-    gap: spacing[3],
-    marginBottom: spacing[6],
-  },
-  quickAmountChip: {
-    flex: 1,
-    height: 44,
-    backgroundColor: colors.surfaceDark,
-    borderRadius: borderRadius.full,
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.background.elevated,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  quickAmountChipSelected: {
-    backgroundColor: colors.primary,
+  backIcon: {
+    fontSize: 20,
+    color: COLORS.text.primary,
   },
-  quickAmountText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textSecondary,
+  scrollView: {
+    flex: 1,
   },
-  quickAmountTextSelected: {
-    color: colors.textPrimaryDark,
+  scrollContent: {
+    paddingHorizontal: LAYOUT.screenPaddingH,
+  },
+  titleContainer: {
+    marginBottom: SPACING[4],
+  },
+  title: {
+    fontSize: TYPOGRAPHY.fontSize['2xl'],
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text.primary,
+    marginBottom: SPACING[2],
+  },
+  subtitle: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.text.secondary,
+  },
+  hint: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.muted,
+    textAlign: 'center',
+    marginBottom: SPACING[2],
+  },
+  errorText: {
+    color: COLORS.semantic.error,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    textAlign: 'center',
+    marginBottom: SPACING[2],
   },
   previewContainer: {
-    backgroundColor: colors.cardDark,
-    borderRadius: borderRadius.default,
-    padding: spacing[4],
+    backgroundColor: COLORS.background.elevated,
+    borderRadius: RADIUS.xl,
+    padding: SPACING[4],
+    marginTop: SPACING[4],
   },
   previewTitle: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    marginBottom: spacing[4],
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
+    marginBottom: SPACING[3],
+  },
+  allocationBar: {
+    height: 12,
+    borderRadius: 6,
+    flexDirection: 'row',
+    overflow: 'hidden',
+    marginBottom: SPACING[4],
+  },
+  allocationSegment: {
+    height: '100%',
   },
   previewItems: {
-    gap: spacing[3],
-    marginBottom: spacing[4],
+    gap: SPACING[3],
   },
   previewItem: {
     flexDirection: 'row',
@@ -363,49 +341,26 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    marginRight: spacing[2],
+    marginRight: SPACING[2],
   },
   previewLabel: {
-    fontSize: typography.fontSize.base,
-    color: colors.textPrimaryDark,
-    marginRight: spacing[1],
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.text.primary,
+    marginRight: SPACING[1],
   },
   previewPercentage: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
   },
   previewAmount: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textPrimaryDark,
-  },
-  allocationBar: {
-    height: 8,
-    borderRadius: 4,
-    flexDirection: 'row',
-    overflow: 'hidden',
-  },
-  allocationSegment: {
-    height: '100%',
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.primary,
   },
   footer: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[8],
-  },
-  button: {
-    backgroundColor: colors.primary,
-    height: 56,
-    borderRadius: borderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  buttonDisabled: {
-    backgroundColor: colors.surfaceDark,
-  },
-  buttonText: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
+    paddingHorizontal: LAYOUT.screenPaddingH,
+    paddingBottom: LAYOUT.totalBottomSpace,
+    paddingTop: SPACING[2],
   },
 });
 

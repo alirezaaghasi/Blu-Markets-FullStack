@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>OTP Verification</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#6da9f8",
+                        "background-light": "#f5f7f8",
+                        "background-dark": "#0E1420", // Specific requested background
+                        "surface-dark": "#151C28", // Requested box background
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "0.75rem", // 12px requested
+                        "xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Custom appearance for numeric inputs to match design */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-white min-h-screen flex flex-col">
+<!-- Top Navigation Bar -->
+<header class="flex items-center px-4 py-6">
+<button class="flex items-center justify-center size-10 rounded-full hover:bg-white/10 transition-colors">
+<span class="material-symbols-outlined text-white text-2xl">chevron_left</span>
+</button>
+</header>
+<!-- Main Content Area -->
+<main class="flex-grow px-6 pt-4 flex flex-col items-center">
+<!-- Headline -->
+<h1 class="text-2xl font-bold text-center mb-2">Enter verification code</h1>
+<!-- Meta Text -->
+<div class="flex items-center gap-1.5 mb-10">
+<p class="text-[#94A3B8] text-sm">Code sent to +98 912 345 6789</p>
+<button class="text-primary text-sm font-semibold hover:underline">Change</button>
+</div>
+<!-- OTP Input Row -->
+<div class="flex justify-center gap-2 mb-6">
+<!-- Box 1: Filled -->
+<div class="w-12 h-14 flex items-center justify-center bg-surface-dark rounded-lg text-2xl font-bold border-2 border-transparent">
+                4
+            </div>
+<!-- Box 2: Filled -->
+<div class="w-12 h-14 flex items-center justify-center bg-surface-dark rounded-lg text-2xl font-bold border-2 border-transparent">
+                7
+            </div>
+<!-- Box 3: Filled -->
+<div class="w-12 h-14 flex items-center justify-center bg-surface-dark rounded-lg text-2xl font-bold border-2 border-transparent">
+                2
+            </div>
+<!-- Box 4: Focused State -->
+<div class="w-12 h-14 flex items-center justify-center bg-surface-dark rounded-lg text-2xl font-bold border-2 border-primary ring-2 ring-primary/20">
+<span class="w-0.5 h-6 bg-primary animate-pulse"></span>
+</div>
+<!-- Box 5: Empty -->
+<div class="w-12 h-14 flex items-center justify-center bg-surface-dark rounded-lg text-2xl font-bold border-2 border-transparent">
+                 
+            </div>
+<!-- Box 6: Empty -->
+<div class="w-12 h-14 flex items-center justify-center bg-surface-dark rounded-lg text-2xl font-bold border-2 border-transparent">
+                 
+            </div>
+</div>
+<!-- Timer -->
+<p class="text-[#94A3B8] text-sm font-medium">Resend code in 0:45</p>
+</main>
+<!-- Bottom Actions Container -->
+<div class="px-6 pb-6 mt-auto">
+<!-- CTA Button -->
+<button class="w-full bg-primary hover:bg-primary/90 text-white font-bold py-4 rounded-lg transition-colors text-lg mb-8">
+            Verify
+        </button>
+<!-- Custom Numeric Keypad -->
+<div class="grid grid-cols-3 gap-y-4 gap-x-8 max-w-sm mx-auto mb-4">
+<!-- Row 1 -->
+<button class="flex items-center justify-center py-3 text-2xl font-semibold active:bg-white/10 rounded-lg transition-colors">1</button>
+<button class="flex items-center justify-center py-3 text-2xl font-semibold active:bg-white/10 rounded-lg transition-colors">2</button>
+<button class="flex items-center justify-center py-3 text-2xl font-semibold active:bg-white/10 rounded-lg transition-colors">3</button>
+<!-- Row 2 -->
+<button class="flex items-center justify-center py-3 text-2xl font-semibold active:bg-white/10 rounded-lg transition-colors">4</button>
+<button class="flex items-center justify-center py-3 text-2xl font-semibold active:bg-white/10 rounded-lg transition-colors">5</button>
+<button class="flex items-center justify-center py-3 text-2xl font-semibold active:bg-white/10 rounded-lg transition-colors">6</button>
+<!-- Row 3 -->
+<button class="flex items-center justify-center py-3 text-2xl font-semibold active:bg-white/10 rounded-lg transition-colors">7</button>
+<button class="flex items-center justify-center py-3 text-2xl font-semibold active:bg-white/10 rounded-lg transition-colors">8</button>
+<button class="flex items-center justify-center py-3 text-2xl font-semibold active:bg-white/10 rounded-lg transition-colors">9</button>
+<!-- Row 4 -->
+<div class="flex items-center justify-center"></div>
+<button class="flex items-center justify-center py-3 text-2xl font-semibold active:bg-white/10 rounded-lg transition-colors">0</button>
+<button class="flex items-center justify-center py-3 active:bg-white/10 rounded-lg transition-colors">
+<span class="material-symbols-outlined text-3xl">backspace</span>
+</button>
+</div>
+<!-- iOS Home Indicator Spacing -->
+<div class="h-6 w-full"></div>
+</div>
+</body></html>

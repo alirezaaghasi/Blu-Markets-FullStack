@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Refined Wealth Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#0f49bd",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#0E1420",
+                        "surface-dark": "#151C28",
+                        "text-secondary": "#94a3b8",
+                        "accent-green": "#10b981",
+                        "accent-blue": "#3b82f6",
+                        "accent-purple": "#a855f7",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "2xl": "1rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        body {
+            font-family: 'Manrope', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        ::-webkit-scrollbar {
+            width: 0px;
+            background: transparent;
+        }
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-dark text-white overflow-x-hidden min-h-screen relative pb-40">
+<header class="flex items-center justify-between px-5 pt-6 pb-2 sticky top-0 bg-background-dark/95 backdrop-blur-sm z-50">
+<div class="flex items-center gap-2 bg-accent-green/10 border border-accent-green/20 px-3 py-1.5 rounded-full">
+<span class="text-sm">🛡️</span>
+<span class="text-accent-green text-sm font-bold tracking-tight">Balanced</span>
+</div>
+<button class="relative group">
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-surface-dark ring-2 ring-transparent group-hover:ring-primary/50 transition-all">
+<img alt="User profile avatar showing a smiling person" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAisQ_gFEfo3UrPGCx0fQHffkFcnucNdWbba7lnk-asMkJ3lYDxW0KH-suGMC01adXBZLm1DcNKURCpr31pNyYUUbdcMWQ88JZkOctlqhpdYdEOTHYIcCEoX9My2cJOapWWiIvKOjPg4q0oIIHI_Wq3GWbnQXcaYSdTIuXcUGQ-4u9U42sAltmCkv0vzkrjZqp6TiJOs-_gX73edFYi9OBlb1pKQGNBhI8LRe0VMn1bi67gil6vECrDVL-GsdNOb0BxgraFOjpUpOZW"/>
+</div>
+<div class="absolute bottom-0 right-0 w-3 h-3 bg-accent-green rounded-full border-2 border-background-dark"></div>
+</button>
+</header>
+<section class="flex flex-col items-center justify-center pt-8 pb-8 px-4">
+<h1 class="text-4xl md:text-5xl font-extrabold text-white tracking-tight mb-2 text-center">
+            10,000,000 <span class="text-2xl font-semibold text-gray-400">IRR</span>
+</h1>
+<div class="flex items-center gap-1.5 bg-surface-dark px-3 py-1 rounded-lg">
+<span class="material-symbols-outlined text-accent-green text-lg font-bold">trending_up</span>
+<span class="text-accent-green font-bold text-sm">+1.2% Today</span>
+</div>
+</section>
+<section class="px-5 mb-8">
+<div class="flex justify-between items-end mb-3">
+<h2 class="text-base font-semibold text-white/90">Allocation</h2>
+<span class="text-xs text-text-secondary">Total Assets</span>
+</div>
+<div class="flex h-4 w-full rounded-full overflow-hidden bg-surface-dark">
+<div class="bg-accent-blue w-[50%] h-full"></div>
+<div class="bg-accent-purple w-[35%] h-full"></div>
+<div class="bg-accent-green w-[15%] h-full"></div>
+</div>
+<div class="flex items-center justify-between mt-3 px-1">
+<div class="flex flex-col items-center gap-1">
+<div class="flex items-center gap-1.5">
+<div class="w-2 h-2 rounded-full bg-accent-blue"></div>
+<span class="text-xs font-medium text-text-secondary">Foundation</span>
+</div>
+<span class="text-[10px] text-white font-bold">50%</span>
+</div>
+<div class="flex flex-col items-center gap-1">
+<div class="flex items-center gap-1.5">
+<div class="w-2 h-2 rounded-full bg-accent-purple"></div>
+<span class="text-xs font-medium text-text-secondary">Growth</span>
+</div>
+<span class="text-[10px] text-white font-bold">35%</span>
+</div>
+<div class="flex flex-col items-center gap-1">
+<div class="flex items-center gap-1.5">
+<div class="w-2 h-2 rounded-full bg-accent-green"></div>
+<span class="text-xs font-medium text-text-secondary">Upside</span>
+</div>
+<span class="text-[10px] text-white font-bold">15%</span>
+</div>
+</div>
+</section>
+<section class="px-5 mb-8">
+<h2 class="text-lg font-bold text-white mb-4">Your Holdings</h2>
+<div class="flex flex-col gap-3">
+<div class="flex items-center justify-between p-4 bg-surface-dark rounded-2xl border border-white/5 active:scale-[0.98] transition-transform">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-teal-500/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-teal-400 text-2xl">attach_money</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="text-white font-bold text-base">USDT</span>
+<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-accent-blue/20 text-accent-blue uppercase tracking-wide">Foundation</span>
+</div>
+<span class="text-text-secondary text-sm">Tether</span>
+</div>
+</div>
+<div class="text-right">
+<div class="text-white font-bold text-base">5,000,000</div>
+<div class="text-xs text-text-secondary">IRR</div>
+</div>
+</div>
+<div class="flex items-center justify-between p-4 bg-surface-dark rounded-2xl border border-white/5 active:scale-[0.98] transition-transform">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-orange-400 text-2xl">currency_bitcoin</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="text-white font-bold text-base">BTC</span>
+<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-accent-purple/20 text-accent-purple uppercase tracking-wide">Growth</span>
+</div>
+<span class="text-text-secondary text-sm">Bitcoin</span>
+</div>
+</div>
+<div class="text-right">
+<div class="text-white font-bold text-base">3,500,000</div>
+<div class="text-xs text-text-secondary">IRR</div>
+</div>
+</div>
+</div>
+</section>
+<section class="px-5 mb-12">
+<h2 class="text-lg font-bold text-white mb-6">Recent Activity</h2>
+<div class="relative ml-4">
+<div class="absolute left-0 top-2 bottom-2 w-[1.5px] bg-white/10"></div>
+<div class="space-y-4">
+<div class="relative pl-8">
+<div class="absolute left-[-3.5px] top-4 w-2 h-2 rounded-full bg-accent-green shadow-[0_0_8px_rgba(16,185,129,0.4)]"></div>
+<div class="bg-surface-dark p-4 rounded-2xl rounded-tl-none relative shadow-sm border border-white/5">
+<div class="flex flex-col">
+<p class="text-white text-[15px] leading-relaxed mb-4">Portfolio rebalanced to target</p>
+<div class="flex items-center justify-between mt-1">
+<span class="text-[11px] text-text-secondary">Just now</span>
+<div class="flex items-center gap-1.5 bg-accent-green/10 px-2 py-0.5 rounded-full">
+<span class="text-[9px] font-bold text-accent-green uppercase tracking-wider">Balanced</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="relative pl-8">
+<div class="absolute left-[-3.5px] top-4 w-2 h-2 rounded-full bg-accent-blue shadow-[0_0_8px_rgba(59,130,246,0.4)]"></div>
+<div class="bg-surface-dark p-4 rounded-2xl rounded-tl-none relative shadow-sm border border-white/5">
+<div class="flex flex-col">
+<p class="text-white text-[15px] leading-relaxed mb-4">You bought 2.5M IRR of Bitcoin</p>
+<div class="flex items-center justify-between mt-1">
+<span class="text-[11px] text-text-secondary">10:35 AM</span>
+<div class="flex items-center gap-1.5 bg-accent-blue/10 px-2 py-0.5 rounded-full">
+<span class="text-[9px] font-bold text-accent-blue uppercase tracking-wider">Safe</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="relative pl-8">
+<div class="absolute left-[-3.5px] top-4 w-2 h-2 rounded-full bg-accent-purple shadow-[0_0_8px_rgba(168,85,247,0.4)]"></div>
+<div class="bg-surface-dark p-4 rounded-2xl rounded-tl-none relative shadow-sm border border-white/5">
+<div class="flex flex-col">
+<p class="text-white text-[15px] leading-relaxed mb-4">Protected Solana for 3 months</p>
+<div class="flex items-center justify-between mt-1">
+<span class="text-[11px] text-text-secondary">Yesterday</span>
+<div class="flex items-center gap-1.5 bg-accent-purple/10 px-2 py-0.5 rounded-full">
+<span class="text-[9px] font-bold text-accent-purple uppercase tracking-wider">Hedged</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="relative pl-8">
+<div class="absolute left-[-3.5px] top-4 w-2 h-2 rounded-full bg-gray-500"></div>
+<div class="bg-surface-dark p-4 rounded-2xl rounded-tl-none relative shadow-sm border border-white/5">
+<div class="flex flex-col">
+<p class="text-white text-[15px] leading-relaxed mb-4">Started with 10M IRR</p>
+<div class="flex items-center justify-between mt-1">
+<span class="text-[11px] text-text-secondary">09:00 AM</span>
+<div class="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded-full">
+<span class="text-[9px] font-bold text-text-secondary uppercase tracking-wider">Initial</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<div class="fixed bottom-0 left-0 right-0 z-50">
+<div class="px-5 pb-4 pointer-events-none flex flex-col items-end gap-4">
+<button class="pointer-events-auto flex items-center justify-center gap-2 h-12 px-6 rounded-full border border-white/20 text-white font-bold text-sm bg-background-dark/80 backdrop-blur-md hover:bg-white/5 transition-colors shadow-lg">
+<span class="material-symbols-outlined text-lg">add</span>
+                Add Funds
+            </button>
+<button class="pointer-events-auto flex items-center justify-center gap-3 h-16 w-16 md:w-auto md:px-8 rounded-full bg-primary text-white shadow-2xl shadow-primary/40 hover:scale-105 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-3xl">sync_alt</span>
+<span class="hidden md:inline font-bold">Rebalance</span>
+</button>
+</div>
+<nav class="bg-background-dark/95 backdrop-blur-xl border-t border-white/5 pb-8 pt-3 px-6 flex justify-between items-center text-xs font-medium text-text-secondary">
+<button class="flex flex-col items-center gap-1 text-white">
+<span class="material-symbols-outlined filled">home</span>
+                Home
+            </button>
+<button class="flex flex-col items-center gap-1 hover:text-white transition-colors">
+<span class="material-symbols-outlined">pie_chart</span>
+                Portfolio
+            </button>
+<button class="flex flex-col items-center gap-1 hover:text-white transition-colors">
+<span class="material-symbols-outlined">candlestick_chart</span>
+                Market
+            </button>
+<button class="flex flex-col items-center gap-1 hover:text-white transition-colors">
+<span class="material-symbols-outlined">person</span>
+                Profile
+            </button>
+</nav>
+</div>
+
+</body></html>

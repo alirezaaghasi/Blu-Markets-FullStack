@@ -1,104 +1,81 @@
 // Main Tab Navigator
-// Based on PRD Section 7 - Navigation Architecture
+// Based on CLAUDE_CODE_HANDOFF.md Section 7 - Navigation Architecture
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { MainTabParamList } from './types';
-import { colors, components } from '../constants/theme';
+import { COLORS } from '../constants/colors';
+import { SIZES } from '../constants/spacing';
 
-// Import actual screens
-import DashboardScreen from '../screens/portfolio/DashboardScreen';
-import HistoryScreen from '../screens/history/HistoryScreen';
-import ProfileScreen from '../screens/profile/ProfileScreen';
-import ProtectionScreen from '../screens/protection/ProtectionScreen';
-import LoansScreen from '../screens/loans/LoansScreen';
+// Import screens
+import DashboardScreen from '../screens/main/DashboardScreen';
+import PortfolioScreen from '../screens/main/PortfolioScreen';
+import MarketScreen from '../screens/main/MarketScreen';
+import HistoryScreen from '../screens/main/HistoryScreen';
+import ProfileScreen from '../screens/main/ProfileScreen';
 
-// Tab icons (simplified for now, will use actual icons)
-const TabIcon = ({ name, focused }: { name: string; focused: boolean }) => {
-  const icons: Record<string, string> = {
-    Portfolio: '📊',
-    Protection: '🛡️',
-    Loans: '💰',
-    History: '📜',
-    Profile: '👤',
-  };
+// Tab configuration per handoff
+const TABS = [
+  { name: 'Home', icon: '🏠', screen: DashboardScreen },
+  { name: 'Portfolio', icon: '📊', screen: PortfolioScreen },
+  { name: 'Market', icon: '📈', screen: MarketScreen },
+  { name: 'History', icon: '🕐', screen: HistoryScreen },
+  { name: 'Profile', icon: '👤', screen: ProfileScreen },
+] as const;
 
-  return (
-    <Text style={[styles.icon, focused && styles.iconFocused]}>
-      {icons[name] || '●'}
-    </Text>
-  );
-};
+// Tab icon component
+const TabIcon = ({ icon, focused }: { icon: string; focused: boolean }) => (
+  <View style={styles.iconContainer}>
+    <Text style={[styles.icon, focused && styles.iconFocused]}>{icon}</Text>
+  </View>
+);
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export const MainTabNavigator: React.FC = () => {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused }) => (
-          <TabIcon name={route.name} focused={focused} />
-        ),
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textSecondary,
-        tabBarStyle: {
-          backgroundColor: colors.cardDark,
-          borderTopColor: colors.borderDark,
-          height: components.tabBar.height,
-          paddingBottom: 8,
-          paddingTop: 8,
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '500',
-        },
-        headerStyle: {
-          backgroundColor: colors.bgDark,
-        },
-        headerTintColor: colors.textPrimaryDark,
-        headerTitleStyle: {
-          fontWeight: '600',
-        },
-      })}
+      screenOptions={{
+        tabBarActiveTintColor: COLORS.brand.primary,
+        tabBarInactiveTintColor: COLORS.text.muted,
+        tabBarStyle: styles.tabBar,
+        tabBarLabelStyle: styles.tabLabel,
+        headerShown: false,
+      }}
     >
       <Tab.Screen
-        name="Portfolio"
+        name="Home"
         component={DashboardScreen}
         options={{
-          title: 'Portfolio',
-          headerShown: false,
+          tabBarIcon: ({ focused }) => <TabIcon icon="🏠" focused={focused} />,
         }}
       />
       <Tab.Screen
-        name="Protection"
-        component={ProtectionScreen}
+        name="Portfolio"
+        component={PortfolioScreen}
         options={{
-          title: 'Protection',
-          headerShown: false,
+          tabBarIcon: ({ focused }) => <TabIcon icon="📊" focused={focused} />,
         }}
       />
       <Tab.Screen
-        name="Loans"
-        component={LoansScreen}
+        name="Market"
+        component={MarketScreen}
         options={{
-          title: 'Loans',
-          headerShown: false,
+          tabBarIcon: ({ focused }) => <TabIcon icon="📈" focused={focused} />,
         }}
       />
       <Tab.Screen
         name="History"
         component={HistoryScreen}
         options={{
-          title: 'History',
-          headerShown: false,
+          tabBarIcon: ({ focused }) => <TabIcon icon="🕐" focused={focused} />,
         }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
         options={{
-          title: 'Profile',
-          headerShown: false,
+          tabBarIcon: ({ focused }) => <TabIcon icon="👤" focused={focused} />,
         }}
       />
     </Tab.Navigator>
@@ -106,10 +83,28 @@ export const MainTabNavigator: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  tabBar: {
+    backgroundColor: COLORS.background.surface,
+    borderTopColor: COLORS.border,
+    borderTopWidth: 1,
+    height: SIZES.bottomNavHeight,
+    paddingBottom: 8,
+    paddingTop: 8,
+  },
+  tabLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  iconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   icon: {
-    fontSize: 24,
+    fontSize: 22,
+    opacity: 0.6,
   },
   iconFocused: {
+    opacity: 1,
     transform: [{ scale: 1.1 }],
   },
 });

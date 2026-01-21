@@ -1,24 +1,31 @@
-// Questionnaire Screen
-// Based on PRD Section 6.1 - Swipeable cards with Farsi questions
-import React, { useState, useRef } from 'react';
+/**
+ * QuestionnaireScreen
+ * Design System: Blu Markets
+ * Target: iPhone 16 Pro (393 x 852)
+ *
+ * Risk profiling questionnaire with Farsi questions and RTL support
+ * Shows block headers and progress indicator
+ */
+
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
-  Dimensions,
-  ScrollView,
   Animated,
+  StatusBar,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/types';
-import { colors, typography, spacing, borderRadius } from '../../constants/theme';
+import { COLORS } from '../../constants/colors';
+import { TYPOGRAPHY } from '../../constants/typography';
+import { SPACING, RADIUS } from '../../constants/spacing';
+import { LAYOUT } from '../../constants/layout';
 import { useAppDispatch, useAppSelector } from '../../hooks/useStore';
 import { setAnswer } from '../../store/slices/onboardingSlice';
-import { QUESTIONS, Question, QuestionOption } from '../../constants/questionnaire';
-
-const { width } = Dimensions.get('window');
+import { QUESTIONS, Question, QuestionOption, BLOCK_HEADERS } from '../../constants/questionnaire';
 
 type QuestionnaireScreenProps = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'Questionnaire'>;
@@ -28,12 +35,23 @@ const QuestionnaireScreen: React.FC<QuestionnaireScreenProps> = ({ navigation })
   const dispatch = useAppDispatch();
   const answers = useAppSelector((state) => state.onboarding.answers);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const scrollViewRef = useRef<ScrollView>(null);
-  const progressAnim = useRef(new Animated.Value(0)).current;
+  const progressAnim = useRef(new Animated.Value(1 / QUESTIONS.length)).current;
 
   const currentQuestion = QUESTIONS[currentIndex];
   const totalQuestions = QUESTIONS.length;
   const progress = (currentIndex + 1) / totalQuestions;
+
+  // Get block header for current question
+  const blockHeader = BLOCK_HEADERS[currentQuestion.dimension];
+
+  // Animate progress bar on mount and index change
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: progress,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [currentIndex, progress]);
 
   const handleSelectOption = (optionIndex: number) => {
     dispatch(setAnswer({ questionId: currentQuestion.id, optionIndex }));
@@ -51,22 +69,12 @@ const QuestionnaireScreen: React.FC<QuestionnaireScreenProps> = ({ navigation })
   const goToNext = () => {
     if (currentIndex < totalQuestions - 1) {
       setCurrentIndex(currentIndex + 1);
-      Animated.timing(progressAnim, {
-        toValue: (currentIndex + 2) / totalQuestions,
-        duration: 300,
-        useNativeDriver: false,
-      }).start();
     }
   };
 
   const goBack = () => {
     if (currentIndex > 0) {
       setCurrentIndex(currentIndex - 1);
-      Animated.timing(progressAnim, {
-        toValue: currentIndex / totalQuestions,
-        duration: 300,
-        useNativeDriver: false,
-      }).start();
     } else {
       navigation.goBack();
     }
@@ -74,12 +82,22 @@ const QuestionnaireScreen: React.FC<QuestionnaireScreenProps> = ({ navigation })
 
   const selectedOption = answers[currentQuestion.id];
 
+  // Check if entering a new block
+  const isNewBlock = currentIndex === 0 ||
+    QUESTIONS[currentIndex - 1].dimension !== currentQuestion.dimension;
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header with back and progress */}
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.background.primary} />
+
+      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={goBack}>
-          <Text style={styles.backButtonText}>← Back</Text>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={goBack}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
         <Text style={styles.progressText}>
           {currentIndex + 1} / {totalQuestions}
@@ -101,8 +119,17 @@ const QuestionnaireScreen: React.FC<QuestionnaireScreenProps> = ({ navigation })
         />
       </View>
 
-      {/* Question card */}
+      {/* Content */}
       <View style={styles.content}>
+        {/* Block header (shown when entering new block) */}
+        {isNewBlock && (
+          <View style={styles.blockHeader}>
+            <Text style={styles.blockTitleFarsi}>{blockHeader.farsi}</Text>
+            <Text style={styles.blockTitleEnglish}>{blockHeader.english}</Text>
+          </View>
+        )}
+
+        {/* Question card */}
         <QuestionCard
           question={currentQuestion}
           selectedOption={selectedOption}
@@ -110,7 +137,7 @@ const QuestionnaireScreen: React.FC<QuestionnaireScreenProps> = ({ navigation })
         />
       </View>
 
-      {/* Layer preview for specific questions */}
+      {/* Layer preview for specific questions (questions about goals and behavior) */}
       {(currentIndex === 4 || currentIndex === 7) && (
         <View style={styles.layerPreview}>
           <Text style={styles.layerPreviewTitle}>Your portfolio layers</Text>
@@ -120,9 +147,9 @@ const QuestionnaireScreen: React.FC<QuestionnaireScreenProps> = ({ navigation })
             <View style={[styles.layerBar, styles.upsideBar]} />
           </View>
           <View style={styles.layerLabels}>
-            <Text style={styles.layerLabel}>Foundation</Text>
-            <Text style={styles.layerLabel}>Growth</Text>
-            <Text style={styles.layerLabel}>Upside</Text>
+            <Text style={[styles.layerLabel, { color: COLORS.layers.foundation }]}>Foundation</Text>
+            <Text style={[styles.layerLabel, { color: COLORS.layers.growth }]}>Growth</Text>
+            <Text style={[styles.layerLabel, { color: COLORS.layers.upside }]}>Upside</Text>
           </View>
         </View>
       )}
@@ -131,14 +158,20 @@ const QuestionnaireScreen: React.FC<QuestionnaireScreenProps> = ({ navigation })
 };
 
 // Question Card Component
-const QuestionCard: React.FC<{
+interface QuestionCardProps {
   question: Question;
   selectedOption: number | undefined;
   onSelectOption: (index: number) => void;
-}> = ({ question, selectedOption, onSelectOption }) => {
+}
+
+const QuestionCard: React.FC<QuestionCardProps> = ({
+  question,
+  selectedOption,
+  onSelectOption
+}) => {
   return (
     <View style={styles.card}>
-      {/* Question text in Farsi */}
+      {/* Question text in Farsi (RTL) */}
       <Text style={styles.questionText}>{question.question}</Text>
 
       {/* English subtitle */}
@@ -187,76 +220,100 @@ const QuestionCard: React.FC<{
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bgDark,
+    backgroundColor: COLORS.background.primary,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing[6],
-    paddingVertical: spacing[4],
+    paddingHorizontal: LAYOUT.screenPaddingH,
+    paddingTop: SPACING[2],
+    paddingBottom: SPACING[4],
   },
   backButton: {
-    padding: spacing[2],
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.background.elevated,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  backButtonText: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.base,
+  backIcon: {
+    fontSize: 20,
+    color: COLORS.text.primary,
   },
   progressText: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
+    color: COLORS.text.secondary,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
   },
   progressBarContainer: {
     height: 4,
-    backgroundColor: colors.surfaceDark,
-    marginHorizontal: spacing[6],
+    backgroundColor: COLORS.background.elevated,
+    marginHorizontal: LAYOUT.screenPaddingH,
     borderRadius: 2,
     overflow: 'hidden',
   },
   progressBar: {
     height: '100%',
-    backgroundColor: colors.primary,
+    backgroundColor: COLORS.brand.primary,
     borderRadius: 2,
   },
   content: {
     flex: 1,
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[6],
+    paddingHorizontal: LAYOUT.screenPaddingH,
+    paddingTop: SPACING[6],
   },
-  card: {
-    backgroundColor: colors.cardDark,
-    borderRadius: borderRadius.lg,
-    padding: spacing[6],
+  blockHeader: {
+    marginBottom: SPACING[4],
+    paddingBottom: SPACING[3],
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
-  questionText: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
+  blockTitleFarsi: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.primary,
     textAlign: 'right',
     writingDirection: 'rtl',
-    marginBottom: spacing[2],
+    marginBottom: SPACING[1],
+  },
+  blockTitleEnglish: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.muted,
+  },
+  card: {
+    backgroundColor: COLORS.background.elevated,
+    borderRadius: RADIUS.xl,
+    padding: SPACING[5],
+  },
+  questionText: {
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text.primary,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+    marginBottom: SPACING[2],
     lineHeight: 32,
   },
   questionSubtext: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    marginBottom: spacing[6],
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
+    marginBottom: SPACING[5],
   },
   optionsContainer: {
-    gap: spacing[3],
+    gap: SPACING[3],
   },
   optionButton: {
-    backgroundColor: colors.surfaceDark,
-    borderRadius: borderRadius.default,
-    padding: spacing[4],
+    backgroundColor: COLORS.background.input,
+    borderRadius: RADIUS.lg,
+    padding: SPACING[4],
     borderWidth: 2,
     borderColor: 'transparent',
   },
   optionButtonSelected: {
-    borderColor: colors.primary,
-    backgroundColor: `${colors.primary}15`,
+    borderColor: COLORS.brand.primary,
+    backgroundColor: COLORS.brand.primaryMuted,
   },
   optionContent: {
     flexDirection: 'row',
@@ -267,46 +324,46 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: colors.textSecondary,
+    borderColor: COLORS.text.muted,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing[3],
+    marginRight: SPACING[3],
     marginTop: 2,
   },
   radioOuterSelected: {
-    borderColor: colors.primary,
+    borderColor: COLORS.brand.primary,
   },
   radioInner: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: colors.primary,
+    backgroundColor: COLORS.brand.primary,
   },
   optionTextContainer: {
     flex: 1,
   },
   optionText: {
-    fontSize: typography.fontSize.base,
-    color: colors.textPrimaryDark,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.text.primary,
     textAlign: 'right',
     writingDirection: 'rtl',
-    marginBottom: spacing[1],
+    marginBottom: SPACING[1],
   },
   optionTextSelected: {
-    fontWeight: typography.fontWeight.semibold,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
   },
   optionSubtext: {
-    fontSize: typography.fontSize.xs,
-    color: colors.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.text.secondary,
   },
   layerPreview: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[8],
+    paddingHorizontal: LAYOUT.screenPaddingH,
+    paddingBottom: LAYOUT.totalBottomSpace,
   },
   layerPreviewTitle: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    marginBottom: spacing[3],
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
+    marginBottom: SPACING[3],
     textAlign: 'center',
   },
   layerBars: {
@@ -314,30 +371,30 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     overflow: 'hidden',
-    marginBottom: spacing[2],
+    marginBottom: SPACING[2],
   },
   layerBar: {
     height: '100%',
   },
   foundationBar: {
     flex: 50,
-    backgroundColor: colors.layerFoundation,
+    backgroundColor: COLORS.layers.foundation,
   },
   growthBar: {
     flex: 35,
-    backgroundColor: colors.layerGrowth,
+    backgroundColor: COLORS.layers.growth,
   },
   upsideBar: {
     flex: 15,
-    backgroundColor: colors.layerUpside,
+    backgroundColor: COLORS.layers.upside,
   },
   layerLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   layerLabel: {
-    fontSize: typography.fontSize.xs,
-    color: colors.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
   },
 });
 

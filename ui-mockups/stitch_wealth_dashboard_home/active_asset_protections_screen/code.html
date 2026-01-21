@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Active Asset Protections</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&amp;family=Noto+Sans:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#2377f6",
+                        "background-light": "#f5f7f8",
+                        "background-dark": "#0E1420", // Matches user request
+                        "surface-dark": "#151C28",    // Matches user request
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"],
+                        "body": ["Noto Sans", "sans-serif"],
+                    },
+                    borderRadius: { "DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-[#111418] dark:text-white font-display overflow-x-hidden flex flex-col min-h-screen">
+<!-- Header -->
+<div class="sticky top-0 z-20 flex items-center bg-[#0E1420] p-4 justify-between border-b border-white/5">
+<div class="text-white flex size-12 shrink-0 items-center justify-start cursor-pointer">
+<span class="material-symbols-outlined text-white" style="font-size: 24px;">arrow_back_ios</span>
+</div>
+<h2 class="text-white text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center">Protections</h2>
+<div class="flex w-12 items-center justify-end">
+<button class="flex items-center justify-center text-white p-0 bg-transparent">
+<span class="material-symbols-outlined text-white" style="font-size: 24px;">info</span>
+</button>
+</div>
+</div>
+<!-- Main Content -->
+<div class="flex-1 flex flex-col gap-6 p-4 pb-24">
+<!-- Summary Card -->
+<div class="flex flex-col gap-4 bg-[#151C28] rounded-xl p-5 shadow-lg border border-white/5">
+<div class="flex justify-between items-start">
+<div class="flex flex-col gap-1">
+<p class="text-[#94A3B8] text-[11px] font-bold tracking-wider uppercase">Total Protected Value</p>
+<p class="text-white text-3xl font-extrabold tracking-tight">45,500,000 IRR</p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<div class="flex items-center justify-center size-6 rounded-full bg-primary/20 text-primary">
+<span class="material-symbols-outlined" style="font-size: 16px;">verified_user</span>
+</div>
+<p class="text-white text-sm font-medium">3 active protections</p>
+</div>
+</div>
+<!-- Active Protections List Title -->
+<h3 class="text-white text-base font-bold px-1">Active Protections</h3>
+<!-- Protection Card 1 (BTC) -->
+<div class="flex flex-col bg-[#151C28] rounded-xl overflow-hidden border border-white/5 shadow-md">
+<div class="p-4 flex flex-col gap-4">
+<!-- Header & Badge -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="size-10 rounded-full bg-gradient-to-br from-orange-400 to-yellow-600 flex items-center justify-center text-white font-bold text-xs" data-alt="Bitcoin logo gradient">
+<span class="material-symbols-outlined">currency_bitcoin</span>
+</div>
+<div>
+<p class="text-white text-base font-bold leading-none">Bitcoin</p>
+<p class="text-[#94A3B8] text-xs font-medium">BTC</p>
+</div>
+</div>
+<div class="px-2.5 py-1 rounded-full bg-purple-500/20 border border-purple-500/30">
+<span class="text-purple-400 text-[10px] font-bold tracking-wide uppercase">GROWTH</span>
+</div>
+</div>
+<!-- Values -->
+<div class="grid grid-cols-2 gap-4 py-1">
+<div class="flex flex-col gap-1">
+<p class="text-[#94A3B8] text-xs font-medium">Protected Value</p>
+<p class="text-white text-sm font-bold">25,000,000 IRR</p>
+</div>
+<div class="flex flex-col gap-1">
+<p class="text-[#94A3B8] text-xs font-medium">Premium Paid</p>
+<p class="text-white text-sm font-bold">750,000 IRR</p>
+</div>
+</div>
+<!-- Progress Bar -->
+<div class="flex flex-col gap-2">
+<div class="flex justify-between text-xs font-medium">
+<span class="text-primary">45 days remaining</span>
+<span class="text-[#94A3B8]">90 days total</span>
+</div>
+<div class="h-1.5 w-full bg-[#304769] rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 60%;"></div>
+</div>
+</div>
+</div>
+<!-- Footer -->
+<div class="bg-[#1A2230] px-4 py-3 flex items-center justify-between border-t border-white/5">
+<p class="text-[#94A3B8] text-xs font-medium">Expires: Mar 15, 2026</p>
+<button class="text-red-400 text-xs font-bold hover:text-red-300 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-400/10">
+                    Cancel
+                </button>
+</div>
+</div>
+<!-- Protection Card 2 (SOL) -->
+<div class="flex flex-col bg-[#151C28] rounded-xl overflow-hidden border border-white/5 shadow-md">
+<div class="p-4 flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="size-10 rounded-full bg-gradient-to-br from-purple-600 to-blue-500 flex items-center justify-center text-white font-bold text-xs" data-alt="Solana logo gradient">
+                            S
+                        </div>
+<div>
+<p class="text-white text-base font-bold leading-none">Solana</p>
+<p class="text-[#94A3B8] text-xs font-medium">SOL</p>
+</div>
+</div>
+<div class="px-2.5 py-1 rounded-full bg-green-500/20 border border-green-500/30">
+<span class="text-green-400 text-[10px] font-bold tracking-wide uppercase">UPSIDE</span>
+</div>
+</div>
+<div class="flex flex-col gap-1 py-1">
+<p class="text-[#94A3B8] text-xs font-medium">Protected Value</p>
+<p class="text-white text-sm font-bold">12,500,000 IRR</p>
+</div>
+<div class="flex flex-col gap-2">
+<div class="flex justify-between text-xs font-medium">
+<span class="text-primary">22 days remaining</span>
+<span class="text-[#94A3B8]">30 days total</span>
+</div>
+<div class="h-1.5 w-full bg-[#304769] rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 75%;"></div>
+</div>
+</div>
+</div>
+<div class="bg-[#1A2230] px-4 py-3 flex items-center justify-between border-t border-white/5">
+<p class="text-[#94A3B8] text-xs font-medium">Expires: Feb 10, 2026</p>
+<button class="text-[#94A3B8] hover:text-white transition-colors">
+<span class="material-symbols-outlined" style="font-size: 20px;">chevron_right</span>
+</button>
+</div>
+</div>
+<!-- Protection Card 3 (ETH) -->
+<div class="flex flex-col bg-[#151C28] rounded-xl overflow-hidden border border-white/5 shadow-md">
+<div class="p-4 flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="size-10 rounded-full bg-gradient-to-br from-gray-500 to-gray-700 flex items-center justify-center text-white font-bold text-xs" data-alt="Ethereum logo gradient">
+<span class="material-symbols-outlined">token</span>
+</div>
+<div>
+<p class="text-white text-base font-bold leading-none">Ethereum</p>
+<p class="text-[#94A3B8] text-xs font-medium">ETH</p>
+</div>
+</div>
+<div class="px-2.5 py-1 rounded-full bg-purple-500/20 border border-purple-500/30">
+<span class="text-purple-400 text-[10px] font-bold tracking-wide uppercase">GROWTH</span>
+</div>
+</div>
+<div class="flex flex-col gap-1 py-1">
+<p class="text-[#94A3B8] text-xs font-medium">Protected Value</p>
+<p class="text-white text-sm font-bold">8,000,000 IRR</p>
+</div>
+<div class="flex flex-col gap-2">
+<div class="flex justify-between text-xs font-medium">
+<span class="text-primary">Active</span>
+<span class="text-[#94A3B8]">30% time elapsed</span>
+</div>
+<div class="h-1.5 w-full bg-[#304769] rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 30%;"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Navigation -->
+<div class="fixed bottom-0 left-0 right-0 bg-[#0E1420]/95 backdrop-blur-lg border-t border-white/5 pb-5 pt-3 px-6 z-30">
+<div class="flex justify-between items-center max-w-md mx-auto">
+<div class="flex flex-col items-center gap-1 cursor-pointer group">
+<span class="material-symbols-outlined text-[#94A3B8] group-hover:text-white transition-colors">home</span>
+<span class="text-[10px] font-medium text-[#94A3B8] group-hover:text-white">Home</span>
+</div>
+<div class="flex flex-col items-center gap-1 cursor-pointer group">
+<span class="material-symbols-outlined text-primary group-hover:text-blue-400 transition-colors">pie_chart</span>
+<span class="text-[10px] font-medium text-primary group-hover:text-blue-400">Portfolio</span>
+</div>
+<div class="flex flex-col items-center gap-1 cursor-pointer group">
+<span class="material-symbols-outlined text-[#94A3B8] group-hover:text-white transition-colors">candlestick_chart</span>
+<span class="text-[10px] font-medium text-[#94A3B8] group-hover:text-white">Market</span>
+</div>
+<div class="flex flex-col items-center gap-1 cursor-pointer group">
+<span class="material-symbols-outlined text-[#94A3B8] group-hover:text-white transition-colors">history</span>
+<span class="text-[10px] font-medium text-[#94A3B8] group-hover:text-white">History</span>
+</div>
+<div class="flex flex-col items-center gap-1 cursor-pointer group">
+<span class="material-symbols-outlined text-[#94A3B8] group-hover:text-white transition-colors">person</span>
+<span class="text-[10px] font-medium text-[#94A3B8] group-hover:text-white">Profile</span>
+</div>
+</div>
+</div>
+</body></html>
