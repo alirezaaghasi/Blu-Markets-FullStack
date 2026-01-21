@@ -76,8 +76,14 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
         navigation.navigate('Questionnaire');
       }
       // If onboarding complete, RootNavigator handles navigation
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Verification failed. Please try again.';
+    } catch (err: unknown) {
+      // Handle different error formats (Error instance, API error object, or unknown)
+      let errorMessage = 'Verification failed. Please try again.';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (err && typeof err === 'object' && 'message' in err) {
+        errorMessage = String((err as { message: unknown }).message);
+      }
       setError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -94,8 +100,13 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
       await auth.sendOtp(phone);
       setResendTimer(60);
       setOtp('');
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to resend code.';
+    } catch (err: unknown) {
+      let errorMessage = 'Failed to resend code.';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (err && typeof err === 'object' && 'message' in err) {
+        errorMessage = String((err as { message: unknown }).message);
+      }
       setError(errorMessage);
     } finally {
       setIsResending(false);
