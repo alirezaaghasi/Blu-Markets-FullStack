@@ -96,7 +96,7 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
   const driftPct = calculateDrift(allocation, targetAllocation);
 
   // Determine status
-  const status = determineStatus(driftPct);
+  const status = determineStatus(driftPct, allocation);
 
   return {
     id: portfolio.id,
@@ -273,9 +273,24 @@ function calculateDrift(current: TargetAllocation, target: TargetAllocation): nu
   return Math.max(foundationDrift, growthDrift, upsideDrift);
 }
 
-function determineStatus(driftPct: number): PortfolioStatus {
+function determineStatus(
+  driftPct: number,
+  allocation?: TargetAllocation
+): PortfolioStatus {
+  // Per PRD Section 20.1:
+  // ATTENTION_REQUIRED: Foundation < 30% OR Upside > 25%
+  if (allocation) {
+    if (allocation.foundation < 30 || allocation.upside > 25) {
+      return 'ATTENTION_REQUIRED';
+    }
+  }
+
+  // BALANCED: All layers within 5% of target
   if (driftPct <= 5) return 'BALANCED';
+
+  // SLIGHTLY_OFF: Any layer > 5% drift, no hard limits breached
   if (driftPct <= 10) return 'SLIGHTLY_OFF';
+
   return 'ATTENTION_REQUIRED';
 }
 

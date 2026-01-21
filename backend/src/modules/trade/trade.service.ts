@@ -11,12 +11,21 @@ import type {
   TradeAction,
   Boundary,
   TargetAllocation,
-  MIN_TRADE_IRR,
+  Layer,
 } from '../../types/domain.js';
 import type { TradePreviewResponse, TradeExecuteResponse } from '../../types/api.js';
 
-// Spread rates per PRD (0.30%)
-const DEFAULT_SPREAD = 0.003;
+// Spread rates per PRD Section 21 - Layer-based
+const SPREAD_BY_LAYER: Record<Layer, number> = {
+  FOUNDATION: 0.0015, // 0.15%
+  GROWTH: 0.003,      // 0.30%
+  UPSIDE: 0.006,      // 0.60%
+};
+
+function getSpreadForAsset(assetId: AssetId): number {
+  const layer = getAssetLayer(assetId);
+  return SPREAD_BY_LAYER[layer];
+}
 
 // Friction copy per boundary type
 const FRICTION_COPY: Record<Boundary, string> = {
@@ -68,8 +77,9 @@ export async function previewTrade(
     };
   }
 
-  // Calculate trade details
-  const spreadAmountIrr = amountIrr * DEFAULT_SPREAD;
+  // Calculate trade details with layer-based spread
+  const spread = getSpreadForAsset(assetId);
+  const spreadAmountIrr = amountIrr * spread;
   const effectiveAmountIrr = action === 'BUY' ? amountIrr - spreadAmountIrr : amountIrr;
   const quantity = effectiveAmountIrr / price.priceIrr;
 
@@ -83,7 +93,7 @@ export async function previewTrade(
         quantity,
         amountIrr,
         priceIrr: price.priceIrr,
-        spread: DEFAULT_SPREAD,
+        spread: getSpreadForAsset(assetId),
         spreadAmountIrr,
       },
       allocation: {
@@ -108,7 +118,7 @@ export async function previewTrade(
           quantity,
           amountIrr,
           priceIrr: price.priceIrr,
-          spread: DEFAULT_SPREAD,
+          spread: getSpreadForAsset(assetId),
           spreadAmountIrr,
         },
         allocation: {
@@ -132,7 +142,7 @@ export async function previewTrade(
           quantity,
           amountIrr,
           priceIrr: price.priceIrr,
-          spread: DEFAULT_SPREAD,
+          spread: getSpreadForAsset(assetId),
           spreadAmountIrr,
         },
         allocation: {
@@ -176,7 +186,7 @@ export async function previewTrade(
       quantity,
       amountIrr,
       priceIrr: price.priceIrr,
-      spread: DEFAULT_SPREAD,
+      spread,
       spreadAmountIrr,
     },
     allocation: {
@@ -411,6 +421,12 @@ function determineStatusFromAllocation(
   allocation: TargetAllocation,
   target: TargetAllocation
 ): 'BALANCED' | 'SLIGHTLY_OFF' | 'ATTENTION_REQUIRED' {
+  // Per PRD Section 20.1:
+  // ATTENTION_REQUIRED: Foundation < 30% OR Upside > 25%
+  if (allocation.foundation < 30 || allocation.upside > 25) {
+    return 'ATTENTION_REQUIRED';
+  }
+
   const maxDrift = Math.max(
     Math.abs(allocation.foundation - target.foundation),
     Math.abs(allocation.growth - target.growth),
