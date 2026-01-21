@@ -26,7 +26,7 @@ import { LAYOUT } from '../../constants/layout';
 import { Button, OTPInput } from '../../components/common';
 import { useAppDispatch } from '../../hooks/useStore';
 import { setAuthToken } from '../../store/slices/authSlice';
-import { auth } from '../../services/api';
+import { auth, setAuthTokens } from '../../services/api';
 
 type OTPVerifyScreenProps = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'OTPVerify'>;
@@ -67,8 +67,19 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
     try {
       const response = await auth.verifyOtp(phone, verifyCode);
 
-      // Store auth token in Redux
-      dispatch(setAuthToken(response.accessToken));
+      // Get tokens - handle both direct and nested response formats
+      // Backend returns { tokens: { accessToken, refreshToken } }, mock returns { accessToken, refreshToken }
+      const responseAny = response as any;
+      const accessToken = responseAny.tokens?.accessToken || response.accessToken;
+      const refreshToken = responseAny.tokens?.refreshToken || response.refreshToken;
+
+      // Store auth tokens in AsyncStorage (for API client)
+      if (accessToken && refreshToken) {
+        await setAuthTokens(accessToken, refreshToken);
+      }
+
+      // Store auth token in Redux (for app state)
+      dispatch(setAuthToken(accessToken));
 
       // Navigate based on onboarding status
       if (!response.onboardingComplete) {

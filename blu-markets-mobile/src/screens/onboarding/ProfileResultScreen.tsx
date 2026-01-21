@@ -87,17 +87,29 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation, r
         const response = await onboarding.submitQuestionnaire(apiAnswers);
 
         // Build profile data (handle both mock and real API response formats)
-        // Backend returns lowercase keys, mock returns UPPERCASE - handle both
+        // Backend returns lowercase keys with integer percentages (30, 45, 25)
+        // Mock returns UPPERCASE keys with decimals (0.30, 0.45, 0.25)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const allocation = response.targetAllocation as any;
+
+        // Get raw values (prefer UPPERCASE from mock, fallback to lowercase from backend)
+        let foundation = allocation.FOUNDATION ?? allocation.foundation ?? 50;
+        let growth = allocation.GROWTH ?? allocation.growth ?? 35;
+        let upside = allocation.UPSIDE ?? allocation.upside ?? 15;
+
+        // Normalize to decimals if values are > 1 (backend sends integers like 30, 45, 25)
+        if (foundation > 1) foundation = foundation / 100;
+        if (growth > 1) growth = growth / 100;
+        if (upside > 1) upside = upside / 100;
+
         const profileData: RiskProfileData = {
           score: response.riskScore,
           profileName: response.profileName || response.riskProfile?.name || 'Balanced',
           profileNameFarsi: response.riskProfile?.nameFa || getProfileNameFarsi(response.riskScore),
           targetAllocation: {
-            FOUNDATION: allocation.FOUNDATION ?? allocation.foundation ?? 0.5,
-            GROWTH: allocation.GROWTH ?? allocation.growth ?? 0.35,
-            UPSIDE: allocation.UPSIDE ?? allocation.upside ?? 0.15,
+            FOUNDATION: foundation,
+            GROWTH: growth,
+            UPSIDE: upside,
           },
         };
 
