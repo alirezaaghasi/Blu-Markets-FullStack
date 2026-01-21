@@ -32,8 +32,8 @@ type InitialFundingScreenProps = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'InitialFunding'>;
 };
 
-// Quick amount options
-const QUICK_AMOUNTS = [5_000_000, 10_000_000, 25_000_000, 50_000_000];
+// Quick amount options (all must be >= MIN_INVESTMENT_AMOUNT of 10M)
+const QUICK_AMOUNTS = [10_000_000, 25_000_000, 50_000_000, 100_000_000];
 
 // Format number with commas
 const formatNumber = (num: number): string => {

@@ -87,14 +87,17 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation, r
         const response = await onboarding.submitQuestionnaire(apiAnswers);
 
         // Build profile data (handle both mock and real API response formats)
+        // Backend returns lowercase keys, mock returns UPPERCASE - handle both
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const allocation = response.targetAllocation as any;
         const profileData: RiskProfileData = {
           score: response.riskScore,
           profileName: response.profileName || response.riskProfile?.name || 'Balanced',
           profileNameFarsi: response.riskProfile?.nameFa || getProfileNameFarsi(response.riskScore),
           targetAllocation: {
-            FOUNDATION: response.targetAllocation.FOUNDATION,
-            GROWTH: response.targetAllocation.GROWTH,
-            UPSIDE: response.targetAllocation.UPSIDE,
+            FOUNDATION: allocation.FOUNDATION ?? allocation.foundation ?? 0.5,
+            GROWTH: allocation.GROWTH ?? allocation.growth ?? 0.35,
+            UPSIDE: allocation.UPSIDE ?? allocation.upside ?? 0.15,
           },
         };
 
