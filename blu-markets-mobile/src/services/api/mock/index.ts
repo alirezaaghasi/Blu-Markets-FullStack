@@ -11,11 +11,12 @@ import {
   addLoan,
   updateLoan,
   logAction,
+  initializePortfolio,
 } from '../../../store/slices/portfolioSlice';
 import { enableDemoMode, completeOnboarding, logout } from '../../../store/slices/authSlice';
 import { setRiskProfile } from '../../../store/slices/onboardingSlice';
 import { ASSETS } from '../../../constants/assets';
-import { FIXED_INCOME_UNIT_PRICE, RISK_PROFILE_ALLOCATIONS, RISK_PROFILE_NAMES } from '../../../constants/business';
+import { FIXED_INCOME_UNIT_PRICE, RISK_PROFILE_ALLOCATIONS, RISK_PROFILE_NAMES, SPREAD_BY_LAYER } from '../../../constants/business';
 import type {
   AssetId,
   Holding,
@@ -158,20 +159,93 @@ export const onboarding = {
   createPortfolio: async (amountIrr: number): Promise<PortfolioResponse> => {
     await delay(MOCK_DELAY);
 
-    store.dispatch(loadDemoData());
-    store.dispatch(addFundsAction({ amountIRR: amountIrr }));
+    const state = getState();
+    const { riskProfile } = state.onboarding;
+    const { prices, fxRate } = state.prices;
+
+    // Use user's risk profile allocation, or default to balanced (50/35/15)
+    const targetAllocation = riskProfile?.targetAllocation || {
+      FOUNDATION: 0.50,
+      GROWTH: 0.35,
+      UPSIDE: 0.15,
+    };
+
+    // Calculate amount per layer
+    const foundationIRR = amountIrr * targetAllocation.FOUNDATION;
+    const growthIRR = amountIrr * targetAllocation.GROWTH;
+    const upsideIRR = amountIrr * targetAllocation.UPSIDE;
+
+    // Asset distribution within layers:
+    // Foundation: USDT 70%, IRR_FIXED_INCOME 30%
+    // Growth: BTC 60%, ETH 40%
+    // Upside: SOL 100%
+
+    // Get prices with fallbacks
+    const usdtPrice = prices['USDT'] || 1.0;
+    const btcPrice = prices['BTC'] || 97500;
+    const ethPrice = prices['ETH'] || 3200;
+    const solPrice = prices['SOL'] || 185;
+
+    // Calculate quantities (accounting for spread on Growth and Upside)
+    const usdtAmount = foundationIRR * 0.70;
+    const fixedIncomeAmount = foundationIRR * 0.30;
+    const btcAmount = growthIRR * 0.60;
+    const ethAmount = growthIRR * 0.40;
+    const solAmount = upsideIRR;
+
+    // Convert to quantities
+    const usdtQuantity = usdtAmount / (usdtPrice * fxRate);
+    const fixedIncomeQuantity = fixedIncomeAmount / FIXED_INCOME_UNIT_PRICE;
+
+    // Apply spread for Growth and Upside assets
+    const btcQuantity = (btcAmount * (1 - SPREAD_BY_LAYER.GROWTH)) / (btcPrice * fxRate);
+    const ethQuantity = (ethAmount * (1 - SPREAD_BY_LAYER.GROWTH)) / (ethPrice * fxRate);
+    const solQuantity = (solAmount * (1 - SPREAD_BY_LAYER.UPSIDE)) / (solPrice * fxRate);
+
+    // Create holdings array
+    const holdings: Holding[] = [];
+
+    if (usdtQuantity > 0) {
+      holdings.push({ assetId: 'USDT', quantity: usdtQuantity, frozen: false, layer: 'FOUNDATION' });
+    }
+    if (fixedIncomeQuantity > 0) {
+      holdings.push({ assetId: 'IRR_FIXED_INCOME', quantity: fixedIncomeQuantity, frozen: false, layer: 'FOUNDATION' });
+    }
+    if (btcQuantity > 0) {
+      holdings.push({ assetId: 'BTC', quantity: btcQuantity, frozen: false, layer: 'GROWTH' });
+    }
+    if (ethQuantity > 0) {
+      holdings.push({ assetId: 'ETH', quantity: ethQuantity, frozen: false, layer: 'GROWTH' });
+    }
+    if (solQuantity > 0) {
+      holdings.push({ assetId: 'SOL', quantity: solQuantity, frozen: false, layer: 'UPSIDE' });
+    }
+
+    // Initialize portfolio with calculated holdings
+    store.dispatch(initializePortfolio({
+      cashIRR: 0, // All money invested
+      holdings,
+      targetLayerPct: targetAllocation,
+    }));
+
+    // Log the portfolio creation
+    store.dispatch(logAction({
+      type: 'PORTFOLIO_CREATED',
+      boundary: 'SAFE',
+      message: `Started with ${amountIrr.toLocaleString()} IRR`,
+      amountIRR: amountIrr,
+    }));
+
+    // Complete onboarding
     store.dispatch(completeOnboarding());
 
-    const state = getState();
-    const { holdings, targetLayerPct, status, cashIRR } = state.portfolio;
-    const { prices, fxRate } = state.prices;
-    const totalValue = calculatePortfolioValue(holdings, prices, fxRate) + cashIRR;
+    const totalValue = calculatePortfolioValue(holdings, prices, fxRate);
 
     return {
-      cashIrr: cashIRR,
+      cashIrr: 0,
       holdings,
-      targetAllocation: targetLayerPct,
-      status,
+      targetAllocation,
+      status: 'BALANCED',
       totalValueIrr: totalValue,
       dailyChangePercent: 0,
     };
