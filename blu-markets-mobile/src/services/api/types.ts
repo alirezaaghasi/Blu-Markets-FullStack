@@ -12,6 +12,7 @@ import type {
   TradePreview,
   RebalancePreview,
   Boundary,
+  Layer,
 } from '../../types';
 
 export interface AuthResponse {
@@ -39,6 +40,9 @@ export interface PortfolioResponse {
   status: PortfolioStatus;
   totalValueIrr: number;
   dailyChangePercent: number;
+  // Risk profile info (for profile screen)
+  riskScore?: number;
+  riskProfileName?: string;
 }
 
 export interface ActivityResponse {
@@ -117,4 +121,5 @@ export type {
   TradePreview,
   RebalancePreview,
   Boundary,
+  Layer,
 };

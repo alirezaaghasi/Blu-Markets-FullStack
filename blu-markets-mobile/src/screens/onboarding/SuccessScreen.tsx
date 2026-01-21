@@ -150,11 +150,14 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
 
   const handleGoToDashboard = () => {
     // Initialize local portfolio state (portfolio already created on backend)
+    // Include risk profile info for profile screen to use
     dispatch(
       initializePortfolio({
         cashIRR: initialInvestment, // Cash from initial funding
         holdings: [], // Will be fetched from backend
         targetLayerPct: allocation,
+        riskScore: riskProfile?.score,
+        riskProfileName: riskProfile?.profileName,
       })
     );
 

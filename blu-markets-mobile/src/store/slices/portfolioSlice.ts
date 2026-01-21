@@ -32,6 +32,8 @@ const initialState: PortfolioState = {
   ledger: [],
   status: 'BALANCED',
   lastSyncTimestamp: 0,
+  riskScore: 5,
+  riskProfileName: 'Balanced',
 };
 
 const portfolioSlice = createSlice({
@@ -45,6 +47,8 @@ const portfolioSlice = createSlice({
         cashIRR: number;
         holdings: Holding[];
         targetLayerPct: TargetLayerPct;
+        riskScore?: number;
+        riskProfileName?: string;
       }>
     ) => {
       state.cashIRR = action.payload.cashIRR;
@@ -52,6 +56,21 @@ const portfolioSlice = createSlice({
       state.targetLayerPct = action.payload.targetLayerPct;
       state.status = 'BALANCED';
       state.lastSyncTimestamp = Date.now();
+      if (action.payload.riskScore !== undefined) {
+        state.riskScore = action.payload.riskScore;
+      }
+      if (action.payload.riskProfileName) {
+        state.riskProfileName = action.payload.riskProfileName;
+      }
+    },
+
+    // Set risk profile info (from onboarding or API)
+    setRiskProfile: (
+      state,
+      action: PayloadAction<{ riskScore: number; riskProfileName: string }>
+    ) => {
+      state.riskScore = action.payload.riskScore;
+      state.riskProfileName = action.payload.riskProfileName;
     },
 
     // Cash management
@@ -520,6 +539,7 @@ const portfolioSlice = createSlice({
 
 export const {
   initializePortfolio,
+  setRiskProfile,
   setCash,
   updateCash,
   addCash,

@@ -24,7 +24,12 @@ import { clearAllState } from '../../utils/storage';
 const ProfileScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const { phone } = useAppSelector((state) => state.auth);
-  const { targetLayerPct } = useAppSelector((state) => state.portfolio);
+  const portfolioState = useAppSelector((state) => state.portfolio);
+  const onboardingState = useAppSelector((state) => state.onboarding);
+
+  // Use stored risk score from portfolio state or onboarding state
+  const targetLayerPct = portfolioState?.targetLayerPct || { FOUNDATION: 0.5, GROWTH: 0.35, UPSIDE: 0.15 };
+  const storedRiskScore = portfolioState?.riskScore || onboardingState?.riskProfile?.score;
 
   // Biometric authentication
   const {
@@ -38,14 +43,8 @@ const ProfileScreen: React.FC = () => {
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
-  // Calculate risk score from target allocation (rough reverse calculation)
-  const foundationPct = targetLayerPct.FOUNDATION;
-  let riskScore = 5; // Default
-  if (foundationPct >= 0.8) riskScore = 1;
-  else if (foundationPct >= 0.65) riskScore = 3;
-  else if (foundationPct >= 0.5) riskScore = 5;
-  else if (foundationPct >= 0.4) riskScore = 7;
-  else riskScore = 9;
+  // Use stored risk score (prefer portfolio, fallback to onboarding, then default)
+  const riskScore = storedRiskScore || 5;
 
   const profileNames = RISK_PROFILE_NAMES[riskScore];
 

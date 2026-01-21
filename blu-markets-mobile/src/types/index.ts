@@ -181,6 +181,9 @@ export interface PortfolioState {
   ledger: LedgerEntry[];
   status: PortfolioStatus;
   lastSyncTimestamp: number;
+  // Risk profile from onboarding (stored for profile screen)
+  riskScore: number;
+  riskProfileName: string;
 }
 
 export interface PriceState {
