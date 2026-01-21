@@ -1,12 +1,21 @@
 // Loans Tab - Part of Services Screen
 // Based on UI Restructure Specification Section 3
+// Updated to use API hooks for backend integration
 
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
+  ActivityIndicator,
+} from 'react-native';
 import { COLORS } from '../../constants/colors';
 import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING, RADIUS } from '../../constants/spacing';
-import { useAppSelector } from '../../hooks/useStore';
+import { useLoans } from '../../hooks/useLoans';
 import { Loan } from '../../types';
 
 interface LoansTabProps {
@@ -14,20 +23,81 @@ interface LoansTabProps {
 }
 
 export function LoansTab({ loanId }: LoansTabProps) {
-  const loans = useAppSelector((state) => state.portfolio.loans);
+  const {
+    loans,
+    capacity,
+    isLoading,
+    isRefreshing,
+    error,
+    refresh,
+    createLoan,
+    repayLoan,
+  } = useLoans();
+
   const hasLoans = loans.length > 0;
 
+  if (isLoading && loans.length === 0) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.brand.primary} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={refresh}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   if (!hasLoans) {
-    return <LoansEmptyState />;
+    return (
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.emptyContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={refresh}
+            tintColor={COLORS.brand.primary}
+          />
+        }
+      >
+        <LoansEmptyState
+          availableCapacity={capacity?.availableIrr || 0}
+          onBorrow={() => createLoan(5000000, 3)}
+        />
+      </ScrollView>
+    );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefreshing}
+          onRefresh={refresh}
+          tintColor={COLORS.brand.primary}
+        />
+      }
+    >
       {/* Borrow Capacity Card */}
       <View style={styles.capacityCard}>
         <Text style={styles.capacityLabel}>Available to Borrow</Text>
-        <Text style={styles.capacityValue}>25,000,000 IRR</Text>
-        <TouchableOpacity style={styles.borrowButton}>
+        <Text style={styles.capacityValue}>
+          {(capacity?.availableIrr || 0).toLocaleString()} IRR
+        </Text>
+        <TouchableOpacity
+          style={styles.borrowButton}
+          onPress={() => createLoan(5000000, 3)}
+        >
           <Text style={styles.borrowButtonText}>Borrow</Text>
         </TouchableOpacity>
       </View>
@@ -35,13 +105,24 @@ export function LoansTab({ loanId }: LoansTabProps) {
       {/* Active Loans */}
       <Text style={styles.sectionTitle}>Active Loans</Text>
       {loans.map((loan) => (
-        <LoanCard key={loan.id} loan={loan} highlighted={loan.id === loanId} />
+        <LoanCard
+          key={loan.id}
+          loan={loan}
+          highlighted={loan.id === loanId}
+          onRepay={(amount) => repayLoan(loan.id, amount)}
+        />
       ))}
     </ScrollView>
   );
 }
 
-function LoansEmptyState() {
+function LoansEmptyState({
+  availableCapacity,
+  onBorrow,
+}: {
+  availableCapacity: number;
+  onBorrow: () => void;
+}) {
   return (
     <View style={styles.emptyState}>
       <Text style={styles.emptyIcon}>💰</Text>
@@ -49,14 +130,27 @@ function LoansEmptyState() {
       <Text style={styles.emptySubtitle}>
         Borrow against your crypto holdings at competitive rates
       </Text>
-      <TouchableOpacity style={styles.emptyButton}>
+      {availableCapacity > 0 && (
+        <Text style={styles.emptyCapacity}>
+          Up to {availableCapacity.toLocaleString()} IRR available
+        </Text>
+      )}
+      <TouchableOpacity style={styles.emptyButton} onPress={onBorrow}>
         <Text style={styles.emptyButtonText}>Explore Borrowing</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
-function LoanCard({ loan, highlighted }: { loan: Loan; highlighted: boolean }) {
+function LoanCard({
+  loan,
+  highlighted,
+  onRepay,
+}: {
+  loan: Loan;
+  highlighted: boolean;
+  onRepay: (amount: number) => void;
+}) {
   const nextInstallment = loan.installments.find((i) => i.status === 'PENDING');
   const daysUntilDue = nextInstallment
     ? Math.ceil((new Date(nextInstallment.dueISO).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
@@ -72,12 +166,20 @@ function LoanCard({ loan, highlighted }: { loan: Loan; highlighted: boolean }) {
       <View style={styles.loanHeader}>
         <View style={styles.loanCollateral}>
           <Text style={styles.loanCollateralText}>
-            {loan.collateralQuantity} {loan.collateralAssetId}
+            {loan.collateralQuantity.toFixed(4)} {loan.collateralAssetId}
           </Text>
           <Text style={styles.loanCollateralLabel}>Collateral</Text>
         </View>
-        <View style={styles.loanStatus}>
-          <Text style={styles.loanStatusText}>{loan.status}</Text>
+        <View style={[
+          styles.loanStatus,
+          loan.status === 'REPAID' && styles.loanStatusRepaid,
+        ]}>
+          <Text style={[
+            styles.loanStatusText,
+            loan.status === 'REPAID' && styles.loanStatusTextRepaid,
+          ]}>
+            {loan.status}
+          </Text>
         </View>
       </View>
 
@@ -100,7 +202,7 @@ function LoanCard({ loan, highlighted }: { loan: Loan; highlighted: boolean }) {
         </View>
       </View>
 
-      {nextInstallment && (
+      {nextInstallment && loan.status === 'ACTIVE' && (
         <View style={styles.nextPayment}>
           <Text style={styles.nextPaymentLabel}>
             Next Payment {daysUntilDue !== null && `in ${daysUntilDue} days`}
@@ -108,7 +210,10 @@ function LoanCard({ loan, highlighted }: { loan: Loan; highlighted: boolean }) {
           <Text style={styles.nextPaymentValue}>
             {nextInstallment.totalIRR.toLocaleString()} IRR
           </Text>
-          <TouchableOpacity style={styles.payButton}>
+          <TouchableOpacity
+            style={styles.payButton}
+            onPress={() => onRepay(nextInstallment.totalIRR)}
+          >
             <Text style={styles.payButtonText}>Pay Now</Text>
           </TouchableOpacity>
         </View>
@@ -124,6 +229,37 @@ const styles = StyleSheet.create({
   content: {
     padding: SPACING[5],
     paddingBottom: SPACING[10],
+  },
+  emptyContent: {
+    flexGrow: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING[5],
+  },
+  errorText: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.semantic.error,
+    textAlign: 'center',
+    marginBottom: SPACING[4],
+  },
+  retryButton: {
+    backgroundColor: COLORS.brand.primary,
+    paddingHorizontal: SPACING[6],
+    paddingVertical: SPACING[3],
+    borderRadius: RADIUS.full,
+  },
+  retryButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.inverse,
   },
   capacityCard: {
     backgroundColor: COLORS.background.elevated,
@@ -193,10 +329,16 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING[1],
     borderRadius: RADIUS.sm,
   },
+  loanStatusRepaid: {
+    backgroundColor: `${COLORS.text.muted}20`,
+  },
   loanStatusText: {
     fontSize: TYPOGRAPHY.fontSize.xs,
     fontWeight: TYPOGRAPHY.fontWeight.medium,
     color: COLORS.semantic.success,
+  },
+  loanStatusTextRepaid: {
+    color: COLORS.text.muted,
   },
   loanDetails: {
     borderTopWidth: 1,
@@ -266,6 +408,12 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.base,
     color: COLORS.text.secondary,
     textAlign: 'center',
+    marginBottom: SPACING[2],
+  },
+  emptyCapacity: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.brand.primary,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
     marginBottom: SPACING[6],
   },
   emptyButton: {

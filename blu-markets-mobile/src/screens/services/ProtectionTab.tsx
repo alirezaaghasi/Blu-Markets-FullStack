@@ -1,13 +1,22 @@
 // Protection Tab - Part of Services Screen
 // Based on UI Restructure Specification Section 3
+// Updated to use API hooks for backend integration
 
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
+  ActivityIndicator,
+} from 'react-native';
 import { COLORS } from '../../constants/colors';
 import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING, RADIUS } from '../../constants/spacing';
-import { useAppSelector } from '../../hooks/useStore';
-import { Protection } from '../../types';
+import { useProtections } from '../../hooks/useProtections';
+import { Protection, AssetId } from '../../types';
 import { ASSETS } from '../../constants/assets';
 
 interface ProtectionTabProps {
@@ -15,18 +24,50 @@ interface ProtectionTabProps {
 }
 
 export function ProtectionTab({ protectionId }: ProtectionTabProps) {
-  const protections = useAppSelector((state) => state.portfolio.protections);
-  const holdings = useAppSelector((state) => state.portfolio.holdings);
+  const {
+    protections,
+    eligibleAssets,
+    isLoading,
+    isRefreshing,
+    error,
+    refresh,
+    purchaseProtection,
+    cancelProtection,
+  } = useProtections();
+
   const hasProtections = protections.length > 0;
 
-  // Get eligible assets for protection (non-frozen, eligible per PRD)
-  const eligibleHoldings = holdings.filter((h) => {
-    const asset = ASSETS[h.assetId as keyof typeof ASSETS];
-    return asset?.protectionEligible && !h.frozen;
-  });
+  if (isLoading && protections.length === 0) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.brand.primary} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={refresh}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefreshing}
+          onRefresh={refresh}
+          tintColor={COLORS.brand.primary}
+        />
+      }
+    >
       {/* Active Protections */}
       {hasProtections && (
         <>
@@ -36,6 +77,7 @@ export function ProtectionTab({ protectionId }: ProtectionTabProps) {
               key={protection.id}
               protection={protection}
               highlighted={protection.id === protectionId}
+              onCancel={() => cancelProtection(protection.id)}
             />
           ))}
         </>
@@ -45,8 +87,11 @@ export function ProtectionTab({ protectionId }: ProtectionTabProps) {
       <Text style={[styles.sectionTitle, hasProtections && { marginTop: SPACING[6] }]}>
         Protect Your Assets
       </Text>
-      {eligibleHoldings.length > 0 ? (
-        <EligibleAssetsGrid holdings={eligibleHoldings} />
+      {eligibleAssets.length > 0 ? (
+        <EligibleAssetsGrid
+          assets={eligibleAssets}
+          onProtect={(assetId) => purchaseProtection(assetId, 3)}
+        />
       ) : (
         <View style={styles.noEligible}>
           <Text style={styles.noEligibleText}>
@@ -55,14 +100,22 @@ export function ProtectionTab({ protectionId }: ProtectionTabProps) {
         </View>
       )}
 
-      {!hasProtections && eligibleHoldings.length === 0 && (
+      {!hasProtections && eligibleAssets.length === 0 && (
         <ProtectionEmptyState />
       )}
     </ScrollView>
   );
 }
 
-function ProtectionCard({ protection, highlighted }: { protection: Protection; highlighted: boolean }) {
+function ProtectionCard({
+  protection,
+  highlighted,
+  onCancel,
+}: {
+  protection: Protection;
+  highlighted: boolean;
+  onCancel: () => void;
+}) {
   const asset = ASSETS[protection.assetId];
 
   // Calculate days remaining from endISO
@@ -84,8 +137,16 @@ function ProtectionCard({ protection, highlighted }: { protection: Protection; h
             <Text style={styles.protectionAssetSymbol}>{protection.assetId}</Text>
           </View>
         </View>
-        <View style={styles.protectionStatus}>
-          <Text style={styles.protectionStatusText}>{isActive ? 'ACTIVE' : 'EXPIRED'}</Text>
+        <View style={[
+          styles.protectionStatus,
+          !isActive && styles.protectionStatusExpired,
+        ]}>
+          <Text style={[
+            styles.protectionStatusText,
+            !isActive && styles.protectionStatusTextExpired,
+          ]}>
+            {isActive ? 'ACTIVE' : 'EXPIRED'}
+          </Text>
         </View>
       </View>
 
@@ -108,31 +169,51 @@ function ProtectionCard({ protection, highlighted }: { protection: Protection; h
         </View>
       </View>
 
-      <View style={styles.protectionActions}>
-        <TouchableOpacity style={styles.cancelButton}>
-          <Text style={styles.cancelButtonText}>Cancel Protection</Text>
-        </TouchableOpacity>
-      </View>
+      {isActive && (
+        <View style={styles.protectionActions}>
+          <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
+            <Text style={styles.cancelButtonText}>Cancel Protection</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
 
-function EligibleAssetsGrid({ holdings }: { holdings: { assetId: string; quantity: number }[] }) {
+function EligibleAssetsGrid({
+  assets,
+  onProtect,
+}: {
+  assets: Array<{
+    assetId: AssetId;
+    holdingQuantity: number;
+    holdingValueIrr: number;
+    premiumRatePerMonth: number;
+    estimatedPremiumIrr: number;
+  }>;
+  onProtect: (assetId: AssetId) => void;
+}) {
   return (
     <View style={styles.eligibleGrid}>
-      {holdings.map((holding) => {
-        const asset = ASSETS[holding.assetId as keyof typeof ASSETS];
+      {assets.map((item) => {
+        const asset = ASSETS[item.assetId];
         return (
-          <TouchableOpacity key={holding.assetId} style={styles.eligibleCard}>
+          <View key={item.assetId} style={styles.eligibleCard}>
             <Text style={styles.eligibleIcon}>{asset?.symbol?.slice(0, 2) || '?'}</Text>
-            <Text style={styles.eligibleName}>{asset?.name || holding.assetId}</Text>
+            <Text style={styles.eligibleName}>{asset?.name || item.assetId}</Text>
             <Text style={styles.eligibleQuantity}>
-              {holding.quantity} {asset?.symbol}
+              {item.holdingQuantity.toFixed(4)} {asset?.symbol}
             </Text>
-            <TouchableOpacity style={styles.protectButton}>
+            <Text style={styles.eligiblePremium}>
+              ~{item.estimatedPremiumIrr.toLocaleString()} IRR/mo
+            </Text>
+            <TouchableOpacity
+              style={styles.protectButton}
+              onPress={() => onProtect(item.assetId)}
+            >
               <Text style={styles.protectButtonText}>Protect</Text>
             </TouchableOpacity>
-          </TouchableOpacity>
+          </View>
         );
       })}
     </View>
@@ -158,6 +239,34 @@ const styles = StyleSheet.create({
   content: {
     padding: SPACING[5],
     paddingBottom: SPACING[10],
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING[5],
+  },
+  errorText: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.semantic.error,
+    textAlign: 'center',
+    marginBottom: SPACING[4],
+  },
+  retryButton: {
+    backgroundColor: COLORS.brand.primary,
+    paddingHorizontal: SPACING[6],
+    paddingVertical: SPACING[3],
+    borderRadius: RADIUS.full,
+  },
+  retryButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.inverse,
   },
   sectionTitle: {
     fontSize: TYPOGRAPHY.fontSize.sm,
@@ -214,10 +323,16 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING[1],
     borderRadius: RADIUS.sm,
   },
+  protectionStatusExpired: {
+    backgroundColor: `${COLORS.text.muted}20`,
+  },
   protectionStatusText: {
     fontSize: TYPOGRAPHY.fontSize.xs,
     fontWeight: TYPOGRAPHY.fontWeight.medium,
     color: COLORS.semantic.success,
+  },
+  protectionStatusTextExpired: {
+    color: COLORS.text.muted,
   },
   protectionDetails: {
     borderTopWidth: 1,
@@ -277,6 +392,11 @@ const styles = StyleSheet.create({
   eligibleQuantity: {
     fontSize: TYPOGRAPHY.fontSize.xs,
     color: COLORS.text.secondary,
+    marginBottom: SPACING[1],
+  },
+  eligiblePremium: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.text.muted,
     marginBottom: SPACING[3],
   },
   protectButton: {

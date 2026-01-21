@@ -1,7 +1,8 @@
 // Home Screen (Command Center / Activity Hero)
 // Based on UI Restructure Specification Section 2
+// Updated to use API hooks for backend integration
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -10,12 +11,14 @@ import {
   TouchableOpacity,
   SafeAreaView,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS } from '../../constants/colors';
 import { TYPOGRAPHY } from '../../constants/typography';
-import { SPACING, RADIUS, SIZES } from '../../constants/spacing';
+import { SPACING, RADIUS } from '../../constants/spacing';
 import { useAppSelector } from '../../hooks/useStore';
+import { useActivityFeed } from '../../hooks/useActivityFeed';
 import { ASSETS } from '../../constants/assets';
 import { FIXED_INCOME_UNIT_PRICE } from '../../constants/business';
 import { ActivityCard } from '../../components/ActivityCard';
@@ -81,9 +84,17 @@ const QuickActionButton: React.FC<{
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const [refreshing, setRefreshing] = useState(false);
 
-  const { holdings, cashIRR, targetLayerPct, actionLog, status, loans } = useAppSelector(
+  // Use activity feed hook for API data
+  const {
+    activities,
+    isLoading: isLoadingActivities,
+    isRefreshing,
+    refresh,
+  } = useActivityFeed(5);
+
+  // Keep using Redux for portfolio data (will be updated with usePortfolio in future)
+  const { holdings, cashIRR, targetLayerPct, loans } = useAppSelector(
     (state) => state.portfolio
   );
   const { prices, fxRate } = useAppSelector((state) => state.prices);
@@ -140,11 +151,6 @@ const HomeScreen: React.FC = () => {
     return null;
   })() : null;
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  };
-
   // Deep link navigation handlers
   const handleDeepLinkPortfolio = () => {
     navigation.navigate('Portfolio');
@@ -153,9 +159,6 @@ const HomeScreen: React.FC = () => {
   const handleDeepLinkServices = (initialTab?: 'loans' | 'protection', loanId?: string) => {
     navigation.navigate('Services', { initialTab, loanId });
   };
-
-  // Build activity entries with deep links
-  const recentActivity = actionLog.slice(0, 5);
 
   // Calculate portfolio status
   const getPortfolioStatus = () => {
@@ -183,8 +186,8 @@ const HomeScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
+            refreshing={isRefreshing}
+            onRefresh={refresh}
             tintColor={COLORS.brand.primary}
           />
         }
@@ -216,25 +219,35 @@ const HomeScreen: React.FC = () => {
         <View style={styles.activitySection}>
           <Text style={styles.sectionTitle}>📋 Recent Activity</Text>
 
-          {recentActivity.map((entry: ActionLogEntry) => (
-            <ActivityCard
-              key={entry.id}
-              id={entry.id}
-              type={entry.type}
-              title={entry.message}
-              timestamp={formatRelativeTime(entry.timestamp)}
-              boundary={entry.boundary}
-              deepLink={
-                entry.type === 'TRADE'
-                  ? { label: 'View in Portfolio →', onPress: handleDeepLinkPortfolio }
-                  : entry.type === 'BORROW' || entry.type === 'REPAY'
-                  ? { label: 'View Loan →', onPress: () => handleDeepLinkServices('loans') }
-                  : entry.type === 'PROTECT' || entry.type === 'CANCEL_PROTECTION'
-                  ? { label: 'View Protection →', onPress: () => handleDeepLinkServices('protection') }
-                  : undefined
-              }
-            />
-          ))}
+          {isLoadingActivities ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={COLORS.brand.primary} />
+            </View>
+          ) : activities.length === 0 ? (
+            <View style={styles.emptyActivity}>
+              <Text style={styles.emptyActivityText}>No recent activity</Text>
+            </View>
+          ) : (
+            activities.map((entry: ActionLogEntry) => (
+              <ActivityCard
+                key={entry.id}
+                id={entry.id}
+                type={entry.type}
+                title={entry.message}
+                timestamp={formatRelativeTime(entry.timestamp)}
+                boundary={entry.boundary}
+                deepLink={
+                  entry.type === 'TRADE'
+                    ? { label: 'View in Portfolio →', onPress: handleDeepLinkPortfolio }
+                    : entry.type === 'BORROW' || entry.type === 'REPAY'
+                    ? { label: 'View Loan →', onPress: () => handleDeepLinkServices('loans') }
+                    : entry.type === 'PROTECT' || entry.type === 'CANCEL_PROTECTION'
+                    ? { label: 'View Protection →', onPress: () => handleDeepLinkServices('protection') }
+                    : undefined
+                }
+              />
+            ))
+          )}
 
           {/* Loan Payment Due Alert */}
           {nextLoanPayment && nextLoanPayment.daysUntil <= 7 && (
@@ -424,6 +437,20 @@ const styles = StyleSheet.create({
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
     color: COLORS.text.secondary,
     marginBottom: SPACING[3],
+  },
+  loadingContainer: {
+    padding: SPACING[6],
+    alignItems: 'center',
+  },
+  emptyActivity: {
+    backgroundColor: COLORS.background.elevated,
+    borderRadius: RADIUS.lg,
+    padding: SPACING[6],
+    alignItems: 'center',
+  },
+  emptyActivityText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.muted,
   },
   // Value Section
   valueSection: {
