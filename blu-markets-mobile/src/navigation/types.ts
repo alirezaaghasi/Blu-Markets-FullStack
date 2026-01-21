@@ -20,11 +20,16 @@ export type OnboardingStackParamList = {
   Success: undefined;
 };
 
-// Main Tab Navigator (4 tabs per PRD - no Market in MVP)
+// Main Tab Navigator (4 tabs per UI Restructure Spec)
+// Home, Portfolio, Services, Profile - NO History or Market tabs
 export type MainTabParamList = {
   Home: undefined;
   Portfolio: undefined;
-  History: undefined;
+  Services: {
+    initialTab?: 'loans' | 'protection';
+    loanId?: string;
+    protectionId?: string;
+  } | undefined;
   Profile: undefined;
 };
 

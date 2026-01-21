@@ -1,103 +1,71 @@
 // Main Tab Navigator
-// Based on PRD Section 7 - Navigation Architecture (4 tabs)
+// Based on UI Restructure Specification - 4 Tabs Only
+// Home, Portfolio, Services, Profile
+
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, StyleSheet } from 'react-native';
+import { Home, PieChart, Briefcase, User } from 'lucide-react-native';
 import { MainTabParamList } from './types';
-import { COLORS } from '../constants/colors';
-import { SIZES } from '../constants/spacing';
 
 // Import screens
-import DashboardScreen from '../screens/main/DashboardScreen';
+import HomeScreen from '../screens/main/HomeScreen';
 import PortfolioScreen from '../screens/main/PortfolioScreen';
-import HistoryScreen from '../screens/main/HistoryScreen';
+import ServicesScreen from '../screens/services/ServicesScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
-
-// Tab configuration per PRD (4 tabs - no Market tab in MVP)
-const TABS = [
-  { name: 'Home', icon: '🏠', screen: DashboardScreen },
-  { name: 'Portfolio', icon: '📊', screen: PortfolioScreen },
-  { name: 'History', icon: '🕐', screen: HistoryScreen },
-  { name: 'Profile', icon: '👤', screen: ProfileScreen },
-] as const;
-
-// Tab icon component
-const TabIcon = ({ icon, focused }: { icon: string; focused: boolean }) => (
-  <View style={styles.iconContainer}>
-    <Text style={[styles.icon, focused && styles.iconFocused]}>{icon}</Text>
-  </View>
-);
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-export const MainTabNavigator: React.FC = () => {
+export function MainTabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={{
-        tabBarActiveTintColor: COLORS.brand.primary,
-        tabBarInactiveTintColor: COLORS.text.muted,
-        tabBarStyle: styles.tabBar,
-        tabBarLabelStyle: styles.tabLabel,
         headerShown: false,
+        tabBarStyle: {
+          backgroundColor: '#0E1420',
+          borderTopColor: '#1C2433',
+          borderTopWidth: 1,
+          height: 64 + 34, // 64pt nav + 34pt safe area
+          paddingBottom: 34,
+          paddingTop: 8,
+        },
+        tabBarActiveTintColor: '#6FAAF8',
+        tabBarInactiveTintColor: '#6B7280',
+        tabBarLabelStyle: {
+          fontSize: 11,
+          marginTop: 4,
+        },
       }}
     >
       <Tab.Screen
         name="Home"
-        component={DashboardScreen}
+        component={HomeScreen}
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="🏠" focused={focused} />,
+          tabBarIcon: ({ color }) => <Home color={color} size={24} />,
         }}
       />
       <Tab.Screen
         name="Portfolio"
         component={PortfolioScreen}
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="📊" focused={focused} />,
+          tabBarIcon: ({ color }) => <PieChart color={color} size={24} />,
         }}
       />
       <Tab.Screen
-        name="History"
-        component={HistoryScreen}
+        name="Services"
+        component={ServicesScreen}
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="🕐" focused={focused} />,
+          tabBarIcon: ({ color }) => <Briefcase color={color} size={24} />,
         }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="👤" focused={focused} />,
+          tabBarIcon: ({ color }) => <User color={color} size={24} />,
         }}
       />
     </Tab.Navigator>
   );
-};
-
-const styles = StyleSheet.create({
-  tabBar: {
-    backgroundColor: COLORS.background.surface,
-    borderTopColor: COLORS.border,
-    borderTopWidth: 1,
-    height: SIZES.bottomNavHeight,
-    paddingBottom: 8,
-    paddingTop: 8,
-  },
-  tabLabel: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  iconContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  icon: {
-    fontSize: 22,
-    opacity: 0.6,
-  },
-  iconFocused: {
-    opacity: 1,
-    transform: [{ scale: 1.1 }],
-  },
-});
+}
 
 export default MainTabNavigator;

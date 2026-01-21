@@ -5,7 +5,7 @@ import { Layer, TargetLayerPct } from '../types';
 
 // Currency & Pricing
 export const DEFAULT_FX_RATE = 1_456_000; // IRR per USD
-export const FIXED_INCOME_UNIT_PRICE = 500_000; // IRR per unit
+export const FIXED_INCOME_UNIT_PRICE = 1_000_000; // IRR per unit (1M IRR)
 export const FIXED_INCOME_ANNUAL_RATE = 0.30; // 30% annual
 
 // Trading
