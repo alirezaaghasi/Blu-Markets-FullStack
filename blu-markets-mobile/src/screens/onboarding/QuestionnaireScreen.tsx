@@ -56,25 +56,29 @@ const QuestionnaireScreen: React.FC<QuestionnaireScreenProps> = ({ navigation })
   const handleSelectOption = (optionIndex: number) => {
     dispatch(setAnswer({ questionId: currentQuestion.id, optionIndex }));
 
-    // Auto-advance after selection with small delay
+    // Capture current index at selection time
+    const selectedIndex = currentIndex;
+    const isLastQuestion = selectedIndex >= totalQuestions - 1;
+
+    // Quick advance after selection (just enough to show selection feedback)
     setTimeout(() => {
-      if (currentIndex < totalQuestions - 1) {
-        goToNext();
-      } else {
+      if (isLastQuestion) {
         navigation.navigate('ProfileResult');
+      } else {
+        setCurrentIndex(selectedIndex + 1);
       }
-    }, 300);
+    }, 150);
   };
 
   const goToNext = () => {
-    if (currentIndex < totalQuestions - 1) {
-      setCurrentIndex(currentIndex + 1);
-    }
+    setCurrentIndex(prevIndex =>
+      prevIndex < totalQuestions - 1 ? prevIndex + 1 : prevIndex
+    );
   };
 
   const goBack = () => {
     if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
+      setCurrentIndex(prevIndex => prevIndex - 1);
     } else {
       navigation.goBack();
     }
