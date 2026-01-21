@@ -1,7 +1,12 @@
 // API Service
 // Connects to Blu Markets backend
+// Supports demo mode with mock responses
 import { Platform } from 'react-native';
 import { API_BASE_URL } from '../constants/business';
+import { DEMO_MODE } from '../config/api';
+import { store } from '../store';
+import { enableDemoMode } from '../store/slices/authSlice';
+import { loadDemoData } from '../store/slices/portfolioSlice';
 
 // Token storage keys
 const ACCESS_TOKEN_KEY = 'blu_access_token';
@@ -216,6 +221,16 @@ async function apiFetch<T>(
 export const authApi = {
   // Send OTP to phone number
   async sendOtp(phone: string): Promise<SendOtpResponse> {
+    // Demo mode: always succeed
+    if (DEMO_MODE) {
+      await new Promise((resolve) => setTimeout(resolve, 500)); // Simulate network delay
+      return {
+        success: true,
+        message: 'OTP sent successfully (demo mode)',
+        expiresIn: 300,
+      };
+    }
+
     return apiFetch<SendOtpResponse>('/api/v1/auth/send-otp', {
       method: 'POST',
       body: JSON.stringify({ phone }),
@@ -224,6 +239,38 @@ export const authApi = {
 
   // Verify OTP and get tokens
   async verifyOtp(phone: string, code: string): Promise<VerifyOtpResponse> {
+    // Demo mode: accept 999999 or any 6-digit code
+    if (DEMO_MODE) {
+      await new Promise((resolve) => setTimeout(resolve, 500)); // Simulate network delay
+
+      // Accept 999999 specifically, or any 6-digit code in dev mode
+      if (code !== '999999' && code.length !== 6) {
+        throw {
+          code: 'OTP_INVALID',
+          message: 'Invalid OTP code',
+          statusCode: 400,
+        } as ApiError;
+      }
+
+      // Enable demo mode in Redux
+      store.dispatch(enableDemoMode());
+      store.dispatch(loadDemoData());
+
+      // Store demo tokens
+      await storeTokens('demo_access_token', 'demo_refresh_token');
+
+      return {
+        success: true,
+        tokens: {
+          accessToken: 'demo_access_token',
+          refreshToken: 'demo_refresh_token',
+          expiresIn: 86400,
+        },
+        isNewUser: false,
+        onboardingComplete: true, // Skip to main app in demo
+      };
+    }
+
     const response = await apiFetch<VerifyOtpResponse>('/api/v1/auth/verify-otp', {
       method: 'POST',
       body: JSON.stringify({ phone, code }),
