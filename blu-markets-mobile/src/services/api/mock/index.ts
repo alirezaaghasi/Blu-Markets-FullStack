@@ -3,7 +3,6 @@
 
 import { store } from '../../../store';
 import {
-  loadDemoData,
   addFunds as addFundsAction,
   executeTrade as executeTradeAction,
   addProtection,
@@ -13,7 +12,7 @@ import {
   logAction,
   initializePortfolio,
 } from '../../../store/slices/portfolioSlice';
-import { enableDemoMode, completeOnboarding, logout } from '../../../store/slices/authSlice';
+import { completeOnboarding, logout } from '../../../store/slices/authSlice';
 import { setRiskProfile } from '../../../store/slices/onboardingSlice';
 import { ASSETS } from '../../../constants/assets';
 import { FIXED_INCOME_UNIT_PRICE, RISK_PROFILE_ALLOCATIONS, RISK_PROFILE_NAMES, SPREAD_BY_LAYER } from '../../../constants/business';
@@ -83,29 +82,37 @@ export const auth = {
   verifyOtp: async (_phone: string, code: string): Promise<AuthResponse> => {
     await delay(MOCK_DELAY);
 
-    // Accept any 6-digit code in demo mode
+    // Accept any 6-digit code in mock mode
     if (code.length !== 6) {
       throw new Error('Invalid OTP code');
     }
 
-    store.dispatch(enableDemoMode());
-    store.dispatch(loadDemoData());
+    // Check if user has completed onboarding previously
+    const state = getState();
+    const hasCompletedOnboarding = state.auth.onboardingComplete;
 
+    // For new users or users who haven't completed onboarding,
+    // don't load demo data - let them go through the real flow
     return {
-      accessToken: 'demo_access_token',
-      refreshToken: 'demo_refresh_token',
-      isNewUser: false,
-      onboardingComplete: true,
+      accessToken: 'mock_access_token',
+      refreshToken: 'mock_refresh_token',
+      isNewUser: !hasCompletedOnboarding,
+      onboardingComplete: hasCompletedOnboarding,
     };
   },
 
   refresh: async (): Promise<AuthResponse> => {
     await delay(MOCK_DELAY);
+
+    // Check current state to determine onboarding status
+    const state = getState();
+    const hasCompletedOnboarding = state.auth.onboardingComplete;
+
     return {
-      accessToken: 'demo_access_token_refreshed',
-      refreshToken: 'demo_refresh_token_refreshed',
+      accessToken: 'mock_access_token_refreshed',
+      refreshToken: 'mock_refresh_token_refreshed',
       isNewUser: false,
-      onboardingComplete: true,
+      onboardingComplete: hasCompletedOnboarding,
     };
   },
 
