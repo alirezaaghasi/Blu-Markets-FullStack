@@ -26,6 +26,7 @@ replit.nix
 # Documentation and design files (keep in separate docs repo if needed)
 *.md
 !README.md
+!PRD.md
 !MIGRATION_PLAN.md
 !BACKEND_DATABASE_PLAN.md
 screenshots*/
