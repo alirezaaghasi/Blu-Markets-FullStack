@@ -9,10 +9,10 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { OnboardingStackParamList } from '../../navigation/types';
@@ -92,7 +92,8 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation, r
           };
         });
 
-        console.log('[ProfileResult] Calling API...');
+        console.log('[ProfileResult] Calling API with', formattedAnswers.length, 'answers');
+        console.log('[ProfileResult] Answers:', JSON.stringify(formattedAnswers));
         const response = await onboarding.submitQuestionnaire(formattedAnswers);
         console.log('[ProfileResult] API response received:', JSON.stringify(response).substring(0, 100));
 
