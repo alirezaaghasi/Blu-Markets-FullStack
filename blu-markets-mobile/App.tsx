@@ -11,8 +11,9 @@ import { store } from './src/store';
 import RootNavigator from './src/navigation/RootNavigator';
 import { colors } from './src/constants/theme';
 import { setDefaultPrices } from './src/store/slices/pricesSlice';
-import { usePricePolling } from './src/hooks/usePricePolling';
-import { usePersistence } from './src/hooks/usePersistence';
+// Disabled during debugging
+// import { usePricePolling } from './src/hooks/usePricePolling';
+// import { usePersistence } from './src/hooks/usePersistence';
 
 // Navigation theme
 const navigationTheme = {
@@ -34,15 +35,9 @@ const navigationTheme = {
 };
 
 function AppContent() {
-  // Only enable persistence and price polling after onboarding is complete
-  // to avoid performance issues during questionnaire
-  const isOnboardingComplete = store.getState().auth.onboardingComplete;
-
-  // Initialize persistence (disabled during onboarding for performance)
+  // Disabled all hooks during debugging to isolate infinite loop issue
   // usePersistence();
-
-  // Initialize price polling (disabled during onboarding)
-  usePricePolling({ enabled: isOnboardingComplete });
+  // usePricePolling({ enabled: false });
 
   useEffect(() => {
     // Initialize default prices on app start

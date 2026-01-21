@@ -23,10 +23,11 @@ export interface AuthResponse {
 
 export interface QuestionnaireResponse {
   riskScore: number;
-  riskTier: number;
-  riskProfile: {
+  riskTier: number | string;
+  profileName: string;
+  riskProfile?: {
     name: string;
-    nameFa: string;
+    nameFa?: string;
   };
   targetAllocation: TargetLayerPct;
 }

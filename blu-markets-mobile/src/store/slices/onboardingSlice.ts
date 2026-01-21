@@ -28,6 +28,9 @@ const onboardingSlice = createSlice({
     setAnswer: (state, action: PayloadAction<{ questionId: string; optionIndex: number }>) => {
       state.answers[action.payload.questionId] = action.payload.optionIndex;
     },
+    setAllAnswers: (state, action: PayloadAction<Record<string, number>>) => {
+      state.answers = action.payload;
+    },
     setRiskProfile: (state, action: PayloadAction<RiskProfile>) => {
       state.riskProfile = action.payload;
     },
@@ -50,6 +53,7 @@ export const {
   setStep,
   setPhone,
   setAnswer,
+  setAllAnswers,
   setRiskProfile,
   setConsent,
   setAllConsents,

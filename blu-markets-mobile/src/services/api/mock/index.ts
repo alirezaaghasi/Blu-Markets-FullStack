@@ -122,14 +122,21 @@ export const auth = {
   },
 };
 
+// Questionnaire answer type for type consistency with real API
+interface QuestionnaireAnswer {
+  questionId: string;
+  answerId: string;
+  value: number;
+}
+
 // Onboarding APIs
 export const onboarding = {
-  submitQuestionnaire: async (answers: Record<string, number>): Promise<QuestionnaireResponse> => {
+  submitQuestionnaire: async (answers: QuestionnaireAnswer[]): Promise<QuestionnaireResponse> => {
     await delay(MOCK_DELAY);
 
     // Calculate risk score from answers (simplified)
-    const totalScore = Object.values(answers).reduce((sum, val) => sum + val, 0);
-    const avgScore = totalScore / Object.keys(answers).length;
+    const totalScore = answers.reduce((sum, a) => sum + a.value, 0);
+    const avgScore = totalScore / answers.length;
     const riskScore = Math.min(10, Math.max(1, Math.round(avgScore)));
     const riskTier = Math.ceil(riskScore / 2);
 
@@ -150,6 +157,7 @@ export const onboarding = {
     return {
       riskScore,
       riskTier,
+      profileName: profileNames.en,
       riskProfile: {
         name: profileNames.en,
         nameFa: profileNames.fa,

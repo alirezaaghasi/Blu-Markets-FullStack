@@ -1,89 +1,55 @@
 /**
  * ProfileResultScreen
- * Design System: Blu Markets
- * Target: iPhone 16 Pro (393 x 852)
- *
- * Shows calculated risk profile with donut chart visualization
- * Uses Foundation/Growth/Upside layer naming
+ * Simplified version to avoid infinite render loops
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
-  Dimensions,
   ActivityIndicator,
   StatusBar,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RouteProp } from '@react-navigation/native';
 import { OnboardingStackParamList } from '../../navigation/types';
 import { COLORS } from '../../constants/colors';
 import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING, RADIUS } from '../../constants/spacing';
-import { LAYOUT, DEVICE } from '../../constants/layout';
-import { Button, Card } from '../../components/common';
-import { useAppDispatch, useAppSelector } from '../../hooks/useStore';
+import { LAYOUT } from '../../constants/layout';
+import { Button } from '../../components/common';
+import { store } from '../../store';
 import { setRiskProfile } from '../../store/slices/onboardingSlice';
-import { formatAllocation } from '../../utils/riskProfile';
 import { onboarding } from '../../services/api';
 import { QUESTIONS } from '../../constants/questionnaire';
 
-const { width } = Dimensions.get('window');
-
 type ProfileResultScreenProps = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'ProfileResult'>;
+  route: RouteProp<OnboardingStackParamList, 'ProfileResult'>;
 };
 
-const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation }) => {
-  const dispatch = useAppDispatch();
-  const answers = useAppSelector((state) => state.onboarding.answers);
-  const riskProfile = useAppSelector((state) => state.onboarding.riskProfile);
+interface RiskProfileData {
+  score: number;
+  profileName: string;
+  profileNameFarsi: string;
+  targetAllocation: {
+    FOUNDATION: number;
+    GROWTH: number;
+    UPSIDE: number;
+  };
+}
+
+const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation, route }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [profile, setProfile] = useState<RiskProfileData | null>(null);
+  const hasSubmittedRef = useRef(false);
 
-  useEffect(() => {
-    // Submit questionnaire to backend
-    const submitQuestionnaire = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        // Transform answers to backend format - Record<string, number> of scores
-        const apiAnswers: Record<string, number> = {};
-        QUESTIONS.forEach((question) => {
-          const optionIndex = answers[question.id] ?? 0;
-          const option = question.options[optionIndex];
-          apiAnswers[question.id] = option?.score ?? 5;
-        });
-
-        const response = await onboarding.submitQuestionnaire(apiAnswers);
-
-        // Map backend response to local format
-        const profile = {
-          score: response.riskScore,
-          profileName: response.riskProfile.name,
-          profileNameFarsi: response.riskProfile.nameFa || getProfileNameFarsi(response.riskScore),
-          targetAllocation: {
-            FOUNDATION: response.targetAllocation.FOUNDATION,
-            GROWTH: response.targetAllocation.GROWTH,
-            UPSIDE: response.targetAllocation.UPSIDE,
-          },
-        };
-
-        dispatch(setRiskProfile(profile));
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to calculate profile';
-        setError(errorMessage);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    submitQuestionnaire();
-  }, [answers, dispatch]);
+  // Get answers from route params (passed from QuestionnaireScreen)
+  const answersFromParams = route.params?.answers;
 
   // Helper to get Farsi profile name
   function getProfileNameFarsi(score: number): string {
@@ -94,13 +60,73 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation })
     return 'جسور';
   }
 
-  if (isLoading || !riskProfile) {
+  useEffect(() => {
+    // Prevent double submission
+    if (hasSubmittedRef.current) return;
+    hasSubmittedRef.current = true;
+
+    const submitQuestionnaire = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // Use answers from route params (avoids Redux entirely)
+        const answers = answersFromParams || {};
+
+        // Transform answers to backend format (array of { questionId, answerId, value })
+        const apiAnswers = QUESTIONS.map((question) => {
+          const optionIndex = answers[question.id] ?? 0;
+          const option = question.options[optionIndex];
+          return {
+            questionId: question.id,
+            answerId: `option_${optionIndex}`,
+            value: option?.score ?? 5,
+          };
+        });
+
+        const response = await onboarding.submitQuestionnaire(apiAnswers);
+
+        // Build profile data (handle both mock and real API response formats)
+        const profileData: RiskProfileData = {
+          score: response.riskScore,
+          profileName: response.profileName || response.riskProfile?.name || 'Balanced',
+          profileNameFarsi: response.riskProfile?.nameFa || getProfileNameFarsi(response.riskScore),
+          targetAllocation: {
+            FOUNDATION: response.targetAllocation.FOUNDATION,
+            GROWTH: response.targetAllocation.GROWTH,
+            UPSIDE: response.targetAllocation.UPSIDE,
+          },
+        };
+
+        // Update local state
+        setProfile(profileData);
+
+        // Also save to Redux for later use
+        store.dispatch(setRiskProfile(profileData));
+      } catch (err: unknown) {
+        let errorMessage = 'Failed to calculate profile';
+        if (err instanceof Error) {
+          errorMessage = err.message;
+        } else if (err && typeof err === 'object' && 'message' in err) {
+          errorMessage = String((err as { message: unknown }).message);
+        }
+        setError(errorMessage);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    submitQuestionnaire();
+  }, [answersFromParams]); // Only depends on answers from params
+
+  if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor={COLORS.background.primary} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.brand.primary} />
-          <Text style={styles.loadingText}>Calculating your profile...</Text>
+          <Text style={styles.loadingText}>محاسبه پروفایل شما...</Text>
+          <Text style={styles.loadingSubtext}>Calculating your profile...</Text>
         </View>
       </SafeAreaView>
     );
@@ -113,7 +139,7 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation })
         <View style={styles.loadingContainer}>
           <Text style={styles.errorText}>{error}</Text>
           <Button
-            label="Go Back"
+            label="بازگشت - Go Back"
             variant="primary"
             size="md"
             onPress={() => navigation.goBack()}
@@ -123,7 +149,9 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation })
     );
   }
 
-  const allocation = formatAllocation(riskProfile.targetAllocation);
+  if (!profile) {
+    return null;
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -144,140 +172,103 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation })
         {/* Profile title */}
         <View style={styles.titleContainer}>
           <Text style={styles.profileLabelFarsi}>
-            شما یک سرمایه‌گذار {riskProfile.profileNameFarsi} هستید
+            شما یک سرمایه‌گذار {profile.profileNameFarsi} هستید
           </Text>
           <Text style={styles.profileLabelEn}>
-            You are a {riskProfile.profileName} investor
+            You are a {profile.profileName} investor
           </Text>
         </View>
 
-        {/* Chart and score */}
+        {/* Allocation Bar */}
         <View style={styles.chartContainer}>
-          <AllocationBar
-            foundation={riskProfile.targetAllocation.FOUNDATION}
-            growth={riskProfile.targetAllocation.GROWTH}
-            upside={riskProfile.targetAllocation.UPSIDE}
-          />
+          <View style={styles.barOuter}>
+            <View
+              style={[
+                styles.barSegment,
+                { backgroundColor: COLORS.layers.foundation, flex: profile.targetAllocation.FOUNDATION },
+              ]}
+            />
+            <View
+              style={[
+                styles.barSegment,
+                { backgroundColor: COLORS.layers.growth, flex: profile.targetAllocation.GROWTH },
+              ]}
+            />
+            <View
+              style={[
+                styles.barSegment,
+                { backgroundColor: COLORS.layers.upside, flex: profile.targetAllocation.UPSIDE },
+              ]}
+            />
+          </View>
+          <View style={styles.barLabels}>
+            <Text style={[styles.barLabel, { color: COLORS.layers.foundation }]}>
+              {Math.round(profile.targetAllocation.FOUNDATION * 100)}%
+            </Text>
+            <Text style={[styles.barLabel, { color: COLORS.layers.growth }]}>
+              {Math.round(profile.targetAllocation.GROWTH * 100)}%
+            </Text>
+            <Text style={[styles.barLabel, { color: COLORS.layers.upside }]}>
+              {Math.round(profile.targetAllocation.UPSIDE * 100)}%
+            </Text>
+          </View>
+
           <View style={styles.scoreContainer}>
-            <Text style={styles.scoreValue}>{riskProfile.score}</Text>
+            <Text style={styles.scoreValue}>{profile.score}</Text>
             <Text style={styles.scoreLabel}>Risk Score</Text>
           </View>
         </View>
 
         {/* Allocation breakdown */}
         <View style={styles.allocationContainer}>
-          <AllocationItem
-            label="Foundation"
-            labelFa="پایه"
-            percentage={allocation.foundation}
-            color={COLORS.layers.foundation}
-            description="Stable assets for security"
-          />
-          <AllocationItem
-            label="Growth"
-            labelFa="رشد"
-            percentage={allocation.growth}
-            color={COLORS.layers.growth}
-            description="Balanced growth potential"
-          />
-          <AllocationItem
-            label="Upside"
-            labelFa="صعود"
-            percentage={allocation.upside}
-            color={COLORS.layers.upside}
-            description="High-risk, high-reward"
-          />
+          <View style={styles.allocationItem}>
+            <View style={[styles.allocationDot, { backgroundColor: COLORS.layers.foundation }]} />
+            <View style={styles.allocationTextContainer}>
+              <Text style={styles.allocationLabel}>Foundation (پایه)</Text>
+              <Text style={styles.allocationDescription}>Stable assets for security</Text>
+            </View>
+            <Text style={[styles.allocationPercentage, { color: COLORS.layers.foundation }]}>
+              {Math.round(profile.targetAllocation.FOUNDATION * 100)}%
+            </Text>
+          </View>
+
+          <View style={styles.allocationItem}>
+            <View style={[styles.allocationDot, { backgroundColor: COLORS.layers.growth }]} />
+            <View style={styles.allocationTextContainer}>
+              <Text style={styles.allocationLabel}>Growth (رشد)</Text>
+              <Text style={styles.allocationDescription}>Balanced growth potential</Text>
+            </View>
+            <Text style={[styles.allocationPercentage, { color: COLORS.layers.growth }]}>
+              {Math.round(profile.targetAllocation.GROWTH * 100)}%
+            </Text>
+          </View>
+
+          <View style={styles.allocationItem}>
+            <View style={[styles.allocationDot, { backgroundColor: COLORS.layers.upside }]} />
+            <View style={styles.allocationTextContainer}>
+              <Text style={styles.allocationLabel}>Upside (صعود)</Text>
+              <Text style={styles.allocationDescription}>High-risk, high-reward</Text>
+            </View>
+            <Text style={[styles.allocationPercentage, { color: COLORS.layers.upside }]}>
+              {Math.round(profile.targetAllocation.UPSIDE * 100)}%
+            </Text>
+          </View>
         </View>
       </View>
 
       {/* Footer */}
       <View style={styles.footer}>
         <Button
-          label="This looks right"
+          label="این درسته - This looks right →"
           variant="primary"
           size="lg"
           fullWidth
           onPress={() => navigation.navigate('Consent')}
-          icon={<Text style={styles.arrowIcon}>→</Text>}
-          iconPosition="right"
         />
       </View>
     </SafeAreaView>
   );
 };
-
-// Allocation Bar Component
-interface AllocationBarProps {
-  foundation: number;
-  growth: number;
-  upside: number;
-}
-
-const AllocationBar: React.FC<AllocationBarProps> = ({ foundation, growth, upside }) => {
-  return (
-    <View style={styles.barContainer}>
-      <View style={styles.barOuter}>
-        <View
-          style={[
-            styles.barSegment,
-            { backgroundColor: COLORS.layers.foundation, flex: foundation },
-          ]}
-        />
-        <View
-          style={[
-            styles.barSegment,
-            { backgroundColor: COLORS.layers.growth, flex: growth },
-          ]}
-        />
-        <View
-          style={[
-            styles.barSegment,
-            { backgroundColor: COLORS.layers.upside, flex: upside },
-          ]}
-        />
-      </View>
-      <View style={styles.barLabels}>
-        <Text style={[styles.barLabel, { color: COLORS.layers.foundation }]}>
-          {Math.round(foundation * 100)}%
-        </Text>
-        <Text style={[styles.barLabel, { color: COLORS.layers.growth }]}>
-          {Math.round(growth * 100)}%
-        </Text>
-        <Text style={[styles.barLabel, { color: COLORS.layers.upside }]}>
-          {Math.round(upside * 100)}%
-        </Text>
-      </View>
-    </View>
-  );
-};
-
-// Allocation Item Component
-interface AllocationItemProps {
-  label: string;
-  labelFa: string;
-  percentage: string;
-  color: string;
-  description: string;
-}
-
-const AllocationItem: React.FC<AllocationItemProps> = ({
-  label,
-  labelFa,
-  percentage,
-  color,
-  description,
-}) => (
-  <View style={styles.allocationItem}>
-    <View style={[styles.allocationDot, { backgroundColor: color }]} />
-    <View style={styles.allocationTextContainer}>
-      <View style={styles.allocationHeader}>
-        <Text style={styles.allocationLabel}>{label}</Text>
-        <Text style={[styles.allocationPercentage, { color }]}>{percentage}</Text>
-      </View>
-      <Text style={styles.allocationDescription}>{description}</Text>
-    </View>
-  </View>
-);
 
 const styles = StyleSheet.create({
   container: {
@@ -291,9 +282,15 @@ const styles = StyleSheet.create({
     padding: LAYOUT.screenPaddingH,
   },
   loadingText: {
-    color: COLORS.text.secondary,
+    color: COLORS.text.primary,
     fontSize: TYPOGRAPHY.fontSize.lg,
     marginTop: SPACING[4],
+    textAlign: 'center',
+  },
+  loadingSubtext: {
+    color: COLORS.text.secondary,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    marginTop: SPACING[2],
   },
   errorText: {
     color: COLORS.semantic.error,
@@ -331,7 +328,6 @@ const styles = StyleSheet.create({
     fontWeight: TYPOGRAPHY.fontWeight.bold,
     color: COLORS.text.primary,
     textAlign: 'center',
-    writingDirection: 'rtl',
     marginBottom: SPACING[2],
   },
   profileLabelEn: {
@@ -346,11 +342,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background.elevated,
     borderRadius: RADIUS.xl,
   },
-  barContainer: {
-    width: '100%',
-    marginBottom: SPACING[4],
-  },
   barOuter: {
+    width: '100%',
     height: 24,
     borderRadius: RADIUS.md,
     flexDirection: 'row',
@@ -361,8 +354,10 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   barLabels: {
+    width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginBottom: SPACING[4],
   },
   barLabel: {
     fontSize: TYPOGRAPHY.fontSize.sm,
@@ -370,7 +365,6 @@ const styles = StyleSheet.create({
   },
   scoreContainer: {
     alignItems: 'center',
-    marginTop: SPACING[2],
   },
   scoreValue: {
     fontSize: 48,
@@ -386,7 +380,7 @@ const styles = StyleSheet.create({
   },
   allocationItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     backgroundColor: COLORS.background.elevated,
     padding: SPACING[4],
     borderRadius: RADIUS.lg,
@@ -396,38 +390,28 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     marginRight: SPACING[3],
-    marginTop: 4,
   },
   allocationTextContainer: {
     flex: 1,
-  },
-  allocationHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING[1],
   },
   allocationLabel: {
     fontSize: TYPOGRAPHY.fontSize.base,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
     color: COLORS.text.primary,
-  },
-  allocationPercentage: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    marginBottom: SPACING[1],
   },
   allocationDescription: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.text.secondary,
   },
+  allocationPercentage: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+  },
   footer: {
     paddingHorizontal: LAYOUT.screenPaddingH,
     paddingBottom: LAYOUT.totalBottomSpace,
     paddingTop: SPACING[4],
-  },
-  arrowIcon: {
-    fontSize: 18,
-    color: COLORS.text.inverse,
   },
 });
 

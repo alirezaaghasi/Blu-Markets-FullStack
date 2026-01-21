@@ -22,15 +22,15 @@ export const onboardingRoutes: FastifyPluginAsync = async (app: FastifyInstance)
         properties: {
           answers: {
             type: 'array',
-            minItems: 10,
-            maxItems: 10,
+            minItems: 9,
+            maxItems: 9,
             items: {
               type: 'object',
               required: ['questionId', 'answerId', 'value'],
               properties: {
                 questionId: { type: 'string' },
                 answerId: { type: 'string' },
-                value: { type: 'number', minimum: 1, maximum: 5 },
+                value: { type: 'number', minimum: 1, maximum: 10 },
               },
             },
           },

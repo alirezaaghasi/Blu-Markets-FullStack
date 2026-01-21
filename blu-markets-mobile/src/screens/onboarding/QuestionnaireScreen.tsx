@@ -1,8 +1,8 @@
 /**
- * QuestionnaireScreen - Minimal test version
+ * QuestionnaireScreen - Simple state-based version
  */
 
-import React, { useRef, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/types';
-import { store } from '../../store';
-import { setAnswer } from '../../store/slices/onboardingSlice';
 import { QUESTIONS } from '../../constants/questionnaire';
 
 type Props = {
@@ -21,37 +19,44 @@ type Props = {
 };
 
 const QuestionnaireScreen: React.FC<Props> = ({ navigation }) => {
-  // Use refs to avoid any React re-renders
-  const indexRef = useRef(0);
-  const answersRef = useRef<number[]>([]);
-  const [, forceUpdate] = React.useReducer(x => x + 1, 0);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [answers, setAnswers] = useState<number[]>([]);
+  const [isNavigating, setIsNavigating] = useState(false);
+
+  const question = QUESTIONS[currentIndex];
 
   const handleOption = useCallback((optionIdx: number) => {
-    answersRef.current = [...answersRef.current, optionIdx];
+    // Prevent multiple taps
+    if (isNavigating) return;
 
-    if (indexRef.current >= QUESTIONS.length - 1) {
-      // Save all answers to Redux at once
+    const newAnswers = [...answers, optionIdx];
+    setAnswers(newAnswers);
+
+    if (currentIndex >= QUESTIONS.length - 1) {
+      // Last question - navigate to ProfileResult
+      setIsNavigating(true);
+
+      // Build answers object
+      const answersObj: Record<string, number> = {};
       QUESTIONS.forEach((q, i) => {
-        if (answersRef.current[i] !== undefined) {
-          store.dispatch(setAnswer({ questionId: q.id, optionIndex: answersRef.current[i] }));
-        }
+        answersObj[q.id] = newAnswers[i] ?? 0;
       });
-      navigation.navigate('ProfileResult');
+
+      // Use requestAnimationFrame to ensure state updates complete before navigation
+      requestAnimationFrame(() => {
+        navigation.navigate('ProfileResult', { answers: answersObj });
+      });
     } else {
-      indexRef.current += 1;
-      forceUpdate();
+      setCurrentIndex(currentIndex + 1);
     }
-  }, [navigation]);
+  }, [currentIndex, answers, isNavigating, navigation]);
 
   const handleBack = useCallback(() => {
-    if (indexRef.current > 0) {
-      indexRef.current -= 1;
-      answersRef.current = answersRef.current.slice(0, -1);
-      forceUpdate();
+    if (currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1);
+      setAnswers(answers.slice(0, -1));
     }
-  }, []);
-
-  const question = QUESTIONS[indexRef.current];
+  }, [currentIndex, answers]);
 
   if (!question) {
     return null;
@@ -59,22 +64,23 @@ const QuestionnaireScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.progress}>{indexRef.current + 1} / {QUESTIONS.length}</Text>
-      <Text style={styles.question}>{question.questionEn}</Text>
+      <Text style={styles.progress}>{currentIndex + 1} / {QUESTIONS.length}</Text>
+      <Text style={styles.question}>{question.question}</Text>
 
       {question.options.map((opt, i) => (
         <Pressable
           key={i}
           style={styles.option}
           onPress={() => handleOption(i)}
+          disabled={isNavigating}
         >
-          <Text style={styles.optionText}>{opt.labelEn}</Text>
+          <Text style={styles.optionText}>{opt.label}</Text>
         </Pressable>
       ))}
 
-      {indexRef.current > 0 && (
-        <Pressable style={styles.back} onPress={handleBack}>
-          <Text style={styles.backText}>Back</Text>
+      {currentIndex > 0 && (
+        <Pressable style={styles.back} onPress={handleBack} disabled={isNavigating}>
+          <Text style={styles.backText}>بازگشت - Back</Text>
         </Pressable>
       )}
     </SafeAreaView>
@@ -84,7 +90,7 @@ const QuestionnaireScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0f', padding: 20 },
   progress: { color: '#888', fontSize: 14, marginBottom: 20 },
-  question: { color: '#fff', fontSize: 18, marginBottom: 30 },
+  question: { color: '#fff', fontSize: 18, marginBottom: 30, lineHeight: 28 },
   option: {
     backgroundColor: '#1a1a2e',
     padding: 16,
@@ -93,7 +99,7 @@ const styles = StyleSheet.create({
   },
   optionText: { color: '#fff', fontSize: 16 },
   back: { marginTop: 20, padding: 12 },
-  backText: { color: '#3b82f6', fontSize: 16 },
+  backText: { color: '#3b82f6', fontSize: 16, textAlign: 'center' },
 });
 
 export default QuestionnaireScreen;

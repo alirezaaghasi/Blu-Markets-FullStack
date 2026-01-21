@@ -14,7 +14,7 @@ export type OnboardingStackParamList = {
   PhoneInput: undefined;
   OTPVerify: { phone: string };
   Questionnaire: undefined;
-  ProfileResult: undefined;
+  ProfileResult: { answers: Record<string, number> } | undefined;
   Consent: undefined;
   InitialFunding: undefined;
   Success: undefined;

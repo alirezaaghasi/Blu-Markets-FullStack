@@ -3,14 +3,14 @@ import { z } from 'zod';
 export const questionnaireAnswerSchema = z.object({
   questionId: z.string().min(1),
   answerId: z.string().min(1),
-  value: z.number().min(1).max(5),
+  value: z.number().min(1).max(10),
 });
 
 export const submitQuestionnaireSchema = z.object({
   answers: z
     .array(questionnaireAnswerSchema)
-    .min(10, 'All 10 questions must be answered')
-    .max(10, 'Only 10 questions allowed'),
+    .min(9, 'All 9 questions must be answered')
+    .max(9, 'Only 9 questions allowed'),
 });
 
 export const recordConsentSchema = z.object({

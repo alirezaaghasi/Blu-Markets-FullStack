@@ -159,7 +159,7 @@ export const LOAN_HEALTH_THRESHOLDS = {
 };
 
 // Investment Constraints
-export const MIN_INVESTMENT_AMOUNT = 1_000_000; // IRR
+export const MIN_INVESTMENT_AMOUNT = 10_000_000; // IRR (10M minimum per backend)
 
 // Phone Validation
 export const IRAN_PHONE_PREFIX = '+989';
