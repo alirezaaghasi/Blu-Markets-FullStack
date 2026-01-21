@@ -1,6 +1,6 @@
 // History Screen
 // Based on PRD Section 9.5 - History Tab
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,9 +13,9 @@ import {
   RefreshControl,
 } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../../constants/theme';
-import { Boundary, ActionType, AssetId, ActionLogEntry } from '../../types';
+import { Boundary, ActionType, ActionLogEntry } from '../../types';
 import { exportToCSV } from '../../utils/csvExport';
-import { historyApi, ActivityLogEntry as ApiActivityLogEntry } from '../../services/api';
+import { useAppSelector } from '../../hooks/useStore';
 
 // Boundary indicator colors and icons
 const BOUNDARY_CONFIG: Record<Boundary, { color: string; icon: string }> = {
@@ -85,45 +85,21 @@ const groupByDate = (entries: ActionLogEntry[]): Map<string, ActionLogEntry[]> =
 };
 
 const HistoryScreen: React.FC = () => {
-  const [actionLog, setActionLog] = useState<ActionLogEntry[]>([]);
+  // Use Redux actionLog directly (works in demo mode without backend)
+  const actionLog = useAppSelector((state) => state.portfolio.actionLog);
   const [expandedEntries, setExpandedEntries] = useState<Set<number>>(new Set());
   const [isExporting, setIsExporting] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // Fetch activity from backend
-  const fetchActivity = useCallback(async (showRefreshing = false) => {
-    if (showRefreshing) setIsRefreshing(true);
-    else setIsLoading(true);
-    setError(null);
+  // No loading state needed - data comes from Redux
+  const isLoading = false;
+  const error: string | null = null;
 
-    try {
-      const response = await historyApi.getActivity();
-      // Convert API response to local format
-      const entries: ActionLogEntry[] = response.map((item) => ({
-        id: parseInt(item.id, 10) || Date.now(),
-        timestamp: item.createdAt,
-        type: item.actionType as ActionType,
-        boundary: (item.boundary || 'SAFE') as Boundary,
-        message: item.message,
-        amountIRR: item.amountIrr,
-        assetId: item.assetId as AssetId | undefined,
-      }));
-      setActionLog(entries);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to load activity');
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
+  const onRefresh = useCallback(() => {
+    // In demo mode, just briefly show refresh indicator
+    setIsRefreshing(true);
+    setTimeout(() => setIsRefreshing(false), 500);
   }, []);
-
-  useEffect(() => {
-    fetchActivity();
-  }, [fetchActivity]);
-
-  const onRefresh = () => fetchActivity(true);
 
   const toggleExpand = (entryId: number) => {
     setExpandedEntries((prev) => {

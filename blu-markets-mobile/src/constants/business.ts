@@ -88,7 +88,8 @@ const getApiBaseUrl = () => {
   if (!__DEV__) return 'https://api.blumarkets.ir';
 
   // Check if running in Codespaces (browser will have the codespace hostname)
-  if (typeof window !== 'undefined' && window.location.hostname.includes('github.dev')) {
+  // Note: window.location is undefined in React Native/Expo Go
+  if (typeof window !== 'undefined' && typeof window.location !== 'undefined' && window.location.hostname?.includes('github.dev')) {
     // Replace port 8081 with 3000 in the current URL
     return window.location.origin.replace('-8081.', '-3000.');
   }
@@ -101,7 +102,8 @@ export const API_BASE_URL = getApiBaseUrl();
 const getWebSocketUrl = () => {
   if (!__DEV__) return 'wss://api.blumarkets.ir/api/v1/prices/stream';
 
-  if (typeof window !== 'undefined' && window.location.hostname.includes('github.dev')) {
+  // Note: window.location is undefined in React Native/Expo Go
+  if (typeof window !== 'undefined' && typeof window.location !== 'undefined' && window.location.hostname?.includes('github.dev')) {
     const baseUrl = window.location.origin.replace('-8081.', '-3000.').replace('https://', 'wss://');
     return `${baseUrl}/api/v1/prices/stream`;
   }

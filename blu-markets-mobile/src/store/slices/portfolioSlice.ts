@@ -441,12 +441,25 @@ const portfolioSlice = createSlice({
 
     // Load demo data for testing
     loadDemoData: (state) => {
-      // Demo portfolio: 5M IRR cash + BTC, ETH, USDT holdings
+      // Demo portfolio: balanced allocation matching 50/35/15 target
+      // Using default prices: BTC=$97,500, ETH=$3,200, SOL=$185, USDT=$1
+      // FX rate: 1,456,000 IRR/USD
+      // Total target: ~5B IRR (Foundation 2.5B, Growth 1.75B, Upside 750M)
       state.cashIRR = 5_000_000;
       state.holdings = [
-        { assetId: 'BTC', quantity: 0.05, frozen: false, layer: 'UPSIDE' },
-        { assetId: 'ETH', quantity: 0.5, frozen: false, layer: 'GROWTH' },
+        // Foundation layer (~50% = 2.5B IRR)
+        // USDT: 1000 × $1 × 1,456,000 = 1.456B IRR
+        // Fixed Income: 2000 × 500,000 = 1B IRR
         { assetId: 'USDT', quantity: 1000, frozen: false, layer: 'FOUNDATION' },
+        { assetId: 'IRR_FIXED_INCOME', quantity: 2000, frozen: false, layer: 'FOUNDATION' },
+        // Growth layer (~35% = 1.75B IRR) - BTC, ETH are GROWTH assets
+        // BTC: 0.007 × $97,500 × 1,456,000 = 994M IRR
+        // ETH: 0.15 × $3,200 × 1,456,000 = 699M IRR
+        { assetId: 'BTC', quantity: 0.007, frozen: false, layer: 'GROWTH' },
+        { assetId: 'ETH', quantity: 0.15, frozen: false, layer: 'GROWTH' },
+        // Upside layer (~15% = 750M IRR) - SOL is UPSIDE asset
+        // SOL: 2.5 × $185 × 1,456,000 = 674M IRR
+        { assetId: 'SOL', quantity: 2.5, frozen: false, layer: 'UPSIDE' },
       ];
       state.targetLayerPct = {
         FOUNDATION: 0.50,

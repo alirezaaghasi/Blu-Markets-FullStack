@@ -120,7 +120,7 @@ const DashboardScreen: React.FC = () => {
   );
   const totalValueIRR = holdingsValueIRR + cashIRR;
 
-  // Calculate current layer percentages
+  // Calculate current layer percentages using ASSET CONFIG layer (not holding.layer)
   const layerValues: Record<Layer, number> = {
     FOUNDATION: 0,
     GROWTH: 0,
@@ -129,7 +129,9 @@ const DashboardScreen: React.FC = () => {
 
   holdings.forEach((h) => {
     const value = calculateHoldingValue(h, prices, fxRate);
-    layerValues[h.layer] += value;
+    // Use asset config layer, not the stored holding layer
+    const assetLayer = ASSETS[h.assetId]?.layer || h.layer;
+    layerValues[assetLayer] += value;
   });
 
   const currentAllocation = {
@@ -138,11 +140,29 @@ const DashboardScreen: React.FC = () => {
     UPSIDE: holdingsValueIRR > 0 ? layerValues.UPSIDE / holdingsValueIRR : 0,
   };
 
-  // Group holdings by layer
+  // Calculate portfolio status based on allocation drift
+  const getPortfolioStatus = (): PortfolioStatus => {
+    if (holdingsValueIRR === 0) return 'BALANCED';
+
+    const drifts = [
+      Math.abs(currentAllocation.FOUNDATION - targetLayerPct.FOUNDATION),
+      Math.abs(currentAllocation.GROWTH - targetLayerPct.GROWTH),
+      Math.abs(currentAllocation.UPSIDE - targetLayerPct.UPSIDE),
+    ];
+    const maxDrift = Math.max(...drifts);
+
+    if (maxDrift > 0.10) return 'ATTENTION_REQUIRED'; // >10% drift
+    if (maxDrift > 0.05) return 'SLIGHTLY_OFF'; // >5% drift
+    return 'BALANCED';
+  };
+
+  const calculatedStatus = getPortfolioStatus();
+
+  // Group holdings by layer using ASSET CONFIG layer
   const holdingsByLayer: Record<Layer, Holding[]> = {
-    FOUNDATION: holdings.filter((h) => h.layer === 'FOUNDATION'),
-    GROWTH: holdings.filter((h) => h.layer === 'GROWTH'),
-    UPSIDE: holdings.filter((h) => h.layer === 'UPSIDE'),
+    FOUNDATION: holdings.filter((h) => (ASSETS[h.assetId]?.layer || h.layer) === 'FOUNDATION'),
+    GROWTH: holdings.filter((h) => (ASSETS[h.assetId]?.layer || h.layer) === 'GROWTH'),
+    UPSIDE: holdings.filter((h) => (ASSETS[h.assetId]?.layer || h.layer) === 'UPSIDE'),
   };
 
   const onRefresh = async () => {
@@ -156,7 +176,7 @@ const DashboardScreen: React.FC = () => {
     }
   };
 
-  const showRebalanceButton = status !== 'BALANCED';
+  const showRebalanceButton = calculatedStatus !== 'BALANCED';
 
   // Handle trade initiation
   const handleTrade = (assetId?: AssetId, side: 'BUY' | 'SELL' = 'BUY') => {
@@ -197,7 +217,7 @@ const DashboardScreen: React.FC = () => {
               <ConnectionIndicator isConnected={isConnected} updatedAt={updatedAt} />
             </View>
           </View>
-          <StatusBadge status={status} />
+          <StatusBadge status={calculatedStatus} />
         </View>
 
         {/* Activity Feed - HERO element (40% above fold, first visible content) */}
@@ -224,7 +244,7 @@ const DashboardScreen: React.FC = () => {
         )}
 
         {/* Alert Banner (if needed) */}
-        {status === 'SLIGHTLY_OFF' && (
+        {(calculatedStatus === 'SLIGHTLY_OFF' || calculatedStatus === 'ATTENTION_REQUIRED') && (
           <View style={styles.alertBanner}>
             <Text style={styles.alertIcon}>⚠️</Text>
             <Text style={styles.alertText}>

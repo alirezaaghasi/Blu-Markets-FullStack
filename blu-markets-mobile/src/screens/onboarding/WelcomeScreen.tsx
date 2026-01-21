@@ -24,8 +24,9 @@ import { LAYOUT } from '../../constants/layout';
 import { Button } from '../../components/common';
 import { useAppDispatch } from '../../hooks/useStore';
 import { enableDemoMode } from '../../store/slices/authSlice';
-import { loadDemoData } from '../../store/slices/portfolioSlice';
+import { loadDemoData, resetPortfolio } from '../../store/slices/portfolioSlice';
 import { setDefaultPrices } from '../../store/slices/pricesSlice';
+import { clearAllState } from '../../utils/storage';
 
 type WelcomeScreenProps = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'Welcome'>;
@@ -34,10 +35,14 @@ type WelcomeScreenProps = {
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
   const dispatch = useAppDispatch();
 
-  const handleDemoMode = () => {
+  const handleDemoMode = async () => {
+    // Clear any persisted state first to ensure fresh demo data
+    await clearAllState();
+    // Reset portfolio state before loading demo data
+    dispatch(resetPortfolio());
     // Load demo data into Redux store
     dispatch(setDefaultPrices()); // Set sample prices
-    dispatch(loadDemoData()); // Set sample portfolio
+    dispatch(loadDemoData()); // Set sample portfolio with correct layer assignments
     dispatch(enableDemoMode()); // Skip auth and mark onboarding complete
     // RootNavigator will automatically show MainTabNavigator
   };
