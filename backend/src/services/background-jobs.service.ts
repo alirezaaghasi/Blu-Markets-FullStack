@@ -212,7 +212,7 @@ async function runProtectionExpiryCheck(): Promise<void> {
     const expiredProtections = await prisma.protection.findMany({
       where: {
         status: 'ACTIVE',
-        endDate: { lte: now },
+        expiryDate: { lte: now },
       },
       include: { portfolio: true },
     });

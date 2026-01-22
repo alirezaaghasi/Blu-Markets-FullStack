@@ -84,14 +84,107 @@ export interface TargetLayerPct {
   UPSIDE: number;
 }
 
+export type ProtectionStatus = 'ACTIVE' | 'EXPIRED' | 'EXERCISED' | 'CANCELLED';
+
 export interface Protection {
   id: string;
   assetId: AssetId;
-  notionalIRR: number;
-  premiumIRR: number;
-  startISO: string;
-  endISO: string;
-  durationMonths: number;
+  notionalIrr: number;
+  notionalUsd: number;
+  premiumIrr: number;
+  premiumUsd: number;
+  coveragePct: number;
+  durationDays: number;
+  strikeUsd: number;
+  startDate: string;
+  expiryDate: string;
+  status: ProtectionStatus;
+  // Optional settlement info (for exercised protections)
+  settlementIrr?: number;
+  settlementUsd?: number;
+  settlementDate?: string;
+  // Calculated fields
+  daysRemaining?: number;
+}
+
+// Protection Quote (from /protection/quote endpoint)
+export interface ProtectionQuote {
+  quoteId: string;
+  assetId: AssetId;
+  holdingValueIrr: number;
+  holdingValueUsd: number;
+  coveragePct: number;
+  notionalIrr: number;
+  notionalUsd: number;
+  durationDays: number;
+  strikeUsd: number;
+  strikePct: number;
+  premiumIrr: number;
+  premiumUsd: number;
+  premiumPct: number;
+  annualizedPct: number;
+  breakeven: {
+    priceDrop: number;
+    priceUsd: number;
+  };
+  greeks: {
+    delta: number;
+    gamma: number;
+    vega: number;
+    theta: number;
+  };
+  volatility: {
+    iv: number;
+    regime: string;
+  };
+  expiresAt: string;
+  validForSeconds: number;
+}
+
+// Protectable holding (from /protection/holdings endpoint)
+export interface ProtectableHolding {
+  assetId: AssetId;
+  name: string;
+  layer: Layer;
+  quantity: number;
+  valueIrr: number;
+  valueUsd: number;
+  priceUsd: number;
+  priceIrr: number;
+  isProtectable: boolean;
+  hasExistingProtection: boolean;
+  volatility: {
+    iv: number;
+    regime: string;
+    regimeColor: string;
+  };
+  indicativePremium: {
+    thirtyDayPct: number;
+    thirtyDayIrr: number;
+  };
+}
+
+// Premium curve point (from /protection/quote/curve endpoint)
+export interface PremiumCurvePoint {
+  durationDays: number;
+  premiumIrr: number;
+  premiumPct: number;
+  annualizedPct: number;
+}
+
+// Volatility info (from /protection/volatility/:assetId endpoint)
+export interface AssetVolatility {
+  assetId: AssetId;
+  baseVolatility: number;
+  adjustedVolatility: number;
+  regime: string;
+  regimeDescription: string;
+  regimeColor: string;
+  termStructure: Array<{
+    durationDays: number;
+    multiplier: number;
+    adjustedIv: number;
+  }>;
 }
 
 export interface LoanInstallment {

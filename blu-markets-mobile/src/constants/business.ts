@@ -64,14 +64,35 @@ export const LTV_BY_LAYER: Record<Layer, number> = {
   UPSIDE: 0.30,
 };
 
-// Protection
+// Protection - Duration in days
+export const PROTECTION_DURATION_PRESETS = [7, 14, 30, 60, 90, 180] as const;
+export const PROTECTION_MIN_DURATION_DAYS = 7;
+export const PROTECTION_MAX_DURATION_DAYS = 180;
+export const PROTECTION_DEFAULT_DURATION_DAYS = 30;
+
+// Protection - Coverage percentage
+export const PROTECTION_MIN_COVERAGE_PCT = 0.1;  // 10%
+export const PROTECTION_MAX_COVERAGE_PCT = 1.0;  // 100%
+export const PROTECTION_DEFAULT_COVERAGE_PCT = 1.0; // 100%
+
+// Protection - Eligible assets (high-value assets with reliable pricing)
+export const PROTECTION_ELIGIBLE_ASSETS = ['BTC', 'ETH', 'PAXG', 'KAG', 'QQQ', 'SOL'] as const;
+
+// Protection - Quote validity
+export const PROTECTION_QUOTE_VALIDITY_SECONDS = 300; // 5 minutes
+
+// Protection - Premium tolerance for price changes
+export const PROTECTION_PREMIUM_TOLERANCE = 0.02; // 2%
+
+// Protection - Minimum notional value
+export const PROTECTION_MIN_NOTIONAL_IRR = 10_000_000; // 10M IRR
+
+// Legacy: PREMIUM_BY_LAYER not used (now calculated via Black-Scholes)
 export const PROTECTION_PREMIUM_BY_LAYER: Record<Layer, number> = {
-  FOUNDATION: 0.004, // 0.4% per month
+  FOUNDATION: 0.004, // 0.4% per month (deprecated, kept for reference)
   GROWTH: 0.008,     // 0.8% per month
   UPSIDE: 0.012,     // 1.2% per month
 };
-export const PROTECTION_MIN_DURATION = 1; // months
-export const PROTECTION_MAX_DURATION = 6; // months
 
 // Activity Log
 export const MAX_ACTION_LOG_SIZE = 50;

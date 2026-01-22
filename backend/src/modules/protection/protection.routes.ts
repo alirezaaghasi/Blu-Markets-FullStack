@@ -1,139 +1,261 @@
+/**
+ * Protection Routes
+ * API endpoints for dynamic protection pricing feature
+ *
+ * @module modules/protection/protection.routes
+ */
+
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { authenticate } from '../../middleware/auth.js';
 import { prisma } from '../../config/database.js';
 import { AppError } from '../../middleware/error-handler.js';
-import { getCurrentPrices } from '../../services/price-fetcher.service.js';
-import { getAssetLayer } from '../portfolio/portfolio.service.js';
 import {
+  getProtectionQuote,
+  getPremiumCurve,
+  getProtectableHoldings,
+  calculateBreakeven,
+  isQuoteValid,
+  isPremiumWithinTolerance,
+  getQuoteSecondsRemaining,
+  calculateSettlement,
+  DURATION_PRESETS,
+  MIN_COVERAGE_PCT,
+  MAX_COVERAGE_PCT,
+  MIN_NOTIONAL_IRR,
   PROTECTION_ELIGIBLE_ASSETS,
-  PROTECTION_RATES,
-  type AssetId,
-} from '../../types/domain.js';
+  type ProtectionQuote,
+} from '../../services/protection-pricing.service.js';
+import { getImpliedVolatility, getRegimeDescription } from '../../services/volatility.service.js';
+import { calculatePutGreeks, daysToYears } from '../../services/options-math.js';
+import type { AssetId } from '../../types/domain.js';
 
-const createProtectionSchema = z.object({
-  assetId: z.string().min(1),
-  notionalIrr: z.number().min(1000000),
-  durationMonths: z.number().min(1).max(6),
+// ============================================================================
+// SCHEMAS
+// ============================================================================
+
+const getQuoteSchema = z.object({
+  holdingId: z.string().uuid(),
+  coveragePct: z.number().min(MIN_COVERAGE_PCT).max(MAX_COVERAGE_PCT).default(1.0),
+  durationDays: z.number().refine((d) => DURATION_PRESETS.includes(d as any), {
+    message: `Duration must be one of: ${DURATION_PRESETS.join(', ')}`,
+  }),
 });
 
+const getQuoteCurveSchema = z.object({
+  holdingId: z.string().uuid(),
+  coveragePct: z.number().min(MIN_COVERAGE_PCT).max(MAX_COVERAGE_PCT).default(1.0),
+});
+
+const purchaseSchema = z.object({
+  quoteId: z.string().min(1),
+  holdingId: z.string().uuid(),
+  coveragePct: z.number().min(MIN_COVERAGE_PCT).max(MAX_COVERAGE_PCT),
+  durationDays: z.number().refine((d) => DURATION_PRESETS.includes(d as any)),
+  premiumIrr: z.number().min(0),
+  acknowledgedPremium: z.boolean().refine((v) => v === true, {
+    message: 'Must acknowledge premium amount',
+  }),
+});
+
+// ============================================================================
+// ROUTES
+// ============================================================================
+
 export const protectionRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
+  // All protection routes require authentication
   app.addHook('preHandler', authenticate);
 
-  // GET /api/v1/protection
-  app.get('/', {
+  // ──────────────────────────────────────────────────────────────────────────
+  // GET /api/v1/protection/holdings
+  // Get holdings eligible for protection with pricing estimates
+  // ──────────────────────────────────────────────────────────────────────────
+  app.get('/holdings', {
     schema: {
-      description: 'List active protections',
+      description: 'Get holdings eligible for protection',
       tags: ['Protection'],
       security: [{ bearerAuth: [] }],
     },
     handler: async (request, reply) => {
-      const portfolio = await prisma.portfolio.findUnique({
-        where: { userId: request.userId },
-      });
+      const userId = request.userId;
+      const holdings = await getProtectableHoldings(userId);
 
-      if (!portfolio) {
-        throw new AppError('NOT_FOUND', 'Portfolio not found', 404);
-      }
-
-      const protections = await prisma.protection.findMany({
-        where: { portfolioId: portfolio.id },
-        orderBy: { createdAt: 'desc' },
-      });
-
-      return protections.map((p) => ({
-        id: p.id,
-        assetId: p.assetId,
-        notionalIrr: Number(p.notionalIrr),
-        premiumIrr: Number(p.premiumIrr),
-        durationMonths: p.durationMonths,
-        startDate: p.startDate.toISOString(),
-        endDate: p.endDate.toISOString(),
-        status: p.status,
-        daysRemaining:
-          p.status === 'ACTIVE'
-            ? Math.max(0, Math.ceil((p.endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-            : undefined,
-      }));
-    },
-  });
-
-  // GET /api/v1/protection/eligible
-  app.get('/eligible', {
-    schema: {
-      description: 'List eligible assets for protection',
-      tags: ['Protection'],
-      security: [{ bearerAuth: [] }],
-    },
-    handler: async (request, reply) => {
-      const portfolio = await prisma.portfolio.findUnique({
-        where: { userId: request.userId },
-        include: {
-          holdings: true,
-          protections: { where: { status: 'ACTIVE' } },
+      return {
+        holdings: holdings.map((h) => ({
+          holdingId: h.holdingId,
+          assetId: h.assetId,
+          quantity: h.quantity,
+          valueIrr: h.valueIrr,
+          valueUsd: h.valueUsd,
+          layer: h.layer,
+          alreadyProtected: h.alreadyProtected,
+          estimatedPremiumPct: h.estimatedPremiumPct,
+          estimatedPremiumPctDisplay: `${(h.estimatedPremiumPct * 100).toFixed(1)}%`,
+        })),
+        durationPresets: DURATION_PRESETS,
+        coverageRange: {
+          min: MIN_COVERAGE_PCT,
+          max: MAX_COVERAGE_PCT,
+          step: 0.1,
         },
-      });
-
-      if (!portfolio) {
-        throw new AppError('NOT_FOUND', 'Portfolio not found', 404);
-      }
-
-      const prices = await getCurrentPrices();
-
-      const eligible = portfolio.holdings
-        .filter((h) => PROTECTION_ELIGIBLE_ASSETS.includes(h.assetId as AssetId))
-        .map((holding) => {
-          const assetId = holding.assetId as AssetId;
-          const layer = getAssetLayer(assetId);
-          const price = prices.get(assetId);
-          const holdingValueIrr = price ? Number(holding.quantity) * price.priceIrr : 0;
-          const monthlyRate = PROTECTION_RATES[layer];
-          const alreadyProtected = portfolio.protections.some(
-            (p) => p.assetId === assetId && p.status === 'ACTIVE'
-          );
-
-          return {
-            assetId,
-            layer,
-            holdingValueIrr,
-            monthlyRate: monthlyRate * 100, // Convert to percentage
-            alreadyProtected,
-          };
-        });
-
-      return eligible;
+        minNotionalIrr: MIN_NOTIONAL_IRR,
+      };
     },
   });
 
-  // POST /api/v1/protection
-  app.post<{
-    Body: { assetId: string; notionalIrr: number; durationMonths: number };
-  }>('/', {
+  // ──────────────────────────────────────────────────────────────────────────
+  // GET /api/v1/protection/quote
+  // Get a price quote for protection
+  // ──────────────────────────────────────────────────────────────────────────
+  app.get<{
+    Querystring: {
+      holdingId: string;
+      coveragePct?: string;
+      durationDays: string;
+    };
+  }>('/quote', {
     schema: {
-      description: 'Purchase protection',
+      description: 'Get protection price quote',
       tags: ['Protection'],
       security: [{ bearerAuth: [] }],
-      body: {
+      querystring: {
         type: 'object',
-        required: ['assetId', 'notionalIrr', 'durationMonths'],
+        required: ['holdingId', 'durationDays'],
         properties: {
-          assetId: { type: 'string' },
-          notionalIrr: { type: 'number', minimum: 1000000 },
-          durationMonths: { type: 'number', minimum: 1, maximum: 6 },
+          holdingId: { type: 'string' },
+          coveragePct: { type: 'string' },
+          durationDays: { type: 'string' },
         },
       },
     },
     handler: async (request, reply) => {
-      const { assetId, notionalIrr, durationMonths } = createProtectionSchema.parse(
-        request.body
+      const params = getQuoteSchema.parse({
+        holdingId: request.query.holdingId,
+        coveragePct: request.query.coveragePct ? parseFloat(request.query.coveragePct) : 1.0,
+        durationDays: parseInt(request.query.durationDays),
+      });
+
+      const quote = await getProtectionQuote(
+        params.holdingId,
+        params.coveragePct,
+        params.durationDays,
+        request.userId
       );
 
-      if (!PROTECTION_ELIGIBLE_ASSETS.includes(assetId as AssetId)) {
-        throw new AppError('PROTECTION_NOT_ELIGIBLE', 'Asset is not eligible for protection', 400);
+      const breakeven = calculateBreakeven(quote);
+      const secondsRemaining = getQuoteSecondsRemaining(quote);
+
+      return {
+        quote: formatQuoteResponse(quote),
+        breakeven: {
+          priceDropPct: breakeven.breakEvenPct,
+          priceDropPctDisplay: `${(breakeven.breakEvenPct * 100).toFixed(1)}%`,
+          breakEvenUsd: breakeven.breakEvenUsd,
+          breakEvenIrr: breakeven.breakEvenIrr,
+          description: breakeven.description,
+          descriptionFa: breakeven.descriptionFa,
+        },
+        validity: {
+          secondsRemaining,
+          validUntil: quote.validUntil.toISOString(),
+        },
+      };
+    },
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // GET /api/v1/protection/quote/curve
+  // Get quotes for all duration presets
+  // ──────────────────────────────────────────────────────────────────────────
+  app.get<{
+    Querystring: {
+      holdingId: string;
+      coveragePct?: string;
+    };
+  }>('/quote/curve', {
+    schema: {
+      description: 'Get protection quotes for all durations',
+      tags: ['Protection'],
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        required: ['holdingId'],
+        properties: {
+          holdingId: { type: 'string' },
+          coveragePct: { type: 'string' },
+        },
+      },
+    },
+    handler: async (request, reply) => {
+      const params = getQuoteCurveSchema.parse({
+        holdingId: request.query.holdingId,
+        coveragePct: request.query.coveragePct ? parseFloat(request.query.coveragePct) : 1.0,
+      });
+
+      const quotes = await getPremiumCurve(params.holdingId, params.coveragePct, request.userId);
+
+      return {
+        holdingId: params.holdingId,
+        coveragePct: params.coveragePct,
+        quotes: quotes.map((q) => ({
+          durationDays: q.durationDays,
+          durationLabel: getDurationLabel(q.durationDays),
+          premiumPct: q.premiumPct,
+          premiumPctDisplay: `${(q.premiumPct * 100).toFixed(2)}%`,
+          premiumIrr: q.premiumIrr,
+          premiumPerDayPct: q.premiumPerDayPct,
+          impliedVolatility: q.impliedVolatility,
+          impliedVolatilityPct: `${(q.impliedVolatility * 100).toFixed(1)}%`,
+        })),
+      };
+    },
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // POST /api/v1/protection/purchase
+  // Purchase protection
+  // ──────────────────────────────────────────────────────────────────────────
+  app.post<{ Body: z.infer<typeof purchaseSchema> }>('/purchase', {
+    schema: {
+      description: 'Purchase protection for a holding',
+      tags: ['Protection'],
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object',
+        required: ['quoteId', 'holdingId', 'coveragePct', 'durationDays', 'premiumIrr', 'acknowledgedPremium'],
+        properties: {
+          quoteId: { type: 'string' },
+          holdingId: { type: 'string' },
+          coveragePct: { type: 'number' },
+          durationDays: { type: 'number' },
+          premiumIrr: { type: 'number' },
+          acknowledgedPremium: { type: 'boolean' },
+        },
+      },
+    },
+    handler: async (request, reply) => {
+      const body = purchaseSchema.parse(request.body);
+      const userId = request.userId;
+
+      // Get fresh quote to validate
+      const freshQuote = await getProtectionQuote(
+        body.holdingId,
+        body.coveragePct,
+        body.durationDays,
+        userId
+      );
+
+      // Validate premium hasn't changed too much
+      if (!isPremiumWithinTolerance(body.premiumIrr, freshQuote.premiumIrr)) {
+        throw new AppError('VALIDATION_ERROR', 'Premium has changed, please refresh quote', 400, {
+          quotedPremium: body.premiumIrr,
+          currentPremium: freshQuote.premiumIrr,
+        });
       }
 
+      // Get portfolio and verify cash balance
       const portfolio = await prisma.portfolio.findUnique({
-        where: { userId: request.userId },
+        where: { userId },
         include: {
           holdings: true,
           protections: { where: { status: 'ACTIVE' } },
@@ -144,45 +266,59 @@ export const protectionRoutes: FastifyPluginAsync = async (app: FastifyInstance)
         throw new AppError('NOT_FOUND', 'Portfolio not found', 404);
       }
 
-      // Check if already protected
-      const existingProtection = portfolio.protections.find(
-        (p) => p.assetId === assetId && p.status === 'ACTIVE'
-      );
-      if (existingProtection) {
-        throw new AppError('PROTECTION_EXISTS', 'Asset is already protected', 400);
+      // Verify sufficient cash
+      if (Number(portfolio.cashIrr) < freshQuote.premiumIrr) {
+        throw new AppError('INSUFFICIENT_CASH', 'Not enough cash for premium', 400, {
+          required: freshQuote.premiumIrr,
+          available: Number(portfolio.cashIrr),
+        });
       }
 
-      // Calculate premium
-      const layer = getAssetLayer(assetId as AssetId);
-      const monthlyRate = PROTECTION_RATES[layer];
-      const premiumIrr = notionalIrr * monthlyRate * durationMonths;
-
-      // Check cash balance
-      if (premiumIrr > Number(portfolio.cashIrr)) {
-        throw new AppError('INSUFFICIENT_CASH', 'Not enough cash for premium', 400);
-      }
-
+      // Calculate dates
       const startDate = new Date();
-      const endDate = new Date(startDate);
-      endDate.setMonth(endDate.getMonth() + durationMonths);
+      const expiryDate = new Date(startDate);
+      expiryDate.setDate(expiryDate.getDate() + body.durationDays);
 
-      const result = await prisma.$transaction(async (tx) => {
+      // Create protection in transaction
+      const protection = await prisma.$transaction(async (tx) => {
         // Deduct premium from cash
         await tx.portfolio.update({
           where: { id: portfolio.id },
-          data: { cashIrr: { decrement: premiumIrr } },
+          data: {
+            cashIrr: { decrement: freshQuote.premiumIrr },
+          },
         });
 
-        // Create protection
-        const protection = await tx.protection.create({
+        // Create protection record
+        const newProtection = await tx.protection.create({
           data: {
             portfolioId: portfolio.id,
-            assetId,
-            notionalIrr,
-            premiumIrr,
-            durationMonths,
+            holdingId: body.holdingId,
+            assetId: freshQuote.assetId,
+
+            coveragePct: body.coveragePct,
+            notionalIrr: freshQuote.notionalIrr,
+            notionalUsd: freshQuote.notionalUsd,
+
+            strikePct: freshQuote.strikePct,
+            strikeUsd: freshQuote.strikeUsd,
+            strikeIrr: freshQuote.strikeIrr,
+
+            premiumPct: freshQuote.premiumPct,
+            premiumIrr: freshQuote.premiumIrr,
+            premiumUsd: freshQuote.premiumUsd,
+
+            durationDays: body.durationDays,
             startDate,
-            endDate,
+            expiryDate,
+
+            impliedVolatility: freshQuote.impliedVolatility,
+            quoteId: body.quoteId,
+
+            hedgeType: 'NAKED', // No real hedging for MVP
+            hedgeRatio: 0,
+
+            status: 'ACTIVE',
           },
         });
 
@@ -192,12 +328,12 @@ export const protectionRoutes: FastifyPluginAsync = async (app: FastifyInstance)
             portfolioId: portfolio.id,
             entryType: 'PROTECTION_PURCHASE',
             beforeSnapshot: { cashIrr: Number(portfolio.cashIrr) },
-            afterSnapshot: { cashIrr: Number(portfolio.cashIrr) - premiumIrr },
-            amountIrr: premiumIrr,
-            assetId,
-            protectionId: protection.id,
+            afterSnapshot: { cashIrr: Number(portfolio.cashIrr) - freshQuote.premiumIrr },
+            amountIrr: -freshQuote.premiumIrr,
+            assetId: freshQuote.assetId,
+            protectionId: newProtection.id,
             boundary: 'SAFE',
-            message: `Protection purchased for ${assetId}: ${notionalIrr.toLocaleString()} IRR for ${durationMonths} months`,
+            message: `Purchased ${body.durationDays}-day protection for ${freshQuote.assetId} (${(body.coveragePct * 100).toFixed(0)}% coverage)`,
           },
         });
 
@@ -207,73 +343,274 @@ export const protectionRoutes: FastifyPluginAsync = async (app: FastifyInstance)
             portfolioId: portfolio.id,
             actionType: 'PROTECTION_PURCHASE',
             boundary: 'SAFE',
-            message: `Protected ${assetId} (${notionalIrr.toLocaleString()} IRR)`,
-            amountIrr: premiumIrr,
-            assetId,
+            message: `${body.durationDays}D protection for ${freshQuote.assetId}`,
+            amountIrr: freshQuote.premiumIrr,
+            assetId: freshQuote.assetId,
           },
         });
 
-        return protection;
+        // Create hedge log (mock)
+        await tx.hedgeLog.create({
+          data: {
+            protectionId: newProtection.id,
+            hedgeType: 'NAKED',
+            action: 'OPEN',
+            notionalUsd: freshQuote.notionalUsd,
+            hedgeRatio: 0,
+            delta: freshQuote.greeks.delta,
+            gamma: freshQuote.greeks.gamma,
+            vega: freshQuote.greeks.vega,
+            theta: freshQuote.greeks.theta,
+          },
+        });
+
+        return newProtection;
       });
 
       return {
-        id: result.id,
-        assetId: result.assetId,
-        notionalIrr: Number(result.notionalIrr),
-        premiumIrr: Number(result.premiumIrr),
-        durationMonths: result.durationMonths,
-        startDate: result.startDate.toISOString(),
-        endDate: result.endDate.toISOString(),
-        status: result.status,
+        protection: {
+          id: protection.id,
+          assetId: protection.assetId,
+          coveragePct: Number(protection.coveragePct),
+          notionalIrr: Number(protection.notionalIrr),
+          strikeIrr: Number(protection.strikeIrr),
+          premiumIrr: Number(protection.premiumIrr),
+          premiumPct: Number(protection.premiumPct),
+          durationDays: protection.durationDays,
+          startDate: protection.startDate.toISOString(),
+          expiryDate: protection.expiryDate.toISOString(),
+          status: protection.status,
+        },
+        newCashIrr: Number(portfolio.cashIrr) - freshQuote.premiumIrr,
       };
     },
   });
 
-  // DELETE /api/v1/protection/:id
-  app.delete<{ Params: { id: string } }>('/:id', {
+  // ──────────────────────────────────────────────────────────────────────────
+  // GET /api/v1/protection/active
+  // Get all active protections for user
+  // ──────────────────────────────────────────────────────────────────────────
+  app.get('/active', {
     schema: {
-      description: 'Cancel protection (no refund)',
+      description: 'Get all active protections',
       tags: ['Protection'],
       security: [{ bearerAuth: [] }],
     },
     handler: async (request, reply) => {
-      const protection = await prisma.protection.findUnique({
-        where: { id: request.params.id },
-        include: { portfolio: true },
+      const userId = request.userId;
+
+      const portfolio = await prisma.portfolio.findUnique({
+        where: { userId },
+        include: {
+          protections: {
+            where: { status: 'ACTIVE' },
+            include: { holding: true },
+            orderBy: { expiryDate: 'asc' },
+          },
+        },
       });
 
-      if (!protection || protection.portfolio.userId !== request.userId) {
-        throw new AppError('NOT_FOUND', 'Protection not found', 404);
+      if (!portfolio) {
+        return { protections: [] };
       }
 
-      if (protection.status !== 'ACTIVE') {
-        throw new AppError('VALIDATION_ERROR', 'Protection is not active', 400);
-      }
+      return {
+        protections: portfolio.protections.map((p) => {
+          const daysRemaining = Math.max(
+            0,
+            Math.ceil((new Date(p.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+          );
 
-      await prisma.$transaction(async (tx) => {
-        await tx.protection.update({
-          where: { id: protection.id },
-          data: {
-            status: 'CANCELLED',
-            cancelledAt: new Date(),
-          },
-        });
+          return {
+            id: p.id,
+            assetId: p.assetId,
+            coveragePct: Number(p.coveragePct),
+            notionalIrr: Number(p.notionalIrr),
+            notionalUsd: Number(p.notionalUsd),
+            strikeIrr: Number(p.strikeIrr),
+            strikeUsd: Number(p.strikeUsd),
+            strikePct: Number(p.strikePct),
+            premiumIrr: Number(p.premiumIrr),
+            premiumPct: Number(p.premiumPct),
+            durationDays: p.durationDays,
+            startDate: p.startDate.toISOString(),
+            expiryDate: p.expiryDate.toISOString(),
+            daysRemaining,
+            daysRemainingLabel: formatDaysRemaining(daysRemaining),
+            status: p.status,
+            holding: p.holding
+              ? {
+                  assetId: p.holding.assetId,
+                  quantity: Number(p.holding.quantity),
+                }
+              : null,
+          };
+        }),
+      };
+    },
+  });
 
-        await tx.ledgerEntry.create({
-          data: {
-            portfolioId: protection.portfolioId,
-            entryType: 'PROTECTION_CANCEL',
-            beforeSnapshot: { status: 'ACTIVE' },
-            afterSnapshot: { status: 'CANCELLED' },
-            assetId: protection.assetId,
-            protectionId: protection.id,
-            boundary: 'SAFE',
-            message: `Protection cancelled for ${protection.assetId}`,
+  // ──────────────────────────────────────────────────────────────────────────
+  // GET /api/v1/protection/history
+  // Get protection history (expired, exercised, cancelled)
+  // ──────────────────────────────────────────────────────────────────────────
+  app.get('/history', {
+    schema: {
+      description: 'Get protection history',
+      tags: ['Protection'],
+      security: [{ bearerAuth: [] }],
+    },
+    handler: async (request, reply) => {
+      const userId = request.userId;
+
+      const portfolio = await prisma.portfolio.findUnique({
+        where: { userId },
+        include: {
+          protections: {
+            where: { status: { not: 'ACTIVE' } },
+            orderBy: { expiryDate: 'desc' },
+            take: 50,
           },
-        });
+        },
       });
 
-      return { success: true, refund: 0 };
+      if (!portfolio) {
+        return { protections: [] };
+      }
+
+      return {
+        protections: portfolio.protections.map((p) => ({
+          id: p.id,
+          assetId: p.assetId,
+          coveragePct: Number(p.coveragePct),
+          notionalIrr: Number(p.notionalIrr),
+          premiumIrr: Number(p.premiumIrr),
+          durationDays: p.durationDays,
+          startDate: p.startDate.toISOString(),
+          expiryDate: p.expiryDate.toISOString(),
+          status: p.status,
+          settlementIrr: p.settlementIrr ? Number(p.settlementIrr) : null,
+          settlementDate: p.settlementDate?.toISOString() || null,
+        })),
+      };
+    },
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // DELETE /api/v1/protection/:id
+  // Cancel protection (not implemented - returns 501)
+  // ──────────────────────────────────────────────────────────────────────────
+  app.delete<{ Params: { id: string } }>('/:id', {
+    schema: {
+      description: 'Cancel protection (not available)',
+      tags: ['Protection'],
+      security: [{ bearerAuth: [] }],
+    },
+    handler: async (request, reply) => {
+      throw new AppError('NOT_IMPLEMENTED', 'Protection cancellation is not available', 501);
+    },
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // GET /api/v1/protection/volatility/:assetId
+  // Get volatility data for an asset
+  // ──────────────────────────────────────────────────────────────────────────
+  app.get<{ Params: { assetId: string } }>('/volatility/:assetId', {
+    schema: {
+      description: 'Get volatility data for an asset',
+      tags: ['Protection'],
+      security: [{ bearerAuth: [] }],
+    },
+    handler: async (request, reply) => {
+      const assetId = request.params.assetId as AssetId;
+
+      if (!PROTECTION_ELIGIBLE_ASSETS.includes(assetId)) {
+        throw new AppError('VALIDATION_ERROR', 'Asset not eligible for protection', 400);
+      }
+
+      const volData = getImpliedVolatility(assetId, 30);
+
+      return {
+        assetId,
+        impliedVolatility: volData.adjustedVolatility,
+        impliedVolatilityPct: `${(volData.adjustedVolatility * 100).toFixed(1)}%`,
+        baseVolatility: volData.baseVolatility,
+        regime: volData.regime,
+        regimeDescription: getRegimeDescription(volData.regime),
+        termMultiplier: volData.termMultiplier,
+      };
     },
   });
 };
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+function formatQuoteResponse(quote: ProtectionQuote) {
+  return {
+    quoteId: quote.quoteId,
+    holdingId: quote.holdingId,
+    assetId: quote.assetId,
+
+    coveragePct: quote.coveragePct,
+    notionalIrr: quote.notionalIrr,
+    notionalUsd: quote.notionalUsd,
+
+    strikePct: quote.strikePct,
+    strikeUsd: quote.strikeUsd,
+    strikeIrr: quote.strikeIrr,
+
+    durationDays: quote.durationDays,
+    durationLabel: getDurationLabel(quote.durationDays),
+
+    spotPriceUsd: quote.spotPriceUsd,
+    spotPriceIrr: quote.spotPriceIrr,
+
+    premiumPct: quote.premiumPct,
+    premiumPctDisplay: `${(quote.premiumPct * 100).toFixed(2)}%`,
+    premiumIrr: quote.premiumIrr,
+    premiumUsd: quote.premiumUsd,
+
+    // Breakdown
+    breakdown: {
+      fairValuePct: quote.fairValuePct,
+      executionSpreadPct: quote.executionSpreadPct,
+      profitMarginPct: quote.profitMarginPct,
+    },
+
+    impliedVolatility: quote.impliedVolatility,
+    impliedVolatilityPct: `${(quote.impliedVolatility * 100).toFixed(1)}%`,
+    volatilityRegime: quote.volatilityRegime,
+
+    greeks: {
+      delta: quote.greeks.delta,
+      gamma: quote.greeks.gamma,
+      vega: quote.greeks.vega,
+      theta: quote.greeks.theta,
+    },
+
+    quotedAt: quote.quotedAt.toISOString(),
+    validUntil: quote.validUntil.toISOString(),
+  };
+}
+
+function getDurationLabel(days: number): string {
+  if (days === 7) return '1 Week';
+  if (days === 14) return '2 Weeks';
+  if (days === 30) return '1 Month';
+  if (days === 60) return '2 Months';
+  if (days === 90) return '3 Months';
+  if (days === 180) return '6 Months';
+  return `${days} Days`;
+}
+
+function formatDaysRemaining(days: number): string {
+  if (days <= 0) return 'Expired';
+  if (days === 1) return '1 day';
+  if (days < 7) return `${days} days`;
+  if (days < 14) return '1 week';
+  if (days < 30) return `${Math.floor(days / 7)} weeks`;
+  if (days < 60) return '1 month';
+  return `${Math.floor(days / 30)} months`;
+}

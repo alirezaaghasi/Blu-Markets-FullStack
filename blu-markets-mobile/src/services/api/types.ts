@@ -6,6 +6,10 @@ import type {
   Holding,
   Loan,
   Protection,
+  ProtectionQuote,
+  ProtectableHolding,
+  PremiumCurvePoint,
+  AssetVolatility,
   TargetLayerPct,
   ActionLogEntry,
   PortfolioStatus,
@@ -66,6 +70,46 @@ export interface ProtectionsResponse {
   protections: Protection[];
 }
 
+export interface ProtectableHoldingsResponse {
+  holdings: ProtectableHolding[];
+}
+
+export interface ProtectionQuoteRequest {
+  assetId: AssetId;
+  coveragePct: number;
+  durationDays: number;
+}
+
+export interface ProtectionQuoteResponse {
+  quote: ProtectionQuote;
+}
+
+export interface PremiumCurveRequest {
+  assetId: AssetId;
+  coveragePct: number;
+}
+
+export interface PremiumCurveResponse {
+  assetId: AssetId;
+  coveragePct: number;
+  curve: PremiumCurvePoint[];
+}
+
+export interface ProtectionPurchaseRequest {
+  quoteId: string;
+  maxPremiumIrr?: number;
+}
+
+export interface ProtectionPurchaseResponse {
+  success: boolean;
+  protection: Protection;
+}
+
+export interface VolatilityResponse {
+  volatility: AssetVolatility;
+}
+
+// Legacy - keep for backwards compatibility
 export interface EligibleAssetsResponse {
   assets: Array<{
     assetId: AssetId;
@@ -115,6 +159,10 @@ export type {
   Holding,
   Loan,
   Protection,
+  ProtectionQuote,
+  ProtectableHolding,
+  PremiumCurvePoint,
+  AssetVolatility,
   TargetLayerPct,
   ActionLogEntry,
   PortfolioStatus,

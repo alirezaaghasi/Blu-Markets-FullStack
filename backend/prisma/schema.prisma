@@ -15,13 +15,13 @@ datasource db {
 // ============================================================================
 
 model User {
-  id                String    @id @default(uuid()) @db.Uuid
-  phone             String    @unique @db.VarChar(15) // +989XXXXXXXXX
-  phoneVerified     Boolean   @default(false) @map("phone_verified")
+  id            String  @id @default(uuid()) @db.Uuid
+  phone         String  @unique @db.VarChar(15) // +989XXXXXXXXX
+  phoneVerified Boolean @default(false) @map("phone_verified")
 
   // Risk Profile
   riskScore         Int?      @map("risk_score") @db.SmallInt
-  riskTier          RiskTier?  @map("risk_tier")
+  riskTier          RiskTier? @map("risk_tier")
   riskProfileName   String?   @map("risk_profile_name") @db.VarChar(50)
   targetFoundation  Decimal?  @map("target_foundation") @db.Decimal(5, 2)
   targetGrowth      Decimal?  @map("target_growth") @db.Decimal(5, 2)
@@ -29,24 +29,24 @@ model User {
   questionnaireData Json?     @map("questionnaire_data")
 
   // Consent
-  consentRisk       Boolean   @default(false) @map("consent_risk")
-  consentLoss       Boolean   @default(false) @map("consent_loss")
-  consentNoGuarantee Boolean  @default(false) @map("consent_no_guarantee")
-  consentTimestamp  DateTime? @map("consent_timestamp")
+  consentRisk        Boolean   @default(false) @map("consent_risk")
+  consentLoss        Boolean   @default(false) @map("consent_loss")
+  consentNoGuarantee Boolean   @default(false) @map("consent_no_guarantee")
+  consentTimestamp   DateTime? @map("consent_timestamp")
 
   // Settings
-  biometricEnabled  Boolean   @default(false) @map("biometric_enabled")
-  pinHash           String?   @map("pin_hash") @db.VarChar(255)
-  notificationToken String?   @map("notification_token") @db.VarChar(255)
+  biometricEnabled  Boolean @default(false) @map("biometric_enabled")
+  pinHash           String? @map("pin_hash") @db.VarChar(255)
+  notificationToken String? @map("notification_token") @db.VarChar(255)
 
   // Timestamps
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
-  lastLoginAt       DateTime? @map("last_login_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  lastLoginAt DateTime? @map("last_login_at")
 
   // Relations
-  portfolio         Portfolio?
-  sessions          Session[]
+  portfolio Portfolio?
+  sessions  Session[]
 
   @@map("users")
 }
@@ -58,17 +58,17 @@ enum RiskTier {
 }
 
 model Session {
-  id               String   @id @default(uuid()) @db.Uuid
-  userId           String   @map("user_id") @db.Uuid
-  refreshTokenHash String   @unique @map("refresh_token_hash") @db.VarChar(64)
-  deviceInfo       Json?    @map("device_info")
-  ipAddress        String?  @map("ip_address") @db.VarChar(45)
-  expiresAt        DateTime @map("expires_at")
-  revoked          Boolean  @default(false)
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  refreshTokenHash String    @unique @map("refresh_token_hash") @db.VarChar(64)
+  deviceInfo       Json?     @map("device_info")
+  ipAddress        String?   @map("ip_address") @db.VarChar(45)
+  expiresAt        DateTime  @map("expires_at")
+  revoked          Boolean   @default(false)
   revokedAt        DateTime? @map("revoked_at")
-  createdAt        DateTime @default(now()) @map("created_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
 
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("sessions")
@@ -92,39 +92,39 @@ model OtpCode {
 // ============================================================================
 
 model Portfolio {
-  id                String          @id @default(uuid()) @db.Uuid
-  userId            String          @unique @map("user_id") @db.Uuid
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @unique @map("user_id") @db.Uuid
 
   // Cash Balance
-  cashIrr           Decimal         @default(0) @map("cash_irr") @db.Decimal(20, 2)
+  cashIrr Decimal @default(0) @map("cash_irr") @db.Decimal(20, 2)
 
   // Portfolio Status
-  status            PortfolioStatus @default(BALANCED)
+  status PortfolioStatus @default(BALANCED)
 
   // Fixed Income Tracking
-  fixedIncomeStart  DateTime?       @map("fixed_income_start")
+  fixedIncomeStart DateTime? @map("fixed_income_start")
 
   // Metrics (denormalized for performance)
-  totalValueIrr     Decimal?        @map("total_value_irr") @db.Decimal(20, 2)
-  holdingsValueIrr  Decimal?        @map("holdings_value_irr") @db.Decimal(20, 2)
-  foundationPct     Decimal?        @map("foundation_pct") @db.Decimal(5, 2)
-  growthPct         Decimal?        @map("growth_pct") @db.Decimal(5, 2)
-  upsidePct         Decimal?        @map("upside_pct") @db.Decimal(5, 2)
+  totalValueIrr    Decimal? @map("total_value_irr") @db.Decimal(20, 2)
+  holdingsValueIrr Decimal? @map("holdings_value_irr") @db.Decimal(20, 2)
+  foundationPct    Decimal? @map("foundation_pct") @db.Decimal(5, 2)
+  growthPct        Decimal? @map("growth_pct") @db.Decimal(5, 2)
+  upsidePct        Decimal? @map("upside_pct") @db.Decimal(5, 2)
 
   // Rebalancing
-  lastRebalanceAt   DateTime?       @map("last_rebalance_at")
-  driftDetectedAt   DateTime?       @map("drift_detected_at")
+  lastRebalanceAt DateTime? @map("last_rebalance_at")
+  driftDetectedAt DateTime? @map("drift_detected_at")
 
-  createdAt         DateTime        @default(now()) @map("created_at")
-  updatedAt         DateTime        @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  holdings          Holding[]
-  loans             Loan[]
-  protections       Protection[]
-  ledgerEntries     LedgerEntry[]
-  actionLogs        ActionLog[]
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  holdings      Holding[]
+  loans         Loan[]
+  protections   Protection[]
+  ledgerEntries LedgerEntry[]
+  actionLogs    ActionLog[]
 
   @@index([userId])
   @@map("portfolios")
@@ -137,21 +137,22 @@ enum PortfolioStatus {
 }
 
 model Holding {
-  id           String   @id @default(uuid()) @db.Uuid
-  portfolioId  String   @map("portfolio_id") @db.Uuid
-  assetId      String   @map("asset_id") @db.VarChar(30)
+  id          String @id @default(uuid()) @db.Uuid
+  portfolioId String @map("portfolio_id") @db.Uuid
+  assetId     String @map("asset_id") @db.VarChar(30)
 
-  quantity     Decimal  @db.Decimal(18, 8)
-  layer        Layer
-  frozen       Boolean  @default(false) // Locked as loan collateral
+  quantity Decimal @db.Decimal(18, 8)
+  layer    Layer
+  frozen   Boolean @default(false) // Locked as loan collateral
 
   // Fixed Income specific
   purchaseDate DateTime? @map("purchase_date")
 
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  portfolio    Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  portfolio   Portfolio    @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  protections Protection[]
 
   @@unique([portfolioId, assetId])
   @@index([portfolioId])
@@ -170,45 +171,45 @@ enum Layer {
 // ============================================================================
 
 model Loan {
-  id                  String     @id @default(uuid()) @db.Uuid
-  portfolioId         String     @map("portfolio_id") @db.Uuid
+  id          String @id @default(uuid()) @db.Uuid
+  portfolioId String @map("portfolio_id") @db.Uuid
 
   // Collateral
-  collateralAssetId   String     @map("collateral_asset_id") @db.VarChar(30)
-  collateralQuantity  Decimal    @map("collateral_quantity") @db.Decimal(18, 8)
-  collateralValueIrr  Decimal    @map("collateral_value_irr") @db.Decimal(20, 2)
+  collateralAssetId  String  @map("collateral_asset_id") @db.VarChar(30)
+  collateralQuantity Decimal @map("collateral_quantity") @db.Decimal(18, 8)
+  collateralValueIrr Decimal @map("collateral_value_irr") @db.Decimal(20, 2)
 
   // Loan Details
-  principalIrr        Decimal    @map("principal_irr") @db.Decimal(20, 2)
-  interestRate        Decimal    @default(0.30) @map("interest_rate") @db.Decimal(5, 4)
-  durationMonths      Int        @map("duration_months") @db.SmallInt
+  principalIrr   Decimal @map("principal_irr") @db.Decimal(20, 2)
+  interestRate   Decimal @default(0.30) @map("interest_rate") @db.Decimal(5, 4)
+  durationMonths Int     @map("duration_months") @db.SmallInt
 
   // Interest Calculation
-  totalInterestIrr    Decimal    @map("total_interest_irr") @db.Decimal(20, 2)
-  totalDueIrr         Decimal    @map("total_due_irr") @db.Decimal(20, 2)
+  totalInterestIrr Decimal @map("total_interest_irr") @db.Decimal(20, 2)
+  totalDueIrr      Decimal @map("total_due_irr") @db.Decimal(20, 2)
 
   // Payment Tracking
-  paidIrr             Decimal    @default(0) @map("paid_irr") @db.Decimal(20, 2)
-  installmentsPaid    Int        @default(0) @map("installments_paid")
+  paidIrr          Decimal @default(0) @map("paid_irr") @db.Decimal(20, 2)
+  installmentsPaid Int     @default(0) @map("installments_paid")
 
   // Dates
-  startDate           DateTime   @map("start_date")
-  dueDate             DateTime   @map("due_date")
+  startDate DateTime @map("start_date")
+  dueDate   DateTime @map("due_date")
 
   // Status
-  status              LoanStatus @default(ACTIVE)
+  status LoanStatus @default(ACTIVE)
 
   // LTV Tracking
-  maxLtv              Decimal    @map("max_ltv") @db.Decimal(5, 2)
-  currentLtv          Decimal?   @map("current_ltv") @db.Decimal(5, 2)
+  maxLtv     Decimal  @map("max_ltv") @db.Decimal(5, 2)
+  currentLtv Decimal? @map("current_ltv") @db.Decimal(5, 2)
 
-  createdAt           DateTime   @default(now()) @map("created_at")
-  updatedAt           DateTime   @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  portfolio           Portfolio  @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
-  installments        LoanInstallment[]
-  ledgerEntries       LedgerEntry[]
+  portfolio     Portfolio         @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  installments  LoanInstallment[]
+  ledgerEntries LedgerEntry[]
 
   @@index([portfolioId])
   @@index([status])
@@ -222,23 +223,23 @@ enum LoanStatus {
 }
 
 model LoanInstallment {
-  id           String            @id @default(uuid()) @db.Uuid
-  loanId       String            @map("loan_id") @db.Uuid
+  id     String @id @default(uuid()) @db.Uuid
+  loanId String @map("loan_id") @db.Uuid
 
-  number       Int               @db.SmallInt
-  dueDate      DateTime          @map("due_date")
+  number  Int      @db.SmallInt
+  dueDate DateTime @map("due_date")
 
-  principalIrr Decimal           @map("principal_irr") @db.Decimal(20, 2)
-  interestIrr  Decimal           @map("interest_irr") @db.Decimal(20, 2)
-  totalIrr     Decimal           @map("total_irr") @db.Decimal(20, 2)
-  paidIrr      Decimal           @default(0) @map("paid_irr") @db.Decimal(20, 2)
+  principalIrr Decimal @map("principal_irr") @db.Decimal(20, 2)
+  interestIrr  Decimal @map("interest_irr") @db.Decimal(20, 2)
+  totalIrr     Decimal @map("total_irr") @db.Decimal(20, 2)
+  paidIrr      Decimal @default(0) @map("paid_irr") @db.Decimal(20, 2)
 
-  status       InstallmentStatus @default(PENDING)
-  paidAt       DateTime?         @map("paid_at")
+  status InstallmentStatus @default(PENDING)
+  paidAt DateTime?         @map("paid_at")
 
-  createdAt    DateTime          @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
-  loan         Loan              @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  loan Loan @relation(fields: [loanId], references: [id], onDelete: Cascade)
 
   @@unique([loanId, number])
   @@index([loanId])
@@ -256,34 +257,113 @@ enum InstallmentStatus {
 // ============================================================================
 
 model Protection {
-  id             String           @id @default(uuid()) @db.Uuid
-  portfolioId    String           @map("portfolio_id") @db.Uuid
+  id          String  @id @default(uuid()) @db.Uuid
+  portfolioId String  @map("portfolio_id") @db.Uuid
+  holdingId   String? @map("holding_id") @db.Uuid
 
-  assetId        String           @map("asset_id") @db.VarChar(30)
-  notionalIrr    Decimal          @map("notional_irr") @db.Decimal(20, 2)
-  premiumIrr     Decimal          @map("premium_irr") @db.Decimal(20, 2)
+  assetId String @map("asset_id") @db.VarChar(30)
 
-  durationMonths Int              @map("duration_months") @db.SmallInt
-  startDate      DateTime         @map("start_date")
-  endDate        DateTime         @map("end_date")
+  // Coverage and Notional
+  coveragePct Decimal  @default(1.0) @map("coverage_pct") @db.Decimal(5, 4)
+  notionalIrr Decimal  @map("notional_irr") @db.Decimal(20, 2)
+  notionalUsd Decimal? @map("notional_usd") @db.Decimal(20, 8)
 
-  status         ProtectionStatus @default(ACTIVE)
-  cancelledAt    DateTime?        @map("cancelled_at")
+  // Strike (ATM = 1.0)
+  strikePct Decimal  @default(1.0) @map("strike_pct") @db.Decimal(5, 4)
+  strikeUsd Decimal? @map("strike_usd") @db.Decimal(20, 8)
+  strikeIrr Decimal? @map("strike_irr") @db.Decimal(20, 2)
 
-  createdAt      DateTime         @default(now()) @map("created_at")
+  // Premium
+  premiumPct Decimal? @map("premium_pct") @db.Decimal(8, 6)
+  premiumIrr Decimal  @map("premium_irr") @db.Decimal(20, 2)
+  premiumUsd Decimal? @map("premium_usd") @db.Decimal(20, 8)
 
-  portfolio      Portfolio        @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
-  ledgerEntries  LedgerEntry[]
+  // Duration (in days)
+  durationDays Int      @map("duration_days") @db.SmallInt
+  startDate    DateTime @map("start_date")
+  expiryDate   DateTime @map("expiry_date")
+
+  // Volatility at time of purchase
+  impliedVolatility Decimal? @map("implied_volatility") @db.Decimal(8, 6)
+
+  // Quote tracking
+  quoteId String? @map("quote_id") @db.VarChar(50)
+
+  // Hedge tracking (mock for now)
+  hedgeType  HedgeType? @map("hedge_type")
+  hedgeRatio Decimal?   @map("hedge_ratio") @db.Decimal(5, 4)
+
+  // Settlement
+  settlementIrr  Decimal?  @map("settlement_irr") @db.Decimal(20, 2)
+  settlementUsd  Decimal?  @map("settlement_usd") @db.Decimal(20, 8)
+  settlementDate DateTime? @map("settlement_date")
+
+  // Status
+  status      ProtectionStatus @default(ACTIVE)
+  cancelledAt DateTime?        @map("cancelled_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  portfolio     Portfolio     @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  holding       Holding?      @relation(fields: [holdingId], references: [id])
+  ledgerEntries LedgerEntry[]
+  hedgeLogs     HedgeLog[]
 
   @@index([portfolioId])
   @@index([portfolioId, assetId])
+  @@index([status])
+  @@index([expiryDate])
   @@map("protections")
 }
 
 enum ProtectionStatus {
   ACTIVE
   EXPIRED
+  EXERCISED
   CANCELLED
+}
+
+enum HedgeType {
+  NAKED
+  EXCHANGE_PUT
+  DELTA_HEDGE
+  PARTIAL
+  OTC
+}
+
+// ============================================================================
+// HEDGE LOG (Protection Hedge Tracking)
+// ============================================================================
+
+model HedgeLog {
+  id           String @id @default(uuid()) @db.Uuid
+  protectionId String @map("protection_id") @db.Uuid
+
+  hedgeType   HedgeType @map("hedge_type")
+  action      String    @db.VarChar(20) // OPEN, REBALANCE, CLOSE
+  notionalUsd Decimal   @map("notional_usd") @db.Decimal(20, 8)
+  hedgeRatio  Decimal   @map("hedge_ratio") @db.Decimal(5, 4)
+
+  // Greeks at time of action
+  delta Decimal? @db.Decimal(8, 6)
+  gamma Decimal? @db.Decimal(8, 6)
+  vega  Decimal? @db.Decimal(8, 6)
+  theta Decimal? @db.Decimal(8, 6)
+
+  // Execution details (for future real hedging)
+  instrument      String?  @db.VarChar(50)
+  exchangeOrderId String?  @map("exchange_order_id") @db.VarChar(100)
+  costUsd         Decimal? @map("cost_usd") @db.Decimal(20, 8)
+  errorMessage    String?  @map("error_message") @db.Text
+
+  executedAt DateTime @default(now()) @map("executed_at")
+
+  protection Protection @relation(fields: [protectionId], references: [id], onDelete: Cascade)
+
+  @@index([protectionId])
+  @@map("hedge_logs")
 }
 
 // ============================================================================
@@ -291,43 +371,43 @@ enum ProtectionStatus {
 // ============================================================================
 
 model LedgerEntry {
-  id              String      @id @default(uuid()) @db.Uuid
-  portfolioId     String      @map("portfolio_id") @db.Uuid
+  id          String @id @default(uuid()) @db.Uuid
+  portfolioId String @map("portfolio_id") @db.Uuid
 
   // Entry Type
-  entryType       LedgerEntryType @map("entry_type")
+  entryType LedgerEntryType @map("entry_type")
 
   // Snapshot Data
-  beforeSnapshot  Json        @map("before_snapshot")
-  afterSnapshot   Json        @map("after_snapshot")
+  beforeSnapshot Json @map("before_snapshot")
+  afterSnapshot  Json @map("after_snapshot")
 
   // Transaction Details
-  assetId         String?     @map("asset_id") @db.VarChar(30)
-  quantity        Decimal?    @db.Decimal(18, 8)
-  amountIrr       Decimal?    @map("amount_irr") @db.Decimal(20, 2)
+  assetId   String?  @map("asset_id") @db.VarChar(30)
+  quantity  Decimal? @db.Decimal(18, 8)
+  amountIrr Decimal? @map("amount_irr") @db.Decimal(20, 2)
 
   // Boundary Classification
-  boundary        Boundary?
+  boundary Boundary?
 
   // Related Entities
-  loanId          String?     @map("loan_id") @db.Uuid
-  protectionId    String?     @map("protection_id") @db.Uuid
+  loanId       String? @map("loan_id") @db.Uuid
+  protectionId String? @map("protection_id") @db.Uuid
 
   // Metadata
-  message         String?     @db.Text
-  metadata        Json?
+  message  String? @db.Text
+  metadata Json?
 
   // Blockchain-style immutability
-  sequenceNumber  BigInt      @default(autoincrement()) @map("sequence_number")
-  prevHash        String?     @map("prev_hash") @db.VarChar(64)
-  entryHash       String?     @map("entry_hash") @db.VarChar(64)
+  sequenceNumber BigInt  @default(autoincrement()) @map("sequence_number")
+  prevHash       String? @map("prev_hash") @db.VarChar(64)
+  entryHash      String? @map("entry_hash") @db.VarChar(64)
 
-  createdAt       DateTime    @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
-  portfolio       Portfolio   @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
-  loan            Loan?       @relation(fields: [loanId], references: [id])
-  protection      Protection? @relation(fields: [protectionId], references: [id])
+  portfolio  Portfolio   @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  loan       Loan?       @relation(fields: [loanId], references: [id])
+  protection Protection? @relation(fields: [protectionId], references: [id])
 
   @@index([portfolioId])
   @@index([portfolioId, sequenceNumber])
@@ -345,6 +425,7 @@ enum LedgerEntryType {
   PROTECTION_PURCHASE
   PROTECTION_CANCEL
   PROTECTION_EXPIRE
+  PROTECTION_SETTLEMENT
   LOAN_CREATE
   LOAN_REPAY
   LOAN_LIQUIDATE
@@ -362,19 +443,19 @@ enum Boundary {
 // ============================================================================
 
 model ActionLog {
-  id          BigInt    @id @default(autoincrement())
-  portfolioId String    @map("portfolio_id") @db.Uuid
+  id          BigInt @id @default(autoincrement())
+  portfolioId String @map("portfolio_id") @db.Uuid
 
-  actionType  String    @map("action_type") @db.VarChar(30)
-  boundary    Boundary?
-  message     String    @db.Text
+  actionType String    @map("action_type") @db.VarChar(30)
+  boundary   Boundary?
+  message    String    @db.Text
 
-  amountIrr   Decimal?  @map("amount_irr") @db.Decimal(20, 2)
-  assetId     String?   @map("asset_id") @db.VarChar(30)
+  amountIrr Decimal? @map("amount_irr") @db.Decimal(20, 2)
+  assetId   String?  @map("asset_id") @db.VarChar(30)
 
-  createdAt   DateTime  @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
-  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
 
   @@index([portfolioId, createdAt(sort: Desc)])
   @@map("action_log")
@@ -385,37 +466,37 @@ model ActionLog {
 // ============================================================================
 
 model Asset {
-  id                  String   @id @db.VarChar(30) // BTC, ETH, etc.
-  name                String   @db.VarChar(100)
+  id   String @id @db.VarChar(30) // BTC, ETH, etc.
+  name String @db.VarChar(100)
 
-  layer               Layer
-  layerWeight         Decimal  @map("layer_weight") @db.Decimal(5, 4)
+  layer       Layer
+  layerWeight Decimal @map("layer_weight") @db.Decimal(5, 4)
 
-  volatility          Decimal? @db.Decimal(5, 4)
-  liquidityScore      Decimal? @map("liquidity_score") @db.Decimal(5, 4)
+  volatility     Decimal? @db.Decimal(5, 4)
+  liquidityScore Decimal? @map("liquidity_score") @db.Decimal(5, 4)
 
   // LTV and Protection
-  maxLtv              Decimal  @map("max_ltv") @db.Decimal(5, 4)
-  protectionEligible  Boolean  @default(true) @map("protection_eligible")
-  protectionRate      Decimal? @map("protection_rate") @db.Decimal(5, 4)
+  maxLtv             Decimal  @map("max_ltv") @db.Decimal(5, 4)
+  protectionEligible Boolean  @default(true) @map("protection_eligible")
+  protectionRate     Decimal? @map("protection_rate") @db.Decimal(5, 4)
 
   // Pricing
-  coingeckoId         String?  @map("coingecko_id") @db.VarChar(50)
-  finnhubSymbol       String?  @map("finnhub_symbol") @db.VarChar(20)
-  isInternal          Boolean  @default(false) @map("is_internal")
-  defaultPriceUsd     Decimal? @map("default_price_usd") @db.Decimal(20, 8)
+  coingeckoId     String?  @map("coingecko_id") @db.VarChar(50)
+  finnhubSymbol   String?  @map("finnhub_symbol") @db.VarChar(20)
+  isInternal      Boolean  @default(false) @map("is_internal")
+  defaultPriceUsd Decimal? @map("default_price_usd") @db.Decimal(20, 8)
 
   // Trading
-  minTradeIrr         Decimal  @default(1000000) @map("min_trade_irr") @db.Decimal(20, 2)
-  spread              Decimal? @db.Decimal(5, 4)
-  decimals            Int      @default(8)
+  minTradeIrr Decimal  @default(1000000) @map("min_trade_irr") @db.Decimal(20, 2)
+  spread      Decimal? @db.Decimal(5, 4)
+  decimals    Int      @default(8)
 
-  active              Boolean  @default(true)
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  price               Price?
+  price Price?
 
   @@map("assets")
 }
@@ -425,22 +506,22 @@ model Asset {
 // ============================================================================
 
 model Price {
-  assetId      String   @id @map("asset_id") @db.VarChar(30)
+  assetId String @id @map("asset_id") @db.VarChar(30)
 
-  priceUsd     Decimal  @map("price_usd") @db.Decimal(20, 8)
-  priceIrr     Decimal  @map("price_irr") @db.Decimal(20, 2)
+  priceUsd Decimal @map("price_usd") @db.Decimal(20, 8)
+  priceIrr Decimal @map("price_irr") @db.Decimal(20, 2)
 
-  fxRate       Decimal  @map("fx_rate") @db.Decimal(15, 2)
-  fxSource     String?  @map("fx_source") @db.VarChar(20)
+  fxRate   Decimal @map("fx_rate") @db.Decimal(15, 2)
+  fxSource String? @map("fx_source") @db.VarChar(20)
 
-  source       String?  @db.VarChar(30)
-  fetchedAt    DateTime @map("fetched_at")
+  source    String?  @db.VarChar(30)
+  fetchedAt DateTime @map("fetched_at")
 
   change24hPct Decimal? @map("change_24h_pct") @db.Decimal(8, 4)
 
-  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  asset        Asset    @relation(fields: [assetId], references: [id])
+  asset Asset @relation(fields: [assetId], references: [id])
 
   @@index([updatedAt])
   @@map("prices")

@@ -174,18 +174,25 @@ async function main() {
   await prisma.protection.deleteMany({ where: { portfolioId: demoPortfolio.id } });
 
   const protectionStart = new Date();
-  const protectionEnd = new Date();
-  protectionEnd.setMonth(protectionEnd.getMonth() + 3);
+  const protectionExpiry = new Date();
+  protectionExpiry.setDate(protectionExpiry.getDate() + 90); // 90 days
 
   await prisma.protection.create({
     data: {
       portfolioId: demoPortfolio.id,
       assetId: 'BTC',
+      coveragePct: 1.0, // 100% coverage
       notionalIrr: 60000000, // 60M IRR protected
-      premiumIrr: 1440000, // 0.8% monthly * 3 months
-      durationMonths: 3,
+      notionalUsd: 41.21, // ~60M IRR / 1,456,000 FX rate
+      strikePct: 1.0, // ATM
+      strikeUsd: 95000, // BTC price at time of protection
+      strikeIrr: 138320000000,
+      premiumPct: 0.0607, // ~6% for 90 days
+      premiumIrr: 3642000, // 6% of 60M IRR
+      premiumUsd: 2.50,
+      durationDays: 90,
       startDate: protectionStart,
-      endDate: protectionEnd,
+      expiryDate: protectionExpiry,
       status: 'ACTIVE',
     },
   });
