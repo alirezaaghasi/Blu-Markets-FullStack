@@ -6,16 +6,15 @@ describe('Risk Scoring Service', () => {
   describe('calculateRiskScore', () => {
     it('should return LOW tier for very conservative answers', () => {
       const answers = [
-        { questionId: 'q1', answerId: 'a1', value: 1 },
-        { questionId: 'q2', answerId: 'a1', value: 1 },
-        { questionId: 'q3', answerId: 'a1', value: 2 },
-        { questionId: 'q4', answerId: 'a1', value: 1 },
-        { questionId: 'q5', answerId: 'a1', value: 1 },
-        { questionId: 'q6', answerId: 'a1', value: 2 },
-        { questionId: 'q7', answerId: 'a1', value: 1 },
-        { questionId: 'q8', answerId: 'a1', value: 2 },
-        { questionId: 'q9', answerId: 'a1', value: 1 },
-        { questionId: 'q10', answerId: 'a1', value: 2 },
+        { questionId: 'q_income', answerId: 'a1', value: 1 },
+        { questionId: 'q_buffer', answerId: 'a1', value: 1 },
+        { questionId: 'q_proportion', answerId: 'a1', value: 2 },
+        { questionId: 'q_goal', answerId: 'a1', value: 1 },
+        { questionId: 'q_horizon', answerId: 'a1', value: 1 },
+        { questionId: 'q_crash_20', answerId: 'a1', value: 2 },
+        { questionId: 'q_tradeoff', answerId: 'a1', value: 1 },
+        { questionId: 'q_past_behavior', answerId: 'a1', value: 2 },
+        { questionId: 'q_max_loss', answerId: 'a1', value: 1 },
       ];
 
       const result = calculateRiskScore(answers);
@@ -27,37 +26,34 @@ describe('Risk Scoring Service', () => {
 
     it('should return HIGH tier for aggressive answers', () => {
       const answers = [
-        { questionId: 'q1', answerId: 'a5', value: 5 },
-        { questionId: 'q2', answerId: 'a5', value: 5 },
-        { questionId: 'q3', answerId: 'a5', value: 5 },
-        { questionId: 'q4', answerId: 'a5', value: 5 },
-        { questionId: 'q5', answerId: 'a5', value: 5 },
-        { questionId: 'q6', answerId: 'a5', value: 5 },
-        { questionId: 'q7', answerId: 'a5', value: 5 },
-        { questionId: 'q8', answerId: 'a5', value: 5 },
-        { questionId: 'q9', answerId: 'a5', value: 5 },
-        { questionId: 'q10', answerId: 'a5', value: 5 },
+        { questionId: 'q_income', answerId: 'a5', value: 8 },
+        { questionId: 'q_buffer', answerId: 'a5', value: 8 },
+        { questionId: 'q_proportion', answerId: 'a5', value: 8 },
+        { questionId: 'q_goal', answerId: 'a5', value: 8 },
+        { questionId: 'q_horizon', answerId: 'a5', value: 10 }, // Long horizon
+        { questionId: 'q_crash_20', answerId: 'a5', value: 8 },
+        { questionId: 'q_tradeoff', answerId: 'a5', value: 8 },
+        { questionId: 'q_past_behavior', answerId: 'a5', value: 8 },
+        { questionId: 'q_max_loss', answerId: 'a5', value: 8 },
       ];
 
       const result = calculateRiskScore(answers);
 
-      // All 5s is pathological - should be capped at 7
-      expect(result.score).toBe(7);
+      expect(result.score).toBeGreaterThanOrEqual(7);
       expect(result.tier).toBe('HIGH');
     });
 
     it('should return MEDIUM tier for balanced answers', () => {
       const answers = [
-        { questionId: 'q1', answerId: 'a3', value: 3 },
-        { questionId: 'q2', answerId: 'a3', value: 3 },
-        { questionId: 'q3', answerId: 'a3', value: 3 },
-        { questionId: 'q4', answerId: 'a3', value: 4 },
-        { questionId: 'q5', answerId: 'a3', value: 3 },
-        { questionId: 'q6', answerId: 'a3', value: 3 },
-        { questionId: 'q7', answerId: 'a3', value: 4 },
-        { questionId: 'q8', answerId: 'a3', value: 3 },
-        { questionId: 'q9', answerId: 'a3', value: 3 },
-        { questionId: 'q10', answerId: 'a3', value: 3 },
+        { questionId: 'q_income', answerId: 'a3', value: 5 },
+        { questionId: 'q_buffer', answerId: 'a3', value: 5 },
+        { questionId: 'q_proportion', answerId: 'a3', value: 5 },
+        { questionId: 'q_goal', answerId: 'a3', value: 5 },
+        { questionId: 'q_horizon', answerId: 'a3', value: 7 }, // Mid-range horizon
+        { questionId: 'q_crash_20', answerId: 'a3', value: 5 },
+        { questionId: 'q_tradeoff', answerId: 'a3', value: 5 },
+        { questionId: 'q_past_behavior', answerId: 'a3', value: 5 },
+        { questionId: 'q_max_loss', answerId: 'a3', value: 5 },
       ];
 
       const result = calculateRiskScore(answers);
@@ -68,120 +64,123 @@ describe('Risk Scoring Service', () => {
     });
 
     it('should cap score when loss comfort is very low', () => {
-      // High in other areas but very low loss comfort
+      // High capacity but very low willingness (crash_20 and max_loss)
       const answers = [
-        { questionId: 'q1', answerId: 'a1', value: 1 }, // lossComfort
-        { questionId: 'q2', answerId: 'a1', value: 1 }, // lossComfort
-        { questionId: 'q3', answerId: 'a5', value: 5 }, // timeHorizon
-        { questionId: 'q4', answerId: 'a5', value: 5 }, // timeHorizon
-        { questionId: 'q5', answerId: 'a5', value: 5 }, // experience
-        { questionId: 'q6', answerId: 'a5', value: 5 }, // experience
-        { questionId: 'q7', answerId: 'a5', value: 5 }, // financialStability
-        { questionId: 'q8', answerId: 'a5', value: 5 }, // financialStability
-        { questionId: 'q9', answerId: 'a5', value: 5 }, // goalClarity
-        { questionId: 'q10', answerId: 'a5', value: 5 }, // goalClarity
+        { questionId: 'q_income', answerId: 'a5', value: 8 },
+        { questionId: 'q_buffer', answerId: 'a5', value: 8 },
+        { questionId: 'q_proportion', answerId: 'a5', value: 8 },
+        { questionId: 'q_goal', answerId: 'a5', value: 8 },
+        { questionId: 'q_horizon', answerId: 'a5', value: 10 },
+        { questionId: 'q_crash_20', answerId: 'a1', value: 1 }, // Very low loss comfort
+        { questionId: 'q_tradeoff', answerId: 'a1', value: 1 },
+        { questionId: 'q_past_behavior', answerId: 'a1', value: 1 },
+        { questionId: 'q_max_loss', answerId: 'a1', value: 1 },
       ];
 
       const result = calculateRiskScore(answers);
 
-      // Score should be capped at 5 due to conservative dominance rule
+      // Score should be capped due to conservative dominance rule (min of capacity, willingness)
       expect(result.score).toBeLessThanOrEqual(5);
     });
 
     it('should cap score when time horizon is very short', () => {
       // High in other areas but very short time horizon
       const answers = [
-        { questionId: 'q1', answerId: 'a5', value: 5 }, // lossComfort
-        { questionId: 'q2', answerId: 'a5', value: 5 }, // lossComfort
-        { questionId: 'q3', answerId: 'a1', value: 1 }, // timeHorizon - short
-        { questionId: 'q4', answerId: 'a1', value: 1 }, // timeHorizon - short
-        { questionId: 'q5', answerId: 'a5', value: 5 }, // experience
-        { questionId: 'q6', answerId: 'a5', value: 5 }, // experience
-        { questionId: 'q7', answerId: 'a5', value: 5 }, // financialStability
-        { questionId: 'q8', answerId: 'a5', value: 5 }, // financialStability
-        { questionId: 'q9', answerId: 'a5', value: 5 }, // goalClarity
-        { questionId: 'q10', answerId: 'a5', value: 5 }, // goalClarity
+        { questionId: 'q_income', answerId: 'a5', value: 8 },
+        { questionId: 'q_buffer', answerId: 'a5', value: 8 },
+        { questionId: 'q_proportion', answerId: 'a5', value: 8 },
+        { questionId: 'q_goal', answerId: 'a5', value: 8 },
+        { questionId: 'q_horizon', answerId: 'a1', value: 1 }, // Very short horizon
+        { questionId: 'q_crash_20', answerId: 'a5', value: 8 },
+        { questionId: 'q_tradeoff', answerId: 'a5', value: 8 },
+        { questionId: 'q_past_behavior', answerId: 'a5', value: 8 },
+        { questionId: 'q_max_loss', answerId: 'a5', value: 8 },
       ];
 
       const result = calculateRiskScore(answers);
 
-      // Score should be capped at 6 due to time horizon hard cap
-      expect(result.score).toBeLessThanOrEqual(6);
+      // Score should be capped at 3 due to time horizon hard cap (value=1 caps at 3)
+      expect(result.score).toBeLessThanOrEqual(3);
     });
 
-    it('should reduce score for low experience', () => {
+    it('should reduce score for low willingness', () => {
       const answers = [
-        { questionId: 'q1', answerId: 'a4', value: 4 },
-        { questionId: 'q2', answerId: 'a4', value: 4 },
-        { questionId: 'q3', answerId: 'a4', value: 4 },
-        { questionId: 'q4', answerId: 'a4', value: 4 },
-        { questionId: 'q5', answerId: 'a1', value: 1 }, // experience - low
-        { questionId: 'q6', answerId: 'a1', value: 1 }, // experience - low
-        { questionId: 'q7', answerId: 'a4', value: 4 },
-        { questionId: 'q8', answerId: 'a4', value: 4 },
-        { questionId: 'q9', answerId: 'a4', value: 4 },
-        { questionId: 'q10', answerId: 'a4', value: 4 },
+        { questionId: 'q_income', answerId: 'a4', value: 6 },
+        { questionId: 'q_buffer', answerId: 'a4', value: 6 },
+        { questionId: 'q_proportion', answerId: 'a4', value: 6 },
+        { questionId: 'q_goal', answerId: 'a4', value: 6 },
+        { questionId: 'q_horizon', answerId: 'a4', value: 7 },
+        { questionId: 'q_crash_20', answerId: 'a1', value: 2 }, // Low willingness
+        { questionId: 'q_tradeoff', answerId: 'a1', value: 2 },
+        { questionId: 'q_past_behavior', answerId: 'a1', value: 2 },
+        { questionId: 'q_max_loss', answerId: 'a1', value: 2 },
       ];
 
-      const resultWithLowExp = calculateRiskScore(answers);
+      const resultWithLowWillingness = calculateRiskScore(answers);
 
-      // Compare to same answers but with higher experience
-      const answersWithHighExp = answers.map((a) =>
-        a.questionId === 'q5' || a.questionId === 'q6' ? { ...a, value: 5 } : a
+      // Compare to same answers but with higher willingness
+      const answersWithHighWillingness = answers.map((a) =>
+        ['q_crash_20', 'q_tradeoff', 'q_past_behavior', 'q_max_loss'].includes(a.questionId)
+          ? { ...a, value: 7 }
+          : a
       );
-      const resultWithHighExp = calculateRiskScore(answersWithHighExp);
+      const resultWithHighWillingness = calculateRiskScore(answersWithHighWillingness);
 
-      // Low experience should result in lower or equal score
-      expect(resultWithLowExp.score).toBeLessThanOrEqual(resultWithHighExp.score);
+      // Low willingness should result in lower or equal score
+      expect(resultWithLowWillingness.score).toBeLessThanOrEqual(resultWithHighWillingness.score);
     });
 
     it('should handle pathological all-1s answers', () => {
-      const answers = Array.from({ length: 10 }, (_, i) => ({
-        questionId: `q${i + 1}`,
-        answerId: 'a1',
-        value: 1,
-      }));
-
-      const result = calculateRiskScore(answers);
-
-      // All 1s should result in score 2 per pathological rule
-      expect(result.score).toBe(2);
-      expect(result.tier).toBe('LOW');
-    });
-
-    it('should apply consistency penalty for high variance', () => {
-      // Answers with high variance (alternating 1s and 5s)
       const answers = [
-        { questionId: 'q1', answerId: 'a1', value: 1 },
-        { questionId: 'q2', answerId: 'a5', value: 5 },
-        { questionId: 'q3', answerId: 'a1', value: 1 },
-        { questionId: 'q4', answerId: 'a5', value: 5 },
-        { questionId: 'q5', answerId: 'a1', value: 1 },
-        { questionId: 'q6', answerId: 'a5', value: 5 },
-        { questionId: 'q7', answerId: 'a1', value: 1 },
-        { questionId: 'q8', answerId: 'a5', value: 5 },
-        { questionId: 'q9', answerId: 'a1', value: 1 },
-        { questionId: 'q10', answerId: 'a5', value: 5 },
+        { questionId: 'q_income', answerId: 'a1', value: 1 },
+        { questionId: 'q_buffer', answerId: 'a1', value: 1 },
+        { questionId: 'q_proportion', answerId: 'a1', value: 1 },
+        { questionId: 'q_goal', answerId: 'a1', value: 1 },
+        { questionId: 'q_horizon', answerId: 'a1', value: 1 }, // Short horizon caps at 3
+        { questionId: 'q_crash_20', answerId: 'a1', value: 1 },
+        { questionId: 'q_tradeoff', answerId: 'a1', value: 1 },
+        { questionId: 'q_past_behavior', answerId: 'a1', value: 1 },
+        { questionId: 'q_max_loss', answerId: 'a1', value: 1 },
       ];
 
       const result = calculateRiskScore(answers);
 
-      // High variance should apply penalty, pushing score toward conservative
+      // All 1s should result in low score
+      expect(result.score).toBeLessThanOrEqual(3);
+      expect(result.tier).toBe('LOW');
+    });
+
+    it('should apply consistency penalty for inconsistent answers', () => {
+      // q_crash_20 <= 2 AND q_max_loss >= 7 triggers consistency penalty
+      const answers = [
+        { questionId: 'q_income', answerId: 'a4', value: 6 },
+        { questionId: 'q_buffer', answerId: 'a4', value: 6 },
+        { questionId: 'q_proportion', answerId: 'a4', value: 6 },
+        { questionId: 'q_goal', answerId: 'a4', value: 6 },
+        { questionId: 'q_horizon', answerId: 'a4', value: 7 },
+        { questionId: 'q_crash_20', answerId: 'a1', value: 2 }, // Low crash comfort
+        { questionId: 'q_tradeoff', answerId: 'a4', value: 6 },
+        { questionId: 'q_past_behavior', answerId: 'a4', value: 6 },
+        { questionId: 'q_max_loss', answerId: 'a5', value: 8 }, // High max loss tolerance (inconsistent)
+      ];
+
+      const result = calculateRiskScore(answers);
+
+      // Consistency penalty should be applied
       expect(result.score).toBeLessThanOrEqual(5);
     });
 
     it('should include target allocation in result', () => {
       const answers = [
-        { questionId: 'q1', answerId: 'a3', value: 3 },
-        { questionId: 'q2', answerId: 'a3', value: 3 },
-        { questionId: 'q3', answerId: 'a3', value: 3 },
-        { questionId: 'q4', answerId: 'a3', value: 3 },
-        { questionId: 'q5', answerId: 'a3', value: 3 },
-        { questionId: 'q6', answerId: 'a3', value: 3 },
-        { questionId: 'q7', answerId: 'a3', value: 3 },
-        { questionId: 'q8', answerId: 'a3', value: 3 },
-        { questionId: 'q9', answerId: 'a3', value: 3 },
-        { questionId: 'q10', answerId: 'a3', value: 3 },
+        { questionId: 'q_income', answerId: 'a3', value: 5 },
+        { questionId: 'q_buffer', answerId: 'a3', value: 5 },
+        { questionId: 'q_proportion', answerId: 'a3', value: 5 },
+        { questionId: 'q_goal', answerId: 'a3', value: 5 },
+        { questionId: 'q_horizon', answerId: 'a3', value: 7 },
+        { questionId: 'q_crash_20', answerId: 'a3', value: 5 },
+        { questionId: 'q_tradeoff', answerId: 'a3', value: 5 },
+        { questionId: 'q_past_behavior', answerId: 'a3', value: 5 },
+        { questionId: 'q_max_loss', answerId: 'a3', value: 5 },
       ];
 
       const result = calculateRiskScore(answers);
