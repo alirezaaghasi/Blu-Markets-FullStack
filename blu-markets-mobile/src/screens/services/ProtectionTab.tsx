@@ -169,6 +169,9 @@ function ProtectionCard({
         </View>
       </View>
 
+      {/* Cancel functionality is disabled until backend supports it.
+          Backend currently returns 501 NOT_IMPLEMENTED for cancellation.
+          TODO: Re-enable when protection cancellation is implemented.
       {isActive && (
         <View style={styles.protectionActions}>
           <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
@@ -176,6 +179,7 @@ function ProtectionCard({
           </TouchableOpacity>
         </View>
       )}
+      */}
     </View>
   );
 }

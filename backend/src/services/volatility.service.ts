@@ -143,19 +143,27 @@ const REGIME_MULTIPLIERS: Record<VolatilityRegime, number> = {
 };
 
 /**
- * Current regime simulation
+ * Per-asset regime simulation
  * In production, this would be derived from actual market data
- * For now, we randomly simulate regime with bias toward NORMAL
+ * Each asset can have its own volatility regime for realistic multi-asset pricing
  */
-let simulatedRegimeMultiplier = 1.0;
+const simulatedRegimeMultipliers = new Map<string, number>();
+
+/**
+ * Get the regime multiplier for a specific asset
+ * Returns 1.0 (NORMAL) if no specific multiplier is set
+ */
+function getAssetRegimeMultiplier(assetId: AssetId): number {
+  return simulatedRegimeMultipliers.get(assetId) ?? 1.0;
+}
 
 /**
  * Get current volatility regime for an asset
  * In production, this would compare current IV to historical average
  */
 export function getVolatilityRegime(assetId: AssetId): VolatilityRegime {
-  // For simulation, use the regime multiplier to determine regime
-  const multiplier = simulatedRegimeMultiplier;
+  // Use per-asset regime multiplier
+  const multiplier = getAssetRegimeMultiplier(assetId);
 
   if (multiplier < REGIME_THRESHOLDS.LOW) return 'LOW';
   if (multiplier < REGIME_THRESHOLDS.NORMAL_LOW) return 'LOW';
@@ -173,18 +181,36 @@ export function getRegimeMultiplier(regime: VolatilityRegime): number {
 }
 
 /**
- * Set simulated regime (for testing/admin)
- * @param multiplier - 0.7 to 2.0 range
+ * Set simulated regime for a specific asset (for testing/admin)
+ * @param assetId - Asset to set regime for
+ * @param multiplier - 0.5 to 2.5 range
  */
-export function setSimulatedRegime(multiplier: number): void {
-  simulatedRegimeMultiplier = Math.max(0.5, Math.min(2.5, multiplier));
+export function setSimulatedRegime(assetId: AssetId, multiplier: number): void {
+  simulatedRegimeMultipliers.set(assetId, Math.max(0.5, Math.min(2.5, multiplier)));
 }
 
 /**
- * Reset to normal regime
+ * Set simulated regime for all assets (for testing/admin)
+ * @param multiplier - 0.5 to 2.5 range
  */
-export function resetRegime(): void {
-  simulatedRegimeMultiplier = 1.0;
+export function setGlobalSimulatedRegime(multiplier: number): void {
+  const clampedMultiplier = Math.max(0.5, Math.min(2.5, multiplier));
+  const allAssets: AssetId[] = ['BTC', 'ETH', 'SOL', 'TON', 'BNB', 'XRP', 'LINK', 'AVAX', 'MATIC', 'ARB', 'PAXG', 'KAG', 'QQQ'];
+  for (const assetId of allAssets) {
+    simulatedRegimeMultipliers.set(assetId, clampedMultiplier);
+  }
+}
+
+/**
+ * Reset regime for a specific asset to normal
+ */
+export function resetRegime(assetId?: AssetId): void {
+  if (assetId) {
+    simulatedRegimeMultipliers.delete(assetId);
+  } else {
+    // Reset all assets
+    simulatedRegimeMultipliers.clear();
+  }
 }
 
 // ============================================================================

@@ -143,6 +143,7 @@ export interface ProtectionQuote {
 
 // Protectable holding (from /protection/holdings endpoint)
 export interface ProtectableHolding {
+  holdingId: string;
   assetId: AssetId;
   name: string;
   layer: Layer;

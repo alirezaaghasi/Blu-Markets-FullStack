@@ -72,6 +72,9 @@ export interface ProtectionsResponse {
 
 export interface ProtectableHoldingsResponse {
   holdings: ProtectableHolding[];
+  durationPresets?: number[];
+  coverageRange?: { min: number; max: number; step: number };
+  minNotionalIrr?: number;
 }
 
 export interface ProtectionQuoteRequest {
@@ -82,6 +85,53 @@ export interface ProtectionQuoteRequest {
 
 export interface ProtectionQuoteResponse {
   quote: ProtectionQuote;
+}
+
+// Backend's actual quote response shape (different from frontend's ProtectionQuote)
+export interface BackendQuoteResponse {
+  quote: {
+    quoteId: string;
+    holdingId: string;
+    assetId: string;
+    coveragePct: number;
+    notionalIrr: number;
+    notionalUsd: number;
+    strikePct: number;
+    strikeUsd: number;
+    strikeIrr: number;
+    durationDays: number;
+    spotPriceUsd: number;
+    spotPriceIrr: number;
+    premiumPct: number;
+    premiumIrr: number;
+    premiumUsd: number;
+    fairValuePct: number;
+    executionSpreadPct: number;
+    profitMarginPct: number;
+    impliedVolatility: number;
+    volatilityRegime: string;
+    greeks: {
+      delta: number;
+      gamma: number;
+      vega: number;
+      theta: number;
+      rho: number;
+    };
+    quotedAt: string;
+    validUntil: string;
+  };
+  breakeven: {
+    priceDropPct: number;
+    priceDropPctDisplay: string;
+    breakEvenUsd: number;
+    breakEvenIrr: number;
+    description: string;
+    descriptionFa: string;
+  };
+  validity: {
+    secondsRemaining: number;
+    validUntil: string;
+  };
 }
 
 export interface PremiumCurveRequest {

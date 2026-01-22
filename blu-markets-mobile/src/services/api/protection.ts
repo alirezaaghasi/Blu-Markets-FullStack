@@ -15,6 +15,7 @@ import type {
   PremiumCurveResponse,
   ProtectionPurchaseResponse,
   VolatilityResponse,
+  BackendQuoteResponse,
 } from './types';
 
 // Type for raw API responses (interceptor unwraps .data)
@@ -60,6 +61,7 @@ export const protection = {
   /**
    * Get a protection quote for a holding
    * Uses GET with query params per backend API
+   * Transforms backend response to match frontend ProtectionQuote type
    */
   getQuote: async (
     holdingId: string,
@@ -68,13 +70,49 @@ export const protection = {
   ): Promise<ProtectionQuote> => {
     const data = (await apiClient.get('/protection/quote', {
       params: { holdingId, coveragePct, durationDays },
-    })) as unknown as ApiResponse<ProtectionQuoteResponse | ProtectionQuote>;
+    })) as unknown as ApiResponse<BackendQuoteResponse>;
 
-    // Handle both wrapped and unwrapped response
-    if ('quote' in data) {
-      return data.quote;
-    }
-    return data as ProtectionQuote;
+    // Transform backend response to frontend-expected shape
+    const { quote: backendQuote, breakeven, validity } = data;
+
+    // Calculate annualized premium percentage
+    const annualizedPct = (backendQuote.premiumPct / durationDays) * 365;
+
+    // Transform to frontend ProtectionQuote shape
+    const frontendQuote: ProtectionQuote = {
+      quoteId: backendQuote.quoteId,
+      assetId: backendQuote.assetId as AssetId,
+      holdingValueIrr: backendQuote.notionalIrr / coveragePct,
+      holdingValueUsd: backendQuote.notionalUsd / coveragePct,
+      coveragePct: backendQuote.coveragePct,
+      notionalIrr: backendQuote.notionalIrr,
+      notionalUsd: backendQuote.notionalUsd,
+      durationDays: backendQuote.durationDays,
+      strikeUsd: backendQuote.strikeUsd,
+      strikePct: backendQuote.strikePct,
+      premiumIrr: backendQuote.premiumIrr,
+      premiumUsd: backendQuote.premiumUsd,
+      premiumPct: backendQuote.premiumPct,
+      annualizedPct,
+      breakeven: {
+        priceDrop: breakeven.priceDropPct,
+        priceUsd: breakeven.breakEvenUsd,
+      },
+      greeks: {
+        delta: backendQuote.greeks.delta,
+        gamma: backendQuote.greeks.gamma,
+        vega: backendQuote.greeks.vega,
+        theta: backendQuote.greeks.theta,
+      },
+      volatility: {
+        iv: backendQuote.impliedVolatility,
+        regime: backendQuote.volatilityRegime,
+      },
+      expiresAt: validity.validUntil,
+      validForSeconds: validity.secondsRemaining,
+    };
+
+    return frontendQuote;
   },
 
   /**

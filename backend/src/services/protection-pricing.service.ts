@@ -11,7 +11,6 @@ import {
   blackScholesPut,
   calculatePutGreeks,
   daysToYears,
-  calculatePremiumWithSpreads,
   RISK_FREE_RATE,
   type PutGreeks,
 } from './options-math.js';

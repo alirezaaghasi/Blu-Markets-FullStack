@@ -62,6 +62,7 @@ interface ExpiryResult {
   processed: number;
   exercised: number;
   expired: number;
+  pendingPriceData: number;
   totalSettlementIrr: number;
   errors: number;
 }
@@ -78,6 +79,7 @@ export async function processExpiredProtections(): Promise<ExpiryResult> {
     processed: 0,
     exercised: 0,
     expired: 0,
+    pendingPriceData: 0,
     totalSettlementIrr: 0,
     errors: 0,
   };
@@ -123,9 +125,13 @@ async function processProtectionExpiry(
   const priceData = prices.get(assetId);
 
   if (!priceData) {
-    console.error(`[EXPIRY] No price data for ${assetId}, marking as expired`);
-    await markProtectionExpired(protection, 0);
-    result.expired++;
+    // IMPORTANT: Do not expire protections when price data is unavailable.
+    // This could be a transient price feed outage - retry on next job run.
+    console.warn(
+      `[EXPIRY] No price data for ${assetId}, skipping protection ${protection.id}. ` +
+        `Will retry on next scheduled run.`
+    );
+    result.pendingPriceData++;
     return;
   }
 
@@ -402,6 +408,7 @@ export async function processSpecificProtection(protectionId: string): Promise<v
     processed: 0,
     exercised: 0,
     expired: 0,
+    pendingPriceData: 0,
     totalSettlementIrr: 0,
     errors: 0,
   };
