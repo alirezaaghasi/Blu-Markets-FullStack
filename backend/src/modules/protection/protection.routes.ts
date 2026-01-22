@@ -19,6 +19,8 @@ import {
   isPremiumWithinTolerance,
   getQuoteSecondsRemaining,
   calculateSettlement,
+  getAndValidateCachedQuote,
+  consumeQuote,
   DURATION_PRESETS,
   MIN_COVERAGE_PCT,
   MAX_COVERAGE_PCT,
@@ -237,21 +239,41 @@ export const protectionRoutes: FastifyPluginAsync = async (app: FastifyInstance)
       const body = purchaseSchema.parse(request.body);
       const userId = request.userId;
 
-      // Get fresh quote to validate
-      const freshQuote = await getProtectionQuote(
-        body.holdingId,
-        body.coveragePct,
-        body.durationDays,
-        userId
-      );
+      // Validate the provided quoteId exists, belongs to user, and is not expired
+      const cachedQuote = getAndValidateCachedQuote(body.quoteId, userId);
 
-      // Validate premium hasn't changed too much
-      if (!isPremiumWithinTolerance(body.premiumIrr, freshQuote.premiumIrr)) {
-        throw new AppError('VALIDATION_ERROR', 'Premium has changed, please refresh quote', 400, {
-          quotedPremium: body.premiumIrr,
-          currentPremium: freshQuote.premiumIrr,
+      // Verify the quote parameters match what was requested
+      if (cachedQuote.holdingId !== body.holdingId) {
+        throw new AppError('VALIDATION_ERROR', 'Quote holding does not match request', 400, {
+          quoteHoldingId: cachedQuote.holdingId,
+          requestHoldingId: body.holdingId,
         });
       }
+
+      if (Math.abs(cachedQuote.coveragePct - body.coveragePct) > 0.001) {
+        throw new AppError('VALIDATION_ERROR', 'Quote coverage does not match request', 400, {
+          quoteCoveragePct: cachedQuote.coveragePct,
+          requestCoveragePct: body.coveragePct,
+        });
+      }
+
+      if (cachedQuote.durationDays !== body.durationDays) {
+        throw new AppError('VALIDATION_ERROR', 'Quote duration does not match request', 400, {
+          quoteDurationDays: cachedQuote.durationDays,
+          requestDurationDays: body.durationDays,
+        });
+      }
+
+      // Validate premium matches (within tolerance for minor display rounding)
+      if (!isPremiumWithinTolerance(body.premiumIrr, cachedQuote.premiumIrr)) {
+        throw new AppError('VALIDATION_ERROR', 'Premium does not match quote', 400, {
+          quotedPremium: cachedQuote.premiumIrr,
+          providedPremium: body.premiumIrr,
+        });
+      }
+
+      // Use the validated cached quote for the purchase
+      const freshQuote = cachedQuote;
 
       // Get portfolio and verify cash balance
       const portfolio = await prisma.portfolio.findUnique({
@@ -366,6 +388,9 @@ export const protectionRoutes: FastifyPluginAsync = async (app: FastifyInstance)
 
         return newProtection;
       });
+
+      // Consume the quote to prevent reuse
+      consumeQuote(body.quoteId);
 
       return {
         protection: {

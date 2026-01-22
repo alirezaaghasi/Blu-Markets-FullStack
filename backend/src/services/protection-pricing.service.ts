@@ -21,6 +21,7 @@ import {
   type VolatilityRegime,
 } from './volatility.service.js';
 import { getCurrentPrices } from './price-fetcher.service.js';
+import { AppError } from '../middleware/error-handler.js';
 import type { AssetId, Layer } from '../types/domain.js';
 
 // ============================================================================
@@ -93,6 +94,76 @@ const MAX_PREMIUM_30D: Record<string, number> = {
   KAG: 0.035, // 3.5%
   QQQ: 0.04, // 4%
 };
+
+// ============================================================================
+// QUOTE CACHE (In-memory for MVP, consider Redis for production)
+// ============================================================================
+
+interface CachedQuote {
+  quote: ProtectionQuote;
+  userId: string;
+  createdAt: Date;
+}
+
+/** In-memory quote cache with TTL */
+const quoteCache = new Map<string, CachedQuote>();
+
+/** Clean up expired quotes periodically */
+function cleanupExpiredQuotes(): void {
+  const now = new Date();
+  for (const [quoteId, cached] of quoteCache.entries()) {
+    if (now > cached.quote.validUntil) {
+      quoteCache.delete(quoteId);
+    }
+  }
+}
+
+// Run cleanup every minute
+setInterval(cleanupExpiredQuotes, 60_000);
+
+/**
+ * Store a quote in the cache
+ */
+function cacheQuote(quote: ProtectionQuote, userId: string): void {
+  quoteCache.set(quote.quoteId, {
+    quote,
+    userId,
+    createdAt: new Date(),
+  });
+}
+
+/**
+ * Retrieve and validate a cached quote
+ * @throws AppError if quote not found, expired, or belongs to different user
+ */
+export function getAndValidateCachedQuote(quoteId: string, userId: string): ProtectionQuote {
+  const cached = quoteCache.get(quoteId);
+
+  if (!cached) {
+    throw new AppError('QUOTE_NOT_FOUND', 'Quote not found or already used', 404, { quoteId });
+  }
+
+  if (cached.userId !== userId) {
+    throw new AppError('UNAUTHORIZED', 'Quote does not belong to user', 401);
+  }
+
+  if (!isQuoteValid(cached.quote)) {
+    quoteCache.delete(quoteId); // Clean up expired quote
+    throw new AppError('QUOTE_EXPIRED', 'Quote has expired, please request a new quote', 410, {
+      quoteId,
+      expiredAt: cached.quote.validUntil.toISOString(),
+    });
+  }
+
+  return cached.quote;
+}
+
+/**
+ * Consume a quote (remove from cache after successful purchase)
+ */
+export function consumeQuote(quoteId: string): void {
+  quoteCache.delete(quoteId);
+}
 
 // ============================================================================
 // TYPES
@@ -179,12 +250,22 @@ export async function getProtectionQuote(
 ): Promise<ProtectionQuote> {
   // Validate coverage
   if (coveragePct < MIN_COVERAGE_PCT || coveragePct > MAX_COVERAGE_PCT) {
-    throw new Error(`Coverage must be between ${MIN_COVERAGE_PCT * 100}% and ${MAX_COVERAGE_PCT * 100}%`);
+    throw new AppError(
+      'VALIDATION_ERROR',
+      `Coverage must be between ${MIN_COVERAGE_PCT * 100}% and ${MAX_COVERAGE_PCT * 100}%`,
+      400,
+      { min: MIN_COVERAGE_PCT, max: MAX_COVERAGE_PCT, provided: coveragePct }
+    );
   }
 
   // Validate duration
   if (!DURATION_PRESETS.includes(durationDays as DurationDays)) {
-    throw new Error(`Duration must be one of: ${DURATION_PRESETS.join(', ')} days`);
+    throw new AppError(
+      'VALIDATION_ERROR',
+      `Duration must be one of: ${DURATION_PRESETS.join(', ')} days`,
+      400,
+      { validDurations: DURATION_PRESETS, provided: durationDays }
+    );
   }
 
   // Get holding with portfolio
@@ -200,18 +281,23 @@ export async function getProtectionQuote(
   });
 
   if (!holding) {
-    throw new Error('Holding not found');
+    throw new AppError('NOT_FOUND', 'Holding not found', 404, { holdingId });
   }
 
   if (holding.portfolio.userId !== userId) {
-    throw new Error('Holding does not belong to user');
+    throw new AppError('UNAUTHORIZED', 'Holding does not belong to user', 401);
   }
 
   const assetId = holding.assetId as AssetId;
 
   // Check if asset is eligible
   if (!PROTECTION_ELIGIBLE_ASSETS.includes(assetId)) {
-    throw new Error(`Asset ${assetId} is not eligible for protection`);
+    throw new AppError(
+      'VALIDATION_ERROR',
+      `Asset ${assetId} is not eligible for protection`,
+      400,
+      { assetId, eligibleAssets: PROTECTION_ELIGIBLE_ASSETS }
+    );
   }
 
   // Check if already protected
@@ -219,7 +305,12 @@ export async function getProtectionQuote(
     (p) => p.holdingId === holdingId && p.status === 'ACTIVE'
   );
   if (existingProtection) {
-    throw new Error('This holding already has active protection');
+    throw new AppError(
+      'CONFLICT',
+      'This holding already has active protection',
+      409,
+      { existingProtectionId: existingProtection.id }
+    );
   }
 
   // Get current price
@@ -227,7 +318,12 @@ export async function getProtectionQuote(
   const priceData = prices.get(assetId);
 
   if (!priceData) {
-    throw new Error(`No price data available for ${assetId}`);
+    throw new AppError(
+      'SERVICE_UNAVAILABLE',
+      `No price data available for ${assetId}`,
+      503,
+      { assetId }
+    );
   }
 
   const spotPriceUsd = priceData.priceUsd;
@@ -242,7 +338,12 @@ export async function getProtectionQuote(
 
   // Validate minimum notional
   if (notionalIrr < MIN_NOTIONAL_IRR) {
-    throw new Error(`Minimum protected value is ${MIN_NOTIONAL_IRR.toLocaleString()} IRR`);
+    throw new AppError(
+      'VALIDATION_ERROR',
+      `Minimum protected value is ${MIN_NOTIONAL_IRR.toLocaleString()} IRR`,
+      400,
+      { minNotionalIrr: MIN_NOTIONAL_IRR, providedNotionalIrr: notionalIrr }
+    );
   }
 
   // Calculate strike (ATM for MVP)
@@ -318,6 +419,9 @@ export async function getProtectionQuote(
     quotedAt: now,
     validUntil: new Date(now.getTime() + QUOTE_VALIDITY_MS),
   };
+
+  // Cache the quote for later validation during purchase
+  cacheQuote(quote, userId);
 
   return quote;
 }
