@@ -95,7 +95,7 @@ export const onboardingRoutes: FastifyPluginAsync = async (app: FastifyInstance)
         type: 'object',
         required: ['amountIrr'],
         properties: {
-          amountIrr: { type: 'number', minimum: 10000000 },
+          amountIrr: { type: 'number', minimum: 1000000 },  // Per PRD Section 13.2
         },
       },
       response: {

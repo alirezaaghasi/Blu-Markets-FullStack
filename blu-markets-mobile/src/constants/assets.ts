@@ -13,7 +13,7 @@ export const ASSETS: Record<AssetId, AssetConfig> = {
     volatility: 0.01,
     layerWeight: 0.40,
     liquidity: 1.00,
-    protectionEligible: true,
+    protectionEligible: false, // Foundation assets not protection-eligible per PRD
     ltv: 0.90,
     coinGeckoId: 'tether',
   },
@@ -25,7 +25,7 @@ export const ASSETS: Record<AssetId, AssetConfig> = {
     volatility: 0.12,
     layerWeight: 0.30,
     liquidity: 0.85,
-    protectionEligible: true,
+    protectionEligible: true, // Gold has liquid COMEX derivatives market
     ltv: 0.70,
     coinGeckoId: 'pax-gold',
   },
@@ -74,7 +74,7 @@ export const ASSETS: Record<AssetId, AssetConfig> = {
     volatility: 0.50,
     layerWeight: 0.15,
     liquidity: 0.90,
-    protectionEligible: true,
+    protectionEligible: false, // Not protection-eligible per PRD
     ltv: 0.50,
     coinGeckoId: 'binancecoin',
   },
@@ -86,7 +86,7 @@ export const ASSETS: Record<AssetId, AssetConfig> = {
     volatility: 0.60,
     layerWeight: 0.10,
     liquidity: 0.88,
-    protectionEligible: true,
+    protectionEligible: false, // Not protection-eligible per PRD
     ltv: 0.45,
     coinGeckoId: 'ripple',
   },
@@ -148,7 +148,7 @@ export const ASSETS: Record<AssetId, AssetConfig> = {
     volatility: 0.60,
     layerWeight: 0.18,
     liquidity: 0.85,
-    protectionEligible: true,
+    protectionEligible: false, // Not protection-eligible per PRD
     ltv: 0.35,
     coinGeckoId: 'chainlink',
   },
@@ -160,7 +160,7 @@ export const ASSETS: Record<AssetId, AssetConfig> = {
     volatility: 0.70,
     layerWeight: 0.16,
     liquidity: 0.82,
-    protectionEligible: true,
+    protectionEligible: false, // Not protection-eligible per PRD
     ltv: 0.30,
     coinGeckoId: 'avalanche-2',
   },

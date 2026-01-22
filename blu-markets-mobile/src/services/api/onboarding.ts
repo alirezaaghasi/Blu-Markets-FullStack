@@ -8,6 +8,7 @@ interface QuestionnaireAnswer {
   questionId: string;
   answerId: string;
   value: number;
+  flag?: string; // Pathological user flags: panic_seller, gambler, high_proportion, inexperienced
 }
 
 /**

@@ -179,20 +179,15 @@ export const PROTECTION_RATES: Record<Layer, number> = {
   UPSIDE: 0.012, // 1.2%
 };
 
-// Protection eligible assets (per PRD, synced with frontend TC-7.1.1)
-// Note: Frontend assets.ts marks these as protectionEligible: true
+// Protection eligible assets - assets with liquid derivatives markets for hedging
+// Criteria: Must have big, liquid derivatives market (futures/options)
 export const PROTECTION_ELIGIBLE_ASSETS: AssetId[] = [
-  'BTC',
-  'ETH',
-  'KAG', // Kinesis Silver
-  'QQQ',
-  'SOL',
-  'USDT', // Added to match frontend
-  'PAXG', // Added to match frontend
-  'BNB', // Added to match frontend
-  'XRP', // Added to match frontend
-  'LINK', // Added to match frontend
-  'AVAX', // Added to match frontend
+  'BTC',   // CME futures, Deribit/Binance options
+  'ETH',   // CME futures, major exchange options
+  'PAXG',  // Gold - COMEX futures/options
+  'KAG',   // Silver - COMEX futures/options
+  'QQQ',   // Nasdaq-100 options (most liquid)
+  'SOL',   // CME futures, exchange perps
 ];
 
 // ============================================================================
