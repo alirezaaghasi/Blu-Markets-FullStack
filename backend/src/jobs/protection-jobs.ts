@@ -102,8 +102,10 @@ export async function processExpiredProtections(): Promise<ExpiryResult> {
 
   for (const protection of expiredProtections) {
     try {
-      await processProtectionExpiry(protection, prices, result);
-      result.processed++;
+      const wasProcessed = await processProtectionExpiry(protection, prices, result);
+      if (wasProcessed) {
+        result.processed++;
+      }
     } catch (error) {
       console.error(`[EXPIRY] Failed to process protection ${protection.id}:`, error);
       result.errors++;
@@ -115,12 +117,13 @@ export async function processExpiredProtections(): Promise<ExpiryResult> {
 
 /**
  * Process a single protection expiry
+ * @returns true if the protection was actually settled/expired, false if skipped
  */
 async function processProtectionExpiry(
   protection: any,
   prices: Map<string, any>,
   result: ExpiryResult
-): Promise<void> {
+): Promise<boolean> {
   const assetId = protection.assetId as AssetId;
   const priceData = prices.get(assetId);
 
@@ -132,7 +135,7 @@ async function processProtectionExpiry(
         `Will retry on next scheduled run.`
     );
     result.pendingPriceData++;
-    return;
+    return false; // Not processed - will retry
   }
 
   const currentPriceUsd = priceData.priceUsd;
@@ -162,6 +165,8 @@ async function processProtectionExpiry(
       `[EXPIRY] Protection ${protection.id} expired worthless: ${assetId} above strike`
     );
   }
+
+  return true; // Successfully processed
 }
 
 /**

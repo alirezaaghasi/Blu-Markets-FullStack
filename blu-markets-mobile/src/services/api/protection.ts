@@ -75,15 +75,19 @@ export const protection = {
     // Transform backend response to frontend-expected shape
     const { quote: backendQuote, breakeven, validity } = data;
 
-    // Calculate annualized premium percentage
-    const annualizedPct = (backendQuote.premiumPct / durationDays) * 365;
+    // Guard against invalid coveragePct to prevent divide-by-zero
+    const safeCoveragePct = coveragePct > 0 ? coveragePct : (backendQuote.coveragePct || 1);
 
-    // Transform to frontend ProtectionQuote shape
+    // Calculate annualized premium percentage (guard against zero duration)
+    const safeDurationDays = durationDays > 0 ? durationDays : (backendQuote.durationDays || 30);
+    const annualizedPct = (backendQuote.premiumPct / safeDurationDays) * 365;
+
+    // Transform to frontend ProtectionQuote shape with safe defaults for optional fields
     const frontendQuote: ProtectionQuote = {
       quoteId: backendQuote.quoteId,
       assetId: backendQuote.assetId as AssetId,
-      holdingValueIrr: backendQuote.notionalIrr / coveragePct,
-      holdingValueUsd: backendQuote.notionalUsd / coveragePct,
+      holdingValueIrr: backendQuote.notionalIrr / safeCoveragePct,
+      holdingValueUsd: backendQuote.notionalUsd / safeCoveragePct,
       coveragePct: backendQuote.coveragePct,
       notionalIrr: backendQuote.notionalIrr,
       notionalUsd: backendQuote.notionalUsd,
@@ -95,21 +99,21 @@ export const protection = {
       premiumPct: backendQuote.premiumPct,
       annualizedPct,
       breakeven: {
-        priceDrop: breakeven.priceDropPct,
-        priceUsd: breakeven.breakEvenUsd,
+        priceDrop: breakeven?.priceDropPct ?? 0,
+        priceUsd: breakeven?.breakEvenUsd ?? 0,
       },
       greeks: {
-        delta: backendQuote.greeks.delta,
-        gamma: backendQuote.greeks.gamma,
-        vega: backendQuote.greeks.vega,
-        theta: backendQuote.greeks.theta,
+        delta: backendQuote.greeks?.delta ?? 0,
+        gamma: backendQuote.greeks?.gamma ?? 0,
+        vega: backendQuote.greeks?.vega ?? 0,
+        theta: backendQuote.greeks?.theta ?? 0,
       },
       volatility: {
-        iv: backendQuote.impliedVolatility,
-        regime: backendQuote.volatilityRegime,
+        iv: backendQuote.impliedVolatility ?? 0,
+        regime: backendQuote.volatilityRegime ?? 'NORMAL',
       },
-      expiresAt: validity.validUntil,
-      validForSeconds: validity.secondsRemaining,
+      expiresAt: validity?.validUntil ?? new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+      validForSeconds: validity?.secondsRemaining ?? 300,
     };
 
     return frontendQuote;
