@@ -75,12 +75,23 @@ export const protection = {
     // Transform backend response to frontend-expected shape
     const { quote: backendQuote, breakeven, validity } = data;
 
-    // Guard against invalid coveragePct to prevent divide-by-zero
-    const safeCoveragePct = coveragePct > 0 ? coveragePct : (backendQuote.coveragePct || 1);
+    // Use backend's validated coveragePct (may differ from requested if clamped/adjusted)
+    // Fall back to requested coveragePct only if backend didn't return one
+    const safeCoveragePct = backendQuote.coveragePct || coveragePct || 1;
 
     // Calculate annualized premium percentage (guard against zero duration)
-    const safeDurationDays = durationDays > 0 ? durationDays : (backendQuote.durationDays || 30);
+    const safeDurationDays = backendQuote.durationDays || durationDays || 30;
     const annualizedPct = (backendQuote.premiumPct / safeDurationDays) * 365;
+
+    // Determine validity - prefer validity object, then backendQuote.validUntil
+    // Only generate synthetic timestamp as last resort
+    const expiresAt = validity?.validUntil
+      ?? backendQuote.validUntil
+      ?? new Date(Date.now() + 5 * 60 * 1000).toISOString();
+
+    // Calculate seconds remaining from expiresAt if not provided
+    const validForSeconds = validity?.secondsRemaining
+      ?? Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000));
 
     // Transform to frontend ProtectionQuote shape with safe defaults for optional fields
     const frontendQuote: ProtectionQuote = {
@@ -112,8 +123,8 @@ export const protection = {
         iv: backendQuote.impliedVolatility ?? 0,
         regime: backendQuote.volatilityRegime ?? 'NORMAL',
       },
-      expiresAt: validity?.validUntil ?? new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-      validForSeconds: validity?.secondsRemaining ?? 300,
+      expiresAt,
+      validForSeconds,
     };
 
     return frontendQuote;
