@@ -1,27 +1,35 @@
 // Protections Hook
-// src/hooks/useProtections.ts
-
+// Updated to work with Black-Scholes pricing backend
 import { useState, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { protection as protectionApi } from '../services/api/index';
-import type { Protection, AssetId } from '../types';
-import type { EligibleAssetsResponse } from '../services/api/index';
+import type { Protection, ProtectableHolding, AssetId } from '../types';
 import { getErrorMessage } from '../utils/errorUtils';
 
 interface UseProtectionsResult {
   protections: Protection[];
-  eligibleAssets: EligibleAssetsResponse['assets'];
+  protectableHoldings: ProtectableHolding[];
+  durationPresets: number[];
+  coverageRange: { min: number; max: number; step: number };
   isLoading: boolean;
   isRefreshing: boolean;
   error: string | null;
   refresh: () => Promise<void>;
-  purchaseProtection: (assetId: AssetId, notionalIrr: number, durationMonths: number) => Promise<Protection | null>;
+  purchaseProtection: (params: {
+    holdingId: string;
+    coveragePct: number;
+    durationDays: number;
+    quoteId: string;
+    premiumIrr: number;
+  }) => Promise<Protection | null>;
   cancelProtection: (protectionId: string) => Promise<boolean>;
 }
 
 export function useProtections(): UseProtectionsResult {
   const [protections, setProtections] = useState<Protection[]>([]);
-  const [eligibleAssets, setEligibleAssets] = useState<EligibleAssetsResponse['assets']>([]);
+  const [protectableHoldings, setProtectableHoldings] = useState<ProtectableHolding[]>([]);
+  const [durationPresets, setDurationPresets] = useState<number[]>([7, 14, 30, 60, 90, 180]);
+  const [coverageRange, setCoverageRange] = useState({ min: 0.1, max: 1.0, step: 0.1 });
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,14 +43,21 @@ export function useProtections(): UseProtectionsResult {
       }
       setError(null);
 
-      // Fetch active protections and eligible assets in parallel
-      const [activeResponse, eligibleResponse] = await Promise.all([
+      // Fetch active protections and protectable holdings in parallel
+      const [activeProtections, holdingsResponse] = await Promise.all([
         protectionApi.getActive(),
-        protectionApi.getEligible(),
+        protectionApi.getHoldings(),
       ]);
 
-      setProtections(activeResponse?.protections || []);
-      setEligibleAssets(eligibleResponse?.assets || []);
+      setProtections(activeProtections || []);
+      setProtectableHoldings(holdingsResponse?.holdings || []);
+
+      if (holdingsResponse?.durationPresets) {
+        setDurationPresets(holdingsResponse.durationPresets);
+      }
+      if (holdingsResponse?.coverageRange) {
+        setCoverageRange(holdingsResponse.coverageRange);
+      }
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to load protections'));
     } finally {
@@ -55,18 +70,23 @@ export function useProtections(): UseProtectionsResult {
     await fetchProtections(true);
   }, [fetchProtections]);
 
-  const purchaseProtection = useCallback(async (
-    assetId: AssetId,
-    notionalIrr: number,
-    durationMonths: number
-  ): Promise<Protection | null> => {
+  const purchaseProtection = useCallback(async (params: {
+    holdingId: string;
+    coveragePct: number;
+    durationDays: number;
+    quoteId: string;
+    premiumIrr: number;
+  }): Promise<Protection | null> => {
     try {
       setError(null);
-      const newProtection = await protectionApi.purchase(assetId, notionalIrr, durationMonths);
+      const newProtection = await protectionApi.purchase({
+        ...params,
+        acknowledgedPremium: true,
+      });
       setProtections((prev) => [newProtection, ...prev]);
-      // Refresh eligible assets after purchase
-      const eligibleResponse = await protectionApi.getEligible();
-      setEligibleAssets(eligibleResponse.assets);
+      // Refresh protectable holdings after purchase
+      const holdingsResponse = await protectionApi.getHoldings();
+      setProtectableHoldings(holdingsResponse?.holdings || []);
       return newProtection;
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to purchase protection'));
@@ -79,9 +99,9 @@ export function useProtections(): UseProtectionsResult {
       setError(null);
       await protectionApi.cancel(protectionId);
       setProtections((prev) => prev.filter((p) => p.id !== protectionId));
-      // Refresh eligible assets after cancellation
-      const eligibleResponse = await protectionApi.getEligible();
-      setEligibleAssets(eligibleResponse.assets);
+      // Refresh protectable holdings after cancellation
+      const holdingsResponse = await protectionApi.getHoldings();
+      setProtectableHoldings(holdingsResponse?.holdings || []);
       return true;
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to cancel protection'));
@@ -98,7 +118,9 @@ export function useProtections(): UseProtectionsResult {
 
   return {
     protections,
-    eligibleAssets,
+    protectableHoldings,
+    durationPresets,
+    coverageRange,
     isLoading,
     isRefreshing,
     error,
@@ -108,4 +130,14 @@ export function useProtections(): UseProtectionsResult {
   };
 }
 
+// Legacy export for backwards compatibility
 export default useProtections;
+
+// Also export eligibleAssets alias for backwards compatibility
+export function useProtectionsLegacy() {
+  const result = useProtections();
+  return {
+    ...result,
+    eligibleAssets: result.protectableHoldings,
+  };
+}

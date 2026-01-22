@@ -1,6 +1,6 @@
 // Protection Bottom Sheet Component
-// Based on PRD Section 6.4 - Protection Flow
-import React, { useState, useMemo } from 'react';
+// Updated to use Black-Scholes pricing from backend API
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,92 +10,112 @@ import {
   SafeAreaView,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../constants/theme';
-import { Holding, Protection } from '../types';
-import { ASSETS, LAYER_COLORS, LAYER_NAMES } from '../constants/assets';
-import {
-  PROTECTION_PREMIUM_BY_LAYER,
-  PROTECTION_MIN_DURATION,
-  PROTECTION_MAX_DURATION,
-} from '../constants/business';
+import { ProtectableHolding, ProtectionQuote } from '../types';
+import { ASSETS, LAYER_COLORS } from '../constants/assets';
+import { PROTECTION_DURATION_PRESETS } from '../constants/business';
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
 import { addProtection, subtractCash, logAction } from '../store/slices/portfolioSlice';
+import { protection as protectionApi, formatPremiumPct, formatDuration, getRegimeColor } from '../services/api/protection';
 
 interface ProtectionSheetProps {
   visible: boolean;
   onClose: () => void;
-  holding: Holding;
+  holding: ProtectableHolding;
+  onPurchaseComplete?: () => void;
 }
-
-// Duration options in months
-const DURATION_OPTIONS = [1, 2, 3, 4, 5, 6];
 
 export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
   visible,
   onClose,
   holding,
+  onPurchaseComplete,
 }) => {
   const dispatch = useAppDispatch();
   const { cashIRR } = useAppSelector((state) => state.portfolio);
-  const { prices, fxRate } = useAppSelector((state) => state.prices);
 
-  const [durationMonths, setDurationMonths] = useState(3);
+  const [durationDays, setDurationDays] = useState(30);
+  const [coveragePct, setCoveragePct] = useState(1.0);
+  const [quote, setQuote] = useState<ProtectionQuote | null>(null);
+  const [isLoadingQuote, setIsLoadingQuote] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
 
   const asset = ASSETS[holding.assetId];
-  const priceUSD = prices[holding.assetId] || 0;
-  const holdingValueIRR = holding.quantity * priceUSD * fxRate;
 
-  // Calculate premium
-  const monthlyRate = PROTECTION_PREMIUM_BY_LAYER[asset.layer];
-  const premiumIRR = useMemo(() => {
-    return Math.round(holdingValueIRR * monthlyRate * durationMonths);
-  }, [holdingValueIRR, monthlyRate, durationMonths]);
+  // Fetch quote when parameters change
+  const fetchQuote = useCallback(async () => {
+    if (!holding.holdingId) return;
+
+    setIsLoadingQuote(true);
+    setQuoteError(null);
+
+    try {
+      const newQuote = await protectionApi.getQuote(
+        holding.holdingId,
+        coveragePct,
+        durationDays
+      );
+      setQuote(newQuote);
+    } catch (err: any) {
+      setQuoteError(err?.message || 'Failed to get quote');
+      setQuote(null);
+    } finally {
+      setIsLoadingQuote(false);
+    }
+  }, [holding.holdingId, coveragePct, durationDays]);
+
+  // Fetch quote on mount and when params change
+  useEffect(() => {
+    if (visible) {
+      fetchQuote();
+    }
+  }, [visible, fetchQuote]);
 
   // Validation
-  const canAfford = cashIRR >= premiumIRR;
-  const isValid = canAfford && holdingValueIRR > 0;
+  const canAfford = quote ? cashIRR >= quote.premiumIrr : false;
+  const isValid = canAfford && quote && !quoteError;
 
   // Handle confirmation
   const handleConfirm = async () => {
-    if (!isValid) return;
+    if (!isValid || !quote) return;
 
     setIsSubmitting(true);
     try {
-      const now = new Date();
-      const endDate = new Date(now);
-      endDate.setMonth(endDate.getMonth() + durationMonths);
+      const protection = await protectionApi.purchase({
+        quoteId: quote.quoteId,
+        holdingId: holding.holdingId,
+        coveragePct,
+        durationDays,
+        premiumIrr: quote.premiumIrr,
+        acknowledgedPremium: true,
+      });
 
-      const protection: Protection = {
-        id: `prot-${Date.now()}`,
-        assetId: holding.assetId,
-        notionalIRR: holdingValueIRR,
-        premiumIRR,
-        startISO: now.toISOString(),
-        endISO: endDate.toISOString(),
-        durationMonths,
-      };
-
+      // Update local state
       dispatch(addProtection(protection));
-      dispatch(subtractCash(premiumIRR));
+      dispatch(subtractCash(quote.premiumIrr));
       dispatch(
         logAction({
           type: 'PROTECT',
           boundary: 'SAFE',
-          message: `Protected ${asset.symbol} for ${durationMonths}mo`,
-          amountIRR: premiumIRR,
+          message: `Protected ${asset.symbol} for ${formatDuration(durationDays)}`,
+          amountIRR: quote.premiumIrr,
           assetId: holding.assetId,
         })
       );
 
       Alert.alert(
         'Protection Activated',
-        `Your ${asset.name} is now protected for ${durationMonths} months.`,
-        [{ text: 'OK', onPress: onClose }]
+        `Your ${asset.name} is now protected for ${formatDuration(durationDays)}.\n\nBreakeven: ${quote.breakeven?.priceDrop ? `${(quote.breakeven.priceDrop * 100).toFixed(1)}% price drop` : 'N/A'}`,
+        [{ text: 'OK', onPress: () => {
+          onClose();
+          onPurchaseComplete?.();
+        }}]
       );
-    } catch (error) {
-      Alert.alert('Error', 'Failed to activate protection. Please try again.');
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to activate protection. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -112,7 +132,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.dragIndicator} />
-          <Text style={styles.title}>Protect {asset.name}</Text>
+          <Text style={styles.title}>Protect {asset?.name || holding.assetId}</Text>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <Text style={styles.closeButtonText}>Cancel</Text>
           </TouchableOpacity>
@@ -125,23 +145,28 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
               <View
                 style={[
                   styles.assetIcon,
-                  { backgroundColor: `${LAYER_COLORS[asset.layer]}20` },
+                  { backgroundColor: `${LAYER_COLORS[asset?.layer || 'GROWTH']}20` },
                 ]}
               >
-                <Text style={styles.assetIconText}>{asset.symbol.slice(0, 2)}</Text>
+                <Text style={styles.assetIconText}>{holding.assetId.slice(0, 2)}</Text>
               </View>
               <View>
-                <Text style={styles.assetName}>{asset.name}</Text>
+                <Text style={styles.assetName}>{asset?.name || holding.assetId}</Text>
                 <Text style={styles.assetQuantity}>
-                  {holding.quantity.toFixed(6)} {asset.symbol}
+                  {holding.quantity?.toFixed(6) || '0'} {holding.assetId}
                 </Text>
               </View>
             </View>
             <View style={styles.assetValue}>
               <Text style={styles.assetValueLabel}>Value to Protect</Text>
               <Text style={styles.assetValueAmount}>
-                {holdingValueIRR.toLocaleString()} IRR
+                {(holding.valueIrr || 0).toLocaleString()} IRR
               </Text>
+              {holding.valueUsd && (
+                <Text style={styles.assetValueUsd}>
+                  ${holding.valueUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })} USD
+                </Text>
+              )}
             </View>
           </View>
 
@@ -149,47 +174,153 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Coverage Duration</Text>
             <View style={styles.durationOptions}>
-              {DURATION_OPTIONS.map((months) => (
+              {PROTECTION_DURATION_PRESETS.map((days) => (
                 <TouchableOpacity
-                  key={months}
+                  key={days}
                   style={[
                     styles.durationChip,
-                    durationMonths === months && styles.durationChipActive,
+                    durationDays === days && styles.durationChipActive,
                   ]}
-                  onPress={() => setDurationMonths(months)}
+                  onPress={() => setDurationDays(days)}
                 >
                   <Text
                     style={[
                       styles.durationChipText,
-                      durationMonths === months && styles.durationChipTextActive,
+                      durationDays === days && styles.durationChipTextActive,
                     ]}
                   >
-                    {months}m
+                    {formatDuration(days)}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
 
-          {/* Premium Calculation */}
-          <View style={styles.premiumCard}>
-            <View style={styles.premiumRow}>
-              <Text style={styles.premiumLabel}>Monthly Rate</Text>
-              <Text style={styles.premiumValue}>
-                {(monthlyRate * 100).toFixed(1)}%
-              </Text>
-            </View>
-            <View style={styles.premiumRow}>
-              <Text style={styles.premiumLabel}>Duration</Text>
-              <Text style={styles.premiumValue}>{durationMonths} months</Text>
-            </View>
-            <View style={[styles.premiumRow, styles.premiumRowTotal]}>
-              <Text style={styles.premiumTotalLabel}>Total Premium</Text>
-              <Text style={styles.premiumTotalValue}>
-                {premiumIRR.toLocaleString()} IRR
-              </Text>
+          {/* Coverage Selection */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Coverage Amount</Text>
+            <View style={styles.coverageOptions}>
+              {[0.25, 0.5, 0.75, 1.0].map((pct) => (
+                <TouchableOpacity
+                  key={pct}
+                  style={[
+                    styles.coverageChip,
+                    coveragePct === pct && styles.coverageChipActive,
+                  ]}
+                  onPress={() => setCoveragePct(pct)}
+                >
+                  <Text
+                    style={[
+                      styles.coverageChipText,
+                      coveragePct === pct && styles.coverageChipTextActive,
+                    ]}
+                  >
+                    {pct * 100}%
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
+
+          {/* Quote Loading */}
+          {isLoadingQuote && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator color={colors.primary} />
+              <Text style={styles.loadingText}>Getting quote...</Text>
+            </View>
+          )}
+
+          {/* Quote Error */}
+          {quoteError && (
+            <View style={styles.errorBanner}>
+              <Text style={styles.errorText}>{quoteError}</Text>
+              <TouchableOpacity onPress={fetchQuote}>
+                <Text style={styles.retryText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Quote Details */}
+          {quote && !isLoadingQuote && (
+            <>
+              {/* Premium Calculation */}
+              <View style={styles.premiumCard}>
+                <View style={styles.premiumRow}>
+                  <Text style={styles.premiumLabel}>Premium Rate</Text>
+                  <Text style={styles.premiumValue}>
+                    {formatPremiumPct(quote.premiumPct || 0)}
+                  </Text>
+                </View>
+                <View style={styles.premiumRow}>
+                  <Text style={styles.premiumLabel}>Covered Amount</Text>
+                  <Text style={styles.premiumValue}>
+                    {(quote.notionalIrr || 0).toLocaleString()} IRR
+                  </Text>
+                </View>
+                <View style={styles.premiumRow}>
+                  <Text style={styles.premiumLabel}>Strike Price</Text>
+                  <Text style={styles.premiumValue}>
+                    ${quote.strikeUsd?.toLocaleString() || 'N/A'}
+                  </Text>
+                </View>
+                <View style={[styles.premiumRow, styles.premiumRowTotal]}>
+                  <Text style={styles.premiumTotalLabel}>Total Premium</Text>
+                  <Text style={styles.premiumTotalValue}>
+                    {(quote.premiumIrr || 0).toLocaleString()} IRR
+                  </Text>
+                </View>
+              </View>
+
+              {/* Greeks & Volatility */}
+              {(quote.greeks || quote.volatility) && (
+                <View style={styles.greeksCard}>
+                  <Text style={styles.greeksTitle}>Option Metrics</Text>
+                  {quote.volatility && (
+                    <View style={styles.greeksRow}>
+                      <Text style={styles.greeksLabel}>Implied Volatility</Text>
+                      <View style={styles.greeksValueContainer}>
+                        <Text style={styles.greeksValue}>
+                          {((quote.volatility.iv || 0) * 100).toFixed(1)}%
+                        </Text>
+                        <View style={[styles.regimeBadge, { backgroundColor: getRegimeColor(quote.volatility.regime || 'NORMAL') }]}>
+                          <Text style={styles.regimeText}>{quote.volatility.regime}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  )}
+                  {quote.greeks && (
+                    <>
+                      <View style={styles.greeksRow}>
+                        <Text style={styles.greeksLabel}>Delta</Text>
+                        <Text style={styles.greeksValue}>{quote.greeks.delta?.toFixed(4)}</Text>
+                      </View>
+                      <View style={styles.greeksRow}>
+                        <Text style={styles.greeksLabel}>Theta (daily)</Text>
+                        <Text style={styles.greeksValue}>{quote.greeks.theta?.toFixed(4)}</Text>
+                      </View>
+                    </>
+                  )}
+                </View>
+              )}
+
+              {/* Breakeven Info */}
+              {quote.breakeven && (
+                <View style={styles.breakevenCard}>
+                  <Text style={styles.breakevenTitle}>Breakeven Analysis</Text>
+                  <Text style={styles.breakevenText}>
+                    You profit if {holding.assetId} drops more than{' '}
+                    <Text style={styles.breakevenHighlight}>
+                      {((quote.breakeven.priceDrop || 0) * 100).toFixed(1)}%
+                    </Text>{' '}
+                    from ${quote.strikeUsd?.toLocaleString()}
+                  </Text>
+                  <Text style={styles.breakevenSubtext}>
+                    Breakeven price: ${quote.breakeven.priceUsd?.toLocaleString()}
+                  </Text>
+                </View>
+              )}
+            </>
+          )}
 
           {/* Available Cash */}
           <View style={styles.cashInfo}>
@@ -197,17 +328,17 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
             <Text
               style={[
                 styles.cashValue,
-                !canAfford && styles.cashValueInsufficient,
+                quote && !canAfford && styles.cashValueInsufficient,
               ]}
             >
               {cashIRR.toLocaleString()} IRR
             </Text>
           </View>
 
-          {!canAfford && (
+          {quote && !canAfford && (
             <View style={styles.errorBanner}>
               <Text style={styles.errorText}>
-                Insufficient cash. Add {(premiumIRR - cashIRR).toLocaleString()} IRR more to afford this protection.
+                Insufficient cash. Add {((quote.premiumIrr || 0) - cashIRR).toLocaleString()} IRR more.
               </Text>
             </View>
           )}
@@ -218,25 +349,25 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
             <View style={styles.infoItem}>
               <Text style={styles.infoBullet}>•</Text>
               <Text style={styles.infoText}>
-                You pay a one-time premium of {premiumIRR.toLocaleString()} IRR
+                Premium is calculated using Black-Scholes option pricing
               </Text>
             </View>
             <View style={styles.infoItem}>
               <Text style={styles.infoBullet}>•</Text>
               <Text style={styles.infoText}>
-                If {asset.symbol} drops below today's price during coverage, you're protected
+                If {holding.assetId} drops below the strike price, you receive the difference
               </Text>
             </View>
             <View style={styles.infoItem}>
               <Text style={styles.infoBullet}>•</Text>
               <Text style={styles.infoText}>
-                Coverage ends automatically after {durationMonths} months
+                Coverage ends automatically at expiry
               </Text>
             </View>
             <View style={styles.infoItem}>
               <Text style={styles.infoBullet}>•</Text>
               <Text style={styles.infoText}>
-                You can cancel anytime, but premiums are non-refundable
+                Premium is non-refundable once purchased
               </Text>
             </View>
           </View>
@@ -247,15 +378,19 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
           <TouchableOpacity
             style={[
               styles.confirmButton,
-              (!isValid || isSubmitting) && styles.confirmButtonDisabled,
+              (!isValid || isSubmitting || isLoadingQuote) && styles.confirmButtonDisabled,
             ]}
             onPress={handleConfirm}
-            disabled={!isValid || isSubmitting}
+            disabled={!isValid || isSubmitting || isLoadingQuote}
           >
             <Text style={styles.confirmButtonText}>
               {isSubmitting
                 ? 'Processing...'
-                : `Buy Protection for ${premiumIRR.toLocaleString()} IRR`}
+                : isLoadingQuote
+                ? 'Loading...'
+                : quote
+                ? `Buy Protection for ${(quote.premiumIrr || 0).toLocaleString()} IRR`
+                : 'Get Quote First'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -354,6 +489,11 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.bold,
     color: colors.textPrimaryDark,
   },
+  assetValueUsd: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: spacing[1],
+  },
   section: {
     marginBottom: spacing[4],
   },
@@ -366,14 +506,14 @@ const styles = StyleSheet.create({
   },
   durationOptions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing[2],
   },
   durationChip: {
-    flex: 1,
     backgroundColor: colors.surfaceDark,
     borderRadius: borderRadius.full,
-    paddingVertical: spacing[3],
-    alignItems: 'center',
+    paddingVertical: spacing[2],
+    paddingHorizontal: spacing[3],
     borderWidth: 1,
     borderColor: colors.borderDark,
   },
@@ -382,12 +522,48 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   durationChipText: {
-    fontSize: typography.fontSize.base,
+    fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
     color: colors.textPrimaryDark,
   },
   durationChipTextActive: {
     color: colors.textPrimaryDark,
+  },
+  coverageOptions: {
+    flexDirection: 'row',
+    gap: spacing[2],
+  },
+  coverageChip: {
+    flex: 1,
+    backgroundColor: colors.surfaceDark,
+    borderRadius: borderRadius.full,
+    paddingVertical: spacing[3],
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.borderDark,
+  },
+  coverageChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  coverageChipText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textPrimaryDark,
+  },
+  coverageChipTextActive: {
+    color: colors.textPrimaryDark,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing[4],
+    gap: spacing[2],
+  },
+  loadingText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
   },
   premiumCard: {
     backgroundColor: colors.cardDark,
@@ -426,6 +602,77 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.bold,
     color: colors.primary,
   },
+  greeksCard: {
+    backgroundColor: colors.surfaceDark,
+    borderRadius: borderRadius.lg,
+    padding: spacing[4],
+    marginBottom: spacing[4],
+  },
+  greeksTitle: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textSecondary,
+    marginBottom: spacing[3],
+    textTransform: 'uppercase',
+  },
+  greeksRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing[1],
+  },
+  greeksLabel: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+  },
+  greeksValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+  greeksValue: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.textPrimaryDark,
+  },
+  regimeBadge: {
+    paddingHorizontal: spacing[2],
+    paddingVertical: spacing[1],
+    borderRadius: borderRadius.sm,
+  },
+  regimeText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.textPrimaryDark,
+  },
+  breakevenCard: {
+    backgroundColor: `${colors.primary}15`,
+    borderRadius: borderRadius.lg,
+    padding: spacing[4],
+    marginBottom: spacing[4],
+    borderWidth: 1,
+    borderColor: `${colors.primary}30`,
+  },
+  breakevenTitle: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.primary,
+    marginBottom: spacing[2],
+  },
+  breakevenText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textPrimaryDark,
+    lineHeight: 20,
+  },
+  breakevenHighlight: {
+    fontWeight: typography.fontWeight.bold,
+    color: colors.primary,
+  },
+  breakevenSubtext: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: spacing[2],
+  },
   cashInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -454,10 +701,20 @@ const styles = StyleSheet.create({
     marginBottom: spacing[4],
     borderWidth: 1,
     borderColor: `${colors.error}30`,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   errorText: {
     fontSize: typography.fontSize.sm,
     color: colors.error,
+    flex: 1,
+  },
+  retryText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.primary,
+    marginLeft: spacing[2],
   },
   infoCard: {
     backgroundColor: colors.surfaceDark,

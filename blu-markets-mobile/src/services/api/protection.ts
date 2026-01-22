@@ -35,30 +35,39 @@ export const DEFAULT_DURATION_DAYS = 30;
 export const protection = {
   /**
    * Get list of holdings eligible for protection
+   * Returns holdings with holdingId, valueIrr, estimatedPremiumPct, etc.
    */
-  getHoldings: async (): Promise<ProtectableHolding[]> => {
+  getHoldings: async (): Promise<ProtectableHoldingsResponse> => {
     const data = (await apiClient.get('/protection/holdings')) as unknown as ApiResponse<
       ProtectableHoldingsResponse | ProtectableHolding[]
     >;
     // Handle both array response and wrapped response
     if (Array.isArray(data)) {
-      return data;
+      return { holdings: data, durationPresets: DURATION_PRESETS as unknown as number[], coverageRange: { min: MIN_COVERAGE_PCT, max: MAX_COVERAGE_PCT, step: 0.1 }, minNotionalIrr: 10_000_000 };
     }
-    return data?.holdings || [];
+    return data as ProtectableHoldingsResponse;
   },
 
   /**
-   * Get a protection quote for an asset
+   * Alias for getHoldings - returns eligible assets for protection
+   * Used by legacy code
+   */
+  getEligible: async (): Promise<{ assets: ProtectableHolding[] }> => {
+    const response = await protection.getHoldings();
+    return { assets: response.holdings || [] };
+  },
+
+  /**
+   * Get a protection quote for a holding
+   * Uses GET with query params per backend API
    */
   getQuote: async (
-    assetId: AssetId,
+    holdingId: string,
     coveragePct: number = DEFAULT_COVERAGE_PCT,
     durationDays: number = DEFAULT_DURATION_DAYS
   ): Promise<ProtectionQuote> => {
-    const data = (await apiClient.post('/protection/quote', {
-      assetId,
-      coveragePct,
-      durationDays,
+    const data = (await apiClient.get('/protection/quote', {
+      params: { holdingId, coveragePct, durationDays },
     })) as unknown as ApiResponse<ProtectionQuoteResponse | ProtectionQuote>;
 
     // Handle both wrapped and unwrapped response
@@ -70,27 +79,35 @@ export const protection = {
 
   /**
    * Get premium curve for all duration presets
+   * Uses GET with query params per backend API
    */
   getPremiumCurve: async (
-    assetId: AssetId,
+    holdingId: string,
     coveragePct: number = DEFAULT_COVERAGE_PCT
   ): Promise<PremiumCurvePoint[]> => {
-    const data = (await apiClient.post('/protection/quote/curve', {
-      assetId,
-      coveragePct,
-    })) as unknown as ApiResponse<PremiumCurveResponse | { curve: PremiumCurvePoint[] }>;
+    const data = (await apiClient.get('/protection/quote/curve', {
+      params: { holdingId, coveragePct },
+    })) as unknown as ApiResponse<PremiumCurveResponse | { quotes: PremiumCurvePoint[] }>;
 
-    return data?.curve || [];
+    // Backend returns 'quotes' not 'curve'
+    return (data as any)?.quotes || data?.curve || [];
   },
 
   /**
    * Purchase protection using a quote
+   * Requires all fields per backend API
    */
-  purchase: async (quoteId: string, maxPremiumIrr?: number): Promise<Protection> => {
-    const data = (await apiClient.post('/protection/purchase', {
-      quoteId,
-      maxPremiumIrr,
-    })) as unknown as ApiResponse<ProtectionPurchaseResponse | Protection>;
+  purchase: async (params: {
+    quoteId: string;
+    holdingId: string;
+    coveragePct: number;
+    durationDays: number;
+    premiumIrr: number;
+    acknowledgedPremium: boolean;
+  }): Promise<Protection> => {
+    const data = (await apiClient.post('/protection/purchase', params)) as unknown as ApiResponse<
+      ProtectionPurchaseResponse | Protection
+    >;
 
     // Handle both wrapped and unwrapped response
     if ('protection' in data) {
