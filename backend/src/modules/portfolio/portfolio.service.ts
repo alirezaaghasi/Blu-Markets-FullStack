@@ -298,6 +298,53 @@ function formatIrr(amount: number): string {
   return new Intl.NumberFormat('en-US').format(amount) + ' IRR';
 }
 
+export async function getAssetHolding(
+  userId: string,
+  assetId: string
+): Promise<{
+  holding: {
+    assetId: string;
+    quantity: number;
+    frozen: boolean;
+    layer: string;
+  };
+  currentPriceUsd: number;
+  valueIrr: number;
+  changePercent24h: number;
+}> {
+  const portfolio = await prisma.portfolio.findUnique({
+    where: { userId },
+    include: { holdings: true },
+  });
+
+  if (!portfolio) {
+    throw new AppError('NOT_FOUND', 'Portfolio not found', 404);
+  }
+
+  const holding = portfolio.holdings.find((h) => h.assetId === assetId);
+  if (!holding) {
+    throw new AppError('NOT_FOUND', 'Holding not found', 404);
+  }
+
+  const prices = await getCurrentPrices();
+  const price = prices.get(assetId as AssetId);
+
+  const quantity = Number(holding.quantity);
+  const valueIrr = price ? quantity * price.priceIrr : 0;
+
+  return {
+    holding: {
+      assetId: holding.assetId,
+      quantity,
+      frozen: holding.frozen,
+      layer: holding.layer,
+    },
+    currentPriceUsd: price?.priceUsd || 0,
+    valueIrr,
+    changePercent24h: price?.change24hPct || 0,
+  };
+}
+
 // Boundary classification per PRD Section 20
 export function classifyBoundary(
   beforeStatus: PortfolioStatus,

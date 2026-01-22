@@ -124,12 +124,18 @@ export const historyRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
     },
   });
 
-  // GET /api/v1/history/activity (Activity Feed - last 50)
-  app.get('/activity', {
+  // GET /api/v1/history/activity (Activity Feed)
+  app.get<{ Querystring: { limit?: number } }>('/activity', {
     schema: {
-      description: 'Get activity feed (last 50 actions)',
+      description: 'Get activity feed',
       tags: ['History'],
       security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          limit: { type: 'number', minimum: 1, maximum: 100, default: 20 },
+        },
+      },
     },
     handler: async (request, reply) => {
       const portfolio = await prisma.portfolio.findUnique({
@@ -140,13 +146,15 @@ export const historyRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
         throw new AppError('NOT_FOUND', 'Portfolio not found', 404);
       }
 
+      const limit = request.query.limit || 20;
       const actions = await prisma.actionLog.findMany({
         where: { portfolioId: portfolio.id },
         orderBy: { createdAt: 'desc' },
-        take: 50,
+        take: limit + 1, // Fetch one extra to determine hasMore
       });
 
-      return actions.map((a) => ({
+      const hasMore = actions.length > limit;
+      const activities = actions.slice(0, limit).map((a) => ({
         id: String(a.id),
         actionType: a.actionType,
         boundary: a.boundary,
@@ -155,6 +163,67 @@ export const historyRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
         assetId: a.assetId,
         createdAt: a.createdAt.toISOString(),
       }));
+
+      return {
+        activities,
+        hasMore,
+        nextCursor: hasMore ? String(actions[limit - 1].id) : undefined,
+      };
+    },
+  });
+
+  // GET /api/v1/history/all (Paginated activity with cursor)
+  app.get<{ Querystring: { cursor?: string; limit?: number } }>('/all', {
+    schema: {
+      description: 'Get all activities with cursor-based pagination',
+      tags: ['History'],
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          cursor: { type: 'string' },
+          limit: { type: 'number', minimum: 1, maximum: 100, default: 20 },
+        },
+      },
+    },
+    handler: async (request, reply) => {
+      const portfolio = await prisma.portfolio.findUnique({
+        where: { userId: request.userId },
+      });
+
+      if (!portfolio) {
+        throw new AppError('NOT_FOUND', 'Portfolio not found', 404);
+      }
+
+      const { cursor, limit = 20 } = request.query;
+
+      const where: any = { portfolioId: portfolio.id };
+      if (cursor) {
+        where.id = { lt: BigInt(cursor) };
+      }
+
+      const actions = await prisma.actionLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit + 1,
+      });
+
+      const hasMore = actions.length > limit;
+      const activities = actions.slice(0, limit).map((a) => ({
+        id: String(a.id),
+        actionType: a.actionType,
+        boundary: a.boundary,
+        message: a.message,
+        amountIrr: a.amountIrr ? Number(a.amountIrr) : undefined,
+        assetId: a.assetId,
+        createdAt: a.createdAt.toISOString(),
+      }));
+
+      return {
+        activities,
+        hasMore,
+        nextCursor: hasMore ? String(actions[limit - 1].id) : undefined,
+      };
     },
   });
 };

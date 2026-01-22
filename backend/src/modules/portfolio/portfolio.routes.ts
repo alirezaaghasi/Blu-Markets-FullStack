@@ -6,6 +6,7 @@ import {
   getPortfolioHoldings,
   getPortfolioSnapshot,
   addFunds,
+  getAssetHolding,
 } from './portfolio.service.js';
 
 const addFundsSchema = z.object({
@@ -90,6 +91,44 @@ export const portfolioRoutes: FastifyPluginAsync = async (app: FastifyInstance) 
     },
     handler: async (request, reply) => {
       return getPortfolioHoldings(request.userId);
+    },
+  });
+
+  // GET /api/v1/portfolio/asset/:assetId
+  app.get<{ Params: { assetId: string } }>('/asset/:assetId', {
+    schema: {
+      description: 'Get specific asset holding details',
+      tags: ['Portfolio'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['assetId'],
+        properties: {
+          assetId: { type: 'string' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            holding: {
+              type: 'object',
+              properties: {
+                assetId: { type: 'string' },
+                quantity: { type: 'number' },
+                frozen: { type: 'boolean' },
+                layer: { type: 'string' },
+              },
+            },
+            currentPriceUsd: { type: 'number' },
+            valueIrr: { type: 'number' },
+            changePercent24h: { type: 'number' },
+          },
+        },
+      },
+    },
+    handler: async (request, reply) => {
+      return getAssetHolding(request.userId, request.params.assetId);
     },
   });
 

@@ -6,6 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { loans as loansApi } from '../services/api/index';
 import type { Loan } from '../types';
 import type { LoanCapacityResponse } from '../services/api/index';
+import { getErrorMessage } from '../utils/errorUtils';
 
 interface UseLoansResult {
   loans: Loan[];
@@ -14,7 +15,7 @@ interface UseLoansResult {
   isRefreshing: boolean;
   error: string | null;
   refresh: () => Promise<void>;
-  createLoan: (amountIrr: number, termMonths: 3 | 6) => Promise<Loan | null>;
+  createLoan: (collateralAssetId: string, amountIrr: number, termMonths: 3 | 6) => Promise<Loan | null>;
   repayLoan: (loanId: string, amountIrr: number) => Promise<boolean>;
 }
 
@@ -43,7 +44,7 @@ export function useLoans(): UseLoansResult {
       setLoans(loansResponse?.loans || []);
       setCapacity(capacityResponse);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load loans');
+      setError(getErrorMessage(err, 'Failed to load loans'));
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -54,17 +55,17 @@ export function useLoans(): UseLoansResult {
     await fetchLoans(true);
   }, [fetchLoans]);
 
-  const createLoan = useCallback(async (amountIrr: number, termMonths: 3 | 6): Promise<Loan | null> => {
+  const createLoan = useCallback(async (collateralAssetId: string, amountIrr: number, termMonths: 3 | 6): Promise<Loan | null> => {
     try {
       setError(null);
-      const newLoan = await loansApi.create(amountIrr, termMonths);
+      const newLoan = await loansApi.create(collateralAssetId, amountIrr, termMonths);
       setLoans((prev) => [newLoan, ...prev]);
       // Refresh capacity after creating loan
       const newCapacity = await loansApi.getCapacity();
       setCapacity(newCapacity);
       return newLoan;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create loan');
+      setError(getErrorMessage(err, 'Failed to create loan'));
       return null;
     }
   }, []);
@@ -77,7 +78,7 @@ export function useLoans(): UseLoansResult {
       await fetchLoans(true);
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to repay loan');
+      setError(getErrorMessage(err, 'Failed to repay loan'));
       return false;
     }
   }, [fetchLoans]);

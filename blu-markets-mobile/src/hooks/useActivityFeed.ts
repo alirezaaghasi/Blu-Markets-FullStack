@@ -5,6 +5,7 @@ import { useState, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { activity } from '../services/api/index';
 import type { ActionLogEntry } from '../types';
+import { getErrorMessage } from '../utils/errorUtils';
 
 interface UseActivityFeedResult {
   activities: ActionLogEntry[];
@@ -38,7 +39,7 @@ export function useActivityFeed(initialLimit = 10): UseActivityFeedResult {
       setHasMore(response?.hasMore || false);
       setCursor(response?.nextCursor);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load activities');
+      setError(getErrorMessage(err, 'Failed to load activities'));
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -54,7 +55,7 @@ export function useActivityFeed(initialLimit = 10): UseActivityFeedResult {
       setHasMore(response.hasMore);
       setCursor(response.nextCursor);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load more activities');
+      setError(getErrorMessage(err, 'Failed to load more activities'));
     }
   }, [hasMore, isLoading, cursor]);
 

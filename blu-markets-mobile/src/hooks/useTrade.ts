@@ -5,6 +5,7 @@ import { useState, useCallback } from 'react';
 import { trade as tradeApi } from '../services/api/index';
 import type { AssetId, TradePreview } from '../types';
 import type { TradeExecuteResponse } from '../services/api/index';
+import { getErrorMessage } from '../utils/errorUtils';
 
 interface UseTradeResult {
   preview: TradePreview | null;
@@ -36,7 +37,7 @@ export function useTrade(): UseTradeResult {
       setPreview(response);
       return response;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to get trade preview');
+      setError(getErrorMessage(err, 'Failed to get trade preview'));
       return null;
     } finally {
       setIsLoadingPreview(false);
@@ -57,7 +58,7 @@ export function useTrade(): UseTradeResult {
       setPreview(null);
       return response;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to execute trade');
+      setError(getErrorMessage(err, 'Failed to execute trade'));
       return null;
     } finally {
       setIsExecuting(false);

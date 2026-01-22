@@ -5,6 +5,7 @@ import { useState, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { portfolio as portfolioApi } from '../services/api/index';
 import type { PortfolioResponse } from '../services/api/index';
+import { getErrorMessage } from '../utils/errorUtils';
 
 interface UsePortfolioResult {
   portfolio: PortfolioResponse | null;
@@ -34,7 +35,7 @@ export function usePortfolio(): UsePortfolioResult {
       setPortfolio(response);
       return response;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load portfolio');
+      setError(getErrorMessage(err, 'Failed to load portfolio'));
       return null;
     } finally {
       setIsLoading(false);
@@ -53,7 +54,7 @@ export function usePortfolio(): UsePortfolioResult {
       setPortfolio(response);
       return response;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add funds');
+      setError(getErrorMessage(err, 'Failed to add funds'));
       return null;
     }
   }, []);

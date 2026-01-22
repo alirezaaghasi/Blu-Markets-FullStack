@@ -6,6 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { protection as protectionApi } from '../services/api/index';
 import type { Protection, AssetId } from '../types';
 import type { EligibleAssetsResponse } from '../services/api/index';
+import { getErrorMessage } from '../utils/errorUtils';
 
 interface UseProtectionsResult {
   protections: Protection[];
@@ -14,7 +15,7 @@ interface UseProtectionsResult {
   isRefreshing: boolean;
   error: string | null;
   refresh: () => Promise<void>;
-  purchaseProtection: (assetId: AssetId, durationMonths: number) => Promise<Protection | null>;
+  purchaseProtection: (assetId: AssetId, notionalIrr: number, durationMonths: number) => Promise<Protection | null>;
   cancelProtection: (protectionId: string) => Promise<boolean>;
 }
 
@@ -43,7 +44,7 @@ export function useProtections(): UseProtectionsResult {
       setProtections(activeResponse?.protections || []);
       setEligibleAssets(eligibleResponse?.assets || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load protections');
+      setError(getErrorMessage(err, 'Failed to load protections'));
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -56,18 +57,19 @@ export function useProtections(): UseProtectionsResult {
 
   const purchaseProtection = useCallback(async (
     assetId: AssetId,
+    notionalIrr: number,
     durationMonths: number
   ): Promise<Protection | null> => {
     try {
       setError(null);
-      const newProtection = await protectionApi.purchase(assetId, durationMonths);
+      const newProtection = await protectionApi.purchase(assetId, notionalIrr, durationMonths);
       setProtections((prev) => [newProtection, ...prev]);
       // Refresh eligible assets after purchase
       const eligibleResponse = await protectionApi.getEligible();
       setEligibleAssets(eligibleResponse.assets);
       return newProtection;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to purchase protection');
+      setError(getErrorMessage(err, 'Failed to purchase protection'));
       return null;
     }
   }, []);
@@ -82,7 +84,7 @@ export function useProtections(): UseProtectionsResult {
       setEligibleAssets(eligibleResponse.assets);
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to cancel protection');
+      setError(getErrorMessage(err, 'Failed to cancel protection'));
       return false;
     }
   }, []);
