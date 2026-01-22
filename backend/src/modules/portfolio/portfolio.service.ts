@@ -12,7 +12,7 @@ import type {
 } from '../../types/domain.js';
 import type { PortfolioSummary, HoldingResponse } from '../../types/api.js';
 
-// Asset layer mapping per PRD
+// Asset layer mapping per PRD (synced with frontend assets.ts)
 const ASSET_LAYERS: Record<AssetId, Layer> = {
   USDT: 'FOUNDATION',
   PAXG: 'FOUNDATION',
@@ -21,7 +21,7 @@ const ASSET_LAYERS: Record<AssetId, Layer> = {
   ETH: 'GROWTH',
   BNB: 'GROWTH',
   XRP: 'GROWTH',
-  GOLD: 'GROWTH',
+  KAG: 'GROWTH', // Kinesis Silver
   QQQ: 'GROWTH',
   SOL: 'UPSIDE',
   TON: 'UPSIDE',
@@ -39,7 +39,7 @@ const ASSET_NAMES: Record<AssetId, string> = {
   ETH: 'Ethereum',
   BNB: 'BNB',
   XRP: 'XRP',
-  GOLD: 'Gold',
+  KAG: 'Kinesis Silver',
   QQQ: 'Invesco QQQ',
   SOL: 'Solana',
   TON: 'Toncoin',

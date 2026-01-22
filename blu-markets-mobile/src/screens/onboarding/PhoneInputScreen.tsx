@@ -45,13 +45,31 @@ const PhoneInputScreen: React.FC<PhoneInputScreenProps> = ({ navigation }) => {
     setError('');
   };
 
+  // Normalize phone number to 10-digit format (without leading 0)
+  const normalizePhone = (input: string): string => {
+    const cleaned = input.replace(/\D/g, '');
+    // Handle various Iranian phone formats:
+    // 09123456789 (11 digits) -> 9123456789
+    // 9123456789 (10 digits) -> 9123456789
+    // 989123456789 (12 digits with 98 prefix) -> 9123456789
+    // +989123456789 (already handled by replace above)
+    if (cleaned.length === 11 && cleaned.startsWith('0')) {
+      return cleaned.slice(1); // Remove leading 0
+    }
+    if (cleaned.length === 12 && cleaned.startsWith('98')) {
+      return cleaned.slice(2); // Remove 98 prefix
+    }
+    return cleaned;
+  };
+
   const validatePhone = (): boolean => {
-    if (phoneNumber.length !== 10) {
-      setError('Please enter a valid 10-digit phone number');
+    const normalized = normalizePhone(phoneNumber);
+    if (normalized.length !== 10) {
+      setError('Please enter a valid Iranian phone number (e.g., 09123456789)');
       return false;
     }
-    if (!phoneNumber.startsWith('9')) {
-      setError('Phone number must start with 9');
+    if (!normalized.startsWith('9')) {
+      setError('Phone number must start with 9 (e.g., 09123456789)');
       return false;
     }
     return true;
@@ -60,7 +78,9 @@ const PhoneInputScreen: React.FC<PhoneInputScreenProps> = ({ navigation }) => {
   const handleContinue = async () => {
     if (!validatePhone()) return;
 
-    const fullPhone = `${IRAN_PHONE_PREFIX}${phoneNumber.slice(1)}`;
+    // Normalize the phone number before sending
+    const normalized = normalizePhone(phoneNumber);
+    const fullPhone = `${IRAN_PHONE_PREFIX}${normalized.slice(1)}`; // +989XXXXXXXXX
     setIsLoading(true);
     setError('');
 
@@ -76,7 +96,9 @@ const PhoneInputScreen: React.FC<PhoneInputScreenProps> = ({ navigation }) => {
     }
   };
 
-  const isValid = phoneNumber.length === 10 && phoneNumber.startsWith('9');
+  // Check if phone is valid (after normalization)
+  const normalizedForCheck = normalizePhone(phoneNumber);
+  const isValid = normalizedForCheck.length === 10 && normalizedForCheck.startsWith('9');
 
   return (
     <SafeAreaView style={styles.container}>
@@ -110,7 +132,7 @@ const PhoneInputScreen: React.FC<PhoneInputScreenProps> = ({ navigation }) => {
             variant="phone"
             value={phoneNumber}
             onChangeText={handlePhoneChange}
-            placeholder="912 345 6789"
+            placeholder="09123456789"
             error={error}
             autoFocus
           />

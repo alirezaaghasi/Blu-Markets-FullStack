@@ -82,6 +82,7 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation, r
 
         // Format answers for backend API
         // Use score from options (scores are 1-10 range, satisfies backend's value >= 1 requirement)
+        // Include flag field for pathological user detection (panic_seller, gambler, etc.)
         const formattedAnswers = QUESTIONS.map((q) => {
           const optionIndex = answersFromParams[q.id] ?? 0;
           const option = q.options[optionIndex];
@@ -89,6 +90,7 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation, r
             questionId: q.id,
             answerId: `option_${optionIndex}`,
             value: option?.score ?? 1, // Use score, fallback to 1 if undefined
+            flag: option?.flag, // Include flag for pathological user detection (TC-2.1.3)
           };
         });
 

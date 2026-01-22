@@ -15,7 +15,7 @@ export type AssetId =
   | 'ETH'
   | 'BNB'
   | 'XRP'
-  | 'GOLD'
+  | 'KAG' // Kinesis Silver
   | 'QQQ'
   // Upside
   | 'SOL'
@@ -179,13 +179,20 @@ export const PROTECTION_RATES: Record<Layer, number> = {
   UPSIDE: 0.012, // 1.2%
 };
 
-// Protection eligible assets (per PRD)
+// Protection eligible assets (per PRD, synced with frontend TC-7.1.1)
+// Note: Frontend assets.ts marks these as protectionEligible: true
 export const PROTECTION_ELIGIBLE_ASSETS: AssetId[] = [
   'BTC',
   'ETH',
-  'GOLD',
+  'KAG', // Kinesis Silver
   'QQQ',
   'SOL',
+  'USDT', // Added to match frontend
+  'PAXG', // Added to match frontend
+  'BNB', // Added to match frontend
+  'XRP', // Added to match frontend
+  'LINK', // Added to match frontend
+  'AVAX', // Added to match frontend
 ];
 
 // ============================================================================

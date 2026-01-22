@@ -14,7 +14,7 @@ const assets = [
   { id: 'ETH', name: 'Ethereum', layer: 'GROWTH', layerWeight: 0.25, maxLtv: 0.50, coingeckoId: 'ethereum', protectionEligible: true, protectionRate: 0.008 },
   { id: 'BNB', name: 'BNB', layer: 'GROWTH', layerWeight: 0.10, maxLtv: 0.50, coingeckoId: 'binancecoin', protectionEligible: false },
   { id: 'XRP', name: 'XRP', layer: 'GROWTH', layerWeight: 0.10, maxLtv: 0.50, coingeckoId: 'ripple', protectionEligible: false },
-  { id: 'GOLD', name: 'Gold', layer: 'GROWTH', layerWeight: 0.15, maxLtv: 0.50, coingeckoId: 'pax-gold', protectionEligible: true, protectionRate: 0.008 },
+  { id: 'KAG', name: 'Kinesis Silver', layer: 'GROWTH', layerWeight: 0.15, maxLtv: 0.50, coingeckoId: 'kinesis-silver', protectionEligible: true, protectionRate: 0.008 },
   { id: 'QQQ', name: 'Invesco QQQ', layer: 'GROWTH', layerWeight: 0.15, maxLtv: 0.50, finnhubSymbol: 'QQQ', protectionEligible: true, protectionRate: 0.008 },
 
   // Upside Layer
@@ -64,7 +64,7 @@ async function main() {
     { assetId: 'PAXG', priceUsd: 2650, priceIrr: 1643000000 },
     { assetId: 'BNB', priceUsd: 680, priceIrr: 421600000 },
     { assetId: 'XRP', priceUsd: 2.4, priceIrr: 1488000 },
-    { assetId: 'GOLD', priceUsd: 2650, priceIrr: 1643000000 },
+    { assetId: 'KAG', priceUsd: 2650, priceIrr: 1643000000 },
     { assetId: 'QQQ', priceUsd: 520, priceIrr: 322400000 },
     { assetId: 'LINK', priceUsd: 22, priceIrr: 13640000 },
     { assetId: 'AVAX', priceUsd: 35, priceIrr: 21700000 },

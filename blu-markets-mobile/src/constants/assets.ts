@@ -92,7 +92,7 @@ export const ASSETS: Record<AssetId, AssetConfig> = {
   },
   KAG: {
     id: 'KAG',
-    name: 'Kinesis Gold',
+    name: 'Kinesis Silver',
     symbol: 'KAG',
     layer: 'GROWTH',
     volatility: 0.18,
@@ -100,7 +100,7 @@ export const ASSETS: Record<AssetId, AssetConfig> = {
     liquidity: 0.75,
     protectionEligible: true,
     ltv: 0.60,
-    coinGeckoId: 'kinesis-gold',
+    coinGeckoId: 'kinesis-silver',
   },
   QQQ: {
     id: 'QQQ',
