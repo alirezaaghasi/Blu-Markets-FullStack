@@ -6,6 +6,7 @@ import { RootStackParamList } from './types';
 import { useAppSelector } from '../hooks/useStore';
 import OnboardingNavigator from './OnboardingNavigator';
 import MainTabNavigator from './MainTabNavigator';
+import QuestionnaireScreen from '../screens/onboarding/QuestionnaireScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -18,7 +19,17 @@ export const RootNavigator: React.FC = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, animation: 'none' }}>
       {showMainApp ? (
-        <Stack.Screen name="Main" component={MainTabNavigator} />
+        <>
+          <Stack.Screen name="Main" component={MainTabNavigator} />
+          <Stack.Screen
+            name="RetakeQuiz"
+            component={QuestionnaireScreen}
+            options={{
+              presentation: 'modal',
+              animation: 'slide_from_bottom',
+            }}
+          />
+        </>
       ) : (
         <Stack.Screen name="Onboarding" component={OnboardingNavigator} />
       )}

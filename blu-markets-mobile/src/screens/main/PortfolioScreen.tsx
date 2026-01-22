@@ -1,6 +1,6 @@
 // Portfolio Screen
 // Based on CLAUDE_CODE_HANDOFF.md - Holdings by layer view
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,10 +13,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../../constants/colors';
 import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING, RADIUS } from '../../constants/spacing';
-import { useAppSelector } from '../../hooks/useStore';
+import { useAppSelector, useAppDispatch } from '../../hooks/useStore';
+import { setHoldings, updateCash, setStatus, setTargetLayerPct } from '../../store/slices/portfolioSlice';
 import { Layer, Holding } from '../../types';
 import AllocationBar from '../../components/AllocationBar';
 import HoldingCard from '../../components/HoldingCard';
+import { portfolio as portfolioApi } from '../../services/api';
 
 // Layer configuration
 const LAYER_CONFIG: Record<Layer, { name: string; color: string }> = {
@@ -30,6 +32,7 @@ const formatNumber = (num: number): string => {
 };
 
 const PortfolioScreen: React.FC = () => {
+  const dispatch = useAppDispatch();
   const [refreshing, setRefreshing] = useState(false);
   const [expandedLayers, setExpandedLayers] = useState<Record<Layer, boolean>>({
     FOUNDATION: true,
@@ -80,8 +83,25 @@ const PortfolioScreen: React.FC = () => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    // TODO: Fetch latest data
-    setTimeout(() => setRefreshing(false), 1000);
+    try {
+      const response = await portfolioApi.get();
+      // Update Redux state with fresh data from API
+      dispatch(updateCash(response.cashIrr));
+      dispatch(setStatus(response.status));
+      dispatch(setTargetLayerPct(response.targetAllocation));
+      if (response.holdings) {
+        dispatch(setHoldings(response.holdings.map((h: Holding) => ({
+          assetId: h.assetId,
+          quantity: h.quantity,
+          frozen: h.frozen,
+          layer: h.layer,
+        }))));
+      }
+    } catch (error) {
+      console.error('Failed to refresh portfolio:', error);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   return (

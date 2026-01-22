@@ -2,7 +2,7 @@
 // Based on UI Restructure Specification Section 2
 // Updated to use API hooks for backend integration
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,9 @@ import { ASSETS } from '../../constants/assets';
 import { FIXED_INCOME_UNIT_PRICE } from '../../constants/business';
 import { ActivityCard } from '../../components/ActivityCard';
 import AllocationBar from '../../components/AllocationBar';
+import { TradeBottomSheet } from '../../components/TradeBottomSheet';
+import { AddFundsSheet } from '../../components/AddFundsSheet';
+import RebalanceSheet from '../../components/RebalanceSheet';
 import { ActionLogEntry } from '../../types';
 
 // Format number with commas
@@ -92,6 +95,12 @@ const HomeScreen: React.FC = () => {
     isRefreshing,
     refresh,
   } = useActivityFeed(5);
+
+  // Bottom sheet visibility state
+  const [tradeSheetVisible, setTradeSheetVisible] = useState(false);
+  const [addFundsSheetVisible, setAddFundsSheetVisible] = useState(false);
+  const [rebalanceSheetVisible, setRebalanceSheetVisible] = useState(false);
+  const [driftAlertDismissed, setDriftAlertDismissed] = useState(false);
 
   // Keep using Redux for portfolio data (will be updated with usePortfolio in future)
   const portfolioState = useAppSelector((state) => state.portfolio);
@@ -271,7 +280,7 @@ const HomeScreen: React.FC = () => {
           )}
 
           {/* Drift Alert */}
-          {showDriftAlert && (
+          {showDriftAlert && !driftAlertDismissed && (
             <ActivityCard
               id="drift-alert"
               type="ALERT"
@@ -280,11 +289,11 @@ const HomeScreen: React.FC = () => {
               boundary={calculatedStatus === 'ATTENTION_REQUIRED' ? 'STRUCTURAL' : 'DRIFT'}
               primaryAction={{
                 label: 'Rebalance Now',
-                onPress: () => {/* Open rebalance sheet */},
+                onPress: () => setRebalanceSheetVisible(true),
               }}
               secondaryAction={{
                 label: 'Later',
-                onPress: () => {},
+                onPress: () => setDriftAlertDismissed(true),
               }}
             />
           )}
@@ -308,8 +317,8 @@ const HomeScreen: React.FC = () => {
 
         {/* Quick Actions */}
         <View style={styles.quickActionsSection}>
-          <QuickActionButton icon="➕" label="Add Funds" onPress={() => {}} />
-          <QuickActionButton icon="↔️" label="Trade" onPress={() => {}} />
+          <QuickActionButton icon="➕" label="Add Funds" onPress={() => setAddFundsSheetVisible(true)} />
+          <QuickActionButton icon="↔️" label="Trade" onPress={() => setTradeSheetVisible(true)} />
           <QuickActionButton icon="🛡️" label="Protect" onPress={() => handleDeepLinkServices('protection')} />
         </View>
 
@@ -347,6 +356,20 @@ const HomeScreen: React.FC = () => {
           ))}
         </View>
       </ScrollView>
+
+      {/* Bottom Sheets */}
+      <TradeBottomSheet
+        visible={tradeSheetVisible}
+        onClose={() => setTradeSheetVisible(false)}
+      />
+      <AddFundsSheet
+        visible={addFundsSheetVisible}
+        onClose={() => setAddFundsSheetVisible(false)}
+      />
+      <RebalanceSheet
+        visible={rebalanceSheetVisible}
+        onClose={() => setRebalanceSheetVisible(false)}
+      />
     </SafeAreaView>
   );
 };

@@ -6,6 +6,7 @@ import { NavigatorScreenParams } from '@react-navigation/native';
 export type RootStackParamList = {
   Onboarding: NavigatorScreenParams<OnboardingStackParamList>;
   Main: NavigatorScreenParams<MainTabParamList>;
+  RetakeQuiz: undefined; // Modal screen for retaking risk quiz
 };
 
 // Onboarding Stack

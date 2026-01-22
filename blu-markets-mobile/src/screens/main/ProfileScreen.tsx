@@ -11,6 +11,8 @@ import {
   Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { COLORS } from '../../constants/colors';
 import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING, RADIUS } from '../../constants/spacing';
@@ -20,9 +22,11 @@ import { resetPortfolio } from '../../store/slices/portfolioSlice';
 import { RISK_PROFILE_NAMES } from '../../constants/business';
 import { useBiometricAuth } from '../../hooks/useBiometricAuth';
 import { clearAllState } from '../../utils/storage';
+import type { RootStackParamList } from '../../navigation/types';
 
 const ProfileScreen: React.FC = () => {
   const dispatch = useAppDispatch();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { phone } = useAppSelector((state) => state.auth);
   const portfolioState = useAppSelector((state) => state.portfolio);
   const onboardingState = useAppSelector((state) => state.onboarding);
@@ -96,8 +100,7 @@ const ProfileScreen: React.FC = () => {
         {
           text: 'Continue',
           onPress: () => {
-            // TODO: Navigate to questionnaire
-            console.log('Retake quiz');
+            navigation.navigate('RetakeQuiz');
           },
         },
       ],
