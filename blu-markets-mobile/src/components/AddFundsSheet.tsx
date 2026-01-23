@@ -96,14 +96,15 @@ export const AddFundsSheet: React.FC<AddFundsSheetProps> = ({
         amountIRR,
       }));
 
-      // Show success modal
+      // Show success modal with agency-focused messaging
+      // "You decide how to invest it" reinforces user control
       setSuccessResult({
-        title: 'Funds Added!',
-        subtitle: 'Your cash balance has been updated',
+        title: 'Added to Cash Wallet',
+        subtitle: 'This amount is available as cash.\nYou decide how to invest it.',
         items: [
           { label: 'Amount Added', value: `${formatNumber(amountIRR)} IRR` },
-          { label: 'Previous Balance', value: `${formatNumber(cashIRR)} IRR` },
-          { label: 'New Balance', value: `${formatNumber(newBalance)} IRR`, highlight: true },
+          { label: 'Previous Cash', value: `${formatNumber(cashIRR)} IRR` },
+          { label: 'New Cash Balance', value: `${formatNumber(newBalance)} IRR`, highlight: true },
         ],
       });
       setShowSuccess(true);
