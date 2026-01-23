@@ -123,8 +123,15 @@ export async function fetchStockPrices(): Promise<FetchedPrice[]> {
 
   for (const [symbol, assetId] of Object.entries(FINNHUB_ASSETS)) {
     try {
+      // SECURITY: Use header authentication instead of URL parameter
+      // API keys in URLs can be logged in server access logs and browser history
       const response = await fetch(
-        `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${env.FINNHUB_API_KEY}`
+        `https://finnhub.io/api/v1/quote?symbol=${symbol}`,
+        {
+          headers: {
+            'X-Finnhub-Token': env.FINNHUB_API_KEY,
+          },
+        }
       );
 
       if (!response.ok) continue;
