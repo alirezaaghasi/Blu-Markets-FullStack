@@ -15,9 +15,11 @@ import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING, RADIUS } from '../../constants/spacing';
 import { useAppSelector, useAppDispatch } from '../../hooks/useStore';
 import { setHoldings, updateCash, setStatus, setTargetLayerPct } from '../../store/slices/portfolioSlice';
+import { fetchPrices, fetchFxRate } from '../../store/slices/pricesSlice';
 import { Layer, Holding } from '../../types';
 import AllocationBar from '../../components/AllocationBar';
 import HoldingCard from '../../components/HoldingCard';
+import { EmptyState } from '../../components/EmptyState';
 import { portfolio as portfolioApi } from '../../services/api';
 
 // Layer configuration
@@ -44,7 +46,7 @@ const PortfolioScreen: React.FC = () => {
   const holdings = portfolioState?.holdings || [];
   const cashIRR = portfolioState?.cashIRR || 0;
   const targetLayerPct = portfolioState?.targetLayerPct || { FOUNDATION: 0.5, GROWTH: 0.35, UPSIDE: 0.15 };
-  const { prices, fxRate } = useAppSelector((state) => state.prices);
+  const { prices, fxRate, change24h } = useAppSelector((state) => state.prices);
 
   // Group holdings by layer
   const holdingsByLayer: Record<Layer, Holding[]> = {
@@ -84,13 +86,19 @@ const PortfolioScreen: React.FC = () => {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      const response = await portfolioApi.get();
-      // Update Redux state with fresh data from API
-      dispatch(updateCash(response.cashIrr));
-      dispatch(setStatus(response.status));
-      dispatch(setTargetLayerPct(response.targetAllocation));
-      if (response.holdings) {
-        dispatch(setHoldings(response.holdings.map((h: Holding) => ({
+      // Fetch portfolio, prices, and FX rate in parallel
+      const [portfolioResponse] = await Promise.all([
+        portfolioApi.get(),
+        dispatch(fetchPrices()),
+        dispatch(fetchFxRate()),
+      ]);
+
+      // Update Redux state with fresh portfolio data
+      dispatch(updateCash(portfolioResponse.cashIrr));
+      dispatch(setStatus(portfolioResponse.status));
+      dispatch(setTargetLayerPct(portfolioResponse.targetAllocation));
+      if (portfolioResponse.holdings) {
+        dispatch(setHoldings(portfolioResponse.holdings.map((h: Holding) => ({
           assetId: h.assetId,
           quantity: h.quantity,
           frozen: h.frozen,
@@ -139,7 +147,13 @@ const PortfolioScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Holdings</Text>
 
-          {(['FOUNDATION', 'GROWTH', 'UPSIDE'] as Layer[]).map((layer) => {
+          {holdings.length === 0 ? (
+            <EmptyState
+              icon="pie-chart"
+              title="No Holdings Yet"
+              description="Start building your portfolio by adding funds and trading"
+            />
+          ) : (['FOUNDATION', 'GROWTH', 'UPSIDE'] as Layer[]).map((layer) => {
             const config = LAYER_CONFIG[layer];
             const layerHoldings = holdingsByLayer[layer];
             const isExpanded = expandedLayers[layer];
@@ -170,6 +184,7 @@ const PortfolioScreen: React.FC = () => {
                         holding={holding}
                         priceUSD={prices[holding.assetId] || 0}
                         fxRate={fxRate}
+                        change24h={change24h?.[holding.assetId]}
                       />
                     ))}
                   </View>

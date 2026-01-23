@@ -18,6 +18,7 @@ import { SPACING, RADIUS } from '../../constants/spacing';
 import { useProtections } from '../../hooks/useProtections';
 import { Protection, AssetId } from '../../types';
 import { ASSETS } from '../../constants/assets';
+import { EmptyState } from '../../components/EmptyState';
 
 interface ProtectionTabProps {
   protectionId?: string;
@@ -93,15 +94,20 @@ export function ProtectionTab({ protectionId }: ProtectionTabProps) {
           onProtect={(assetId) => purchaseProtection(assetId, 3)}
         />
       ) : (
-        <View style={styles.noEligible}>
-          <Text style={styles.noEligibleText}>
-            No eligible assets to protect. Add holdings to get started.
-          </Text>
-        </View>
+        <EmptyState
+          icon="shield-outline"
+          title="No Assets to Protect"
+          description="Add crypto holdings to your portfolio to enable downside protection"
+          compact
+        />
       )}
 
       {!hasProtections && eligibleAssets.length === 0 && (
-        <ProtectionEmptyState />
+        <EmptyState
+          icon="shield-outline"
+          title="Protect Your Portfolio"
+          description="Guard against downside risk while keeping your upside potential"
+        />
       )}
     </ScrollView>
   );
@@ -220,18 +226,6 @@ function EligibleAssetsGrid({
           </View>
         );
       })}
-    </View>
-  );
-}
-
-function ProtectionEmptyState() {
-  return (
-    <View style={styles.emptyState}>
-      <Text style={styles.emptyIcon}>🛡️</Text>
-      <Text style={styles.emptyTitle}>Protect Your Portfolio</Text>
-      <Text style={styles.emptySubtitle}>
-        Guard against downside risk while keeping your upside potential
-      </Text>
     </View>
   );
 }
@@ -413,39 +407,6 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: TYPOGRAPHY.fontWeight.medium,
     color: COLORS.text.inverse,
-  },
-  noEligible: {
-    backgroundColor: COLORS.background.elevated,
-    borderRadius: RADIUS.lg,
-    padding: SPACING[5],
-    alignItems: 'center',
-  },
-  noEligibleText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
-    textAlign: 'center',
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: SPACING[8],
-    marginTop: SPACING[10],
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: SPACING[4],
-  },
-  emptyTitle: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-    marginBottom: SPACING[2],
-  },
-  emptySubtitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.text.secondary,
-    textAlign: 'center',
   },
 });
 

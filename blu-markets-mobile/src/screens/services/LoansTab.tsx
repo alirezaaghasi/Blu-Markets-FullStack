@@ -17,6 +17,7 @@ import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING, RADIUS } from '../../constants/spacing';
 import { useLoans } from '../../hooks/useLoans';
 import { Loan } from '../../types';
+import { EmptyState } from '../../components/EmptyState';
 
 interface LoansTabProps {
   loanId?: string;
@@ -56,6 +57,7 @@ export function LoansTab({ loanId }: LoansTabProps) {
   }
 
   if (!hasLoans) {
+    const availableCapacity = capacity?.availableIrr || 0;
     return (
       <ScrollView
         style={styles.container}
@@ -68,9 +70,14 @@ export function LoansTab({ loanId }: LoansTabProps) {
           />
         }
       >
-        <LoansEmptyState
-          availableCapacity={capacity?.availableIrr || 0}
-          onBorrow={() => createLoan(5000000, 3)}
+        <EmptyState
+          icon="cash-outline"
+          title="No Active Loans"
+          description={availableCapacity > 0
+            ? `Borrow against your crypto holdings. Up to ${availableCapacity.toLocaleString()} IRR available.`
+            : "Borrow against your crypto holdings at competitive rates"}
+          actionLabel="Explore Borrowing"
+          onAction={() => createLoan(5000000, 3)}
         />
       </ScrollView>
     );
@@ -113,32 +120,6 @@ export function LoansTab({ loanId }: LoansTabProps) {
         />
       ))}
     </ScrollView>
-  );
-}
-
-function LoansEmptyState({
-  availableCapacity,
-  onBorrow,
-}: {
-  availableCapacity: number;
-  onBorrow: () => void;
-}) {
-  return (
-    <View style={styles.emptyState}>
-      <Text style={styles.emptyIcon}>💰</Text>
-      <Text style={styles.emptyTitle}>No Active Loans</Text>
-      <Text style={styles.emptySubtitle}>
-        Borrow against your crypto holdings at competitive rates
-      </Text>
-      {availableCapacity > 0 && (
-        <Text style={styles.emptyCapacity}>
-          Up to {availableCapacity.toLocaleString()} IRR available
-        </Text>
-      )}
-      <TouchableOpacity style={styles.emptyButton} onPress={onBorrow}>
-        <Text style={styles.emptyButtonText}>Explore Borrowing</Text>
-      </TouchableOpacity>
-    </View>
   );
 }
 
@@ -385,45 +366,6 @@ const styles = StyleSheet.create({
   },
   payButtonText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.inverse,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: SPACING[8],
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: SPACING[4],
-  },
-  emptyTitle: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-    marginBottom: SPACING[2],
-  },
-  emptySubtitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.text.secondary,
-    textAlign: 'center',
-    marginBottom: SPACING[2],
-  },
-  emptyCapacity: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.brand.primary,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
-    marginBottom: SPACING[6],
-  },
-  emptyButton: {
-    backgroundColor: COLORS.brand.primary,
-    paddingHorizontal: SPACING[6],
-    paddingVertical: SPACING[3],
-    borderRadius: RADIUS.full,
-  },
-  emptyButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.base,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
     color: COLORS.text.inverse,
   },

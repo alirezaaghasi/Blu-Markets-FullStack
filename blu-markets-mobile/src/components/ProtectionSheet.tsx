@@ -19,6 +19,7 @@ import { PROTECTION_DURATION_PRESETS } from '../constants/business';
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
 import { addProtection, subtractCash, logAction } from '../store/slices/portfolioSlice';
 import { protection as protectionApi, formatPremiumPct, formatDuration, getRegimeColor } from '../services/api/protection';
+import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
 
 interface ProtectionSheetProps {
   visible: boolean;
@@ -42,6 +43,8 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
   const [isLoadingQuote, setIsLoadingQuote] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successResult, setSuccessResult] = useState<TransactionSuccessResult | null>(null);
 
   const asset = ASSETS[holding.assetId];
 
@@ -106,19 +109,34 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
         })
       );
 
-      Alert.alert(
-        'Protection Activated',
-        `Your ${asset.name} is now protected for ${formatDuration(durationDays)}.\n\nBreakeven: ${quote.breakeven?.priceDrop ? `${(quote.breakeven.priceDrop * 100).toFixed(1)}% price drop` : 'N/A'}`,
-        [{ text: 'OK', onPress: () => {
-          onClose();
-          onPurchaseComplete?.();
-        }}]
-      );
+      // Calculate expiry date
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + durationDays);
+
+      // Show success modal
+      setSuccessResult({
+        title: 'Protection Activated!',
+        subtitle: `Your ${asset.name} is now protected`,
+        items: [
+          { label: 'Coverage', value: `${(coveragePct * 100).toFixed(0)}%` },
+          { label: 'Duration', value: formatDuration(durationDays) },
+          { label: 'Premium Paid', value: `${quote.premiumIrr.toLocaleString()} IRR` },
+          { label: 'Expires', value: expiryDate.toLocaleDateString(), highlight: true },
+        ],
+      });
+      setShowSuccess(true);
     } catch (error: any) {
       Alert.alert('Error', error?.message || 'Failed to activate protection. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSuccessClose = () => {
+    setShowSuccess(false);
+    setSuccessResult(null);
+    onClose();
+    onPurchaseComplete?.();
   };
 
   return (
@@ -395,6 +413,14 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
           </TouchableOpacity>
         </View>
       </SafeAreaView>
+
+      {/* Success Modal */}
+      <TransactionSuccessModal
+        visible={showSuccess}
+        onClose={handleSuccessClose}
+        result={successResult}
+        accentColor={colors.primary}
+      />
     </Modal>
   );
 };

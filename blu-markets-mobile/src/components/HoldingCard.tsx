@@ -11,6 +11,7 @@ interface HoldingCardProps {
   holding: Holding;
   priceUSD: number;
   fxRate: number;
+  change24h?: number;
   onPress?: () => void;
 }
 
@@ -46,6 +47,7 @@ export const HoldingCard: React.FC<HoldingCardProps> = ({
   holding,
   priceUSD,
   fxRate,
+  change24h,
   onPress,
 }) => {
   const asset = ASSETS[holding.assetId];
@@ -91,13 +93,25 @@ export const HoldingCard: React.FC<HoldingCardProps> = ({
       {/* Value */}
       <View style={styles.rightSection}>
         <Text style={styles.valueIRR}>{formatNumber(valueIRR)} IRR</Text>
-        {holding.assetId === 'IRR_FIXED_INCOME' ? (
-          <Text style={styles.valueUSD}>Fixed Income</Text>
-        ) : (
-          <Text style={styles.valueUSD}>
-            ${formatNumber(holding.quantity * priceUSD)}
-          </Text>
-        )}
+        <View style={styles.valueRow}>
+          {holding.assetId === 'IRR_FIXED_INCOME' ? (
+            <Text style={styles.valueUSD}>Fixed Income</Text>
+          ) : (
+            <Text style={styles.valueUSD}>
+              ${formatNumber(holding.quantity * priceUSD)}
+            </Text>
+          )}
+          {change24h !== undefined ? (
+            <Text style={[
+              styles.changeText,
+              change24h >= 0 ? styles.changePositive : styles.changeNegative,
+            ]}>
+              {change24h >= 0 ? '+' : ''}{change24h.toFixed(1)}%
+            </Text>
+          ) : (
+            <Text style={styles.changeNeutral}>--</Text>
+          )}
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -161,10 +175,29 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
     color: colors.textPrimaryDark,
   },
+  valueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+    gap: 8,
+  },
   valueUSD: {
     fontSize: typography.fontSize.sm,
     color: colors.textSecondary,
-    marginTop: 2,
+  },
+  changeText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+  },
+  changePositive: {
+    color: colors.success,
+  },
+  changeNegative: {
+    color: colors.error,
+  },
+  changeNeutral: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
   },
 });
 

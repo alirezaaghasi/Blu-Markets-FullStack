@@ -20,6 +20,8 @@ import {
   getQuoteSecondsRemaining,
   calculateSettlement,
   getAndValidateCachedQuote,
+  reserveQuote,
+  releaseQuote,
   consumeQuote,
   DURATION_PRESETS,
   MIN_COVERAGE_PCT,
@@ -239,175 +241,200 @@ export const protectionRoutes: FastifyPluginAsync = async (app: FastifyInstance)
       const body = purchaseSchema.parse(request.body);
       const userId = request.userId;
 
-      // Validate the provided quoteId exists, belongs to user, and is not expired
-      const cachedQuote = getAndValidateCachedQuote(body.quoteId, userId);
+      // CRITICAL: Atomically reserve the quote BEFORE starting any transaction
+      // This prevents race conditions where multiple requests use the same quote
+      const reservedQuote = reserveQuote(body.quoteId, userId);
 
-      // Verify the quote parameters match what was requested
-      if (cachedQuote.holdingId !== body.holdingId) {
-        throw new AppError('VALIDATION_ERROR', 'Quote holding does not match request', 400, {
-          quoteHoldingId: cachedQuote.holdingId,
-          requestHoldingId: body.holdingId,
-        });
-      }
+      try {
+        // Verify the quote parameters match what was requested
+        if (reservedQuote.holdingId !== body.holdingId) {
+          throw new AppError('VALIDATION_ERROR', 'Quote holding does not match request', 400, {
+            quoteHoldingId: reservedQuote.holdingId,
+            requestHoldingId: body.holdingId,
+          });
+        }
 
-      if (Math.abs(cachedQuote.coveragePct - body.coveragePct) > 0.001) {
-        throw new AppError('VALIDATION_ERROR', 'Quote coverage does not match request', 400, {
-          quoteCoveragePct: cachedQuote.coveragePct,
-          requestCoveragePct: body.coveragePct,
-        });
-      }
+        if (Math.abs(reservedQuote.coveragePct - body.coveragePct) > 0.001) {
+          throw new AppError('VALIDATION_ERROR', 'Quote coverage does not match request', 400, {
+            quoteCoveragePct: reservedQuote.coveragePct,
+            requestCoveragePct: body.coveragePct,
+          });
+        }
 
-      if (cachedQuote.durationDays !== body.durationDays) {
-        throw new AppError('VALIDATION_ERROR', 'Quote duration does not match request', 400, {
-          quoteDurationDays: cachedQuote.durationDays,
-          requestDurationDays: body.durationDays,
-        });
-      }
+        if (reservedQuote.durationDays !== body.durationDays) {
+          throw new AppError('VALIDATION_ERROR', 'Quote duration does not match request', 400, {
+            quoteDurationDays: reservedQuote.durationDays,
+            requestDurationDays: body.durationDays,
+          });
+        }
 
-      // Validate premium matches (within tolerance for minor display rounding)
-      if (!isPremiumWithinTolerance(body.premiumIrr, cachedQuote.premiumIrr)) {
-        throw new AppError('VALIDATION_ERROR', 'Premium does not match quote', 400, {
-          quotedPremium: cachedQuote.premiumIrr,
-          providedPremium: body.premiumIrr,
-        });
-      }
+        // Validate premium matches (within tolerance for minor display rounding)
+        if (!isPremiumWithinTolerance(body.premiumIrr, reservedQuote.premiumIrr)) {
+          throw new AppError('VALIDATION_ERROR', 'Premium does not match quote', 400, {
+            quotedPremium: reservedQuote.premiumIrr,
+            providedPremium: body.premiumIrr,
+          });
+        }
 
-      // Use the validated cached quote for the purchase
-      const freshQuote = cachedQuote;
+        // Use the reserved quote for the purchase
+        const freshQuote = reservedQuote;
 
-      // Get portfolio and verify cash balance
-      const portfolio = await prisma.portfolio.findUnique({
-        where: { userId },
-        include: {
-          holdings: true,
-          protections: { where: { status: 'ACTIVE' } },
-        },
-      });
-
-      if (!portfolio) {
-        throw new AppError('NOT_FOUND', 'Portfolio not found', 404);
-      }
-
-      // Verify sufficient cash
-      if (Number(portfolio.cashIrr) < freshQuote.premiumIrr) {
-        throw new AppError('INSUFFICIENT_CASH', 'Not enough cash for premium', 400, {
-          required: freshQuote.premiumIrr,
-          available: Number(portfolio.cashIrr),
-        });
-      }
-
-      // Calculate dates
-      const startDate = new Date();
-      const expiryDate = new Date(startDate);
-      expiryDate.setDate(expiryDate.getDate() + body.durationDays);
-
-      // Create protection in transaction
-      const protection = await prisma.$transaction(async (tx) => {
-        // Deduct premium from cash
-        await tx.portfolio.update({
-          where: { id: portfolio.id },
-          data: {
-            cashIrr: { decrement: freshQuote.premiumIrr },
+        // Get portfolio and verify cash balance
+        const portfolio = await prisma.portfolio.findUnique({
+          where: { userId },
+          include: {
+            holdings: true,
+            protections: { where: { status: 'ACTIVE' } },
           },
         });
 
-        // Create protection record
-        const newProtection = await tx.protection.create({
-          data: {
-            portfolioId: portfolio.id,
-            holdingId: body.holdingId,
-            assetId: freshQuote.assetId,
+        if (!portfolio) {
+          throw new AppError('NOT_FOUND', 'Portfolio not found', 404);
+        }
 
-            coveragePct: body.coveragePct,
-            notionalIrr: freshQuote.notionalIrr,
-            notionalUsd: freshQuote.notionalUsd,
+        // Verify sufficient cash
+        if (Number(portfolio.cashIrr) < freshQuote.premiumIrr) {
+          throw new AppError('INSUFFICIENT_CASH', 'Not enough cash for premium', 400, {
+            required: freshQuote.premiumIrr,
+            available: Number(portfolio.cashIrr),
+          });
+        }
 
-            strikePct: freshQuote.strikePct,
-            strikeUsd: freshQuote.strikeUsd,
-            strikeIrr: freshQuote.strikeIrr,
+        // Calculate dates
+        const startDate = new Date();
+        const expiryDate = new Date(startDate);
+        expiryDate.setDate(expiryDate.getDate() + body.durationDays);
 
-            premiumPct: freshQuote.premiumPct,
-            premiumIrr: freshQuote.premiumIrr,
-            premiumUsd: freshQuote.premiumUsd,
+        // Create protection in transaction
+        const protection = await prisma.$transaction(async (tx) => {
+          // CRITICAL: Re-check that holding doesn't already have active protection
+          // This prevents duplicate purchases from multiple cached quotes
+          const existingProtection = await tx.protection.findFirst({
+            where: {
+              holdingId: body.holdingId,
+              status: 'ACTIVE',
+            },
+          });
 
-            durationDays: body.durationDays,
-            startDate,
-            expiryDate,
+          if (existingProtection) {
+            throw new AppError(
+              'CONFLICT',
+              'This holding already has active protection',
+              409,
+              { existingProtectionId: existingProtection.id }
+            );
+          }
 
-            impliedVolatility: freshQuote.impliedVolatility,
-            quoteId: body.quoteId,
+          // Deduct premium from cash
+          await tx.portfolio.update({
+            where: { id: portfolio.id },
+            data: {
+              cashIrr: { decrement: freshQuote.premiumIrr },
+            },
+          });
 
-            hedgeType: 'NAKED', // No real hedging for MVP
-            hedgeRatio: 0,
+          // Create protection record
+          const newProtection = await tx.protection.create({
+            data: {
+              portfolioId: portfolio.id,
+              holdingId: body.holdingId,
+              assetId: freshQuote.assetId,
 
-            status: 'ACTIVE',
-          },
+              coveragePct: body.coveragePct,
+              notionalIrr: freshQuote.notionalIrr,
+              notionalUsd: freshQuote.notionalUsd,
+
+              strikePct: freshQuote.strikePct,
+              strikeUsd: freshQuote.strikeUsd,
+              strikeIrr: freshQuote.strikeIrr,
+
+              premiumPct: freshQuote.premiumPct,
+              premiumIrr: freshQuote.premiumIrr,
+              premiumUsd: freshQuote.premiumUsd,
+
+              durationDays: body.durationDays,
+              startDate,
+              expiryDate,
+
+              impliedVolatility: freshQuote.impliedVolatility,
+              quoteId: body.quoteId,
+
+              hedgeType: 'NAKED', // No real hedging for MVP
+              hedgeRatio: 0,
+
+              status: 'ACTIVE',
+            },
+          });
+
+          // Create ledger entry
+          await tx.ledgerEntry.create({
+            data: {
+              portfolioId: portfolio.id,
+              entryType: 'PROTECTION_PURCHASE',
+              beforeSnapshot: { cashIrr: Number(portfolio.cashIrr) },
+              afterSnapshot: { cashIrr: Number(portfolio.cashIrr) - freshQuote.premiumIrr },
+              amountIrr: -freshQuote.premiumIrr,
+              assetId: freshQuote.assetId,
+              protectionId: newProtection.id,
+              boundary: 'SAFE',
+              message: `Purchased ${body.durationDays}-day protection for ${freshQuote.assetId} (${(body.coveragePct * 100).toFixed(0)}% coverage)`,
+            },
+          });
+
+          // Create action log
+          await tx.actionLog.create({
+            data: {
+              portfolioId: portfolio.id,
+              actionType: 'PROTECTION_PURCHASE',
+              boundary: 'SAFE',
+              message: `${body.durationDays}D protection for ${freshQuote.assetId}`,
+              amountIrr: freshQuote.premiumIrr,
+              assetId: freshQuote.assetId,
+            },
+          });
+
+          // Create hedge log (mock)
+          await tx.hedgeLog.create({
+            data: {
+              protectionId: newProtection.id,
+              hedgeType: 'NAKED',
+              action: 'OPEN',
+              notionalUsd: freshQuote.notionalUsd,
+              hedgeRatio: 0,
+              delta: freshQuote.greeks.delta,
+              gamma: freshQuote.greeks.gamma,
+              vega: freshQuote.greeks.vega,
+              theta: freshQuote.greeks.theta,
+            },
+          });
+
+          return newProtection;
         });
 
-        // Create ledger entry
-        await tx.ledgerEntry.create({
-          data: {
-            portfolioId: portfolio.id,
-            entryType: 'PROTECTION_PURCHASE',
-            beforeSnapshot: { cashIrr: Number(portfolio.cashIrr) },
-            afterSnapshot: { cashIrr: Number(portfolio.cashIrr) - freshQuote.premiumIrr },
-            amountIrr: -freshQuote.premiumIrr,
-            assetId: freshQuote.assetId,
-            protectionId: newProtection.id,
-            boundary: 'SAFE',
-            message: `Purchased ${body.durationDays}-day protection for ${freshQuote.assetId} (${(body.coveragePct * 100).toFixed(0)}% coverage)`,
+        // SUCCESS: Consume the quote to prevent reuse
+        consumeQuote(body.quoteId);
+
+        return {
+          protection: {
+            id: protection.id,
+            assetId: protection.assetId,
+            coveragePct: Number(protection.coveragePct),
+            notionalIrr: Number(protection.notionalIrr),
+            strikeIrr: Number(protection.strikeIrr),
+            premiumIrr: Number(protection.premiumIrr),
+            premiumPct: Number(protection.premiumPct),
+            durationDays: protection.durationDays,
+            startDate: protection.startDate.toISOString(),
+            expiryDate: protection.expiryDate.toISOString(),
+            status: protection.status,
           },
-        });
-
-        // Create action log
-        await tx.actionLog.create({
-          data: {
-            portfolioId: portfolio.id,
-            actionType: 'PROTECTION_PURCHASE',
-            boundary: 'SAFE',
-            message: `${body.durationDays}D protection for ${freshQuote.assetId}`,
-            amountIrr: freshQuote.premiumIrr,
-            assetId: freshQuote.assetId,
-          },
-        });
-
-        // Create hedge log (mock)
-        await tx.hedgeLog.create({
-          data: {
-            protectionId: newProtection.id,
-            hedgeType: 'NAKED',
-            action: 'OPEN',
-            notionalUsd: freshQuote.notionalUsd,
-            hedgeRatio: 0,
-            delta: freshQuote.greeks.delta,
-            gamma: freshQuote.greeks.gamma,
-            vega: freshQuote.greeks.vega,
-            theta: freshQuote.greeks.theta,
-          },
-        });
-
-        return newProtection;
-      });
-
-      // Consume the quote to prevent reuse
-      consumeQuote(body.quoteId);
-
-      return {
-        protection: {
-          id: protection.id,
-          assetId: protection.assetId,
-          coveragePct: Number(protection.coveragePct),
-          notionalIrr: Number(protection.notionalIrr),
-          strikeIrr: Number(protection.strikeIrr),
-          premiumIrr: Number(protection.premiumIrr),
-          premiumPct: Number(protection.premiumPct),
-          durationDays: protection.durationDays,
-          startDate: protection.startDate.toISOString(),
-          expiryDate: protection.expiryDate.toISOString(),
-          status: protection.status,
-        },
-        newCashIrr: Number(portfolio.cashIrr) - freshQuote.premiumIrr,
-      };
+          newCashIrr: Number(portfolio.cashIrr) - freshQuote.premiumIrr,
+        };
+      } catch (error) {
+        // FAILURE: Release the quote so it can be used again
+        releaseQuote(body.quoteId);
+        throw error;
+      }
     },
   });
 

@@ -1,6 +1,6 @@
 // Loans Screen
 // Based on PRD Section 9.4 - Loans Tab
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,9 +8,14 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
+  RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../../constants/theme';
-import { useAppSelector } from '../../hooks/useStore';
+import { useAppSelector, useAppDispatch } from '../../hooks/useStore';
+import { setHoldings, updateCash, setStatus } from '../../store/slices/portfolioSlice';
+import { fetchPrices, fetchFxRate } from '../../store/slices/pricesSlice';
+import { portfolio as portfolioApi } from '../../services/api';
 import { Loan, Holding } from '../../types';
 import { ASSETS, LAYER_COLORS } from '../../constants/assets';
 import {
@@ -20,14 +25,45 @@ import {
 } from '../../constants/business';
 import LoanSheet from '../../components/LoanSheet';
 import RepaySheet from '../../components/RepaySheet';
+import { EmptyState } from '../../components/EmptyState';
 
 const LoansScreen: React.FC = () => {
+  const dispatch = useAppDispatch();
   const { loans, holdings, cashIRR } = useAppSelector((state) => state.portfolio);
   const { prices, fxRate } = useAppSelector((state) => state.prices);
 
   const [showLoanSheet, setShowLoanSheet] = useState(false);
   const [showRepaySheet, setShowRepaySheet] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Pull-to-refresh handler - refreshes prices to update collateral values
+  const onRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const [portfolioResponse] = await Promise.all([
+        portfolioApi.get(),
+        dispatch(fetchPrices()),
+        dispatch(fetchFxRate()),
+      ]);
+
+      // Update Redux with fresh portfolio data (holdings, cash)
+      dispatch(updateCash(portfolioResponse.cashIrr));
+      dispatch(setStatus(portfolioResponse.status));
+      if (portfolioResponse.holdings) {
+        dispatch(setHoldings(portfolioResponse.holdings.map((h: Holding) => ({
+          assetId: h.assetId,
+          quantity: h.quantity,
+          frozen: h.frozen,
+          layer: h.layer,
+        }))));
+      }
+    } catch (error) {
+      console.error('Failed to refresh loans data:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [dispatch]);
 
   // Calculate total portfolio value
   const portfolioValueIRR = useMemo(() => {
@@ -100,6 +136,13 @@ const LoansScreen: React.FC = () => {
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+          />
+        }
       >
         {/* Capacity Bar */}
         <View style={styles.capacityCard}>
@@ -240,18 +283,13 @@ const LoansScreen: React.FC = () => {
 
         {/* Empty State */}
         {loans.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>💰</Text>
-            <Text style={styles.emptyTitle}>No active loans</Text>
-            <Text style={styles.emptySubtitle}>
-              Borrow against your holdings without selling them
-            </Text>
-            {eligibleHoldings.length > 0 && (
-              <TouchableOpacity style={styles.emptyButton} onPress={handleNewLoan}>
-                <Text style={styles.emptyButtonText}>New Loan</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          <EmptyState
+            icon="cash-outline"
+            title="No Active Loans"
+            description="Borrow against your crypto holdings without selling them"
+            actionLabel={eligibleHoldings.length > 0 ? "New Loan" : undefined}
+            onAction={eligibleHoldings.length > 0 ? handleNewLoan : undefined}
+          />
         )}
 
         {/* Eligible Collateral */}

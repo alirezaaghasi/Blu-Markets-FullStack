@@ -19,6 +19,7 @@ import { ASSETS, LAYER_COLORS, LAYER_NAMES } from '../../constants/assets';
 import { PROTECTION_PREMIUM_BY_LAYER } from '../../constants/business';
 import { removeProtection } from '../../store/slices/portfolioSlice';
 import ProtectionSheet from '../../components/ProtectionSheet';
+import { EmptyState } from '../../components/EmptyState';
 import { protection as protectionApi, ProtectionsResponse, EligibleAssetsResponse } from '../../services/api';
 
 const ProtectionScreen: React.FC = () => {
@@ -316,15 +317,15 @@ const ProtectionScreen: React.FC = () => {
 
         {/* Empty State */}
         {protections.length === 0 && eligibleHoldings.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>🛡️</Text>
-            <Text style={styles.emptyTitle}>No protections yet</Text>
-            <Text style={styles.emptySubtitle}>
-              {holdings.length === 0
+          <EmptyState
+            icon="shield-outline"
+            title="No Active Protections"
+            description={
+              holdings.length === 0
                 ? 'Add assets to your portfolio to protect them'
-                : 'All your eligible assets are protected'}
-            </Text>
-          </View>
+                : 'All your eligible assets are already protected'
+            }
+          />
         )}
       </ScrollView>
       )}

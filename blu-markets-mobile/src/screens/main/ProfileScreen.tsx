@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Alert,
   Switch,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -93,19 +94,49 @@ const ProfileScreen: React.FC = () => {
 
   const handleRetakeQuiz = () => {
     Alert.alert(
-      'Retake Risk Quiz',
-      'This will update your risk profile and target allocation. Continue?',
+      'Retake Risk Assessment',
+      'This will update your investment profile. Continue?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Continue',
           onPress: () => {
-            navigation.navigate('RetakeQuiz');
+            navigation.navigate('Questionnaire', { isRetake: true });
           },
         },
       ],
       { cancelable: true }
     );
+  };
+
+  // Handler functions for settings
+  const handleLanguagePress = () => {
+    Alert.alert('Coming Soon', 'Language settings will be available in a future update.');
+  };
+
+  const handleHelpCenterPress = () => {
+    Linking.openURL('https://blumarkets.com/help').catch(() => {
+      Linking.openURL('mailto:support@blumarkets.com?subject=Help Request');
+    });
+  };
+
+  const handleContactUsPress = () => {
+    Alert.alert(
+      'Contact Us',
+      'Email: support@blumarkets.com\nPhone: +98 21 1234 5678\nTelegram: @BluMarketsSupport',
+      [
+        { text: 'Email', onPress: () => Linking.openURL('mailto:support@blumarkets.com') },
+        { text: 'Close', style: 'cancel' },
+      ]
+    );
+  };
+
+  const handleTermsPress = () => {
+    Linking.openURL('https://blumarkets.com/terms');
+  };
+
+  const handlePrivacyPress = () => {
+    Linking.openURL('https://blumarkets.com/privacy');
   };
 
   return (
@@ -172,7 +203,7 @@ const ProfileScreen: React.FC = () => {
               icon="🌐"
               title="Language"
               value="English"
-              onPress={() => {}}
+              onPress={handleLanguagePress}
             />
           </View>
         </View>
@@ -184,22 +215,22 @@ const ProfileScreen: React.FC = () => {
             <SettingItem
               icon="❓"
               title="Help Center"
-              onPress={() => {}}
+              onPress={handleHelpCenterPress}
             />
             <SettingItem
               icon="📧"
               title="Contact Us"
-              onPress={() => {}}
+              onPress={handleContactUsPress}
             />
             <SettingItem
               icon="📄"
               title="Terms of Service"
-              onPress={() => {}}
+              onPress={handleTermsPress}
             />
             <SettingItem
               icon="🔒"
               title="Privacy Policy"
-              onPress={() => {}}
+              onPress={handlePrivacyPress}
             />
           </View>
         </View>

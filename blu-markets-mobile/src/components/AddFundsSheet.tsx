@@ -16,8 +16,11 @@ import {
 import { colors, typography, spacing, borderRadius } from '../constants/theme';
 import { useAppDispatch, useAppSelector } from '../hooks/useStore';
 import { updateCash, logAction } from '../store/slices/portfolioSlice';
-import { MIN_INVESTMENT_AMOUNT } from '../constants/business';
 import { portfolio } from '../services/api';
+import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
+
+// Minimum deposit amount (100,000 IRR)
+const MIN_DEPOSIT = 100_000;
 
 interface AddFundsSheetProps {
   visible: boolean;
@@ -41,14 +44,16 @@ export const AddFundsSheet: React.FC<AddFundsSheetProps> = ({
 
   const [amountInput, setAmountInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successResult, setSuccessResult] = useState<TransactionSuccessResult | null>(null);
 
   // Parse amount
   const amountIRR = parseInt(amountInput.replace(/,/g, ''), 10) || 0;
 
   // Validation
-  const isValid = amountIRR >= MIN_INVESTMENT_AMOUNT;
-  const validationError = amountIRR > 0 && amountIRR < MIN_INVESTMENT_AMOUNT
-    ? `Minimum amount is ${MIN_INVESTMENT_AMOUNT.toLocaleString()} IRR`
+  const isValid = amountIRR >= MIN_DEPOSIT;
+  const validationError = amountIRR > 0 && amountIRR < MIN_DEPOSIT
+    ? `Minimum deposit is ${MIN_DEPOSIT.toLocaleString()} IRR`
     : null;
 
   // Format number with commas
@@ -80,9 +85,10 @@ export const AddFundsSheet: React.FC<AddFundsSheetProps> = ({
     try {
       // Call backend API
       const result = await portfolio.addFunds(amountIRR);
+      const newBalance = result.cashIrr;
 
       // Update Redux with new cash balance
-      dispatch(updateCash(result.cashIrr));
+      dispatch(updateCash(newBalance));
       dispatch(logAction({
         type: 'ADD_FUNDS',
         boundary: 'SAFE',
@@ -90,17 +96,30 @@ export const AddFundsSheet: React.FC<AddFundsSheetProps> = ({
         amountIRR,
       }));
 
-      Alert.alert(
-        'Funds Added',
-        `Successfully added ${formatNumber(amountIRR)} IRR to your portfolio.`,
-        [{ text: 'OK', onPress: onClose }]
-      );
+      // Show success modal
+      setSuccessResult({
+        title: 'Funds Added!',
+        subtitle: 'Your cash balance has been updated',
+        items: [
+          { label: 'Amount Added', value: `${formatNumber(amountIRR)} IRR` },
+          { label: 'Previous Balance', value: `${formatNumber(cashIRR)} IRR` },
+          { label: 'New Balance', value: `${formatNumber(newBalance)} IRR`, highlight: true },
+        ],
+      });
+      setShowSuccess(true);
       setAmountInput('');
     } catch (error: any) {
       Alert.alert('Error', error?.message || 'Failed to add funds. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Handle success modal close
+  const handleSuccessClose = () => {
+    setShowSuccess(false);
+    setSuccessResult(null);
+    onClose();
   };
 
   return (
@@ -208,6 +227,14 @@ export const AddFundsSheet: React.FC<AddFundsSheetProps> = ({
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
+
+      {/* Success Modal */}
+      <TransactionSuccessModal
+        visible={showSuccess}
+        onClose={handleSuccessClose}
+        result={successResult}
+        accentColor={colors.success}
+      />
     </Modal>
   );
 };

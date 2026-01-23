@@ -17,8 +17,12 @@ import { useNavigation } from '@react-navigation/native';
 import { COLORS } from '../../constants/colors';
 import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING, RADIUS } from '../../constants/spacing';
-import { useAppSelector } from '../../hooks/useStore';
+import { useAppSelector, useAppDispatch } from '../../hooks/useStore';
 import { useActivityFeed } from '../../hooks/useActivityFeed';
+import { setHoldings, updateCash, setStatus, setTargetLayerPct } from '../../store/slices/portfolioSlice';
+import { fetchPrices, fetchFxRate } from '../../store/slices/pricesSlice';
+import { portfolio as portfolioApi } from '../../services/api';
+import type { Holding } from '../../types';
 import { ASSETS } from '../../constants/assets';
 import { FIXED_INCOME_UNIT_PRICE } from '../../constants/business';
 import { ActivityCard } from '../../components/ActivityCard';
@@ -26,6 +30,7 @@ import AllocationBar from '../../components/AllocationBar';
 import { TradeBottomSheet } from '../../components/TradeBottomSheet';
 import { AddFundsSheet } from '../../components/AddFundsSheet';
 import RebalanceSheet from '../../components/RebalanceSheet';
+import { EmptyState } from '../../components/EmptyState';
 import { ActionLogEntry } from '../../types';
 
 // Format number with commas
@@ -87,13 +92,14 @@ const QuickActionButton: React.FC<{
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const dispatch = useAppDispatch();
 
   // Use activity feed hook for API data
   const {
     activities,
     isLoading: isLoadingActivities,
-    isRefreshing,
-    refresh,
+    isRefreshing: isRefreshingActivities,
+    refresh: refreshActivities,
   } = useActivityFeed(5);
 
   // Bottom sheet visibility state
@@ -101,6 +107,7 @@ const HomeScreen: React.FC = () => {
   const [addFundsSheetVisible, setAddFundsSheetVisible] = useState(false);
   const [rebalanceSheetVisible, setRebalanceSheetVisible] = useState(false);
   const [driftAlertDismissed, setDriftAlertDismissed] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Keep using Redux for portfolio data (will be updated with usePortfolio in future)
   const portfolioState = useAppSelector((state) => state.portfolio);
@@ -206,6 +213,37 @@ const HomeScreen: React.FC = () => {
   const calculatedStatus = holdingsValueIRR === 0 ? 'BALANCED' : getPortfolioStatus();
   const showDriftAlert = calculatedStatus === 'SLIGHTLY_OFF' || calculatedStatus === 'ATTENTION_REQUIRED';
 
+  // Comprehensive refresh that fetches all data
+  const onRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      // Fetch activities, portfolio, prices, and FX rate in parallel
+      const [portfolioResponse] = await Promise.all([
+        portfolioApi.get(),
+        refreshActivities(),
+        dispatch(fetchPrices()),
+        dispatch(fetchFxRate()),
+      ]);
+
+      // Update Redux state with fresh portfolio data
+      dispatch(updateCash(portfolioResponse.cashIrr));
+      dispatch(setStatus(portfolioResponse.status));
+      dispatch(setTargetLayerPct(portfolioResponse.targetAllocation));
+      if (portfolioResponse.holdings) {
+        dispatch(setHoldings(portfolioResponse.holdings.map((h: Holding) => ({
+          assetId: h.assetId,
+          quantity: h.quantity,
+          frozen: h.frozen,
+          layer: h.layer,
+        }))));
+      }
+    } catch (error) {
+      console.error('Failed to refresh home screen data:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
@@ -214,8 +252,8 @@ const HomeScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={refresh}
+            refreshing={isRefreshing || isRefreshingActivities}
+            onRefresh={onRefresh}
             tintColor={COLORS.brand.primary}
           />
         }
@@ -252,9 +290,12 @@ const HomeScreen: React.FC = () => {
               <ActivityIndicator size="small" color={COLORS.brand.primary} />
             </View>
           ) : activities.length === 0 ? (
-            <View style={styles.emptyActivity}>
-              <Text style={styles.emptyActivityText}>No recent activity</Text>
-            </View>
+            <EmptyState
+              icon="time-outline"
+              title="No Recent Activity"
+              description="Your transactions will appear here"
+              compact
+            />
           ) : (
             activities.map((entry: ActionLogEntry) => (
               <ActivityCard
@@ -355,12 +396,23 @@ const HomeScreen: React.FC = () => {
         <View style={styles.holdingsSection}>
           <View style={styles.holdingsHeader}>
             <Text style={styles.holdingsTitle}>Holdings</Text>
-            <TouchableOpacity onPress={handleDeepLinkPortfolio}>
-              <Text style={styles.viewAllLink}>View All →</Text>
-            </TouchableOpacity>
+            {topHoldings.length > 0 && (
+              <TouchableOpacity onPress={handleDeepLinkPortfolio}>
+                <Text style={styles.viewAllLink}>View All →</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
-          {topHoldings.map((holding) => (
+          {topHoldings.length === 0 ? (
+            <EmptyState
+              icon="wallet-outline"
+              title="Start Your Journey"
+              description="Add funds to begin investing in crypto assets"
+              actionLabel="Add Funds"
+              onAction={() => setAddFundsSheetVisible(true)}
+              compact
+            />
+          ) : topHoldings.map((holding) => (
             <TouchableOpacity
               key={holding.assetId}
               style={styles.holdingRow}
@@ -653,6 +705,15 @@ const styles = StyleSheet.create({
     color: COLORS.semantic.success,
   },
   changeNegative: {
+    color: COLORS.semantic.error,
+  },
+  changeNeutral: {
+    color: COLORS.text.muted,
+  },
+  changeChipNegative: {
+    backgroundColor: `${COLORS.semantic.error}15`,
+  },
+  changeTextNegative: {
     color: COLORS.semantic.error,
   },
 });

@@ -328,24 +328,31 @@ describe('Protection Pricing Service', () => {
     const { calculateBreakeven } = await import('../services/protection-pricing.service.js');
 
     // calculateBreakeven expects a ProtectionQuote object
+    const now = new Date();
     const mockQuote = {
-      assetId: 'BTC',
+      quoteId: 'test-quote',
+      holdingId: 'test-holding-id',
+      assetId: 'BTC' as const,
+      coveragePct: 1.0,
+      notionalUsd: 100,
+      notionalIrr: 145_600_000,
+      strikePct: 1.0,
+      strikeUsd: 100,
+      strikeIrr: 145_600_000,
+      durationDays: 30,
       spotPriceUsd: 100,
       spotPriceIrr: 145_600_000,
       premiumPct: 0.05, // 5% premium
       premiumUsd: 5,
       premiumIrr: 7_280_000,
-      strikePriceUsd: 100,
-      strikePriceIrr: 145_600_000,
-      notionalUsd: 100,
-      notionalIrr: 145_600_000,
-      durationDays: 30,
-      coveragePct: 1.0,
-      expiresAt: new Date(Date.now() + 300_000),
-      quoteId: 'test-quote',
-      greeks: { delta: -0.5, gamma: 0.025, vega: 0.1, theta: -0.1, rho: -0.05 },
-      volatility: 0.55,
+      fairValuePct: 0.04,
+      executionSpreadPct: 0.005,
+      profitMarginPct: 0.005,
+      impliedVolatility: 0.55,
       volatilityRegime: 'NORMAL' as const,
+      greeks: { delta: -0.5, gamma: 0.025, vega: 0.1, theta: -0.1, rho: -0.05 },
+      quotedAt: now,
+      validUntil: new Date(now.getTime() + 300_000),
     };
 
     const breakeven = calculateBreakeven(mockQuote);

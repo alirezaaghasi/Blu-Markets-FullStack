@@ -10,6 +10,7 @@ import {
   SafeAreaView,
   Alert,
   Switch,
+  Linking,
 } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../../constants/theme';
 import { useAppSelector, useAppDispatch } from '../../hooks/useStore';
@@ -95,13 +96,52 @@ const ProfileScreen: React.FC = () => {
         {
           text: 'Continue',
           onPress: () => {
-            // TODO: Navigate to questionnaire
-            console.log('Retake quiz');
+            // TODO: Navigate to questionnaire when navigation is available
+            Alert.alert('Coming Soon', 'Risk quiz will be available in a future update.');
           },
         },
       ],
       { cancelable: true }
     );
+  };
+
+  const handleLanguage = () => {
+    Alert.alert(
+      'Language / زبان',
+      'Language settings coming soon.\n\nتنظیمات زبان به زودی.',
+      [{ text: 'OK' }]
+    );
+  };
+
+  const handleHelpCenter = () => {
+    Alert.alert(
+      'Help Center',
+      'How can we help you?',
+      [
+        { text: 'Email Support', onPress: () => Linking.openURL('mailto:support@blumarkets.com?subject=Help Request') },
+        { text: 'Telegram', onPress: () => Linking.openURL('https://t.me/BluMarketsSupport') },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  const handleContactUs = () => {
+    Alert.alert(
+      'Contact Us',
+      'Email: support@blumarkets.com\nTelegram: @BluMarketsSupport\nPhone: +98 21 1234 5678',
+      [
+        { text: 'Send Email', onPress: () => Linking.openURL('mailto:support@blumarkets.com') },
+        { text: 'Close', style: 'cancel' },
+      ]
+    );
+  };
+
+  const handleTermsOfService = () => {
+    Linking.openURL('https://blumarkets.com/terms');
+  };
+
+  const handlePrivacyPolicy = () => {
+    Linking.openURL('https://blumarkets.com/privacy');
   };
 
   return (
@@ -168,7 +208,7 @@ const ProfileScreen: React.FC = () => {
               icon="🌐"
               title="Language"
               value="English"
-              onPress={() => {}}
+              onPress={handleLanguage}
             />
           </View>
         </View>
@@ -180,22 +220,22 @@ const ProfileScreen: React.FC = () => {
             <SettingItem
               icon="❓"
               title="Help Center"
-              onPress={() => {}}
+              onPress={handleHelpCenter}
             />
             <SettingItem
               icon="📧"
               title="Contact Us"
-              onPress={() => {}}
+              onPress={handleContactUs}
             />
             <SettingItem
               icon="📄"
               title="Terms of Service"
-              onPress={() => {}}
+              onPress={handleTermsOfService}
             />
             <SettingItem
               icon="🔒"
               title="Privacy Policy"
-              onPress={() => {}}
+              onPress={handlePrivacyPolicy}
             />
           </View>
         </View>

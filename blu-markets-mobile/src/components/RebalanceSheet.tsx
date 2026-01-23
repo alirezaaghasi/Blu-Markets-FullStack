@@ -18,6 +18,7 @@ import { ASSETS, LAYER_COLORS, LAYER_NAMES } from '../constants/assets';
 import { BOUNDARY_MESSAGES } from '../constants/business';
 import { setStatus, setHoldings, updateCash, logAction } from '../store/slices/portfolioSlice';
 import { rebalance, portfolio } from '../services/api';
+import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
 
 interface RebalanceSheetProps {
   visible: boolean;
@@ -37,6 +38,8 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
   const [isLoading, setIsLoading] = useState(false);
   const [preview, setPreview] = useState<RebalancePreview | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successResult, setSuccessResult] = useState<TransactionSuccessResult | null>(null);
 
   const { cashIRR, targetLayerPct } = useAppSelector((state) => state.portfolio);
 
@@ -88,16 +91,30 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
         message: `Rebalanced portfolio (${result.tradesExecuted} trades)`,
       }));
 
-      Alert.alert(
-        'Rebalance Complete',
-        `Successfully executed ${result.tradesExecuted} trades.`,
-        [{ text: 'OK', onPress: onClose }]
-      );
+      // Show success modal with new allocation
+      const afterAlloc = preview.after || preview.target;
+      setSuccessResult({
+        title: 'Rebalance Complete!',
+        subtitle: `Successfully executed ${result.tradesExecuted} trades`,
+        items: [
+          { label: 'Foundation', value: `${(afterAlloc.FOUNDATION * 100).toFixed(0)}%` },
+          { label: 'Growth', value: `${(afterAlloc.GROWTH * 100).toFixed(0)}%` },
+          { label: 'Upside', value: `${(afterAlloc.UPSIDE * 100).toFixed(0)}%` },
+          { label: 'Status', value: 'Balanced', highlight: true },
+        ],
+      });
+      setShowSuccess(true);
     } catch (err: any) {
       Alert.alert('Rebalance Failed', err?.message || 'Unable to rebalance. Please try again.');
     } finally {
       setIsExecuting(false);
     }
+  };
+
+  const handleSuccessClose = () => {
+    setShowSuccess(false);
+    setSuccessResult(null);
+    onClose();
   };
 
   // Convert API response to component-friendly format (uppercase to lowercase, fractions to percentages)
@@ -371,6 +388,14 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
           </View>
         </View>
       </View>
+
+      {/* Success Modal */}
+      <TransactionSuccessModal
+        visible={showSuccess}
+        onClose={handleSuccessClose}
+        result={successResult}
+        accentColor={colors.success}
+      />
     </Modal>
   );
 };

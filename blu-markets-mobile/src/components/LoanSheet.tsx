@@ -23,6 +23,7 @@ import {
 } from '../constants/business';
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
 import { addLoan, freezeHolding, addCash, logAction } from '../store/slices/portfolioSlice';
+import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
 
 interface LoanSheetProps {
   visible: boolean;
@@ -45,6 +46,8 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
   const [amountInput, setAmountInput] = useState('');
   const [durationMonths, setDurationMonths] = useState<3 | 6>(3);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successResult, setSuccessResult] = useState<TransactionSuccessResult | null>(null);
 
   // Selected holding and asset
   const selectedHolding = eligibleHoldings.find((h) => h.assetId === selectedAssetId);
@@ -188,17 +191,31 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
         })
       );
 
-      Alert.alert(
-        'Loan Created',
-        `You've borrowed ${formatNumber(amountIRR)} IRR against your ${selectedAsset.name}. The funds have been added to your cash balance.`,
-        [{ text: 'OK', onPress: onClose }]
-      );
+      // Show success modal
+      setSuccessResult({
+        title: 'Loan Created!',
+        subtitle: `Funds added to your cash balance`,
+        items: [
+          { label: 'Amount Borrowed', value: `${formatNumber(amountIRR)} IRR`, highlight: true },
+          { label: 'Collateral', value: `${selectedAsset.name} (Frozen)` },
+          { label: 'Duration', value: `${durationMonths} months` },
+          { label: 'Interest Rate', value: `${(LOAN_ANNUAL_INTEREST_RATE * 100).toFixed(0)}% annual` },
+          { label: 'Total to Repay', value: `${formatNumber(Math.round(amountIRR + totalInterest))} IRR` },
+        ],
+      });
+      setShowSuccess(true);
       setAmountInput('');
     } catch (error) {
       Alert.alert('Error', 'Failed to create loan. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSuccessClose = () => {
+    setShowSuccess(false);
+    setSuccessResult(null);
+    onClose();
   };
 
   return (
@@ -396,6 +413,14 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
           </TouchableOpacity>
         </View>
       </SafeAreaView>
+
+      {/* Success Modal */}
+      <TransactionSuccessModal
+        visible={showSuccess}
+        onClose={handleSuccessClose}
+        result={successResult}
+        accentColor={colors.primary}
+      />
     </Modal>
   );
 };

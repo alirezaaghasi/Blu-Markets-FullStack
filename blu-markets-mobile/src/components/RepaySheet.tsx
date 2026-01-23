@@ -17,6 +17,7 @@ import { Loan } from '../types';
 import { ASSETS, LAYER_COLORS } from '../constants/assets';
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
 import { updateLoan, removeLoan, unfreezeHolding, subtractCash, logAction } from '../store/slices/portfolioSlice';
+import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
 
 interface RepaySheetProps {
   visible: boolean;
@@ -37,6 +38,8 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
   const [repayOption, setRepayOption] = useState<RepayOption>('MIN');
   const [customAmount, setCustomAmount] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successResult, setSuccessResult] = useState<TransactionSuccessResult | null>(null);
 
   const asset = ASSETS[loan.collateralAssetId];
 
@@ -103,11 +106,17 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
           })
         );
 
-        Alert.alert(
-          'Loan Settled',
-          `Your loan has been fully repaid. Your ${asset.name} collateral has been unfrozen.`,
-          [{ text: 'OK', onPress: onClose }]
-        );
+        // Show success modal for full settlement
+        setSuccessResult({
+          title: 'Loan Fully Settled!',
+          subtitle: 'Your collateral has been unfrozen',
+          items: [
+            { label: 'Amount Paid', value: `${formatNumber(repayAmount)} IRR` },
+            { label: 'Collateral Released', value: asset.name, highlight: true },
+            { label: 'Status', value: 'Closed', highlight: true },
+          ],
+        });
+        setShowSuccess(true);
       } else {
         // Partial payment - update installments
         let remaining = repayAmount;
@@ -145,17 +154,33 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
           })
         );
 
-        Alert.alert(
-          'Payment Received',
-          `Repaid ${formatNumber(repayAmount)} IRR. ${loan.installments.length - paidCount} installments remaining.`,
-          [{ text: 'OK', onPress: onClose }]
-        );
+        // Calculate remaining balance
+        const remainingBalance = totalOutstanding - repayAmount;
+        const remainingInstallments = loan.installments.length - paidCount;
+
+        // Show success modal for partial payment
+        setSuccessResult({
+          title: 'Payment Received!',
+          subtitle: `${remainingInstallments} installments remaining`,
+          items: [
+            { label: 'Amount Paid', value: `${formatNumber(repayAmount)} IRR`, highlight: true },
+            { label: 'Progress', value: `${paidCount}/${loan.installments.length} installments` },
+            { label: 'Remaining Balance', value: `${formatNumber(remainingBalance)} IRR` },
+          ],
+        });
+        setShowSuccess(true);
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to process repayment. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSuccessClose = () => {
+    setShowSuccess(false);
+    setSuccessResult(null);
+    onClose();
   };
 
   return (
@@ -303,6 +328,14 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
           </TouchableOpacity>
         </View>
       </SafeAreaView>
+
+      {/* Success Modal */}
+      <TransactionSuccessModal
+        visible={showSuccess}
+        onClose={handleSuccessClose}
+        result={successResult}
+        accentColor={colors.success}
+      />
     </Modal>
   );
 };

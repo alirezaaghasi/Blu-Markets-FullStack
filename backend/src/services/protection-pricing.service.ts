@@ -46,6 +46,9 @@ export const QUOTE_VALIDITY_MS = 5 * 60 * 1000;
 /** Premium tolerance for purchase validation (5%) */
 export const PREMIUM_TOLERANCE = 0.05;
 
+/** Maximum cache size to prevent memory exhaustion (DoS protection) */
+export const MAX_QUOTE_CACHE_SIZE = 10_000;
+
 /** Minimum notional in IRR */
 export const MIN_NOTIONAL_IRR = 1_000_000;
 
@@ -96,24 +99,48 @@ const MAX_PREMIUM_30D: Record<string, number> = {
 };
 
 // ============================================================================
-// QUOTE CACHE (In-memory for MVP, consider Redis for production)
+// QUOTE CACHE (In-memory for MVP)
 // ============================================================================
+// NOTE: For production multi-instance deployments, replace with Redis or
+// database-backed quotes. The current implementation uses atomic reservation
+// to prevent race conditions within a single instance.
+
+type QuoteStatus = 'available' | 'reserved' | 'consumed';
 
 interface CachedQuote {
   quote: ProtectionQuote;
   userId: string;
   createdAt: Date;
+  status: QuoteStatus;
+  reservedAt?: Date;
 }
 
-/** In-memory quote cache with TTL */
+/** In-memory quote cache with TTL and size limit */
 const quoteCache = new Map<string, CachedQuote>();
 
-/** Clean up expired quotes periodically */
+/** Index of quotes by holdingId for fast invalidation */
+const quotesByHolding = new Map<string, Set<string>>();
+
+/** Reservation timeout - release reservation if transaction takes too long (30s) */
+const RESERVATION_TIMEOUT_MS = 30_000;
+
+/** Clean up expired quotes and stale reservations periodically */
 function cleanupExpiredQuotes(): void {
   const now = new Date();
   for (const [quoteId, cached] of quoteCache.entries()) {
+    // Remove expired quotes
     if (now > cached.quote.validUntil) {
-      quoteCache.delete(quoteId);
+      removeQuoteFromCache(quoteId, cached.quote.holdingId);
+      continue;
+    }
+    // Release stale reservations (transaction timeout)
+    if (
+      cached.status === 'reserved' &&
+      cached.reservedAt &&
+      now.getTime() - cached.reservedAt.getTime() > RESERVATION_TIMEOUT_MS
+    ) {
+      cached.status = 'available';
+      cached.reservedAt = undefined;
     }
   }
 }
@@ -122,18 +149,63 @@ function cleanupExpiredQuotes(): void {
 setInterval(cleanupExpiredQuotes, 60_000);
 
 /**
+ * Remove a quote from cache and holding index
+ */
+function removeQuoteFromCache(quoteId: string, holdingId: string): void {
+  quoteCache.delete(quoteId);
+  const holdingQuotes = quotesByHolding.get(holdingId);
+  if (holdingQuotes) {
+    holdingQuotes.delete(quoteId);
+    if (holdingQuotes.size === 0) {
+      quotesByHolding.delete(holdingId);
+    }
+  }
+}
+
+/**
+ * Evict oldest quotes when cache exceeds size limit (LRU eviction)
+ */
+function evictOldestQuotes(): void {
+  if (quoteCache.size <= MAX_QUOTE_CACHE_SIZE) {
+    return;
+  }
+
+  // Sort by creation time and evict oldest 10%
+  const entries = Array.from(quoteCache.entries());
+  entries.sort((a, b) => a[1].createdAt.getTime() - b[1].createdAt.getTime());
+
+  const evictCount = Math.max(1, Math.floor(quoteCache.size * 0.1));
+  for (let i = 0; i < evictCount && i < entries.length; i++) {
+    const [quoteId, cached] = entries[i];
+    removeQuoteFromCache(quoteId, cached.quote.holdingId);
+  }
+}
+
+/**
  * Store a quote in the cache
  */
 function cacheQuote(quote: ProtectionQuote, userId: string): void {
+  // Evict old quotes if cache is full
+  evictOldestQuotes();
+
   quoteCache.set(quote.quoteId, {
     quote,
     userId,
     createdAt: new Date(),
+    status: 'available',
   });
+
+  // Index by holdingId for fast invalidation
+  let holdingQuotes = quotesByHolding.get(quote.holdingId);
+  if (!holdingQuotes) {
+    holdingQuotes = new Set();
+    quotesByHolding.set(quote.holdingId, holdingQuotes);
+  }
+  holdingQuotes.add(quote.quoteId);
 }
 
 /**
- * Retrieve and validate a cached quote
+ * Retrieve and validate a cached quote (read-only, does not reserve)
  * @throws AppError if quote not found, expired, or belongs to different user
  */
 export function getAndValidateCachedQuote(quoteId: string, userId: string): ProtectionQuote {
@@ -148,21 +220,104 @@ export function getAndValidateCachedQuote(quoteId: string, userId: string): Prot
   }
 
   if (!isQuoteValid(cached.quote)) {
-    quoteCache.delete(quoteId); // Clean up expired quote
+    removeQuoteFromCache(quoteId, cached.quote.holdingId);
     throw new AppError('QUOTE_EXPIRED', 'Quote has expired, please request a new quote', 410, {
       quoteId,
       expiredAt: cached.quote.validUntil.toISOString(),
     });
   }
 
+  // Check if already consumed or reserved by another transaction
+  if (cached.status === 'consumed') {
+    throw new AppError('QUOTE_NOT_FOUND', 'Quote has already been used', 404, { quoteId });
+  }
+
+  if (cached.status === 'reserved') {
+    throw new AppError('QUOTE_IN_USE', 'Quote is being processed by another transaction', 409, { quoteId });
+  }
+
   return cached.quote;
 }
 
 /**
- * Consume a quote (remove from cache after successful purchase)
+ * Atomically reserve a quote for purchase (prevents race conditions)
+ * Must be called BEFORE starting the database transaction.
+ * @returns The quote if reservation successful
+ * @throws AppError if quote not found, expired, already reserved, or belongs to different user
+ */
+export function reserveQuote(quoteId: string, userId: string): ProtectionQuote {
+  const cached = quoteCache.get(quoteId);
+
+  if (!cached) {
+    throw new AppError('QUOTE_NOT_FOUND', 'Quote not found or already used', 404, { quoteId });
+  }
+
+  if (cached.userId !== userId) {
+    throw new AppError('UNAUTHORIZED', 'Quote does not belong to user', 401);
+  }
+
+  if (!isQuoteValid(cached.quote)) {
+    removeQuoteFromCache(quoteId, cached.quote.holdingId);
+    throw new AppError('QUOTE_EXPIRED', 'Quote has expired, please request a new quote', 410, {
+      quoteId,
+      expiredAt: cached.quote.validUntil.toISOString(),
+    });
+  }
+
+  // Atomic status check and update (synchronous, single-threaded in Node.js)
+  if (cached.status === 'consumed') {
+    throw new AppError('QUOTE_NOT_FOUND', 'Quote has already been used', 404, { quoteId });
+  }
+
+  if (cached.status === 'reserved') {
+    throw new AppError('QUOTE_IN_USE', 'Quote is being processed by another transaction', 409, { quoteId });
+  }
+
+  // Reserve the quote atomically
+  cached.status = 'reserved';
+  cached.reservedAt = new Date();
+
+  return cached.quote;
+}
+
+/**
+ * Release a reserved quote (call on transaction failure)
+ */
+export function releaseQuote(quoteId: string): void {
+  const cached = quoteCache.get(quoteId);
+  if (cached && cached.status === 'reserved') {
+    cached.status = 'available';
+    cached.reservedAt = undefined;
+  }
+}
+
+/**
+ * Consume a quote (mark as consumed after successful purchase)
+ * Also invalidates all other quotes for the same holding to prevent duplicate purchases.
+ * Call this AFTER the transaction succeeds.
  */
 export function consumeQuote(quoteId: string): void {
-  quoteCache.delete(quoteId);
+  const cached = quoteCache.get(quoteId);
+  if (cached) {
+    // Mark as consumed (not just deleted, for debugging/audit)
+    cached.status = 'consumed';
+    // Invalidate ALL quotes for this holding to prevent duplicate protection purchases
+    invalidateQuotesForHolding(cached.quote.holdingId);
+  }
+}
+
+/**
+ * Invalidate all cached quotes for a specific holding
+ * Called after purchase to prevent duplicate protection purchases
+ */
+export function invalidateQuotesForHolding(holdingId: string): void {
+  const holdingQuotes = quotesByHolding.get(holdingId);
+  if (holdingQuotes) {
+    for (const quoteId of holdingQuotes) {
+      quoteCache.delete(quoteId);
+    }
+    quotesByHolding.delete(holdingId);
+  }
 }
 
 // ============================================================================

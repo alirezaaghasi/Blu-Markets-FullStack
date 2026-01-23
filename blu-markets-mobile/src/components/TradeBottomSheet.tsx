@@ -49,6 +49,10 @@ interface TradeBottomSheetProps {
   initialSide?: 'BUY' | 'SELL';
 }
 
+// Trade validation constants
+const MIN_BUY_AMOUNT_IRR = 100_000; // Minimum buy amount in IRR
+const MIN_SELL_QUANTITY = 0.0001; // Minimum sell quantity in units
+
 // Quick amount chips as percentages
 const QUICK_AMOUNTS = [
   { label: '25%', value: 0.25 },
@@ -105,7 +109,8 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
 
   // Find holding for selected asset
   const holding = holdings.find((h) => h.assetId === assetId);
-  const holdingValue = holding ? holding.quantity * priceIRR : 0;
+  const holdingQuantity = holding?.quantity || 0;
+  const holdingValue = holdingQuantity * priceIRR;
 
   // Calculate holding values map
   const holdingValues = useMemo(() => {
@@ -136,17 +141,53 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
   // Parse amount
   const amountIRR = parseInt(amountInput.replace(/,/g, ''), 10) || 0;
 
+  // Calculate quantity from IRR amount
+  const tradeQuantity = priceIRR > 0 ? amountIRR / priceIRR : 0;
+
   // Available balance for current side
   const availableBalance = side === 'BUY' ? cashIRR : holdingValue;
 
-  // Validate trade
+  // Enhanced validation with clearer error messages
   const validation = useMemo(() => {
+    const errors: string[] = [];
+
     if (side === 'BUY') {
-      return validateBuyTrade(amountIRR, cashIRR, assetId);
+      // Buy validation
+      if (amountIRR > 0 && amountIRR < MIN_BUY_AMOUNT_IRR) {
+        errors.push(`Minimum trade is ${MIN_BUY_AMOUNT_IRR.toLocaleString()} IRR`);
+      }
+      if (amountIRR > cashIRR) {
+        errors.push('Insufficient funds');
+      }
+      if (!ASSETS[assetId]) {
+        errors.push('Invalid asset');
+      }
     } else {
-      return validateSellTrade(amountIRR, holding, holdingValue);
+      // Sell validation - quantity based
+      if (!holding) {
+        errors.push('You do not hold this asset');
+      } else {
+        if (holding.frozen) {
+          errors.push('This asset is locked as loan collateral');
+        }
+        if (tradeQuantity > 0 && tradeQuantity < MIN_SELL_QUANTITY) {
+          errors.push(`Minimum sell quantity is ${MIN_SELL_QUANTITY} ${asset.symbol}`);
+        }
+        if (tradeQuantity > holdingQuantity) {
+          errors.push('Exceeds available balance');
+        }
+      }
     }
-  }, [side, amountIRR, cashIRR, assetId, holding, holdingValue]);
+
+    return {
+      ok: errors.length === 0 && amountIRR > 0,
+      errors,
+      meta: {
+        required: amountIRR,
+        available: availableBalance,
+      },
+    };
+  }, [side, amountIRR, cashIRR, assetId, holding, holdingQuantity, tradeQuantity, asset.symbol, availableBalance]);
 
   // Generate preview
   const preview = useMemo(() => {
