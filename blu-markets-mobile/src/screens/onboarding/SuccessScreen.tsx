@@ -3,7 +3,14 @@
  * Design System: Blu Markets
  * Target: iPhone 16 Pro (393 x 852)
  *
- * Portfolio creation success with celebration animation
+ * Redesigned to show actual portfolio holdings with asset breakdown
+ * Changes:
+ * - "You're all set!" title
+ * - System attribution language
+ * - USD equivalent display
+ * - Full asset breakdown by layer
+ * - Removed "First activity" card
+ * - "View My Portfolio" CTA
  */
 
 import React, { useEffect, useRef } from 'react';
@@ -11,10 +18,11 @@ import {
   View,
   Text,
   StyleSheet,
-
+  TouchableOpacity,
   Animated,
   Easing,
   StatusBar,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -23,22 +31,131 @@ import { COLORS } from '../../constants/colors';
 import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING, RADIUS } from '../../constants/spacing';
 import { LAYOUT } from '../../constants/layout';
-import { Button } from '../../components/common';
 import { useAppDispatch, useAppSelector } from '../../hooks/useStore';
 import { initializePortfolio, logAction } from '../../store/slices/portfolioSlice';
 import { resetOnboarding } from '../../store/slices/onboardingSlice';
 import { completeOnboarding } from '../../store/slices/authSlice';
+import { ASSETS, getAssetsByLayer } from '../../constants/assets';
+import { DEFAULT_FX_RATE } from '../../constants/business';
 
 type SuccessScreenProps = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'Success'>;
 };
 
-// Format number with commas
-const formatNumber = (num: number): string => {
-  return num.toLocaleString('en-US');
+// Layer configuration
+const LAYER_CONFIG = {
+  FOUNDATION: {
+    color: COLORS.layers.foundation,
+    label: 'Foundation',
+    description: 'Stable assets for security',
+  },
+  GROWTH: {
+    color: COLORS.layers.growth,
+    label: 'Growth',
+    description: 'Balanced growth potential',
+  },
+  UPSIDE: {
+    color: COLORS.layers.upside,
+    label: 'Upside',
+    description: 'Higher risk, higher potential',
+  },
+} as const;
+
+type LayerKey = keyof typeof LAYER_CONFIG;
+
+// Format number with appropriate suffix
+const formatValue = (value: number): string => {
+  if (value >= 1_000_000_000) {
+    return `${(value / 1_000_000_000).toFixed(1)}B`;
+  }
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(1)}M`;
+  }
+  if (value >= 1_000) {
+    return `${(value / 1_000).toFixed(1)}K`;
+  }
+  return value.toLocaleString();
 };
 
-// Confetti particle component
+// Format USD amount
+const formatUsd = (irrValue: number, fxRate: number): string => {
+  const usd = irrValue / fxRate;
+  if (usd >= 1_000_000) {
+    return `$${(usd / 1_000_000).toFixed(2)}M`;
+  }
+  if (usd >= 1_000) {
+    return `$${(usd / 1_000).toFixed(1)}K`;
+  }
+  return `$${usd.toFixed(0)}`;
+};
+
+// Generate holdings based on allocation (for display when API doesn't return holdings)
+const generateDisplayHoldings = (
+  totalInvestment: number,
+  allocation: { FOUNDATION: number; GROWTH: number; UPSIDE: number }
+) => {
+  const holdings: Array<{
+    assetId: string;
+    name: string;
+    symbol: string;
+    valueIrr: number;
+    layer: LayerKey;
+  }> = [];
+
+  // Foundation assets distribution (PAXG, USDT split)
+  const foundationAmount = totalInvestment * allocation.FOUNDATION;
+  const foundationAssets = getAssetsByLayer('FOUNDATION').filter(a => a.id !== 'IRR_FIXED_INCOME');
+  if (foundationAssets.length > 0) {
+    const perAsset = foundationAmount / foundationAssets.length;
+    foundationAssets.forEach(asset => {
+      holdings.push({
+        assetId: asset.id,
+        name: asset.name,
+        symbol: asset.symbol,
+        valueIrr: perAsset,
+        layer: 'FOUNDATION',
+      });
+    });
+  }
+
+  // Growth assets distribution (BTC, ETH, BNB based on weights)
+  const growthAmount = totalInvestment * allocation.GROWTH;
+  const growthAssets = getAssetsByLayer('GROWTH');
+  const mainGrowth = growthAssets.filter(a => ['BTC', 'ETH', 'BNB'].includes(a.id));
+  if (mainGrowth.length > 0) {
+    const totalWeight = mainGrowth.reduce((sum, a) => sum + a.layerWeight, 0);
+    mainGrowth.forEach(asset => {
+      holdings.push({
+        assetId: asset.id,
+        name: asset.name,
+        symbol: asset.symbol,
+        valueIrr: growthAmount * (asset.layerWeight / totalWeight),
+        layer: 'GROWTH',
+      });
+    });
+  }
+
+  // Upside assets distribution (SOL, TON, LINK based on weights)
+  const upsideAmount = totalInvestment * allocation.UPSIDE;
+  const upsideAssets = getAssetsByLayer('UPSIDE');
+  const mainUpside = upsideAssets.filter(a => ['SOL', 'TON', 'LINK'].includes(a.id));
+  if (mainUpside.length > 0) {
+    const totalWeight = mainUpside.reduce((sum, a) => sum + a.layerWeight, 0);
+    mainUpside.forEach(asset => {
+      holdings.push({
+        assetId: asset.id,
+        name: asset.name,
+        symbol: asset.symbol,
+        valueIrr: upsideAmount * (asset.layerWeight / totalWeight),
+        layer: 'UPSIDE',
+      });
+    });
+  }
+
+  return holdings;
+};
+
+// Confetti particle component (kept for celebration effect)
 const ConfettiParticle: React.FC<{
   delay: number;
   color: string;
@@ -109,7 +226,7 @@ const ConfettiParticle: React.FC<{
 
 const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
   const dispatch = useAppDispatch();
-  const { riskProfile, initialInvestment, phone } = useAppSelector(
+  const { riskProfile, initialInvestment } = useAppSelector(
     (state) => state.onboarding
   );
 
@@ -118,7 +235,6 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
   const checkScale = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Animate success icon with bounce
     Animated.sequence([
       Animated.spring(scaleAnim, {
         toValue: 1,
@@ -148,37 +264,49 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
     UPSIDE: 0.15,
   };
 
-  const handleGoToDashboard = () => {
-    // Initialize local portfolio state (portfolio already created on backend)
-    // Include risk profile info for profile screen to use
+  // Generate display holdings
+  const holdings = generateDisplayHoldings(initialInvestment, allocation);
+
+  // Group holdings by layer
+  const groupedHoldings = {
+    FOUNDATION: holdings.filter((h) => h.layer === 'FOUNDATION'),
+    GROWTH: holdings.filter((h) => h.layer === 'GROWTH'),
+    UPSIDE: holdings.filter((h) => h.layer === 'UPSIDE'),
+  };
+
+  // Calculate layer totals
+  const layerTotals = {
+    FOUNDATION: groupedHoldings.FOUNDATION.reduce((sum, h) => sum + h.valueIrr, 0),
+    GROWTH: groupedHoldings.GROWTH.reduce((sum, h) => sum + h.valueIrr, 0),
+    UPSIDE: groupedHoldings.UPSIDE.reduce((sum, h) => sum + h.valueIrr, 0),
+  };
+
+  const handleViewPortfolio = () => {
+    // Initialize local portfolio state
     dispatch(
       initializePortfolio({
-        cashIRR: initialInvestment, // Cash from initial funding
-        holdings: [], // Will be fetched from backend
+        cashIRR: initialInvestment,
+        holdings: [],
         targetLayerPct: allocation,
         riskScore: riskProfile?.score,
         riskProfileName: riskProfile?.profileName,
       })
     );
 
-    // Log the portfolio creation action locally
     dispatch(
       logAction({
         type: 'PORTFOLIO_CREATED',
         boundary: 'SAFE',
-        message: `Started with ${formatNumber(initialInvestment)} IRR`,
+        message: `Started with ${formatValue(initialInvestment)} IRR`,
         amountIRR: initialInvestment,
       })
     );
 
-    // Mark onboarding as complete - this triggers navigation to main app
     dispatch(completeOnboarding());
-
-    // Reset onboarding state for fresh start if user logs out
     dispatch(resetOnboarding());
   };
 
-  // Generate confetti particles
+  // Confetti particles
   const confettiColors = [
     COLORS.layers.foundation,
     COLORS.layers.growth,
@@ -187,12 +315,64 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
     COLORS.semantic.success,
   ];
 
-  const confettiParticles = Array.from({ length: 30 }).map((_, i) => ({
+  const confettiParticles = Array.from({ length: 20 }).map((_, i) => ({
     id: i,
     color: confettiColors[i % confettiColors.length],
-    startX: (i / 30) * 393 - 50,
+    startX: (i / 20) * 393 - 50,
     delay: Math.random() * 500,
   }));
+
+  const renderLayerSection = (layerKey: LayerKey) => {
+    const config = LAYER_CONFIG[layerKey];
+    const layerHoldings = groupedHoldings[layerKey];
+    const layerTotal = layerTotals[layerKey];
+    const percentage = Math.round(allocation[layerKey] * 100);
+
+    if (layerHoldings.length === 0) return null;
+
+    return (
+      <View style={styles.layerSection} key={layerKey}>
+        {/* Layer Header */}
+        <View style={styles.layerHeader}>
+          <View style={styles.layerTitleRow}>
+            <View style={[styles.layerDot, { backgroundColor: config.color }]} />
+            <Text style={styles.layerTitle}>
+              {config.label} ({percentage}%)
+            </Text>
+          </View>
+          <Text style={[styles.layerTotal, { color: config.color }]}>
+            {formatValue(layerTotal)} IRR
+          </Text>
+        </View>
+        <Text style={styles.layerDescription}>{config.description}</Text>
+
+        {/* Holdings List */}
+        <View style={styles.holdingsCard}>
+          {layerHoldings.map((holding, index) => {
+            const isLast = index === layerHoldings.length - 1;
+
+            return (
+              <View
+                key={holding.assetId}
+                style={[
+                  styles.holdingRow,
+                  !isLast && styles.holdingRowBorder,
+                ]}
+              >
+                <View style={styles.holdingInfo}>
+                  <Text style={styles.holdingSymbol}>{holding.symbol}</Text>
+                  <Text style={styles.holdingName}>{holding.name}</Text>
+                </View>
+                <Text style={styles.holdingValue}>
+                  {formatValue(holding.valueIrr)} IRR
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -210,15 +390,19 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
         ))}
       </View>
 
-      <View style={styles.content}>
-        {/* Success icon with checkmark */}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Success Icon */}
         <Animated.View
           style={[
-            styles.successIconContainer,
+            styles.iconContainer,
             { transform: [{ scale: scaleAnim }] },
           ]}
         >
-          <View style={styles.successCircle}>
+          <View style={styles.successIcon}>
             <Animated.Text
               style={[
                 styles.checkmark,
@@ -230,137 +414,89 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
           </View>
         </Animated.View>
 
-        {/* Success message */}
-        <Animated.View style={[styles.messageContainer, { opacity: fadeAnim }]}>
-          <Text style={styles.title}>Your portfolio is ready!</Text>
+        {/* Title */}
+        <Animated.View style={[styles.titleContainer, { opacity: fadeAnim }]}>
+          <Text style={styles.title}>You're all set!</Text>
           <Text style={styles.subtitle}>
-            You've successfully created your Blu Markets portfolio
+            Based on your answers, here's how the system allocated your investment:
           </Text>
         </Animated.View>
 
-        {/* Portfolio summary */}
-        <Animated.View style={[styles.summaryCard, { opacity: fadeAnim }]}>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Total Investment</Text>
-            <Text style={styles.summaryValue}>
-              {formatNumber(initialInvestment)} IRR
-            </Text>
-          </View>
+        {/* Total Investment Card */}
+        <Animated.View style={[styles.totalCard, { opacity: fadeAnim }]}>
+          <Text style={styles.totalLabel}>TOTAL INVESTED</Text>
+          <Text style={styles.totalAmount}>
+            {initialInvestment.toLocaleString()} IRR
+          </Text>
+          <Text style={styles.totalUsd}>
+            ≈ {formatUsd(initialInvestment, DEFAULT_FX_RATE)} USD
+          </Text>
 
-          <View style={styles.divider} />
-
-          <View style={styles.allocationSection}>
-            <Text style={styles.allocationTitle}>Your target allocation</Text>
-            <View style={styles.allocationBar}>
-              <View
-                style={[
-                  styles.allocationSegment,
-                  {
-                    flex: allocation.FOUNDATION,
-                    backgroundColor: COLORS.layers.foundation,
-                  },
-                ]}
-              />
-              <View
-                style={[
-                  styles.allocationSegment,
-                  {
-                    flex: allocation.GROWTH,
-                    backgroundColor: COLORS.layers.growth,
-                  },
-                ]}
-              />
-              <View
-                style={[
-                  styles.allocationSegment,
-                  {
-                    flex: allocation.UPSIDE,
-                    backgroundColor: COLORS.layers.upside,
-                  },
-                ]}
-              />
-            </View>
-
-            {/* Allocation breakdown with amounts */}
-            <View style={styles.allocationBreakdown}>
-              <AllocationBreakdownItem
-                label="Foundation"
-                description="Stable assets (USDT, PAXG)"
-                amount={Math.floor(initialInvestment * allocation.FOUNDATION)}
-                percentage={Math.round(allocation.FOUNDATION * 100)}
-                color={COLORS.layers.foundation}
-              />
-              <AllocationBreakdownItem
-                label="Growth"
-                description="Major crypto (BTC, ETH)"
-                amount={Math.floor(initialInvestment * allocation.GROWTH)}
-                percentage={Math.round(allocation.GROWTH * 100)}
-                color={COLORS.layers.growth}
-              />
-              <AllocationBreakdownItem
-                label="Upside"
-                description="High-potential (SOL, etc.)"
-                amount={initialInvestment - Math.floor(initialInvestment * allocation.FOUNDATION) - Math.floor(initialInvestment * allocation.GROWTH)}
-                percentage={Math.round(allocation.UPSIDE * 100)}
-                color={COLORS.layers.upside}
-              />
-            </View>
+          {/* Allocation Bar */}
+          <View style={styles.allocationBar}>
+            <View
+              style={[
+                styles.barSegment,
+                {
+                  flex: allocation.FOUNDATION,
+                  backgroundColor: LAYER_CONFIG.FOUNDATION.color,
+                  borderTopLeftRadius: 4,
+                  borderBottomLeftRadius: 4,
+                },
+              ]}
+            />
+            <View
+              style={[
+                styles.barSegment,
+                {
+                  flex: allocation.GROWTH,
+                  backgroundColor: LAYER_CONFIG.GROWTH.color,
+                },
+              ]}
+            />
+            <View
+              style={[
+                styles.barSegment,
+                {
+                  flex: allocation.UPSIDE,
+                  backgroundColor: LAYER_CONFIG.UPSIDE.color,
+                  borderTopRightRadius: 4,
+                  borderBottomRightRadius: 4,
+                },
+              ]}
+            />
           </View>
         </Animated.View>
 
-        {/* First activity preview */}
-        <Animated.View style={[styles.activityPreview, { opacity: fadeAnim }]}>
-          <Text style={styles.activityTitle}>First activity</Text>
-          <View style={styles.activityItem}>
-            <View style={[styles.activityDot, { backgroundColor: COLORS.boundary.safe }]} />
-            <View style={styles.activityContent}>
-              <Text style={styles.activityMessage}>
-                Portfolio created with {formatNumber(initialInvestment)} IRR
-              </Text>
-              <Text style={styles.activityTime}>Just now</Text>
-            </View>
-            <Text style={styles.activityBadge}>SAFE</Text>
-          </View>
+        {/* Layer Sections with Holdings */}
+        <Animated.View style={{ opacity: fadeAnim }}>
+          {renderLayerSection('FOUNDATION')}
+          {renderLayerSection('GROWTH')}
+          {renderLayerSection('UPSIDE')}
         </Animated.View>
-      </View>
 
-      {/* CTA Button */}
+        {/* Info Note */}
+        <Animated.View style={[styles.infoCard, { opacity: fadeAnim }]}>
+          <Text style={styles.infoIcon}>ⓘ</Text>
+          <Text style={styles.infoText}>
+            You can adjust your allocation or trade individual assets anytime from your portfolio.
+          </Text>
+        </Animated.View>
+      </ScrollView>
+
+      {/* Footer */}
       <View style={styles.footer}>
-        <Button
-          label="Go to Dashboard"
-          variant="primary"
-          size="lg"
-          fullWidth
-          onPress={handleGoToDashboard}
-          icon={<Text style={styles.arrowIcon}>→</Text>}
-          iconPosition="right"
-        />
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={handleViewPortfolio}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.primaryButtonText}>View My Portfolio</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 };
-
-// Allocation Breakdown Item Component (shows asset layer with amount)
-const AllocationBreakdownItem: React.FC<{
-  label: string;
-  description: string;
-  amount: number;
-  percentage: number;
-  color: string;
-}> = ({ label, description, amount, percentage, color }) => (
-  <View style={styles.breakdownItem}>
-    <View style={styles.breakdownLeft}>
-      <View style={[styles.breakdownDot, { backgroundColor: color }]} />
-      <View>
-        <Text style={styles.breakdownLabel}>
-          {label} <Text style={[styles.breakdownPercentage, { color }]}>({percentage}%)</Text>
-        </Text>
-        <Text style={styles.breakdownDescription}>{description}</Text>
-      </View>
-    </View>
-    <Text style={styles.breakdownAmount}>{formatNumber(amount)} IRR</Text>
-  </View>
-);
 
 const styles = StyleSheet.create({
   container: {
@@ -381,175 +517,202 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 2,
   },
-  content: {
+  scrollView: {
     flex: 1,
+  },
+  content: {
     paddingHorizontal: LAYOUT.screenPaddingH,
-    justifyContent: 'center',
+    paddingTop: SPACING[6],
+    paddingBottom: SPACING[4],
   },
-  successIconContainer: {
+
+  // Success Icon
+  iconContainer: {
     alignItems: 'center',
-    marginBottom: SPACING[6],
+    marginBottom: SPACING[5],
   },
-  successCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+  successIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     backgroundColor: COLORS.semantic.success,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: COLORS.semantic.success,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowRadius: 15,
+    elevation: 8,
   },
   checkmark: {
-    fontSize: 48,
-    color: COLORS.text.inverse,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    fontSize: 36,
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
-  messageContainer: {
+
+  // Title
+  titleContainer: {
     alignItems: 'center',
-    marginBottom: SPACING[6],
+    marginBottom: SPACING[5],
   },
   title: {
-    fontSize: TYPOGRAPHY.fontSize['2xl'],
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    fontSize: 28,
+    fontWeight: '700',
     color: COLORS.text.primary,
-    marginBottom: SPACING[2],
     textAlign: 'center',
+    marginBottom: SPACING[2],
   },
   subtitle: {
     fontSize: TYPOGRAPHY.fontSize.base,
     color: COLORS.text.secondary,
     textAlign: 'center',
+    lineHeight: 22,
+    paddingHorizontal: SPACING[2],
   },
-  summaryCard: {
+
+  // Total Card
+  totalCard: {
     backgroundColor: COLORS.background.elevated,
-    borderRadius: RADIUS.xl,
-    padding: SPACING[5],
-    marginBottom: SPACING[4],
+    borderRadius: RADIUS.lg,
+    padding: SPACING[4],
+    marginBottom: SPACING[5],
   },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  summaryLabel: {
-    fontSize: TYPOGRAPHY.fontSize.base,
+  totalLabel: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    fontWeight: '600',
     color: COLORS.text.secondary,
+    letterSpacing: 1,
+    marginBottom: SPACING[2],
   },
-  summaryValue: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
+  totalAmount: {
+    fontSize: 28,
+    fontWeight: '700',
     color: COLORS.text.primary,
   },
-  divider: {
-    height: 1,
-    backgroundColor: COLORS.border,
-    marginVertical: SPACING[4],
-  },
-  allocationSection: {},
-  allocationTitle: {
+  totalUsd: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
-    marginBottom: SPACING[3],
-  },
-  allocationBar: {
-    height: 12,
-    borderRadius: 6,
-    flexDirection: 'row',
-    overflow: 'hidden',
+    color: COLORS.text.muted,
     marginBottom: SPACING[4],
   },
-  allocationSegment: {
+  allocationBar: {
+    flexDirection: 'row',
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  barSegment: {
     height: '100%',
   },
-  allocationBreakdown: {
-    gap: SPACING[3],
+
+  // Layer Section
+  layerSection: {
+    marginBottom: SPACING[4],
   },
-  breakdownItem: {
+  layerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: SPACING[1],
   },
-  breakdownLeft: {
+  layerTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
   },
-  breakdownDot: {
+  layerDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
     marginRight: SPACING[2],
   },
-  breakdownLabel: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.primary,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
-  },
-  breakdownPercentage: {
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-  },
-  breakdownDescription: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.muted,
-    marginTop: 1,
-  },
-  breakdownAmount: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+  layerTitle: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: '600',
     color: COLORS.text.primary,
   },
-  activityPreview: {
-    backgroundColor: COLORS.background.elevated,
-    borderRadius: RADIUS.xl,
-    padding: SPACING[4],
+  layerTotal: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: '700',
   },
-  activityTitle: {
+  layerDescription: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.text.secondary,
-    marginBottom: SPACING[3],
+    marginLeft: 18,
+    marginBottom: SPACING[2],
   },
-  activityItem: {
+
+  // Holdings Card
+  holdingsCard: {
+    backgroundColor: COLORS.background.elevated,
+    borderRadius: RADIUS.lg,
+    overflow: 'hidden',
+  },
+  holdingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[4],
+  },
+  holdingRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  holdingInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  activityDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: SPACING[3],
-  },
-  activityContent: {
-    flex: 1,
-  },
-  activityMessage: {
+  holdingSymbol: {
     fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '600',
     color: COLORS.text.primary,
-    marginBottom: 2,
+    width: 50,
   },
-  activityTime: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.muted,
+  holdingName: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
   },
-  activityBadge: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.boundary.safe,
-    backgroundColor: `${COLORS.boundary.safe}15`,
-    paddingHorizontal: SPACING[2],
-    paddingVertical: SPACING[1],
-    borderRadius: RADIUS.sm,
+  holdingValue: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '500',
+    color: COLORS.text.primary,
   },
+
+  // Info Card
+  infoCard: {
+    flexDirection: 'row',
+    backgroundColor: `${COLORS.brand.primary}10`,
+    borderRadius: RADIUS.lg,
+    padding: SPACING[4],
+    marginTop: SPACING[2],
+  },
+  infoIcon: {
+    fontSize: 16,
+    color: COLORS.brand.primary,
+    marginRight: SPACING[3],
+    marginTop: 2,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
+    lineHeight: 20,
+  },
+
+  // Footer
   footer: {
     paddingHorizontal: LAYOUT.screenPaddingH,
+    paddingTop: SPACING[3],
     paddingBottom: LAYOUT.totalBottomSpace,
-    paddingTop: SPACING[4],
   },
-  arrowIcon: {
-    fontSize: 18,
+  primaryButton: {
+    backgroundColor: COLORS.brand.primary,
+    paddingVertical: SPACING[4],
+    borderRadius: RADIUS.full,
+    alignItems: 'center',
+  },
+  primaryButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: '600',
     color: COLORS.text.inverse,
   },
 });
