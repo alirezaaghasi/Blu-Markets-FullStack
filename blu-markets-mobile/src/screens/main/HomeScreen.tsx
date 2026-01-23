@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -262,7 +263,18 @@ const HomeScreen: React.FC = () => {
         <View style={styles.header}>
           <StatusChip status={calculatedStatus} />
           <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.notificationButton}>
+            <TouchableOpacity
+              style={styles.notificationButton}
+              onPress={() => {
+                Alert.alert(
+                  'Notifications',
+                  nextLoanPayment && nextLoanPayment.daysUntil <= 7
+                    ? `You have a loan payment due in ${nextLoanPayment.daysUntil} days`
+                    : 'No new notifications',
+                  [{ text: 'OK' }]
+                );
+              }}
+            >
               <Text style={styles.notificationIcon}>🔔</Text>
               {nextLoanPayment && nextLoanPayment.daysUntil <= 7 && (
                 <View style={styles.notificationBadge} />
