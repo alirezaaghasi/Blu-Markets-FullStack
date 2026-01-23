@@ -160,13 +160,13 @@ function ProtectionCard({
         <View style={styles.protectionDetailRow}>
           <Text style={styles.protectionDetailLabel}>Protected Value</Text>
           <Text style={styles.protectionDetailValue}>
-            {protection.notionalIRR.toLocaleString()} IRR
+            {protection.notionalIRR?.toLocaleString() || '0'} IRR
           </Text>
         </View>
         <View style={styles.protectionDetailRow}>
           <Text style={styles.protectionDetailLabel}>Premium Paid</Text>
           <Text style={styles.protectionDetailValue}>
-            {protection.premiumIRR.toLocaleString()} IRR
+            {protection.premiumIRR?.toLocaleString() || '0'} IRR
           </Text>
         </View>
         <View style={styles.protectionDetailRow}>

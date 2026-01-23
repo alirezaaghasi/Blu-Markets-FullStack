@@ -9,6 +9,7 @@ import { getErrorMessage } from '../utils/errorUtils';
 interface UseProtectionsResult {
   protections: Protection[];
   protectableHoldings: ProtectableHolding[];
+  eligibleAssets: ProtectableHolding[]; // Alias for backwards compatibility
   durationPresets: number[];
   coverageRange: { min: number; max: number; step: number };
   isLoading: boolean;
@@ -116,9 +117,13 @@ export function useProtections(): UseProtectionsResult {
     }, [fetchProtections])
   );
 
+  // Ensure protectableHoldings is always an array for safety
+  const safeProtectableHoldings = protectableHoldings || [];
+
   return {
     protections,
-    protectableHoldings,
+    protectableHoldings: safeProtectableHoldings,
+    eligibleAssets: safeProtectableHoldings, // Alias for backwards compatibility
     durationPresets,
     coverageRange,
     isLoading,
