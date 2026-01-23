@@ -141,23 +141,49 @@ async function liquidateLoan(
     const excess = Math.max(0, collateralValueIrr - remainingDue);
     const shortfallIrr = Math.max(0, remainingDue - collateralValueIrr);
 
-    // Mark loan as liquidated with shortfall if any
+    // Mark loan as liquidated with accurate paid amount
+    // paidIrr should reflect actual proceeds from collateral sale, not total due
+    const actualPaidFromLiquidation = proceeds;
+    const previouslyPaid = Number(loan.paidIrr) || 0;
+
     await tx.loan.update({
       where: { id: loanId },
       data: {
         status: 'LIQUIDATED',
-        paidIrr: Number(loan.totalDueIrr), // Mark as fully paid via liquidation
+        paidIrr: previouslyPaid + actualPaidFromLiquidation, // Actual amount recovered
         shortfallIrr: shortfallIrr > 0 ? shortfallIrr : null,
       },
     });
 
-    // Remove collateral holding (selling it)
-    await tx.holding.deleteMany({
+    // Remove only the collateralized quantity from the holding, not all holdings of this asset
+    // Users may have purchased more of the same asset after taking the loan
+    const holding = await tx.holding.findFirst({
       where: {
         portfolioId: loan.portfolioId,
         assetId: loan.collateralAssetId,
       },
     });
+
+    if (holding) {
+      const collateralQty = Number(loan.collateralQuantity);
+      const remainingQty = Number(holding.quantity) - collateralQty;
+
+      if (remainingQty <= 0) {
+        // All of this asset was collateralized, delete the holding
+        await tx.holding.delete({
+          where: { id: holding.id },
+        });
+      } else {
+        // User has additional units beyond collateral, keep them
+        await tx.holding.update({
+          where: { id: holding.id },
+          data: {
+            quantity: remainingQty,
+            frozen: false, // Unfreeze remaining quantity
+          },
+        });
+      }
+    }
 
     // If there's excess, return as cash
     if (excess > 0) {

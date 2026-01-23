@@ -234,7 +234,6 @@ export async function executeTrade(
     throw new AppError('NOT_FOUND', 'Portfolio not found', 404);
   }
 
-  const { quantity, priceIrr, spreadAmountIrr } = preview.preview;
   const layer = getAssetLayer(assetId);
 
   // Execute trade within transaction with re-validation
@@ -248,6 +247,20 @@ export async function executeTrade(
     if (!currentPortfolio) {
       throw new AppError('NOT_FOUND', 'Portfolio not found', 404);
     }
+
+    // CRITICAL: Re-fetch price inside transaction to ensure we use current price
+    // Price may have changed between preview and execution
+    const currentPrice = await getAssetPrice(assetId);
+    if (!currentPrice) {
+      throw new AppError('SERVICE_UNAVAILABLE', 'Current price not available', 503);
+    }
+
+    // Recalculate trade values with current price
+    const spread = getSpreadForAsset(assetId);
+    const spreadAmountIrr = amountIrr * spread;
+    const effectiveAmountIrr = action === 'BUY' ? amountIrr - spreadAmountIrr : amountIrr;
+    const quantity = effectiveAmountIrr / currentPrice.priceIrr;
+    const priceIrr = currentPrice.priceIrr;
 
     let newCashIrr: number;
     let holdingQuantity: number;
@@ -397,6 +410,18 @@ function calculateAfterAllocation(
 ): TargetAllocation {
   const layer = getAssetLayer(assetId);
   const totalValue = snapshot.totalValueIrr;
+
+  // Guard against division by zero for new/empty portfolios
+  if (totalValue <= 0) {
+    // For empty portfolios, the first trade defines 100% allocation to that layer
+    const zeroAllocation = { foundation: 0, growth: 0, upside: 0 };
+    if (action === 'BUY') {
+      if (layer === 'FOUNDATION') zeroAllocation.foundation = 100;
+      else if (layer === 'GROWTH') zeroAllocation.growth = 100;
+      else zeroAllocation.upside = 100;
+    }
+    return zeroAllocation;
+  }
 
   // Clone current allocation
   const newAllocation = { ...snapshot.allocation };

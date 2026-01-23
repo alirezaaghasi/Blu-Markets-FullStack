@@ -178,9 +178,20 @@ export async function executeRebalance(
   }
 
   const result = await prisma.$transaction(async (tx) => {
-    let cashIrr = Number(portfolio.cashIrr);
+    // CRITICAL: Re-fetch portfolio and holdings inside transaction
+    // to get current frozen status and prevent race conditions with loan creation
+    const currentPortfolio = await tx.portfolio.findUnique({
+      where: { id: portfolio.id },
+      include: { holdings: true },
+    });
+
+    if (!currentPortfolio) {
+      throw new AppError('NOT_FOUND', 'Portfolio not found', 404);
+    }
+
+    let cashIrr = Number(currentPortfolio.cashIrr);
     const holdingsMap = new Map(
-      portfolio.holdings.map((h) => [h.assetId, { id: h.id, quantity: Number(h.quantity) }])
+      currentPortfolio.holdings.map((h) => [h.assetId, { id: h.id, quantity: Number(h.quantity), frozen: h.frozen }])
     );
 
     // Execute each trade
@@ -193,6 +204,12 @@ export async function executeRebalance(
       if (trade.side === 'SELL') {
         const holding = holdingsMap.get(trade.assetId);
         if (!holding) continue;
+
+        // CRITICAL: Check frozen status - can't sell collateral
+        if (holding.frozen) {
+          console.warn(`[REBALANCE] Skipping frozen asset ${trade.assetId}`);
+          continue;
+        }
 
         const quantityToSell = trade.amountIrr / price.priceIrr;
         const newQuantity = holding.quantity - quantityToSell;
@@ -238,7 +255,7 @@ export async function executeRebalance(
               frozen: false,
             },
           });
-          holdingsMap.set(trade.assetId, { id: newHolding.id, quantity: quantityToBuy });
+          holdingsMap.set(trade.assetId, { id: newHolding.id, quantity: quantityToBuy, frozen: false });
         }
 
         cashIrr -= trade.amountIrr;

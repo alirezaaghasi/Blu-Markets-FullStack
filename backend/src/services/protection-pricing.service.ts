@@ -485,6 +485,17 @@ export async function getProtectionQuote(
 
   const spotPriceUsd = priceData.priceUsd;
   const spotPriceIrr = priceData.priceIrr;
+
+  // Guard against division by zero or invalid prices
+  if (!spotPriceUsd || spotPriceUsd <= 0 || !isFinite(spotPriceUsd)) {
+    throw new AppError(
+      'SERVICE_UNAVAILABLE',
+      `Invalid USD price for ${assetId}`,
+      503,
+      { assetId, priceUsd: spotPriceUsd }
+    );
+  }
+
   const fxRate = priceData.priceIrr / priceData.priceUsd;
 
   // Calculate notional
@@ -595,17 +606,87 @@ export async function getPremiumCurve(
   coveragePct: number,
   userId: string
 ): Promise<QuoteCurveItem[]> {
+  // OPTIMIZATION: Fetch holding and prices once, then compute all durations in memory
+  // This avoids redundant DB and price lookups for each duration variant
+
+  // Fetch holding once
+  const holding = await prisma.holding.findUnique({
+    where: { id: holdingId },
+    include: { portfolio: true },
+  });
+
+  if (!holding) {
+    throw new AppError('NOT_FOUND', 'Holding not found', 404, { holdingId });
+  }
+
+  if (holding.portfolio.userId !== userId) {
+    throw new AppError('UNAUTHORIZED', 'Holding does not belong to user', 401);
+  }
+
+  const assetId = holding.assetId as AssetId;
+
+  // Check if asset is eligible
+  if (!PROTECTION_ELIGIBLE_ASSETS.includes(assetId)) {
+    throw new AppError(
+      'VALIDATION_ERROR',
+      `Asset ${assetId} is not eligible for protection`,
+      400,
+      { assetId, eligibleAssets: PROTECTION_ELIGIBLE_ASSETS }
+    );
+  }
+
+  // Fetch prices once
+  const prices = await getCurrentPrices();
+  const priceData = prices.get(assetId);
+
+  if (!priceData || !priceData.priceUsd || priceData.priceUsd <= 0) {
+    throw new AppError(
+      'SERVICE_UNAVAILABLE',
+      `No valid price data for ${assetId}`,
+      503,
+      { assetId }
+    );
+  }
+
+  const spotPriceUsd = priceData.priceUsd;
+  const spotPriceIrr = priceData.priceIrr;
+  const holdingValueUsd = Number(holding.quantity) * spotPriceUsd;
+  const holdingValueIrr = Number(holding.quantity) * spotPriceIrr;
+  const notionalUsd = holdingValueUsd * coveragePct;
+  const notionalIrr = holdingValueIrr * coveragePct;
+  const strikePct = DEFAULT_STRIKE_PCT;
+  const layer = getAssetLayer(assetId);
+  const executionSpreadPct = EXECUTION_SPREAD[assetId] || 0.005;
+
+  // Calculate quotes for all durations using pre-fetched data
   const quotes: QuoteCurveItem[] = [];
 
   for (const durationDays of DURATION_PRESETS) {
     try {
-      const quote = await getProtectionQuote(holdingId, coveragePct, durationDays, userId);
+      // Get volatility for this duration
+      const volData = getImpliedVolatility(assetId, durationDays, strikePct);
+      const impliedVolatility = volData.adjustedVolatility;
+
+      // Calculate time and premium
+      const timeYears = daysToYears(durationDays);
+      const profitMarginPct = PROFIT_MARGIN_PER_DAY[layer] * durationDays;
+      const fairValuePct = blackScholesPut(1, strikePct, timeYears, impliedVolatility, RISK_FREE_RATE);
+
+      let totalPremiumPct = fairValuePct + executionSpreadPct + profitMarginPct;
+
+      // Apply bounds
+      const minPremium = (MIN_PREMIUM_30D[assetId] || 0.015) * (durationDays / 30);
+      const maxPremium = (MAX_PREMIUM_30D[assetId] || 0.10) * (durationDays / 30);
+      totalPremiumPct = Math.max(minPremium, Math.min(maxPremium, totalPremiumPct));
+
+      const premiumIrr = notionalIrr * totalPremiumPct;
+
       quotes.push({
         durationDays,
-        premiumPct: quote.premiumPct,
-        premiumIrr: quote.premiumIrr,
-        premiumPerDayPct: quote.premiumPct / durationDays,
-        impliedVolatility: quote.impliedVolatility,
+        premiumPct: totalPremiumPct,
+        premiumIrr,
+        premiumPerDayPct: totalPremiumPct / durationDays,
+        impliedVolatility,
       });
     } catch (error) {
       // Skip invalid durations

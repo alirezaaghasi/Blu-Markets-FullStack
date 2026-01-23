@@ -45,9 +45,18 @@ export async function registerPriceWebSocket(app: FastifyInstance): Promise<void
 
   // WebSocket endpoint: /api/v1/prices/stream
   app.get('/stream', { websocket: true }, async (socket: WebSocket, req: FastifyRequest) => {
-    // JWT Authentication - verify token from query string or header
-    const token = (req.query as Record<string, string>).token ||
-                  req.headers.authorization?.replace('Bearer ', '');
+    // JWT Authentication - prefer Authorization header over query string
+    // SECURITY: Query string tokens can leak via proxy logs, referrers, or analytics
+    // Prefer: Authorization header (works in React Native/mobile clients)
+    // Fallback: Query string (for browser clients that can't set headers)
+    const headerToken = req.headers.authorization?.replace('Bearer ', '');
+    const queryToken = (req.query as Record<string, string>).token;
+
+    if (queryToken && !headerToken) {
+      console.warn('📡 WebSocket using query string token (deprecated) - consider using Authorization header');
+    }
+
+    const token = headerToken || queryToken;
 
     if (!token) {
       console.log('📡 WebSocket connection rejected: No token provided');
