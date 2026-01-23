@@ -3,7 +3,7 @@
  * Works both for onboarding and retaking quiz from profile
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -36,11 +36,6 @@ const QuestionnaireScreen: React.FC<Props> = ({ navigation: propNavigation }) =>
   // Check if this is a retake quiz (accessed from RetakeQuiz route)
   const isRetakeMode = route.name === 'RetakeQuiz';
 
-  useEffect(() => {
-    console.log('[Questionnaire] Component MOUNTED, isRetakeMode:', isRetakeMode);
-    return () => console.log('[Questionnaire] Component UNMOUNTED');
-  }, [isRetakeMode]);
-
   const question = QUESTIONS[currentIndex];
 
   const handleRetakeComplete = async (answersObj: Record<string, number>) => {
@@ -61,7 +56,6 @@ const QuestionnaireScreen: React.FC<Props> = ({ navigation: propNavigation }) =>
         };
       });
 
-      console.log('[Questionnaire] Submitting retake quiz to API...');
       const response = await onboarding.submitQuestionnaire(formattedAnswers);
 
       // Normalize allocation values
@@ -101,15 +95,12 @@ const QuestionnaireScreen: React.FC<Props> = ({ navigation: propNavigation }) =>
   const handleOption = (optionIdx: number) => {
     if (isNavigating || isSubmitting) return;
 
-    console.log(`[Questionnaire] Selected option ${optionIdx} for question ${currentIndex + 1}/${QUESTIONS.length}`);
-
     const newAnswers = [...answers, optionIdx];
     setAnswers(newAnswers);
 
     if (currentIndex >= QUESTIONS.length - 1) {
       // Last question
       setIsNavigating(true);
-      console.log('[Questionnaire] Last question answered, navigating...');
 
       const answersObj: Record<string, number> = {};
       QUESTIONS.forEach((q, i) => {

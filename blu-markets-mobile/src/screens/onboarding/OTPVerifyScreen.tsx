@@ -64,7 +64,6 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
 
     // Prevent multiple submissions
     if (isLoading) {
-      console.log('[OTP] Already verifying, ignoring');
       return;
     }
 
@@ -72,20 +71,16 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
     setError('');
 
     try {
-      console.log('[OTP] Starting verification...');
       const response = await auth.verifyOtp(phone, verifyCode);
-      console.log('[OTP] Verification successful, onboardingComplete:', response.onboardingComplete);
 
       // Store auth token in Redux (for app state) - triggers RootNavigator update
       dispatch(setAuthToken(response.accessToken));
 
       // Navigate based on onboarding status
       if (!response.onboardingComplete) {
-        console.log('[OTP] Navigating to Questionnaire');
         navigation.navigate('Questionnaire');
       } else {
         // Mark onboarding complete to trigger navigation to main app
-        console.log('[OTP] User already completed onboarding, marking complete');
         const { completeOnboarding } = await import('../../store/slices/authSlice');
         dispatch(completeOnboarding());
       }

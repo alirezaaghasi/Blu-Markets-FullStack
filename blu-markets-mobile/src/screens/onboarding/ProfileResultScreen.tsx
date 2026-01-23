@@ -63,12 +63,10 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation, r
   useEffect(() => {
     // Prevent double submission
     if (hasSubmittedRef.current) {
-      console.log('[ProfileResult] Already submitted, skipping');
       return;
     }
 
     if (!answersFromParams) {
-      console.log('[ProfileResult] No answers from params');
       setError('No questionnaire answers found');
       setIsLoading(false);
       return;
@@ -78,8 +76,6 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation, r
 
     const submitQuestionnaire = async () => {
       try {
-        console.log('[ProfileResult] Starting questionnaire submission...');
-
         // Format answers for backend API
         // Use score from options (scores are 1-10 range, satisfies backend's value >= 1 requirement)
         // Include flag field for pathological user detection (panic_seller, gambler, etc.)
@@ -94,10 +90,7 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation, r
           };
         });
 
-        console.log('[ProfileResult] Calling API with', formattedAnswers.length, 'answers');
-        console.log('[ProfileResult] Answers:', JSON.stringify(formattedAnswers));
         const response = await onboarding.submitQuestionnaire(formattedAnswers);
-        console.log('[ProfileResult] API response received:', JSON.stringify(response).substring(0, 100));
 
         // Normalize backend response:
         // - Backend uses lowercase keys (foundation, growth, upside)
@@ -124,8 +117,6 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation, r
           profileNameFarsi: getProfileNameFarsi(riskScore),
           targetAllocation: normalizedAllocation,
         };
-
-        console.log('[ProfileResult] Normalized profile:', profileData);
 
         // Store in Redux
         store.dispatch(setRiskProfile(profileData));
