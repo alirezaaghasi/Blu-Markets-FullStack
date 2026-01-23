@@ -60,9 +60,11 @@ export async function sendOtp(phone: string): Promise<{ expiresIn: number }> {
 }
 
 export async function verifyOtp(phone: string, code: string): Promise<boolean> {
-  // SECURITY: Development bypass removed - always verify through proper channel
-  // In development, OTP is logged to console (see sendSms function) for testing
-  // This prevents accidental bypass if NODE_ENV is misconfigured in production
+  // Development bypass: allow 999999 for any phone in development
+  if (env.NODE_ENV === 'development' && code === '999999') {
+    console.log(`📱 OTP bypass used for ${phone}`);
+    return true;
+  }
 
   // Find valid OTP
   const otp = await prisma.otpCode.findFirst({

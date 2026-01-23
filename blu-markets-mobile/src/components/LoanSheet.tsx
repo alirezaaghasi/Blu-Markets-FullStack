@@ -28,26 +28,41 @@ import { TransactionSuccessModal, TransactionSuccessResult } from './Transaction
 interface LoanSheetProps {
   visible: boolean;
   onClose: () => void;
-  eligibleHoldings: Holding[];
+  eligibleHoldings?: Holding[];
 }
 
 export const LoanSheet: React.FC<LoanSheetProps> = ({
   visible,
   onClose,
-  eligibleHoldings,
+  eligibleHoldings: propHoldings,
 }) => {
   const dispatch = useAppDispatch();
   const { loans, cashIRR, holdings } = useAppSelector((state) => state.portfolio);
   const { prices, fxRate } = useAppSelector((state) => state.prices);
 
-  const [selectedAssetId, setSelectedAssetId] = useState<AssetId | null>(
-    eligibleHoldings[0]?.assetId || null
-  );
+  // Use provided holdings or derive eligible holdings from portfolio
+  // Eligible for loans: unfrozen holdings with LTV > 0
+  const eligibleHoldings = useMemo(() => {
+    if (propHoldings) return propHoldings;
+    return holdings.filter((h) => {
+      const asset = ASSETS[h.assetId];
+      return asset && asset.ltv > 0 && !h.frozen && h.quantity > 0;
+    });
+  }, [propHoldings, holdings]);
+
+  const [selectedAssetId, setSelectedAssetId] = useState<AssetId | null>(null);
   const [amountInput, setAmountInput] = useState('');
   const [durationMonths, setDurationMonths] = useState<3 | 6>(3);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successResult, setSuccessResult] = useState<TransactionSuccessResult | null>(null);
+
+  // Set initial selected asset when eligibleHoldings loads
+  React.useEffect(() => {
+    if (!selectedAssetId && eligibleHoldings.length > 0) {
+      setSelectedAssetId(eligibleHoldings[0].assetId);
+    }
+  }, [eligibleHoldings, selectedAssetId]);
 
   // Selected holding and asset
   const selectedHolding = eligibleHoldings.find((h) => h.assetId === selectedAssetId);
@@ -217,6 +232,36 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
     setSuccessResult(null);
     onClose();
   };
+
+  // Show empty state if no eligible holdings for collateral
+  if (eligibleHoldings.length === 0) {
+    return (
+      <Modal
+        visible={visible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={onClose}
+      >
+        <SafeAreaView style={styles.container}>
+          <View style={styles.header}>
+            <View style={styles.dragIndicator} />
+            <Text style={styles.title}>Borrow IRR</Text>
+            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+              <Text style={styles.closeButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>
+              No assets available as collateral.
+            </Text>
+            <Text style={styles.emptyStateSubtext}>
+              You need assets with LTV value to borrow against.
+            </Text>
+          </View>
+        </SafeAreaView>
+      </Modal>
+    );
+  }
 
   return (
     <Modal
@@ -429,6 +474,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bgDark,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing[6],
+  },
+  emptyStateText: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textPrimaryDark,
+    textAlign: 'center',
+    marginBottom: spacing[2],
+  },
+  emptyStateSubtext: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
   header: {
     alignItems: 'center',

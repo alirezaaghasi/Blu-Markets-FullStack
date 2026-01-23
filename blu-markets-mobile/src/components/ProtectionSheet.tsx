@@ -24,19 +24,41 @@ import { TransactionSuccessModal, TransactionSuccessResult } from './Transaction
 interface ProtectionSheetProps {
   visible: boolean;
   onClose: () => void;
-  holding: ProtectableHolding;
+  holding?: ProtectableHolding;
   onPurchaseComplete?: () => void;
 }
 
 export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
   visible,
   onClose,
-  holding,
+  holding: propHolding,
   onPurchaseComplete,
 }) => {
   const dispatch = useAppDispatch();
-  const { cashIRR } = useAppSelector((state) => state.portfolio);
+  const { cashIRR, holdings } = useAppSelector((state) => state.portfolio);
+  const { prices, fxRate } = useAppSelector((state) => state.prices);
 
+  // Derive eligible holdings for protection if not provided
+  const eligibleHoldings: ProtectableHolding[] = React.useMemo(() => {
+    if (propHolding) return [propHolding];
+    return holdings
+      .filter((h) => {
+        const asset = ASSETS[h.assetId];
+        // Protectable: crypto assets that aren't frozen and have quantity
+        return asset && asset.layer !== 'FOUNDATION' && !h.frozen && h.quantity > 0;
+      })
+      .map((h) => {
+        const priceUSD = prices[h.assetId] || 0;
+        return {
+          ...h,
+          holdingId: h.id || `demo-${h.assetId}`,
+          priceUSD,
+          valueIRR: h.quantity * priceUSD * fxRate,
+        };
+      });
+  }, [propHolding, holdings, prices, fxRate]);
+
+  const [selectedHoldingId, setSelectedHoldingId] = useState<string | null>(null);
   const [durationDays, setDurationDays] = useState(30);
   const [coveragePct, setCoveragePct] = useState(1.0);
   const [quote, setQuote] = useState<ProtectionQuote | null>(null);
@@ -46,11 +68,19 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
   const [showSuccess, setShowSuccess] = useState(false);
   const [successResult, setSuccessResult] = useState<TransactionSuccessResult | null>(null);
 
-  const asset = ASSETS[holding.assetId];
+  // Select first eligible holding if none selected
+  useEffect(() => {
+    if (!selectedHoldingId && eligibleHoldings.length > 0) {
+      setSelectedHoldingId(eligibleHoldings[0].holdingId);
+    }
+  }, [eligibleHoldings, selectedHoldingId]);
+
+  const holding = propHolding || eligibleHoldings.find((h) => h.holdingId === selectedHoldingId);
+  const asset = holding ? ASSETS[holding.assetId] : null;
 
   // Fetch quote when parameters change
   const fetchQuote = useCallback(async () => {
-    if (!holding.holdingId) return;
+    if (!holding?.holdingId) return;
 
     setIsLoadingQuote(true);
     setQuoteError(null);
@@ -68,7 +98,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
     } finally {
       setIsLoadingQuote(false);
     }
-  }, [holding.holdingId, coveragePct, durationDays]);
+  }, [holding?.holdingId, coveragePct, durationDays]);
 
   // Fetch quote on mount and when params change
   useEffect(() => {
@@ -83,7 +113,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
 
   // Handle confirmation
   const handleConfirm = async () => {
-    if (!isValid || !quote) return;
+    if (!isValid || !quote || !holding || !asset) return;
 
     setIsSubmitting(true);
     try {
@@ -138,6 +168,36 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
     onClose();
     onPurchaseComplete?.();
   };
+
+  // Show empty state if no eligible holdings
+  if (!holding) {
+    return (
+      <Modal
+        visible={visible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={onClose}
+      >
+        <SafeAreaView style={styles.container}>
+          <View style={styles.header}>
+            <View style={styles.dragIndicator} />
+            <Text style={styles.title}>Insure Assets</Text>
+            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+              <Text style={styles.closeButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>
+              No assets available for protection.
+            </Text>
+            <Text style={styles.emptyStateSubtext}>
+              Growth and Upside layer assets can be protected against price drops.
+            </Text>
+          </View>
+        </SafeAreaView>
+      </Modal>
+    );
+  }
 
   return (
     <Modal
@@ -429,6 +489,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bgDark,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing[6],
+  },
+  emptyStateText: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textPrimaryDark,
+    textAlign: 'center',
+    marginBottom: spacing[2],
+  },
+  emptyStateSubtext: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
   header: {
     alignItems: 'center',
