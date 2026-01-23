@@ -50,13 +50,17 @@ export function stopBackgroundJobs(): void {
  */
 async function runLoanLiquidationCheck(): Promise<void> {
   try {
-    // Get all active loans
+    // Get all active loans - only select fields needed for LTV calculation
+    // Removed: portfolio.holdings include (unused, inflates query size)
     const activeLoans = await prisma.loan.findMany({
       where: { status: 'ACTIVE' },
-      include: {
-        portfolio: {
-          include: { holdings: true },
-        },
+      select: {
+        id: true,
+        portfolioId: true,
+        collateralAssetId: true,
+        collateralQuantity: true,
+        totalDueIrr: true,
+        paidIrr: true,
       },
     });
 

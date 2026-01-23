@@ -5,11 +5,24 @@ import { priceBroadcaster } from './price-broadcaster.service.js';
 
 // Price cache configuration
 const PRICE_CACHE_TTL_MS = 5000; // 5 seconds cache
+
+// Extended price data for API responses
+export interface CachedPriceData {
+  assetId: AssetId;
+  priceUsd: number;
+  priceIrr: number;
+  change24hPct?: number;
+  source: string;
+  fetchedAt: Date;
+}
+
 let priceCache: {
   data: Map<AssetId, { priceUsd: number; priceIrr: number; change24hPct?: number }> | null;
+  fullData: Map<AssetId, CachedPriceData> | null;
   timestamp: number;
 } = {
   data: null,
+  fullData: null,
   timestamp: 0,
 };
 
@@ -189,11 +202,19 @@ export async function updateAllPrices(): Promise<void> {
   const fetchedAt = new Date();
   const timestamp = fetchedAt.toISOString();
 
-  // Collect all price updates for broadcasting and batch upsert
+  // Collect all price updates for broadcasting
   const priceUpdates = new Map<AssetId, { priceUsd: number; priceIrr: number; change24hPct?: number; source: string; timestamp: string }>();
 
-  // Prepare batch upsert data
-  const upsertOperations = allPrices.map((price) => {
+  // Prepare data for bulk upsert
+  const upsertData: Array<{
+    assetId: string;
+    priceUsd: number;
+    priceIrr: number;
+    change24hPct: number | null;
+    source: string;
+  }> = [];
+
+  for (const price of allPrices) {
     const priceIrr =
       price.assetId === 'IRR_FIXED_INCOME'
         ? 500000 // Fixed income unit price
@@ -208,35 +229,47 @@ export async function updateAllPrices(): Promise<void> {
       timestamp,
     });
 
-    return prisma.price.upsert({
-      where: { assetId: price.assetId },
-      create: {
-        assetId: price.assetId,
-        priceUsd: price.priceUsd,
-        priceIrr,
-        fxRate: fxRate.usdIrr,
-        fxSource: fxRate.source,
-        source: price.source,
-        fetchedAt,
-        change24hPct: price.change24hPct,
-      },
-      update: {
-        priceUsd: price.priceUsd,
-        priceIrr,
-        fxRate: fxRate.usdIrr,
-        fxSource: fxRate.source,
-        source: price.source,
-        fetchedAt,
-        change24hPct: price.change24hPct,
-      },
+    upsertData.push({
+      assetId: price.assetId,
+      priceUsd: price.priceUsd,
+      priceIrr,
+      change24hPct: price.change24hPct ?? null,
+      source: price.source,
     });
-  });
+  }
 
-  // Execute all upserts in a single transaction for better performance
-  await prisma.$transaction(upsertOperations);
+  // PERFORMANCE: Single bulk upsert instead of N individual upserts
+  // Uses PostgreSQL INSERT ... ON CONFLICT DO UPDATE (UPSERT) for efficiency
+  if (upsertData.length > 0) {
+    const values = upsertData.map((d, i) => {
+      const offset = i * 5;
+      return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${upsertData.length * 5 + 1}, $${upsertData.length * 5 + 2}, $${upsertData.length * 5 + 3})`;
+    }).join(', ');
+
+    const params: (string | number | null | Date)[] = [];
+    for (const d of upsertData) {
+      params.push(d.assetId, d.priceUsd, d.priceIrr, d.change24hPct, d.source);
+    }
+    // Add shared params for all rows
+    params.push(fetchedAt, fxRate.usdIrr, fxRate.source);
+
+    await prisma.$executeRawUnsafe(`
+      INSERT INTO prices (asset_id, price_usd, price_irr, change_24h_pct, source, fetched_at, fx_rate, fx_source)
+      VALUES ${values}
+      ON CONFLICT (asset_id) DO UPDATE SET
+        price_usd = EXCLUDED.price_usd,
+        price_irr = EXCLUDED.price_irr,
+        change_24h_pct = EXCLUDED.change_24h_pct,
+        source = EXCLUDED.source,
+        fetched_at = EXCLUDED.fetched_at,
+        fx_rate = EXCLUDED.fx_rate,
+        fx_source = EXCLUDED.fx_source
+    `, ...params);
+  }
 
   // Invalidate cache after update
   priceCache.data = null;
+  priceCache.fullData = null;
   priceCache.timestamp = 0;
 
   // Broadcast individual price updates
@@ -287,6 +320,61 @@ export async function getCurrentPrices(): Promise<Map<AssetId, { priceUsd: numbe
   priceCache.timestamp = now;
 
   return priceMap;
+}
+
+/**
+ * Get all prices with full data for API responses (includes source and fetchedAt)
+ * Uses the same cache as getCurrentPrices to avoid redundant DB queries
+ */
+export async function getAllPricesForApi(): Promise<{
+  prices: CachedPriceData[];
+  latestFetchedAt: Date | null;
+}> {
+  const now = Date.now();
+
+  // Return cached full data if valid
+  if (priceCache.fullData && (now - priceCache.timestamp) < PRICE_CACHE_TTL_MS) {
+    const prices = Array.from(priceCache.fullData.values());
+    const latestFetchedAt = prices.length > 0
+      ? new Date(Math.max(...prices.map(p => p.fetchedAt.getTime())))
+      : null;
+    return { prices, latestFetchedAt };
+  }
+
+  // Fetch from database (no asset join needed - we only need price data)
+  const dbPrices = await prisma.price.findMany();
+
+  const fullDataMap = new Map<AssetId, CachedPriceData>();
+  const priceMap = new Map<AssetId, { priceUsd: number; priceIrr: number; change24hPct?: number }>();
+
+  for (const price of dbPrices) {
+    const assetId = price.assetId as AssetId;
+    fullDataMap.set(assetId, {
+      assetId,
+      priceUsd: Number(price.priceUsd),
+      priceIrr: Number(price.priceIrr),
+      change24hPct: price.change24hPct ? Number(price.change24hPct) : undefined,
+      source: price.source || 'unknown',
+      fetchedAt: price.fetchedAt,
+    });
+    priceMap.set(assetId, {
+      priceUsd: Number(price.priceUsd),
+      priceIrr: Number(price.priceIrr),
+      change24hPct: price.change24hPct ? Number(price.change24hPct) : undefined,
+    });
+  }
+
+  // Update both caches
+  priceCache.data = priceMap;
+  priceCache.fullData = fullDataMap;
+  priceCache.timestamp = now;
+
+  const prices = Array.from(fullDataMap.values());
+  const latestFetchedAt = prices.length > 0
+    ? new Date(Math.max(...prices.map(p => p.fetchedAt.getTime())))
+    : null;
+
+  return { prices, latestFetchedAt };
 }
 
 // Get single asset price

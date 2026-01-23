@@ -92,7 +92,8 @@ export class AuthService {
     });
 
     // Generate access token
-    const accessToken = this.app.jwt.sign(
+    // Generate access JWT with access secret
+    const accessToken = this.app.access.sign(
       {
         sub: userId,
         phone,
@@ -101,8 +102,8 @@ export class AuthService {
       { expiresIn: env.JWT_ACCESS_EXPIRY }
     );
 
-    // Generate refresh JWT (contains session ID)
-    const refreshJwt = this.app.jwt.sign(
+    // Generate refresh JWT with separate refresh secret (security: isolates token compromise)
+    const refreshJwt = this.app.refresh.sign(
       {
         sub: userId,
         sessionId: session.id,
@@ -118,10 +119,10 @@ export class AuthService {
   }
 
   async refreshTokens(refreshToken: string): Promise<AuthTokens> {
-    // Verify refresh token
+    // Verify refresh token with refresh secret
     let payload: RefreshPayload;
     try {
-      payload = this.app.jwt.verify<RefreshPayload>(refreshToken);
+      payload = this.app.refresh.verify<RefreshPayload>(refreshToken);
     } catch {
       throw new AppError('UNAUTHORIZED', 'Invalid refresh token', 401);
     }

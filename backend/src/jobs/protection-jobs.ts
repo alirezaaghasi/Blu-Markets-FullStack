@@ -10,12 +10,10 @@ import { prisma } from '../config/database.js';
 import { getCurrentPrices } from '../services/price-fetcher.service.js';
 import { calculateSettlement } from '../services/protection-pricing.service.js';
 import type { AssetId } from '../types/domain.js';
-import type { Protection, Portfolio } from '@prisma/client';
+import type { Protection } from '@prisma/client';
 
-// Type for protection with portfolio included
-interface ProtectionWithPortfolio extends Protection {
-  portfolio: Portfolio;
-}
+// Protection type alias (portfolio no longer eagerly loaded)
+type ProtectionRecord = Protection;
 
 // Type for price data from getCurrentPrices
 interface PriceData {
@@ -98,13 +96,11 @@ export async function processExpiredProtections(): Promise<ExpiryResult> {
   };
 
   // Find all active protections that have expired
+  // OPTIMIZATION: Removed portfolio include (not used, only portfolioId needed)
   const expiredProtections = await prisma.protection.findMany({
     where: {
       status: 'ACTIVE',
       expiryDate: { lte: now },
-    },
-    include: {
-      portfolio: true,
     },
   });
 
@@ -133,7 +129,7 @@ export async function processExpiredProtections(): Promise<ExpiryResult> {
  * @returns true if the protection was actually settled/expired, false if skipped
  */
 async function processProtectionExpiry(
-  protection: ProtectionWithPortfolio,
+  protection: ProtectionRecord,
   prices: Map<string, PriceData>,
   result: ExpiryResult
 ): Promise<boolean> {
@@ -214,7 +210,7 @@ async function processProtectionExpiry(
  * Exercise a protection (ITM settlement)
  */
 async function exerciseProtection(
-  protection: ProtectionWithPortfolio,
+  protection: ProtectionRecord,
   settlementIrr: number,
   settlementUsd: number
 ): Promise<void> {
@@ -298,7 +294,7 @@ async function exerciseProtection(
 /**
  * Mark protection as expired (OTM)
  */
-async function markProtectionExpired(protection: ProtectionWithPortfolio, settlementIrr: number): Promise<void> {
+async function markProtectionExpired(protection: ProtectionRecord, settlementIrr: number): Promise<void> {
   const now = new Date();
 
   await prisma.$transaction(async (tx) => {
@@ -458,7 +454,6 @@ export async function getCurrentRiskSummary(): Promise<RiskExposure> {
 export async function processSpecificProtection(protectionId: string): Promise<void> {
   const protection = await prisma.protection.findUnique({
     where: { id: protectionId },
-    include: { portfolio: true },
   });
 
   if (!protection) {

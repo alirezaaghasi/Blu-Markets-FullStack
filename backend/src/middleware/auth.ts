@@ -13,6 +13,21 @@ declare module 'fastify' {
   interface FastifyRequest {
     userId: string;
     portfolioId?: string;
+    // JWT namespace methods (access/refresh separation)
+    accessVerify<T = unknown>(options?: { token?: string }): Promise<T>;
+    refreshVerify<T = unknown>(options?: { token?: string }): Promise<T>;
+  }
+
+  interface FastifyInstance {
+    // JWT namespace instances
+    access: {
+      sign(payload: object, options?: object): string;
+      verify<T = unknown>(token: string): T;
+    };
+    refresh: {
+      sign(payload: object, options?: object): string;
+      verify<T = unknown>(token: string): T;
+    };
   }
 }
 
@@ -21,7 +36,8 @@ export async function authenticate(
   reply: FastifyReply
 ): Promise<void> {
   try {
-    const decoded = await request.jwtVerify<JwtPayload>();
+    // Use access namespace for access token verification
+    const decoded = await request.accessVerify<JwtPayload>();
     request.userId = decoded.sub;
     request.portfolioId = decoded.portfolioId;
   } catch (error) {
@@ -34,7 +50,8 @@ export async function optionalAuth(
   _reply: FastifyReply
 ): Promise<void> {
   try {
-    const decoded = await request.jwtVerify<JwtPayload>();
+    // Use access namespace for access token verification
+    const decoded = await request.accessVerify<JwtPayload>();
     request.userId = decoded.sub;
     request.portfolioId = decoded.portfolioId;
   } catch {

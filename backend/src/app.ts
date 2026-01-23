@@ -44,9 +44,22 @@ export async function buildApp(): Promise<FastifyInstance> {
       },
     },
   });
+  // CORS - Production whitelist with explicit methods and headers
+  const allowedOrigins = env.NODE_ENV === 'development'
+    ? true // Allow all in development
+    : [
+        'https://blumarkets.ir',
+        'https://www.blumarkets.ir',
+        'https://api.blumarkets.ir',
+      ];
+
   await app.register(cors, {
-    origin: env.NODE_ENV === 'development' ? true : ['https://blumarkets.ir'],
+    origin: allowedOrigins,
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
+    exposedHeaders: ['X-Request-ID'],
+    maxAge: 86400, // 24 hours preflight cache
   });
 
   // Rate limiting
@@ -61,10 +74,19 @@ export async function buildApp(): Promise<FastifyInstance> {
     }),
   });
 
-  // JWT
+  // JWT - Access tokens (default instance)
   await app.register(jwt, {
     secret: env.JWT_ACCESS_SECRET,
     sign: { expiresIn: env.JWT_ACCESS_EXPIRY },
+    namespace: 'access',
+  });
+
+  // JWT - Refresh tokens (separate secret for security)
+  // Using a different secret prevents access token compromise from affecting refresh tokens
+  await app.register(jwt, {
+    secret: env.JWT_REFRESH_SECRET,
+    sign: { expiresIn: env.JWT_REFRESH_EXPIRY },
+    namespace: 'refresh',
   });
 
   // WebSocket support

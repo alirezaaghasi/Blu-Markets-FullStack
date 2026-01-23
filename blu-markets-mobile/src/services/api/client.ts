@@ -1,9 +1,10 @@
 // HTTP Client with Authentication
 // Modular API Structure - src/services/api/client.ts
+// SECURITY: Uses expo-secure-store for encrypted token storage on native platforms
 
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL, API_TIMEOUT, TOKEN_KEYS } from '../../config/api';
+import { API_BASE_URL, API_TIMEOUT } from '../../config/api';
+import { tokenStorage } from '../../utils/secureStorage';
 
 // Create axios instance
 export const apiClient: AxiosInstance = axios.create({
@@ -32,10 +33,10 @@ const processQueue = (error: Error | null, token: string | null = null) => {
   failedQueue = [];
 };
 
-// Request interceptor - add auth token
+// Request interceptor - add auth token from secure storage
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
-    const token = await AsyncStorage.getItem(TOKEN_KEYS.ACCESS_TOKEN);
+    const token = await tokenStorage.getAccessToken();
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -71,7 +72,7 @@ apiClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const refreshToken = await AsyncStorage.getItem(TOKEN_KEYS.REFRESH_TOKEN);
+        const refreshToken = await tokenStorage.getRefreshToken();
 
         if (!refreshToken) {
           throw new Error('No refresh token available');
@@ -84,9 +85,8 @@ apiClient.interceptors.response.use(
 
         const { accessToken, refreshToken: newRefreshToken } = response.data;
 
-        // Store new tokens
-        await AsyncStorage.setItem(TOKEN_KEYS.ACCESS_TOKEN, accessToken);
-        await AsyncStorage.setItem(TOKEN_KEYS.REFRESH_TOKEN, newRefreshToken);
+        // Store new tokens in secure storage
+        await tokenStorage.setTokens(accessToken, newRefreshToken);
 
         // Update original request with new token
         if (originalRequest.headers) {
@@ -97,9 +97,9 @@ apiClient.interceptors.response.use(
 
         return apiClient(originalRequest);
       } catch (refreshError) {
-        // Refresh failed - clear tokens and reject
+        // Refresh failed - clear tokens from secure storage and reject
         processQueue(refreshError as Error, null);
-        await AsyncStorage.multiRemove([TOKEN_KEYS.ACCESS_TOKEN, TOKEN_KEYS.REFRESH_TOKEN]);
+        await tokenStorage.clearTokens();
 
         // The app should handle this by redirecting to login
         return Promise.reject(refreshError);
@@ -117,22 +117,20 @@ apiClient.interceptors.response.use(
   }
 );
 
-// Helper to clear auth tokens (for logout)
+// Helper to clear auth tokens (for logout) - uses secure storage
 export const clearAuthTokens = async (): Promise<void> => {
-  await AsyncStorage.multiRemove([TOKEN_KEYS.ACCESS_TOKEN, TOKEN_KEYS.REFRESH_TOKEN]);
+  await tokenStorage.clearTokens();
 };
 
-// Helper to set auth tokens (after login)
+// Helper to set auth tokens (after login) - uses secure storage
 export const setAuthTokens = async (
   accessToken: string,
   refreshToken: string
 ): Promise<void> => {
-  await AsyncStorage.setItem(TOKEN_KEYS.ACCESS_TOKEN, accessToken);
-  await AsyncStorage.setItem(TOKEN_KEYS.REFRESH_TOKEN, refreshToken);
+  await tokenStorage.setTokens(accessToken, refreshToken);
 };
 
-// Helper to check if user is authenticated
+// Helper to check if user is authenticated - uses secure storage
 export const isAuthenticated = async (): Promise<boolean> => {
-  const token = await AsyncStorage.getItem(TOKEN_KEYS.ACCESS_TOKEN);
-  return !!token;
+  return tokenStorage.hasTokens();
 };

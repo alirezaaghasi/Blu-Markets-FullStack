@@ -1,9 +1,9 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
-import { prisma } from '../../config/database.js';
 import {
   getCurrentPrices,
   getAssetPrice,
   getCurrentFxRate,
+  getAllPricesForApi,
 } from '../../services/price-fetcher.service.js';
 import type { AssetId } from '../../types/domain.js';
 import type { AllPricesResponse, PriceResponse } from '../../types/api.js';
@@ -46,26 +46,21 @@ export const pricesRoutes: FastifyPluginAsync = async (app: FastifyInstance) => 
       },
     },
     handler: async (request, reply) => {
-      const allPrices = await prisma.price.findMany({
-        include: { asset: true },
-      });
-
+      // Use cached prices to reduce DB load (5-second cache)
+      const { prices: cachedPrices, latestFetchedAt } = await getAllPricesForApi();
       const fxRate = await getCurrentFxRate();
 
       // Determine status based on freshness
-      const latestFetch = allPrices.length > 0
-        ? Math.max(...allPrices.map((p) => p.fetchedAt.getTime()))
-        : 0;
-      const ageMs = Date.now() - latestFetch;
+      const ageMs = latestFetchedAt ? Date.now() - latestFetchedAt.getTime() : Infinity;
       const status: 'live' | 'stale' | 'offline' =
         ageMs < 60000 ? 'live' : ageMs < 300000 ? 'stale' : 'offline';
 
-      const prices: PriceResponse[] = allPrices.map((p) => ({
-        assetId: p.assetId as AssetId,
-        priceUsd: Number(p.priceUsd),
-        priceIrr: Number(p.priceIrr),
-        change24hPct: p.change24hPct ? Number(p.change24hPct) : undefined,
-        source: p.source || 'unknown',
+      const prices: PriceResponse[] = cachedPrices.map((p) => ({
+        assetId: p.assetId,
+        priceUsd: p.priceUsd,
+        priceIrr: p.priceIrr,
+        change24hPct: p.change24hPct,
+        source: p.source,
         fetchedAt: p.fetchedAt.toISOString(),
       }));
 

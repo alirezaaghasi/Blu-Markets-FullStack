@@ -43,8 +43,25 @@ export async function registerPriceWebSocket(app: FastifyInstance): Promise<void
     clients.clear();
   });
 
+  // Allowed WebSocket origins for production
+  const allowedWsOrigins = [
+    'https://blumarkets.ir',
+    'https://www.blumarkets.ir',
+    'https://api.blumarkets.ir',
+  ];
+
   // WebSocket endpoint: /api/v1/prices/stream
   app.get('/stream', { websocket: true }, async (socket: WebSocket, req: FastifyRequest) => {
+    // SECURITY: Validate origin in production to prevent cross-site WebSocket hijacking
+    const origin = req.headers.origin;
+    const isDev = process.env.NODE_ENV === 'development';
+
+    if (!isDev && origin && !allowedWsOrigins.includes(origin)) {
+      console.log(`📡 WebSocket connection rejected: Invalid origin ${origin}`);
+      socket.close(4003, 'Origin not allowed');
+      return;
+    }
+
     // JWT Authentication - prefer Authorization header over query string
     // SECURITY: Query string tokens can leak via proxy logs, referrers, or analytics
     // Prefer: Authorization header (works in React Native/mobile clients)
@@ -65,7 +82,8 @@ export async function registerPriceWebSocket(app: FastifyInstance): Promise<void
     }
 
     try {
-      await (req as any).jwtVerify({ token });
+      // Use access namespace for token verification (separate from refresh tokens)
+      await (req as any).accessVerify({ token });
     } catch (error) {
       console.log('📡 WebSocket connection rejected: Invalid token');
       socket.close(4001, 'Invalid token');
