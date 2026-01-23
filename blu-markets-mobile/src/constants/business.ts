@@ -81,11 +81,11 @@ export const PROTECTION_ELIGIBLE_ASSETS = ['BTC', 'ETH', 'PAXG', 'KAG', 'QQQ', '
 // Protection - Quote validity
 export const PROTECTION_QUOTE_VALIDITY_SECONDS = 300; // 5 minutes
 
-// Protection - Premium tolerance for price changes
-export const PROTECTION_PREMIUM_TOLERANCE = 0.02; // 2%
+// Protection - Premium tolerance for price changes (must match backend PREMIUM_TOLERANCE)
+export const PROTECTION_PREMIUM_TOLERANCE = 0.05; // 5%
 
-// Protection - Minimum notional value
-export const PROTECTION_MIN_NOTIONAL_IRR = 10_000_000; // 10M IRR
+// Protection - Minimum notional value (must match backend MIN_NOTIONAL_IRR)
+export const PROTECTION_MIN_NOTIONAL_IRR = 1_000_000; // 1M IRR
 
 // Legacy: PREMIUM_BY_LAYER not used (now calculated via Black-Scholes)
 export const PROTECTION_PREMIUM_BY_LAYER: Record<Layer, number> = {
