@@ -1,9 +1,10 @@
 // Activity Feed Hook
 // src/hooks/useActivityFeed.ts
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { activity } from '../services/api/index';
+import { useAppSelector } from './useStore';
 import type { ActionLogEntry } from '../types';
 import { getErrorMessage } from '../utils/errorUtils';
 
@@ -25,7 +26,27 @@ export function useActivityFeed(initialLimit = 10): UseActivityFeedResult {
   const [hasMore, setHasMore] = useState(false);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
 
+  // Check if we're in demo mode (runtime check via Redux)
+  const authToken = useAppSelector((state) => state.auth.authToken);
+  const reduxActionLog = useAppSelector((state) => state.portfolio.actionLog);
+  const isDemoMode = authToken === 'demo-token';
+
+  // Demo mode activities from Redux state
+  const demoActivities = useMemo(() => {
+    if (!isDemoMode) return [];
+    return (reduxActionLog || []).slice(0, initialLimit);
+  }, [isDemoMode, reduxActionLog, initialLimit]);
+
   const fetchActivities = useCallback(async (isRefresh = false) => {
+    // In demo mode, use Redux state instead of API
+    if (isDemoMode) {
+      setActivities(demoActivities);
+      setHasMore(false);
+      setIsLoading(false);
+      setIsRefreshing(false);
+      return;
+    }
+
     try {
       if (isRefresh) {
         setIsRefreshing(true);
@@ -44,9 +65,11 @@ export function useActivityFeed(initialLimit = 10): UseActivityFeedResult {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [initialLimit]);
+  }, [initialLimit, isDemoMode, demoActivities]);
 
   const loadMore = useCallback(async () => {
+    // No pagination in demo mode
+    if (isDemoMode) return;
     if (!hasMore || isLoading || !cursor) return;
 
     try {
@@ -57,7 +80,7 @@ export function useActivityFeed(initialLimit = 10): UseActivityFeedResult {
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to load more activities'));
     }
-  }, [hasMore, isLoading, cursor]);
+  }, [hasMore, isLoading, cursor, isDemoMode]);
 
   const refresh = useCallback(async () => {
     await fetchActivities(true);
@@ -71,11 +94,11 @@ export function useActivityFeed(initialLimit = 10): UseActivityFeedResult {
   );
 
   return {
-    activities,
-    isLoading,
+    activities: isDemoMode ? demoActivities : activities,
+    isLoading: isDemoMode ? false : isLoading,
     isRefreshing,
     error,
-    hasMore,
+    hasMore: isDemoMode ? false : hasMore,
     refresh,
     loadMore,
   };

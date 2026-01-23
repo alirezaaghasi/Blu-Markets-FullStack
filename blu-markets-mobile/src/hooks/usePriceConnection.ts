@@ -5,8 +5,9 @@
  * for displaying price feed status indicator on Home screen.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { priceWebSocket, ConnectionStatus } from '../services/priceWebSocket';
+import { useAppSelector } from './useStore';
 
 interface PriceConnectionState {
   isConnected: boolean;
@@ -21,7 +22,18 @@ export function usePriceConnection(): PriceConnectionState {
   const [status, setStatus] = useState<ConnectionStatus>(priceWebSocket.getStatus());
   const [lastUpdate, setLastUpdate] = useState<Date | undefined>(undefined);
 
+  // Check if we're in demo mode (runtime check via Redux)
+  const authToken = useAppSelector((state) => state.auth.authToken);
+  const isDemoMode = authToken === 'demo-token';
+
   useEffect(() => {
+    // In demo mode, skip WebSocket connection and return static "connected" status
+    if (isDemoMode) {
+      setStatus('connected');
+      setLastUpdate(new Date());
+      return;
+    }
+
     // Subscribe to status changes
     const unsubscribeStatus = priceWebSocket.onStatusChange((newStatus) => {
       setStatus(newStatus);
@@ -43,7 +55,16 @@ export function usePriceConnection(): PriceConnectionState {
       unsubscribeStatus();
       unsubscribeMessage();
     };
-  }, []);
+  }, [isDemoMode]);
+
+  // In demo mode, always report as connected with demo prices
+  if (isDemoMode) {
+    return {
+      isConnected: true,
+      status: 'connected',
+      lastUpdate: lastUpdate || new Date(),
+    };
+  }
 
   return {
     isConnected: status === 'connected',

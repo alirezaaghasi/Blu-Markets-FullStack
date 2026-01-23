@@ -251,7 +251,10 @@ const HomeScreen: React.FC = () => {
   const targetLayerPct = portfolioState?.targetLayerPct || { FOUNDATION: 0.50, GROWTH: 0.35, UPSIDE: 0.15 };
   const loans = portfolioState?.loans || [];
   const { prices, fxRate } = useAppSelector((state) => state.prices);
-  const { phone } = useAppSelector((state) => state.auth);
+  const { phone, authToken } = useAppSelector((state) => state.auth);
+
+  // Check if we're in demo mode (runtime check)
+  const isDemoMode = authToken === 'demo-token';
 
   // ==========================================================================
   // COMPUTED VALUES
@@ -360,6 +363,13 @@ const HomeScreen: React.FC = () => {
   const onRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
+      // In demo mode, skip API calls - just refresh activities (which uses Redux)
+      if (isDemoMode) {
+        await refreshActivities();
+        setIsRefreshing(false);
+        return;
+      }
+
       const [portfolioResponse] = await Promise.all([
         portfolioApi.get(),
         refreshActivities(),
@@ -383,7 +393,7 @@ const HomeScreen: React.FC = () => {
     } finally {
       setIsRefreshing(false);
     }
-  }, [dispatch, refreshActivities]);
+  }, [dispatch, refreshActivities, isDemoMode]);
 
   // ==========================================================================
   // RENDER
