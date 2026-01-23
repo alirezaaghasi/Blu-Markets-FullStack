@@ -1,6 +1,20 @@
-// Profile Screen
-// Based on PRD Section 9.6 - Profile Tab
-import React, { useState } from 'react';
+/**
+ * Profile Screen
+ *
+ * Redesigned to comply with the Blu Markets Constitution
+ * (Guidelines for Communicating Risk Profile)
+ *
+ * Key principles:
+ * - Show PREFERENCES, not PERSONALITY
+ * - Use DIMENSIONAL language, not LABELS
+ * - Attribute to THE SYSTEM, not TRUTH
+ * - Enable CHANGE, not LOCK-IN
+ *
+ * "The profile explains the portfolio. The portfolio defines the experience.
+ *  The user defines the future."
+ */
+
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -20,10 +34,162 @@ import { SPACING, RADIUS } from '../../constants/spacing';
 import { useAppSelector, useAppDispatch } from '../../hooks/useStore';
 import { logout } from '../../store/slices/authSlice';
 import { resetPortfolio } from '../../store/slices/portfolioSlice';
-import { RISK_PROFILE_NAMES } from '../../constants/business';
 import { useBiometricAuth } from '../../hooks/useBiometricAuth';
 import { clearAllState } from '../../utils/storage';
 import type { RootStackParamList } from '../../navigation/types';
+
+// =============================================================================
+// TYPES
+// =============================================================================
+
+interface RiskDimensions {
+  stabilityPreference: string;
+  volatilityTolerance: string;
+  drawdownTolerance: string;
+  timeHorizon: string;
+}
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Mask phone number for privacy
+ * "+989123456789" → "+98 912 •••• ••89"
+ */
+function maskPhoneNumber(phone: string): string {
+  if (!phone) return '';
+
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 10) return phone;
+
+  const countryCode = '+98';
+  const firstPart = digits.slice(2, 5);
+  const lastTwo = digits.slice(-2);
+  return `${countryCode} ${firstPart} •••• ••${lastTwo}`;
+}
+
+/**
+ * Map risk score (1-10) to dimensional preferences
+ * Constitution §3.1: "Show as range, not label"
+ */
+function mapRiskScoreToDimensions(riskScore: number): RiskDimensions {
+  if (riskScore <= 2) {
+    return {
+      stabilityPreference: 'Very High',
+      volatilityTolerance: 'Very Low',
+      drawdownTolerance: 'Very Limited',
+      timeHorizon: 'Short',
+    };
+  }
+  if (riskScore <= 4) {
+    return {
+      stabilityPreference: 'High',
+      volatilityTolerance: 'Low',
+      drawdownTolerance: 'Limited',
+      timeHorizon: 'Short-Medium',
+    };
+  }
+  if (riskScore <= 6) {
+    return {
+      stabilityPreference: 'Medium',
+      volatilityTolerance: 'Medium',
+      drawdownTolerance: 'Moderate',
+      timeHorizon: 'Medium',
+    };
+  }
+  if (riskScore <= 8) {
+    return {
+      stabilityPreference: 'Low',
+      volatilityTolerance: 'High',
+      drawdownTolerance: 'Extended',
+      timeHorizon: 'Medium-Long',
+    };
+  }
+  // riskScore 9-10
+  return {
+    stabilityPreference: 'Very Low',
+    volatilityTolerance: 'Very High',
+    drawdownTolerance: 'High',
+    timeHorizon: 'Long',
+  };
+}
+
+/**
+ * Format member since date
+ */
+function formatMemberSince(): string {
+  const now = new Date();
+  const month = now.toLocaleString('en-US', { month: 'long' });
+  const year = now.getFullYear();
+  return `${month} ${year}`;
+}
+
+// =============================================================================
+// COMPONENTS
+// =============================================================================
+
+/**
+ * Dimension Row - displays a single preference dimension
+ */
+const DimensionRow: React.FC<{
+  label: string;
+  value: string;
+  isLast?: boolean;
+}> = ({ label, value, isLast = false }) => (
+  <View style={[styles.dimensionRow, isLast && styles.dimensionRowLast]}>
+    <Text style={styles.dimensionLabel}>{label}</Text>
+    <Text style={styles.dimensionValue}>{value}</Text>
+  </View>
+);
+
+/**
+ * Setting Item Component
+ */
+const SettingItem: React.FC<{
+  icon: string;
+  title: string;
+  value?: string;
+  onPress: () => void;
+}> = ({ icon, title, value, onPress }) => (
+  <TouchableOpacity style={styles.settingItem} onPress={onPress} activeOpacity={0.7}>
+    <View style={styles.settingLeft}>
+      <Text style={styles.settingIcon}>{icon}</Text>
+      <Text style={styles.settingTitle}>{title}</Text>
+    </View>
+    <View style={styles.settingRight}>
+      {value && <Text style={styles.settingValue}>{value}</Text>}
+      <Text style={styles.settingArrow}>›</Text>
+    </View>
+  </TouchableOpacity>
+);
+
+/**
+ * Setting Item with Switch Component
+ */
+const SettingItemWithSwitch: React.FC<{
+  icon: string;
+  title: string;
+  value: boolean;
+  onToggle: (value: boolean) => void;
+}> = ({ icon, title, value, onToggle }) => (
+  <View style={styles.settingItem}>
+    <View style={styles.settingLeft}>
+      <Text style={styles.settingIcon}>{icon}</Text>
+      <Text style={styles.settingTitle}>{title}</Text>
+    </View>
+    <Switch
+      value={value}
+      onValueChange={onToggle}
+      trackColor={{ false: COLORS.background.surface, true: `${COLORS.brand.primary}60` }}
+      thumbColor={value ? COLORS.brand.primary : COLORS.text.secondary}
+    />
+  </View>
+);
+
+// =============================================================================
+// MAIN COMPONENT
+// =============================================================================
 
 const ProfileScreen: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -33,8 +199,8 @@ const ProfileScreen: React.FC = () => {
   const onboardingState = useAppSelector((state) => state.onboarding);
 
   // Use stored risk score from portfolio state or onboarding state
-  const targetLayerPct = portfolioState?.targetLayerPct || { FOUNDATION: 0.5, GROWTH: 0.35, UPSIDE: 0.15 };
   const storedRiskScore = portfolioState?.riskScore || onboardingState?.riskProfile?.score;
+  const riskScore = storedRiskScore || 5;
 
   // Biometric authentication
   const {
@@ -48,12 +214,13 @@ const ProfileScreen: React.FC = () => {
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
-  // Use stored risk score (prefer portfolio, fallback to onboarding, then default)
-  const riskScore = storedRiskScore || 5;
+  // Map risk score to dimensional preferences (Constitution compliance)
+  const dimensions = useMemo(() => mapRiskScoreToDimensions(riskScore), [riskScore]);
 
-  const profileNames = RISK_PROFILE_NAMES[riskScore];
+  // ==========================================================================
+  // HANDLERS
+  // ==========================================================================
 
-  // Handle biometric toggle
   const handleBiometricToggle = async (value: boolean) => {
     if (value) {
       const success = await enableBiometric();
@@ -78,11 +245,8 @@ const ProfileScreen: React.FC = () => {
           text: 'Logout',
           style: 'destructive',
           onPress: async () => {
-            // Clear secure storage
             await clearAuthToken();
-            // Clear AsyncStorage
             await clearAllState();
-            // Clear Redux state
             dispatch(logout());
             dispatch(resetPortfolio());
           },
@@ -92,10 +256,14 @@ const ProfileScreen: React.FC = () => {
     );
   };
 
-  const handleRetakeQuiz = () => {
+  /**
+   * Handle updating risk preferences
+   * Constitution: "Update" implies change is normal, not "Retake" which implies test/verdict
+   */
+  const handleUpdateRiskPreferences = () => {
     Alert.alert(
-      'Retake Risk Assessment',
-      'This will update your investment profile. Continue?',
+      'Update Risk Preferences',
+      'You can update your preferences anytime. This will adjust your target allocation.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -109,7 +277,6 @@ const ProfileScreen: React.FC = () => {
     );
   };
 
-  // Handler functions for settings
   const handleLanguagePress = () => {
     Alert.alert('Coming Soon', 'Language settings will be available in a future update.');
   };
@@ -139,51 +306,88 @@ const ProfileScreen: React.FC = () => {
     Linking.openURL('https://blumarkets.com/privacy');
   };
 
+  // ==========================================================================
+  // RENDER
+  // ==========================================================================
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.header}>
+        {/* ================================================================ */}
+        {/* USER INFO SECTION */}
+        {/* ================================================================ */}
+        <View style={styles.userSection}>
           <View style={styles.avatarContainer}>
-            <Text style={styles.avatarText}>
-              {phone ? phone.slice(-2) : '👤'}
-            </Text>
+            <Text style={styles.avatarIcon}>👤</Text>
           </View>
-          <Text style={styles.phoneNumber}>{phone || 'No phone'}</Text>
-          <Text style={styles.memberSince}>Member since January 2026</Text>
+          <Text style={styles.phoneNumber}>
+            {phone ? maskPhoneNumber(phone) : 'No phone'}
+          </Text>
+          <Text style={styles.memberSince}>Member since {formatMemberSince()}</Text>
         </View>
 
-        {/* Risk Profile Section */}
+        <View style={styles.divider} />
+
+        {/* ================================================================ */}
+        {/* RISK PREFERENCES SECTION */}
+        {/* Constitution: Use "PREFERENCES" not "PROFILE" */}
+        {/* ================================================================ */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Risk Profile</Text>
-          <View style={styles.profileCard}>
-            <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>{profileNames.en}</Text>
-              <Text style={styles.profileNameFarsi}>{profileNames.fa}</Text>
-              <Text style={styles.riskScore}>Risk Score: {riskScore}/10</Text>
-            </View>
-            <View style={styles.allocationPreview}>
-              <AllocationPreviewBar
-                foundation={targetLayerPct.FOUNDATION}
-                growth={targetLayerPct.GROWTH}
-                upside={targetLayerPct.UPSIDE}
-              />
-            </View>
-            <TouchableOpacity
-              style={styles.retakeButton}
-              onPress={handleRetakeQuiz}
-            >
-              <Text style={styles.retakeButtonText}>Retake Quiz</Text>
-            </TouchableOpacity>
+          <Text style={styles.sectionTitle}>RISK PREFERENCES</Text>
+
+          {/* Attribution line - Constitution §2.1: "Always Attribute to the System" */}
+          <Text style={styles.attributionText}>
+            Based on your answers, the system interprets your preferences as:
+          </Text>
+
+          {/* Dimensions Card - Constitution §3.1: Show dimensions, not labels */}
+          <View style={styles.dimensionsCard}>
+            <DimensionRow
+              label="Stability preference"
+              value={dimensions.stabilityPreference}
+            />
+            <DimensionRow
+              label="Volatility tolerance"
+              value={dimensions.volatilityTolerance}
+            />
+            <DimensionRow
+              label="Drawdown tolerance"
+              value={dimensions.drawdownTolerance}
+            />
+            <DimensionRow
+              label="Time horizon"
+              value={dimensions.timeHorizon}
+              isLast
+            />
           </View>
+
+          {/* Update Button - Constitution: "Update" not "Retake Quiz" */}
+          <TouchableOpacity
+            style={styles.updateButton}
+            onPress={handleUpdateRiskPreferences}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.updateButtonText}>Update Risk Preferences</Text>
+          </TouchableOpacity>
+
+          {/* Disclaimer - Constitution §4: Required statements */}
+          <Text style={styles.disclaimerText}>
+            You can change this anytime.{'\n'}
+            Your portfolio is the source of truth.
+          </Text>
         </View>
 
-        {/* Settings Section */}
+        <View style={styles.divider} />
+
+        {/* ================================================================ */}
+        {/* SETTINGS SECTION */}
+        {/* ================================================================ */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Settings</Text>
+          <Text style={styles.sectionTitle}>SETTINGS</Text>
           <View style={styles.settingsList}>
             <SettingItemWithSwitch
               icon="🔔"
@@ -194,7 +398,7 @@ const ProfileScreen: React.FC = () => {
             {biometricAvailable && (
               <SettingItemWithSwitch
                 icon="🔐"
-                title={biometricType || 'Biometric Auth'}
+                title={biometricType || 'Face ID'}
                 value={biometricEnabled}
                 onToggle={handleBiometricToggle}
               />
@@ -208,9 +412,13 @@ const ProfileScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Support Section */}
+        <View style={styles.divider} />
+
+        {/* ================================================================ */}
+        {/* SUPPORT SECTION */}
+        {/* ================================================================ */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Support</Text>
+          <Text style={styles.sectionTitle}>SUPPORT</Text>
           <View style={styles.settingsList}>
             <SettingItem
               icon="❓"
@@ -240,7 +448,7 @@ const ProfileScreen: React.FC = () => {
           <Text style={styles.appVersion}>Blu Markets v1.0.0</Text>
         </View>
 
-        {/* Logout */}
+        {/* Logout Button */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Text style={styles.logoutButtonText}>Logout</Text>
         </TouchableOpacity>
@@ -249,58 +457,9 @@ const ProfileScreen: React.FC = () => {
   );
 };
 
-// Setting Item Component
-const SettingItem: React.FC<{
-  icon: string;
-  title: string;
-  value?: string;
-  onPress: () => void;
-}> = ({ icon, title, value, onPress }) => (
-  <TouchableOpacity style={styles.settingItem} onPress={onPress} activeOpacity={0.7}>
-    <View style={styles.settingLeft}>
-      <Text style={styles.settingIcon}>{icon}</Text>
-      <Text style={styles.settingTitle}>{title}</Text>
-    </View>
-    <View style={styles.settingRight}>
-      {value && <Text style={styles.settingValue}>{value}</Text>}
-      <Text style={styles.settingArrow}>›</Text>
-    </View>
-  </TouchableOpacity>
-);
-
-// Setting Item with Switch Component
-const SettingItemWithSwitch: React.FC<{
-  icon: string;
-  title: string;
-  value: boolean;
-  onToggle: (value: boolean) => void;
-}> = ({ icon, title, value, onToggle }) => (
-  <View style={styles.settingItem}>
-    <View style={styles.settingLeft}>
-      <Text style={styles.settingIcon}>{icon}</Text>
-      <Text style={styles.settingTitle}>{title}</Text>
-    </View>
-    <Switch
-      value={value}
-      onValueChange={onToggle}
-      trackColor={{ false: COLORS.background.surface, true: `${COLORS.brand.primary}60` }}
-      thumbColor={value ? COLORS.brand.primary : COLORS.text.secondary}
-    />
-  </View>
-);
-
-// Allocation Preview Bar
-const AllocationPreviewBar: React.FC<{
-  foundation: number;
-  growth: number;
-  upside: number;
-}> = ({ foundation, growth, upside }) => (
-  <View style={styles.allocationBar}>
-    <View style={[styles.allocationSegment, styles.foundationSegment, { flex: foundation }]} />
-    <View style={[styles.allocationSegment, styles.growthSegment, { flex: growth }]} />
-    <View style={[styles.allocationSegment, styles.upsideSegment, { flex: upside }]} />
-  </View>
-);
+// =============================================================================
+// STYLES
+// =============================================================================
 
 const styles = StyleSheet.create({
   container: {
@@ -311,15 +470,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: SPACING[4],
     paddingBottom: SPACING[8],
   },
-  header: {
+
+  // User Section
+  userSection: {
     alignItems: 'center',
     paddingVertical: SPACING[6],
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    marginBottom: SPACING[6],
+    paddingHorizontal: SPACING[4],
   },
   avatarContainer: {
     width: 80,
@@ -328,16 +486,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.brand.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SPACING[4],
+    marginBottom: SPACING[3],
   },
-  avatarText: {
-    fontSize: 32,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.inverse,
+  avatarIcon: {
+    fontSize: 36,
   },
   phoneNumber: {
     fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    fontWeight: '600',
     color: COLORS.text.primary,
     marginBottom: SPACING[1],
   },
@@ -345,92 +501,111 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.text.secondary,
   },
+
+  // Divider
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginHorizontal: SPACING[4],
+  },
+
+  // Section
   section: {
-    marginBottom: SPACING[6],
+    paddingVertical: SPACING[5],
+    paddingHorizontal: SPACING[4],
   },
   sectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.secondary,
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    fontWeight: '600',
+    color: COLORS.text.muted,
+    letterSpacing: 1,
     marginBottom: SPACING[3],
-    textTransform: 'uppercase',
   },
-  profileCard: {
-    backgroundColor: COLORS.background.elevated,
-    borderRadius: RADIUS.xl,
-    padding: SPACING[4],
-  },
-  profileInfo: {
-    marginBottom: SPACING[4],
-  },
-  profileName: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
-    marginBottom: SPACING[1],
-  },
-  profileNameFarsi: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.text.secondary,
-    marginBottom: SPACING[2],
-  },
-  riskScore: {
+
+  // Attribution Text (Constitution §2.1)
+  attributionText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.brand.primary,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
+    color: COLORS.text.secondary,
+    marginBottom: SPACING[4],
+    lineHeight: 20,
   },
-  allocationPreview: {
+
+  // Dimensions Card
+  dimensionsCard: {
+    backgroundColor: COLORS.background.elevated,
+    borderRadius: RADIUS.lg,
+    padding: SPACING[4],
     marginBottom: SPACING[4],
   },
-  allocationBar: {
-    height: 8,
-    borderRadius: 4,
+  dimensionRow: {
     flexDirection: 'row',
-    overflow: 'hidden',
-  },
-  allocationSegment: {
-    height: '100%',
-  },
-  foundationSegment: {
-    backgroundColor: COLORS.layers.foundation,
-  },
-  growthSegment: {
-    backgroundColor: COLORS.layers.growth,
-  },
-  upsideSegment: {
-    backgroundColor: COLORS.layers.upside,
-  },
-  retakeButton: {
-    backgroundColor: COLORS.background.surface,
-    borderRadius: RADIUS.lg,
-    padding: SPACING[3],
+    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: SPACING[3],
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
-  retakeButtonText: {
+  dimensionRowLast: {
+    borderBottomWidth: 0,
+    paddingBottom: 0,
+  },
+  dimensionLabel: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
+  },
+  dimensionValue: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '600',
+    color: COLORS.text.primary,
+  },
+
+  // Update Button
+  updateButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: COLORS.brand.primary,
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[4],
+    borderRadius: RADIUS.full,
+    alignItems: 'center',
+    marginBottom: SPACING[4],
+  },
+  updateButtonText: {
     fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
+    fontWeight: '600',
     color: COLORS.brand.primary,
   },
+
+  // Disclaimer (Constitution §4)
+  disclaimerText: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.text.muted,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+
+  // Settings List
   settingsList: {
     backgroundColor: COLORS.background.elevated,
-    borderRadius: RADIUS.xl,
+    borderRadius: RADIUS.lg,
     overflow: 'hidden',
   },
   settingItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: SPACING[4],
+    paddingVertical: SPACING[4],
+    paddingHorizontal: SPACING[4],
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
   settingLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: SPACING[3],
   },
   settingIcon: {
     fontSize: 20,
-    marginRight: SPACING[3],
   },
   settingTitle: {
     fontSize: TYPOGRAPHY.fontSize.base,
@@ -439,26 +614,31 @@ const styles = StyleSheet.create({
   settingRight: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: SPACING[2],
   },
   settingValue: {
     fontSize: TYPOGRAPHY.fontSize.base,
     color: COLORS.text.secondary,
-    marginRight: SPACING[2],
   },
   settingArrow: {
     fontSize: 20,
-    color: COLORS.text.secondary,
+    color: COLORS.text.muted,
   },
+
+  // App Info
   appInfo: {
     alignItems: 'center',
-    marginBottom: SPACING[6],
+    paddingVertical: SPACING[4],
   },
   appVersion: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.text.muted,
   },
+
+  // Logout Button
   logoutButton: {
-    backgroundColor: COLORS.semanticBg.error,
+    marginHorizontal: SPACING[4],
+    backgroundColor: COLORS.semanticBg?.error || `${COLORS.semantic.error}10`,
     borderRadius: RADIUS.lg,
     padding: SPACING[4],
     alignItems: 'center',
@@ -467,7 +647,7 @@ const styles = StyleSheet.create({
   },
   logoutButtonText: {
     fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    fontWeight: '600',
     color: COLORS.semantic.error,
   },
 });
