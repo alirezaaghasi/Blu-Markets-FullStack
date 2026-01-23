@@ -26,10 +26,10 @@ interface AddFundsSheetProps {
 
 // Quick amount chips
 const QUICK_AMOUNTS = [
+  { label: '1M', value: 1_000_000 },
   { label: '5M', value: 5_000_000 },
   { label: '10M', value: 10_000_000 },
   { label: '25M', value: 25_000_000 },
-  { label: '50M', value: 50_000_000 },
 ];
 
 export const AddFundsSheet: React.FC<AddFundsSheetProps> = ({

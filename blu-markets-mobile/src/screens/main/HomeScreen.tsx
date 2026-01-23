@@ -108,7 +108,7 @@ const HomeScreen: React.FC = () => {
   const cashIRR = portfolioState?.cashIRR || 0;
   const targetLayerPct = portfolioState?.targetLayerPct || { FOUNDATION: 0.5, GROWTH: 0.35, UPSIDE: 0.15 };
   const loans = portfolioState?.loans || [];
-  const { prices, fxRate } = useAppSelector((state) => state.prices);
+  const { prices, fxRate, change24h } = useAppSelector((state) => state.prices);
   const { phone } = useAppSelector((state) => state.auth);
 
   // Calculate totals
@@ -136,6 +136,23 @@ const HomeScreen: React.FC = () => {
     GROWTH: totalForAllocation > 0 ? layerValues.GROWTH / totalForAllocation : 0,
     UPSIDE: totalForAllocation > 0 ? layerValues.UPSIDE / totalForAllocation : 0,
   };
+
+  // Calculate weighted average 24h change for portfolio
+  const portfolioDailyChange = (() => {
+    let weightedSum = 0;
+    let totalWeight = 0;
+    holdings.forEach((h) => {
+      const assetChange = change24h?.[h.assetId];
+      if (assetChange !== undefined) {
+        const value = h.assetId === 'IRR_FIXED_INCOME'
+          ? h.quantity * FIXED_INCOME_UNIT_PRICE
+          : h.quantity * (prices[h.assetId] || 0) * fxRate;
+        weightedSum += assetChange * value;
+        totalWeight += value;
+      }
+    });
+    return totalWeight > 0 ? weightedSum / totalWeight : null;
+  })();
 
   // Get top holdings
   const topHoldings = holdings
@@ -304,9 +321,21 @@ const HomeScreen: React.FC = () => {
           <Text style={styles.valueAmount}>
             {formatNumber(totalValueIRR)} <Text style={styles.valueCurrency}>IRR</Text>
           </Text>
-          <View style={styles.changeChip}>
-            <Text style={styles.changeIcon}>📈</Text>
-            <Text style={styles.changeText}>+1.2% Today</Text>
+          <View style={[
+            styles.changeChip,
+            portfolioDailyChange !== null && portfolioDailyChange < 0 && styles.changeChipNegative,
+          ]}>
+            <Text style={styles.changeIcon}>
+              {portfolioDailyChange === null ? '📊' : portfolioDailyChange >= 0 ? '📈' : '📉'}
+            </Text>
+            <Text style={[
+              styles.changeText,
+              portfolioDailyChange !== null && portfolioDailyChange < 0 && styles.changeTextNegative,
+            ]}>
+              {portfolioDailyChange !== null
+                ? `${portfolioDailyChange >= 0 ? '+' : ''}${portfolioDailyChange.toFixed(1)}% Today`
+                : '-- Today'}
+            </Text>
           </View>
         </View>
 
@@ -350,7 +379,18 @@ const HomeScreen: React.FC = () => {
               </View>
               <View style={styles.holdingRight}>
                 <Text style={styles.holdingValue}>{formatNumber(holding.value)} IRR</Text>
-                <Text style={[styles.holdingChange, styles.changePositive]}>+2.4%</Text>
+                <Text style={[
+                  styles.holdingChange,
+                  change24h?.[holding.assetId] !== undefined
+                    ? change24h[holding.assetId]! >= 0
+                      ? styles.changePositive
+                      : styles.changeNegative
+                    : styles.changeNeutral,
+                ]}>
+                  {change24h?.[holding.assetId] !== undefined
+                    ? `${change24h[holding.assetId]! >= 0 ? '+' : ''}${change24h[holding.assetId]!.toFixed(1)}%`
+                    : '--'}
+                </Text>
               </View>
             </TouchableOpacity>
           ))}
