@@ -10,10 +10,8 @@ const CRITICAL_LTV_THRESHOLD = 0.90;
 
 let jobIntervals: {
   loanCheck: NodeJS.Timeout | null;
-  protectionCheck: NodeJS.Timeout | null;
 } = {
   loanCheck: null,
-  protectionCheck: null,
 };
 
 /**
@@ -33,11 +31,7 @@ export function startBackgroundJobs(): void {
   jobIntervals.loanCheck = setInterval(runLoanLiquidationCheck, loanIntervalMs);
   console.log('  Loan liquidation check: every ' + (loanIntervalMs / 1000) + 's');
 
-  // Protection expiry check every hour
-  const protectionIntervalMs = env.PROTECTION_CHECK_INTERVAL_MS || 60 * 60 * 1000;
-  runProtectionExpiryCheck(); // Run immediately
-  jobIntervals.protectionCheck = setInterval(runProtectionExpiryCheck, protectionIntervalMs);
-  console.log('  Protection expiry check: every ' + (protectionIntervalMs / 1000) + 's');
+  // Note: Protection expiry is handled by protection-jobs.ts cron job (settlement-aware)
 }
 
 /**
@@ -47,10 +41,6 @@ export function stopBackgroundJobs(): void {
   if (jobIntervals.loanCheck) {
     clearInterval(jobIntervals.loanCheck);
     jobIntervals.loanCheck = null;
-  }
-  if (jobIntervals.protectionCheck) {
-    clearInterval(jobIntervals.protectionCheck);
-    jobIntervals.protectionCheck = null;
   }
   console.log('Background jobs stopped');
 }
@@ -87,6 +77,13 @@ async function runLoanLiquidationCheck(): Promise<void> {
       // Calculate current collateral value
       const collateralValueIrr = Number(loan.collateralQuantity) * price.priceIrr;
       const remainingDue = Number(loan.totalDueIrr) - Number(loan.paidIrr);
+
+      // Guard against division by zero
+      if (collateralValueIrr <= 0) {
+        console.warn(`Invalid collateral value for loan ${loan.id}`);
+        await prisma.loan.update({ where: { id: loan.id }, data: { currentLtv: 1.0 } });
+        continue;
+      }
 
       // Calculate current LTV
       const currentLtv = remainingDue / collateralValueIrr;
@@ -130,13 +127,15 @@ async function liquidateLoan(
     // Calculate proceeds (collateral value minus any excess)
     const proceeds = Math.min(collateralValueIrr, remainingDue);
     const excess = Math.max(0, collateralValueIrr - remainingDue);
+    const shortfallIrr = Math.max(0, remainingDue - collateralValueIrr);
 
-    // Mark loan as liquidated
+    // Mark loan as liquidated with shortfall if any
     await tx.loan.update({
       where: { id: loanId },
       data: {
         status: 'LIQUIDATED',
         paidIrr: Number(loan.totalDueIrr), // Mark as fully paid via liquidation
+        shortfallIrr: shortfallIrr > 0 ? shortfallIrr : null,
       },
     });
 
@@ -202,71 +201,10 @@ async function liquidateLoan(
 }
 
 /**
- * Check for expired protections and update their status
- */
-async function runProtectionExpiryCheck(): Promise<void> {
-  try {
-    const now = new Date();
-
-    // Find active protections that have expired
-    const expiredProtections = await prisma.protection.findMany({
-      where: {
-        status: 'ACTIVE',
-        expiryDate: { lte: now },
-      },
-      include: { portfolio: true },
-    });
-
-    if (expiredProtections.length === 0) return;
-
-    console.log('Processing ' + expiredProtections.length + ' expired protection(s)');
-
-    for (const protection of expiredProtections) {
-      await prisma.$transaction(async (tx) => {
-        // Update protection status
-        await tx.protection.update({
-          where: { id: protection.id },
-          data: { status: 'EXPIRED' },
-        });
-
-        // Create ledger entry
-        await tx.ledgerEntry.create({
-          data: {
-            portfolioId: protection.portfolioId,
-            entryType: 'PROTECTION_EXPIRE',
-            beforeSnapshot: { status: 'ACTIVE' },
-            afterSnapshot: { status: 'EXPIRED' },
-            assetId: protection.assetId,
-            protectionId: protection.id,
-            boundary: 'SAFE',
-            message: 'Protection expired for ' + protection.assetId,
-          },
-        });
-
-        // Create action log
-        await tx.actionLog.create({
-          data: {
-            portfolioId: protection.portfolioId,
-            actionType: 'PROTECTION_EXPIRE',
-            boundary: 'SAFE',
-            message: 'Protection expired for ' + protection.assetId,
-            assetId: protection.assetId,
-          },
-        });
-      });
-    }
-
-    console.log('Marked ' + expiredProtections.length + ' protection(s) as expired');
-  } catch (error) {
-    console.error('Protection expiry check error:', error);
-  }
-}
-
-/**
  * Check if background jobs are running
  */
 export function areBackgroundJobsActive(): boolean {
-  return jobIntervals.loanCheck !== null || jobIntervals.protectionCheck !== null;
+  return jobIntervals.loanCheck !== null;
 }
 
 /**
@@ -274,11 +212,4 @@ export function areBackgroundJobsActive(): boolean {
  */
 export async function triggerLoanCheck(): Promise<void> {
   await runLoanLiquidationCheck();
-}
-
-/**
- * Manually trigger protection expiry check (for testing)
- */
-export async function triggerProtectionCheck(): Promise<void> {
-  await runProtectionExpiryCheck();
 }

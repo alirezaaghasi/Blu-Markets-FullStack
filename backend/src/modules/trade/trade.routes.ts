@@ -143,7 +143,14 @@ export const tradeRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           type: 'object',
           properties: {
             minTradeIrr: { type: 'number' },
-            spreadPct: { type: 'number' },
+            spreadsByLayer: {
+              type: 'object',
+              properties: {
+                FOUNDATION: { type: 'number' },
+                GROWTH: { type: 'number' },
+                UPSIDE: { type: 'number' },
+              },
+            },
           },
         },
       },
@@ -151,7 +158,11 @@ export const tradeRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     handler: async (request, reply) => {
       return {
         minTradeIrr: 1000000,
-        spreadPct: 0.3,
+        spreadsByLayer: {
+          FOUNDATION: 0.15,  // 0.15% spread for Foundation layer
+          GROWTH: 0.30,      // 0.30% spread for Growth layer
+          UPSIDE: 0.60,      // 0.60% spread for Upside layer
+        },
       };
     },
   });

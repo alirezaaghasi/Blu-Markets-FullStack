@@ -1,7 +1,10 @@
 import { randomInt } from 'crypto';
+import bcrypt from 'bcrypt';
 import { prisma } from '../../config/database.js';
 import { env } from '../../config/env.js';
 import { AppError } from '../../middleware/error-handler.js';
+
+const BCRYPT_SALT_ROUNDS = 10;
 
 // OTP Configuration (per PRD)
 const OTP_LENGTH = 6;
@@ -38,11 +41,14 @@ export async function sendOtp(phone: string): Promise<{ expiresIn: number }> {
   const code = generateOtp();
   const expiresAt = new Date(Date.now() + OTP_EXPIRY_SECONDS * 1000);
 
-  // Store OTP
+  // Hash OTP before storing (security: never store plaintext OTPs)
+  const hashedCode = await bcrypt.hash(code, BCRYPT_SALT_ROUNDS);
+
+  // Store hashed OTP
   await prisma.otpCode.create({
     data: {
       phone,
-      code,
+      code: hashedCode,
       expiresAt,
     },
   });
@@ -83,8 +89,9 @@ export async function verifyOtp(phone: string, code: string): Promise<boolean> {
     );
   }
 
-  // Verify code
-  if (otp.code !== code) {
+  // Verify code using bcrypt (compare plaintext with stored hash)
+  const isMatch = await bcrypt.compare(code, otp.code);
+  if (!isMatch) {
     // Increment attempts
     await prisma.otpCode.update({
       where: { id: otp.id },

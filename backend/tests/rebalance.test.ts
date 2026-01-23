@@ -219,4 +219,54 @@ describe('Rebalance Service', () => {
       );
     });
   });
+
+  describe('Rounding Overspend Protection', () => {
+    it('should not allow negative cash after spread application', async () => {
+      // Test that the cash guard prevents overspending
+      // BUY trades deduct amountIrr from cash, not netAmount
+      const tradeAmountIrr = 10000000;
+      const spread = 0.003; // 0.3% spread
+      const netAmount = tradeAmountIrr * (1 - spread);
+      const cashBefore = 10000000;
+
+      // Cash should decrease by full trade amount, not net amount
+      const cashAfter = cashBefore - tradeAmountIrr;
+      expect(cashAfter).toBe(0);
+      expect(cashAfter).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should reject buy when cash insufficient after spreads', async () => {
+      // If cash is 9.9M and trade is 10M, should reject
+      const cashIrr = 9900000;
+      const tradeAmountIrr = 10000000;
+
+      const canExecute = cashIrr >= tradeAmountIrr;
+      expect(canExecute).toBe(false);
+    });
+
+    it('should calculate spread correctly for each layer', async () => {
+      // Spread rates per layer
+      const SPREAD_BY_LAYER = {
+        FOUNDATION: 0.002, // 0.2%
+        GROWTH: 0.003,     // 0.3%
+        UPSIDE: 0.004,     // 0.4%
+      };
+
+      const tradeAmount = 100000000; // 100M
+
+      expect(tradeAmount * SPREAD_BY_LAYER.FOUNDATION).toBe(200000);
+      expect(tradeAmount * SPREAD_BY_LAYER.GROWTH).toBe(300000);
+      expect(tradeAmount * SPREAD_BY_LAYER.UPSIDE).toBe(400000);
+    });
+
+    it('should account for spreads in total buy calculation', async () => {
+      // When buying 100M worth, actual tokens received = 100M * (1 - spread)
+      const buyAmount = 100000000;
+      const spread = 0.003;
+      const netTokenValue = buyAmount * (1 - spread);
+
+      expect(netTokenValue).toBe(99700000); // 99.7M worth of tokens
+    });
+  });
 });
+

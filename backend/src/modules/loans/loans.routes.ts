@@ -215,6 +215,24 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         );
       }
 
+      // Calculate portfolio total value and enforce 25% portfolio limit
+      let totalValueIrr = Number(portfolio.cashIrr);
+      for (const h of portfolio.holdings) {
+        const priceData = prices.get(h.assetId as AssetId);
+        if (priceData) totalValueIrr += Number(h.quantity) * priceData.priceIrr;
+      }
+
+      const maxPortfolioLoanIrr = totalValueIrr * PORTFOLIO_LOAN_LIMIT;
+      const currentLoansIrr = portfolio.loans.reduce((sum, loan) => sum + Number(loan.principalIrr), 0);
+
+      if (currentLoansIrr + amountIrr > maxPortfolioLoanIrr) {
+        throw new AppError(
+          'EXCEEDS_PORTFOLIO_LIMIT',
+          `Portfolio loan limit exceeded. Maximum available: ${Math.floor(maxPortfolioLoanIrr - currentLoansIrr).toLocaleString()} IRR`,
+          400
+        );
+      }
+
       // Calculate interest (simple interest per PRD)
       const annualInterest = amountIrr * INTEREST_RATE;
       const totalInterestIrr = (annualInterest * durationMonths) / 12;
@@ -444,6 +462,15 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           if (instFullyPaid) installmentsPaid++;
           remainingPayment -= paymentToInst;
         }
+
+        // Update installmentsPaid counter on loan
+        const paidCount = await tx.loanInstallment.count({
+          where: { loanId: loan.id, status: 'PAID' },
+        });
+        await tx.loan.update({
+          where: { id: loan.id },
+          data: { installmentsPaid: paidCount },
+        });
 
         // Unfreeze collateral if fully settled
         if (isFullySettled) {

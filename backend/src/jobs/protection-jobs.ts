@@ -10,6 +10,19 @@ import { prisma } from '../config/database.js';
 import { getCurrentPrices } from '../services/price-fetcher.service.js';
 import { calculateSettlement } from '../services/protection-pricing.service.js';
 import type { AssetId } from '../types/domain.js';
+import type { Protection, Portfolio } from '@prisma/client';
+
+// Type for protection with portfolio included
+interface ProtectionWithPortfolio extends Protection {
+  portfolio: Portfolio;
+}
+
+// Type for price data from getCurrentPrices
+interface PriceData {
+  priceUsd: number;
+  priceIrr: number;
+  change24hPct?: number;
+}
 
 // ============================================================================
 // JOB INITIALIZATION
@@ -120,8 +133,8 @@ export async function processExpiredProtections(): Promise<ExpiryResult> {
  * @returns true if the protection was actually settled/expired, false if skipped
  */
 async function processProtectionExpiry(
-  protection: any,
-  prices: Map<string, any>,
+  protection: ProtectionWithPortfolio,
+  prices: Map<string, PriceData>,
   result: ExpiryResult
 ): Promise<boolean> {
   const assetId = protection.assetId as AssetId;
@@ -138,13 +151,32 @@ async function processProtectionExpiry(
     return false; // Not processed - will retry
   }
 
-  const currentPriceUsd = priceData.priceUsd;
+  // Use captured expiry price if available, otherwise capture current price
+  // This ensures settlement uses the price at expiry moment, not runtime
+  const expiryPriceUsd = protection.expiryPriceUsd
+    ? Number(protection.expiryPriceUsd)
+    : priceData.priceUsd;
+  const expiryPriceIrr = protection.expiryPriceIrr
+    ? Number(protection.expiryPriceIrr)
+    : priceData.priceIrr;
+
+  // Capture expiry price if not already captured
+  if (!protection.expiryPriceUsd) {
+    await prisma.protection.update({
+      where: { id: protection.id },
+      data: {
+        expiryPriceUsd: priceData.priceUsd,
+        expiryPriceIrr: priceData.priceIrr,
+      },
+    });
+  }
+
   const strikeUsd = Number(protection.strikeUsd);
   const notionalUsd = Number(protection.notionalUsd);
-  const fxRate = priceData.priceIrr / priceData.priceUsd;
+  const fxRate = expiryPriceIrr / expiryPriceUsd;
 
-  // Calculate settlement
-  const settlement = calculateSettlement(strikeUsd, currentPriceUsd, notionalUsd, fxRate);
+  // Calculate settlement using expiry price
+  const settlement = calculateSettlement(strikeUsd, expiryPriceUsd, notionalUsd, fxRate);
 
   if (settlement.isITM) {
     // Protection is in the money - credit user
@@ -173,7 +205,7 @@ async function processProtectionExpiry(
  * Exercise a protection (ITM settlement)
  */
 async function exerciseProtection(
-  protection: any,
+  protection: ProtectionWithPortfolio,
   settlementIrr: number,
   settlementUsd: number
 ): Promise<void> {
@@ -247,7 +279,7 @@ async function exerciseProtection(
 /**
  * Mark protection as expired (OTM)
  */
-async function markProtectionExpired(protection: any, settlementIrr: number): Promise<void> {
+async function markProtectionExpired(protection: ProtectionWithPortfolio, settlementIrr: number): Promise<void> {
   const now = new Date();
 
   await prisma.$transaction(async (tx) => {

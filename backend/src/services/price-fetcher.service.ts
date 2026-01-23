@@ -3,6 +3,16 @@ import { env } from '../config/env.js';
 import { FALLBACK_FX_RATE, type AssetId } from '../types/domain.js';
 import { priceBroadcaster } from './price-broadcaster.service.js';
 
+// Price cache configuration
+const PRICE_CACHE_TTL_MS = 5000; // 5 seconds cache
+let priceCache: {
+  data: Map<AssetId, { priceUsd: number; priceIrr: number; change24hPct?: number }> | null;
+  timestamp: number;
+} = {
+  data: null,
+  timestamp: 0,
+};
+
 // Asset configuration per PRD
 const COINGECKO_ASSETS: Record<string, AssetId> = {
   bitcoin: 'BTC',
@@ -172,17 +182,26 @@ export async function updateAllPrices(): Promise<void> {
   const fetchedAt = new Date();
   const timestamp = fetchedAt.toISOString();
 
-  // Collect all price updates for broadcasting
+  // Collect all price updates for broadcasting and batch upsert
   const priceUpdates = new Map<AssetId, { priceUsd: number; priceIrr: number; change24hPct?: number; source: string; timestamp: string }>();
 
-  // Upsert prices
-  for (const price of allPrices) {
+  // Prepare batch upsert data
+  const upsertOperations = allPrices.map((price) => {
     const priceIrr =
       price.assetId === 'IRR_FIXED_INCOME'
         ? 500000 // Fixed income unit price
         : price.priceUsd * fxRate.usdIrr;
 
-    await prisma.price.upsert({
+    // Collect for broadcast
+    priceUpdates.set(price.assetId, {
+      priceUsd: price.priceUsd,
+      priceIrr,
+      change24hPct: price.change24hPct,
+      source: price.source,
+      timestamp,
+    });
+
+    return prisma.price.upsert({
       where: { assetId: price.assetId },
       create: {
         assetId: price.assetId,
@@ -204,24 +223,21 @@ export async function updateAllPrices(): Promise<void> {
         change24hPct: price.change24hPct,
       },
     });
+  });
 
-    // Collect for broadcast
-    priceUpdates.set(price.assetId, {
-      priceUsd: price.priceUsd,
-      priceIrr,
-      change24hPct: price.change24hPct,
-      source: price.source,
-      timestamp,
-    });
+  // Execute all upserts in a single transaction for better performance
+  await prisma.$transaction(upsertOperations);
 
-    // Broadcast individual price update
-    priceBroadcaster.broadcastPriceUpdate(price.assetId, {
-      priceUsd: price.priceUsd,
-      priceIrr,
-      change24hPct: price.change24hPct,
-      source: price.source,
-      timestamp,
-    });
+  // Invalidate cache after update
+  priceCache.data = null;
+  priceCache.timestamp = 0;
+
+  // Broadcast individual price updates
+  for (const price of allPrices) {
+    const update = priceUpdates.get(price.assetId);
+    if (update) {
+      priceBroadcaster.broadcastPriceUpdate(price.assetId, update);
+    }
   }
 
   // Broadcast FX rate update
@@ -238,8 +254,16 @@ export async function updateAllPrices(): Promise<void> {
   console.log(`✅ Updated ${allPrices.length} prices in ${duration}ms (broadcast sent)`);
 }
 
-// Get current prices from database
+// Get current prices from database with 5-second in-memory cache
 export async function getCurrentPrices(): Promise<Map<AssetId, { priceUsd: number; priceIrr: number; change24hPct?: number }>> {
+  const now = Date.now();
+
+  // Return cached data if valid
+  if (priceCache.data && (now - priceCache.timestamp) < PRICE_CACHE_TTL_MS) {
+    return priceCache.data;
+  }
+
+  // Fetch from database
   const prices = await prisma.price.findMany();
   const priceMap = new Map<AssetId, { priceUsd: number; priceIrr: number; change24hPct?: number }>();
 
@@ -250,6 +274,10 @@ export async function getCurrentPrices(): Promise<Map<AssetId, { priceUsd: numbe
       change24hPct: price.change24hPct ? Number(price.change24hPct) : undefined,
     });
   }
+
+  // Update cache
+  priceCache.data = priceMap;
+  priceCache.timestamp = now;
 
   return priceMap;
 }

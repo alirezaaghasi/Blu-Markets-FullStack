@@ -219,6 +219,9 @@ export function daysToYears(days: number): number {
  * Calculate moneyness (spot/strike ratio)
  */
 export function calculateMoneyness(spot: number, strike: number): number {
+  if (strike <= 0) {
+    throw new Error('Strike must be positive');
+  }
   return spot / strike;
 }
 

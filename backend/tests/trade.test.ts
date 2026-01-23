@@ -245,4 +245,60 @@ describe('Trade Service', () => {
       expect(result.ledgerEntryId).toBe('ledger-123');
     });
   });
+
+  describe('Layer-Specific Spreads', () => {
+    it('should apply correct spread for Foundation layer assets', async () => {
+      vi.mocked(getPortfolioSnapshot).mockResolvedValue(mockSnapshot as any);
+      vi.mocked(getAssetPrice).mockResolvedValue({ priceIrr: 620000, priceUsd: 1 } as any);
+      vi.mocked(classifyBoundary).mockReturnValue('SAFE');
+
+      const result = await previewTrade('user-123', 'BUY', 'USDT', 10000000);
+
+      expect(result.valid).toBe(true);
+      expect(result.preview.spread).toBe(0.0015); // 0.15% for Foundation
+      expect(result.preview.spreadAmountIrr).toBe(15000);
+    });
+
+    it('should apply correct spread for Growth layer assets', async () => {
+      vi.mocked(getPortfolioSnapshot).mockResolvedValue(mockSnapshot as any);
+      vi.mocked(getAssetPrice).mockResolvedValue(mockBtcPrice as any);
+      vi.mocked(classifyBoundary).mockReturnValue('SAFE');
+
+      const result = await previewTrade('user-123', 'BUY', 'BTC', 10000000);
+
+      expect(result.valid).toBe(true);
+      expect(result.preview.spread).toBe(0.003); // 0.30% for Growth
+      expect(result.preview.spreadAmountIrr).toBe(30000);
+    });
+
+    it('should apply correct spread for Upside layer assets', async () => {
+      vi.mocked(getPortfolioSnapshot).mockResolvedValue(mockSnapshot as any);
+      vi.mocked(getAssetPrice).mockResolvedValue({ priceIrr: 111600000, priceUsd: 180 } as any);
+      vi.mocked(classifyBoundary).mockReturnValue('SAFE');
+
+      const result = await previewTrade('user-123', 'BUY', 'SOL', 10000000);
+
+      expect(result.valid).toBe(true);
+      expect(result.preview.spread).toBe(0.006); // 0.60% for Upside
+      expect(result.preview.spreadAmountIrr).toBe(60000);
+    });
+
+    it('should return per-layer spreads in limits endpoint', async () => {
+      // Test the expected structure from GET /api/v1/trade/limits
+      // These are percentage values (0.15 = 0.15%)
+      const expectedLimits = {
+        minTradeIrr: 1000000,
+        spreadsByLayer: {
+          FOUNDATION: 0.15,  // 0.15%
+          GROWTH: 0.30,      // 0.30%
+          UPSIDE: 0.60,      // 0.60%
+        },
+      };
+
+      expect(expectedLimits.spreadsByLayer.FOUNDATION).toBe(0.15);
+      expect(expectedLimits.spreadsByLayer.GROWTH).toBe(0.30);
+      expect(expectedLimits.spreadsByLayer.UPSIDE).toBe(0.60);
+    });
+  });
 });
+

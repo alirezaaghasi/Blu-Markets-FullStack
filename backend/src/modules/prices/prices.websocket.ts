@@ -45,7 +45,25 @@ export async function registerPriceWebSocket(app: FastifyInstance): Promise<void
 
   // WebSocket endpoint: /api/v1/prices/stream
   app.get('/stream', { websocket: true }, async (socket: WebSocket, req: FastifyRequest) => {
-    console.log('📡 WebSocket client connected');
+    // JWT Authentication - verify token from query string or header
+    const token = (req.query as Record<string, string>).token ||
+                  req.headers.authorization?.replace('Bearer ', '');
+
+    if (!token) {
+      console.log('📡 WebSocket connection rejected: No token provided');
+      socket.close(4001, 'Authentication required');
+      return;
+    }
+
+    try {
+      await (req as any).jwtVerify({ token });
+    } catch (error) {
+      console.log('📡 WebSocket connection rejected: Invalid token');
+      socket.close(4001, 'Invalid token');
+      return;
+    }
+
+    console.log('📡 WebSocket client connected (authenticated)');
 
     // Initialize client state
     const clientState: ClientState = {

@@ -47,10 +47,22 @@ class PriceWebSocketService {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 10;
   private appState: AppStateStatus = AppState.currentState;
+  private appStateSubscription: ReturnType<typeof AppState.addEventListener> | null = null;
 
   constructor() {
-    // Listen to app state changes
-    AppState.addEventListener('change', this.handleAppStateChange);
+    // Listen to app state changes and store subscription for cleanup
+    this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange);
+  }
+
+  /**
+   * Cleanup resources - call when service is no longer needed
+   */
+  cleanup(): void {
+    this.disconnect(true);
+    if (this.appStateSubscription) {
+      this.appStateSubscription.remove();
+      this.appStateSubscription = null;
+    }
   }
 
   private handleAppStateChange = (nextAppState: AppStateStatus) => {

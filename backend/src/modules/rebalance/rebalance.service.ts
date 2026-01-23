@@ -212,6 +212,11 @@ export async function executeRebalance(
         cashIrr += netProceeds;
       } else {
         // BUY
+        // Cash guard: ensure sufficient cash after spreads before deduction
+        if (cashIrr < trade.amountIrr) {
+          throw new AppError('INSUFFICIENT_FUNDS', 'Insufficient cash after spreads', 400);
+        }
+
         const netAmount = trade.amountIrr * (1 - spread);
         const quantityToBuy = netAmount / price.priceIrr;
         const holding = holdingsMap.get(trade.assetId);
