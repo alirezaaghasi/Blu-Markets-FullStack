@@ -1,8 +1,17 @@
-// Home Screen (Command Center / Activity Hero)
-// Based on UI Restructure Specification Section 2
-// Updated to use API hooks for backend integration
+/**
+ * Home Screen (Chat UI) - Complete Implementation
+ *
+ * Design Philosophy (Screenless Positioning):
+ * "Conversation captures intent. State is always explicit. Agency always wins."
+ *
+ * This is NOT a dashboard. It's a STATE SNAPSHOT that answers:
+ * - What do I own right now?
+ * - What is liquid vs. locked?
+ * - What did the system do on my behalf?
+ * - What requires my attention?
+ */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -20,70 +29,206 @@ import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING, RADIUS } from '../../constants/spacing';
 import { useAppSelector, useAppDispatch } from '../../hooks/useStore';
 import { useActivityFeed } from '../../hooks/useActivityFeed';
+import { usePriceConnection } from '../../hooks/usePriceConnection';
 import { setHoldings, updateCash, setStatus, setTargetLayerPct } from '../../store/slices/portfolioSlice';
 import { fetchPrices, fetchFxRate } from '../../store/slices/pricesSlice';
 import { portfolio as portfolioApi } from '../../services/api';
-import type { Holding } from '../../types';
+import type { Holding, ActionLogEntry } from '../../types';
 import { ASSETS } from '../../constants/assets';
-import { FIXED_INCOME_UNIT_PRICE } from '../../constants/business';
+import { FIXED_INCOME_UNIT_PRICE, DRIFT_TOLERANCE, LAYER_CONSTRAINTS } from '../../constants/business';
 import { ActivityCard } from '../../components/ActivityCard';
-import AllocationBar from '../../components/AllocationBar';
-import { AllocationDetailSheet } from '../../components/AllocationDetailSheet';
 import { TradeBottomSheet } from '../../components/TradeBottomSheet';
 import { AddFundsSheet } from '../../components/AddFundsSheet';
 import RebalanceSheet from '../../components/RebalanceSheet';
+import { LoanSheet } from '../../components/LoanSheet';
+import { ProtectionSheet } from '../../components/ProtectionSheet';
 import { EmptyState } from '../../components/EmptyState';
-import { ActionLogEntry } from '../../types';
 import { formatRelativeTime } from '../../utils/dateUtils';
-import { formatDualCurrency, shouldShowUsdEquivalent } from '../../utils/currency';
-import { formatDailyChange } from '../../utils/formatters';
 
-// Format number with commas
-const formatNumber = (num: number): string => {
-  if (num >= 1_000_000_000) {
-    return `${(num / 1_000_000_000).toFixed(1)}B`;
-  }
-  if (num >= 1_000_000) {
-    return `${(num / 1_000_000).toFixed(1)}M`;
-  }
-  return num.toLocaleString('en-US');
-};
+// =============================================================================
+// TYPES
+// =============================================================================
 
-// Status Chip Component
-const StatusChip: React.FC<{ status: 'BALANCED' | 'SLIGHTLY_OFF' | 'ATTENTION_REQUIRED' }> = ({ status }) => {
+type PortfolioStatus = 'BALANCED' | 'SLIGHTLY_OFF' | 'ATTENTION_REQUIRED';
+
+interface PortfolioStatusResult {
+  status: PortfolioStatus;
+  issues: string[];
+}
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+/**
+ * Format IRR with appropriate suffix
+ */
+function formatIRR(value: number): string {
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  return value.toLocaleString('en-US');
+}
+
+/**
+ * Format IRR with short suffix for activity log
+ */
+function formatIRRShort(value: number | undefined): string {
+  if (value === undefined) return '0';
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B IRR`;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(0)}M IRR`;
+  return `${value.toLocaleString('en-US')} IRR`;
+}
+
+/**
+ * Compute portfolio status based on drift from target
+ */
+function computePortfolioStatus(
+  layerPct: { FOUNDATION: number; GROWTH: number; UPSIDE: number },
+  targetLayerPct: { FOUNDATION: number; GROWTH: number; UPSIDE: number }
+): PortfolioStatusResult {
+  const issues: string[] = [];
+
+  // Check drift from target for each layer
+  for (const layer of ['FOUNDATION', 'GROWTH', 'UPSIDE'] as const) {
+    const drift = Math.abs(layerPct[layer] - targetLayerPct[layer]);
+    if (drift > DRIFT_TOLERANCE) {
+      issues.push(`${layer}_${layerPct[layer] < targetLayerPct[layer] ? 'BELOW' : 'ABOVE'}_TARGET`);
+    }
+  }
+
+  // Hard safety limits (absolute bounds from PRD)
+  const hardMinFoundation = LAYER_CONSTRAINTS.FOUNDATION.hardMin || 0.30;
+  const hardMaxUpside = LAYER_CONSTRAINTS.UPSIDE.hardMax || 0.25;
+
+  if (layerPct.FOUNDATION < hardMinFoundation) {
+    return { status: 'ATTENTION_REQUIRED', issues: [...issues, 'FOUNDATION_BELOW_HARD_FLOOR'] };
+  }
+  if (layerPct.UPSIDE > hardMaxUpside) {
+    return { status: 'ATTENTION_REQUIRED', issues: [...issues, 'UPSIDE_ABOVE_HARD_CAP'] };
+  }
+
+  if (issues.length > 0) return { status: 'SLIGHTLY_OFF', issues };
+  return { status: 'BALANCED', issues: [] };
+}
+
+/**
+ * Format activity log message
+ */
+function formatActivityMessage(entry: ActionLogEntry): string {
+  const assetName = entry.assetId ? (ASSETS[entry.assetId]?.name || entry.assetId) : '';
+
+  switch (entry.type) {
+    case 'PORTFOLIO_CREATED':
+      return `Started with ${formatIRRShort(entry.amountIRR)}`;
+    case 'ADD_FUNDS':
+      return `Added ${formatIRRShort(entry.amountIRR)} cash`;
+    case 'TRADE':
+      return entry.message || `Traded ${assetName}`;
+    case 'BORROW':
+      return `Borrowed ${formatIRRShort(entry.amountIRR)} against ${assetName}`;
+    case 'REPAY':
+      return `Repaid ${formatIRRShort(entry.amountIRR)}`;
+    case 'PROTECT':
+      return `Protected ${assetName}`;
+    case 'REBALANCE':
+      return 'Rebalanced portfolio';
+    case 'CANCEL_PROTECTION':
+      return `Cancelled ${assetName} protection`;
+    default:
+      return entry.message || entry.type;
+  }
+}
+
+// =============================================================================
+// COMPONENTS
+// =============================================================================
+
+/**
+ * Portfolio Health Status Badge
+ */
+const StatusBadge: React.FC<{ status: PortfolioStatus }> = ({ status }) => {
   const config = {
-    BALANCED: { label: 'Balanced', color: COLORS.semantic.success },
-    SLIGHTLY_OFF: { label: 'Rebalance', color: COLORS.semantic.warning },
-    ATTENTION_REQUIRED: { label: 'Attention', color: COLORS.semantic.error },
+    BALANCED: { label: 'Balanced', color: '#4ade80', dotColor: '#22c55e' },
+    SLIGHTLY_OFF: { label: 'Slightly Off', color: '#fde047', dotColor: '#eab308' },
+    ATTENTION_REQUIRED: { label: 'Attention Required', color: '#f87171', dotColor: '#ef4444' },
   };
 
-  const { label, color } = config[status];
+  const { label, color, dotColor } = config[status];
 
   return (
-    <View style={[styles.statusChip, { backgroundColor: `${color}15`, borderColor: `${color}30` }]}>
-      <View style={[styles.statusDot, { backgroundColor: color }]} />
-      <Text style={[styles.statusText, { color }]}>{label}</Text>
+    <View style={[styles.statusBadge, { backgroundColor: `${color}20`, borderColor: `${color}40` }]}>
+      <View style={[styles.statusDot, { backgroundColor: dotColor }]} />
+      <Text style={[styles.statusLabel, { color: dotColor }]}>{label}</Text>
     </View>
   );
 };
 
-// Quick Action Button
-const QuickActionButton: React.FC<{
-  icon: string;
+/**
+ * Price Feed Status Indicator
+ */
+const PriceFeedStatus: React.FC<{ isConnected: boolean; lastUpdate?: Date }> = ({ isConnected, lastUpdate }) => {
+  const timeString = lastUpdate
+    ? lastUpdate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    : '--:--';
+
+  return (
+    <View style={styles.priceFeedContainer}>
+      <View style={[styles.priceFeedDot, { backgroundColor: isConnected ? '#4ade80' : '#f87171' }]} />
+      <Text style={styles.priceFeedText}>
+        {isConnected ? 'Live prices' : 'Offline'} · {timeString}
+      </Text>
+    </View>
+  );
+};
+
+/**
+ * Main Action Button (Row 1 - 3 equal width)
+ */
+const MainActionButton: React.FC<{
   label: string;
   onPress: () => void;
-}> = ({ icon, label, onPress }) => (
-  <TouchableOpacity style={styles.quickAction} onPress={onPress} activeOpacity={0.7}>
-    <Text style={styles.quickActionIcon}>{icon}</Text>
-    <Text style={styles.quickActionLabel}>{label}</Text>
+  disabled?: boolean;
+}> = ({ label, onPress, disabled }) => (
+  <TouchableOpacity
+    style={[styles.mainActionButton, disabled && styles.mainActionButtonDisabled]}
+    onPress={onPress}
+    disabled={disabled}
+    activeOpacity={0.7}
+  >
+    <Text style={[styles.mainActionLabel, disabled && styles.mainActionLabelDisabled]}>{label}</Text>
   </TouchableOpacity>
 );
+
+/**
+ * Wide Action Button (Row 2 - 2 half-width)
+ */
+const WideActionButton: React.FC<{
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+}> = ({ label, onPress, disabled }) => (
+  <TouchableOpacity
+    style={[styles.wideActionButton, disabled && styles.wideActionButtonDisabled]}
+    onPress={onPress}
+    disabled={disabled}
+    activeOpacity={0.7}
+  >
+    <Text style={[styles.wideActionLabel, disabled && styles.wideActionLabelDisabled]}>{label}</Text>
+  </TouchableOpacity>
+);
+
+// =============================================================================
+// MAIN COMPONENT
+// =============================================================================
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const dispatch = useAppDispatch();
 
-  // Use activity feed hook for API data
+  // Price connection status
+  const { isConnected: priceConnected, lastUpdate: priceLastUpdate } = usePriceConnection();
+
+  // Activity feed from API
   const {
     activities,
     isLoading: isLoadingActivities,
@@ -95,119 +240,126 @@ const HomeScreen: React.FC = () => {
   const [tradeSheetVisible, setTradeSheetVisible] = useState(false);
   const [addFundsSheetVisible, setAddFundsSheetVisible] = useState(false);
   const [rebalanceSheetVisible, setRebalanceSheetVisible] = useState(false);
-  const [allocationDetailVisible, setAllocationDetailVisible] = useState(false);
-  const [driftAlertDismissed, setDriftAlertDismissed] = useState(false);
+  const [loanSheetVisible, setLoanSheetVisible] = useState(false);
+  const [protectionSheetVisible, setProtectionSheetVisible] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Keep using Redux for portfolio data (will be updated with usePortfolio in future)
+  // Redux state
   const portfolioState = useAppSelector((state) => state.portfolio);
   const holdings = portfolioState?.holdings || [];
   const cashIRR = portfolioState?.cashIRR || 0;
-  const targetLayerPct = portfolioState?.targetLayerPct || { FOUNDATION: 0.5, GROWTH: 0.35, UPSIDE: 0.15 };
+  const targetLayerPct = portfolioState?.targetLayerPct || { FOUNDATION: 0.50, GROWTH: 0.35, UPSIDE: 0.15 };
   const loans = portfolioState?.loans || [];
-  const { prices, fxRate, change24h } = useAppSelector((state) => state.prices);
+  const { prices, fxRate } = useAppSelector((state) => state.prices);
   const { phone } = useAppSelector((state) => state.auth);
 
-  // Calculate totals
-  const holdingsValueIRR = holdings.reduce((sum, h) => {
-    if (h.assetId === 'IRR_FIXED_INCOME') return sum + h.quantity * FIXED_INCOME_UNIT_PRICE;
-    const priceUSD = prices[h.assetId] || 0;
-    return sum + h.quantity * priceUSD * fxRate;
-  }, 0);
-  const totalValueIRR = holdingsValueIRR + cashIRR;
+  // ==========================================================================
+  // COMPUTED VALUES
+  // ==========================================================================
 
-  // Current allocation using ASSET CONFIG layer
-  const layerValues = { FOUNDATION: cashIRR, GROWTH: 0, UPSIDE: 0 };
-  holdings.forEach((h) => {
-    const asset = ASSETS[h.assetId];
-    const layer = asset?.layer || h.layer;
-    const value = h.assetId === 'IRR_FIXED_INCOME'
-      ? h.quantity * FIXED_INCOME_UNIT_PRICE
-      : h.quantity * (prices[h.assetId] || 0) * fxRate;
-    layerValues[layer] += value;
-  });
+  // Calculate portfolio snapshot
+  const snapshot = useMemo(() => {
+    let holdingsIRR = 0;
+    const layerIRR = { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
 
-  const totalForAllocation = layerValues.FOUNDATION + layerValues.GROWTH + layerValues.UPSIDE;
-  const currentAllocation = {
-    FOUNDATION: totalForAllocation > 0 ? layerValues.FOUNDATION / totalForAllocation : 0,
-    GROWTH: totalForAllocation > 0 ? layerValues.GROWTH / totalForAllocation : 0,
-    UPSIDE: totalForAllocation > 0 ? layerValues.UPSIDE / totalForAllocation : 0,
-  };
+    for (const h of holdings) {
+      let valueIRR: number;
 
-  // Calculate weighted average 24h change for portfolio
-  const portfolioDailyChange = (() => {
-    let weightedSum = 0;
-    let totalWeight = 0;
-    holdings.forEach((h) => {
-      const assetChange = change24h?.[h.assetId];
-      if (assetChange !== undefined) {
-        const value = h.assetId === 'IRR_FIXED_INCOME'
-          ? h.quantity * FIXED_INCOME_UNIT_PRICE
-          : h.quantity * (prices[h.assetId] || 0) * fxRate;
-        weightedSum += assetChange * value;
-        totalWeight += value;
+      if (h.assetId === 'IRR_FIXED_INCOME') {
+        // Fixed income: quantity × unit price + accrued interest
+        const principal = h.quantity * FIXED_INCOME_UNIT_PRICE;
+        // Note: Full accrued interest calculation would need purchaseDate
+        valueIRR = principal;
+      } else {
+        // Crypto/ETF: quantity × priceUSD × fxRate
+        const priceUSD = prices[h.assetId] || 0;
+        valueIRR = h.quantity * priceUSD * fxRate;
       }
-    });
-    return totalWeight > 0 ? weightedSum / totalWeight : null;
-  })();
 
-  // Get top holdings
-  const topHoldings = holdings
-    .map((h) => {
+      holdingsIRR += valueIRR;
       const asset = ASSETS[h.assetId];
-      const value = h.assetId === 'IRR_FIXED_INCOME'
-        ? h.quantity * FIXED_INCOME_UNIT_PRICE
-        : h.quantity * (prices[h.assetId] || 0) * fxRate;
-      return { ...h, asset, value };
-    })
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 3);
-
-  // Check for pending loan payments
-  const nextLoanPayment = loans.length > 0 ? (() => {
-    const loan = loans[0];
-    const nextInstallment = loan.installments.find((i) => i.status === 'PENDING');
-    if (nextInstallment) {
-      const daysUntil = Math.ceil(
-        (new Date(nextInstallment.dueISO).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-      );
-      return { loan, installment: nextInstallment, daysUntil };
+      const layer = asset?.layer || h.layer;
+      if (layer) layerIRR[layer] += valueIRR;
     }
-    return null;
-  })() : null;
 
-  // Deep link navigation handlers
-  const handleDeepLinkPortfolio = () => {
-    navigation.navigate('Portfolio');
-  };
+    // Cash is part of Foundation for allocation purposes, but tracked separately for display
+    const totalIRR = holdingsIRR + cashIRR;
+    const totalForAllocation = layerIRR.FOUNDATION + layerIRR.GROWTH + layerIRR.UPSIDE + cashIRR;
 
-  const handleDeepLinkServices = (initialTab?: 'loans' | 'protection', loanId?: string) => {
-    navigation.navigate('Services', { initialTab, loanId });
-  };
+    // Add cash to Foundation for allocation calculation
+    const layerPct = {
+      FOUNDATION: totalForAllocation > 0 ? (layerIRR.FOUNDATION + cashIRR) / totalForAllocation : 0,
+      GROWTH: totalForAllocation > 0 ? layerIRR.GROWTH / totalForAllocation : 0,
+      UPSIDE: totalForAllocation > 0 ? layerIRR.UPSIDE / totalForAllocation : 0,
+    };
+
+    return { totalIRR, holdingsIRR, cashIRR, layerPct, layerIRR };
+  }, [holdings, cashIRR, prices, fxRate]);
+
+  // Calculate USD equivalent
+  const totalUSD = useMemo(() => {
+    return fxRate > 0 ? snapshot.totalIRR / fxRate : 0;
+  }, [snapshot.totalIRR, fxRate]);
 
   // Calculate portfolio status
-  const getPortfolioStatus = () => {
-    if (currentAllocation.FOUNDATION < 0.30 || currentAllocation.UPSIDE > 0.25) {
-      return 'ATTENTION_REQUIRED';
+  const portfolioStatusResult = useMemo(() => {
+    if (snapshot.holdingsIRR === 0 && cashIRR === 0) {
+      return { status: 'BALANCED' as PortfolioStatus, issues: [] };
     }
-    const drifts = [
-      Math.abs(currentAllocation.FOUNDATION - targetLayerPct.FOUNDATION),
-      Math.abs(currentAllocation.GROWTH - targetLayerPct.GROWTH),
-      Math.abs(currentAllocation.UPSIDE - targetLayerPct.UPSIDE),
-    ];
-    const maxDrift = Math.max(...drifts);
-    if (maxDrift > 0.05) return 'SLIGHTLY_OFF';
-    return 'BALANCED';
-  };
+    return computePortfolioStatus(snapshot.layerPct, targetLayerPct);
+  }, [snapshot, targetLayerPct, cashIRR]);
 
-  const calculatedStatus = holdingsValueIRR === 0 ? 'BALANCED' : getPortfolioStatus();
-  const showDriftAlert = calculatedStatus === 'SLIGHTLY_OFF' || calculatedStatus === 'ATTENTION_REQUIRED';
+  // Check for pending loan payments
+  const nextLoanPayment = useMemo(() => {
+    if (loans.length === 0) return null;
 
-  // Comprehensive refresh that fetches all data
-  const onRefresh = async () => {
+    for (const loan of loans) {
+      if (loan.status !== 'ACTIVE') continue;
+      const nextInstallment = loan.installments?.find((i) => i.status === 'PENDING');
+      if (nextInstallment) {
+        const daysUntil = Math.ceil(
+          (new Date(nextInstallment.dueISO).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+        );
+        return { loan, installment: nextInstallment, daysUntil };
+      }
+    }
+    return null;
+  }, [loans]);
+
+  // ==========================================================================
+  // HANDLERS
+  // ==========================================================================
+
+  const handleViewPortfolio = useCallback(() => {
+    navigation.navigate('Portfolio');
+  }, [navigation]);
+
+  const handleViewActivity = useCallback(() => {
+    navigation.navigate('Activity');
+  }, [navigation]);
+
+  const handleNotificationPress = useCallback(() => {
+    Alert.alert(
+      'Notifications',
+      nextLoanPayment && nextLoanPayment.daysUntil <= 7
+        ? `You have a loan payment due in ${nextLoanPayment.daysUntil} days`
+        : 'No new notifications',
+      [{ text: 'OK' }]
+    );
+  }, [nextLoanPayment]);
+
+  const handleProfilePress = useCallback(() => {
+    navigation.navigate('Profile');
+  }, [navigation]);
+
+  const handleDeepLinkServices = useCallback((initialTab?: 'loans' | 'protection', loanId?: string) => {
+    navigation.navigate('Services', { initialTab, loanId });
+  }, [navigation]);
+
+  // Comprehensive refresh
+  const onRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      // Fetch activities, portfolio, prices, and FX rate in parallel
       const [portfolioResponse] = await Promise.all([
         portfolioApi.get(),
         refreshActivities(),
@@ -215,7 +367,6 @@ const HomeScreen: React.FC = () => {
         dispatch(fetchFxRate()),
       ]);
 
-      // Update Redux state with fresh portfolio data
       dispatch(updateCash(portfolioResponse.cashIrr));
       dispatch(setStatus(portfolioResponse.status));
       dispatch(setTargetLayerPct(portfolioResponse.targetAllocation));
@@ -232,7 +383,11 @@ const HomeScreen: React.FC = () => {
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, [dispatch, refreshActivities]);
+
+  // ==========================================================================
+  // RENDER
+  // ==========================================================================
 
   return (
     <SafeAreaView style={styles.container}>
@@ -248,21 +403,16 @@ const HomeScreen: React.FC = () => {
           />
         }
       >
-        {/* Header */}
+        {/* ================================================================ */}
+        {/* HEADER: Status Badge + Notification + Avatar */}
+        {/* ================================================================ */}
         <View style={styles.header}>
-          <StatusChip status={calculatedStatus} />
+          <StatusBadge status={portfolioStatusResult.status} />
           <View style={styles.headerRight}>
             <TouchableOpacity
               style={styles.notificationButton}
-              onPress={() => {
-                Alert.alert(
-                  'Notifications',
-                  nextLoanPayment && nextLoanPayment.daysUntil <= 7
-                    ? `You have a loan payment due in ${nextLoanPayment.daysUntil} days`
-                    : 'No new notifications',
-                  [{ text: 'OK' }]
-                );
-              }}
+              onPress={handleNotificationPress}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Text style={styles.notificationIcon}>🔔</Text>
               {nextLoanPayment && nextLoanPayment.daysUntil <= 7 && (
@@ -271,7 +421,7 @@ const HomeScreen: React.FC = () => {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.avatarContainer}
-              onPress={() => navigation.navigate('Profile')}
+              onPress={handleProfilePress}
             >
               <View style={styles.avatar}>
                 <Text style={styles.avatarText}>
@@ -282,40 +432,80 @@ const HomeScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Hero: Activity Feed */}
+        {/* ================================================================ */}
+        {/* PORTFOLIO VALUE: One Big Number + Asset/Cash Breakdown */}
+        {/* ================================================================ */}
+        <View style={styles.valueSection}>
+          {/* Total Holdings - ONE number */}
+          <Text style={styles.totalValueAmount}>
+            {formatIRR(snapshot.totalIRR)} <Text style={styles.totalValueCurrency}>IRR</Text>
+          </Text>
+          <Text style={styles.totalValueLabel}>Total Holdings</Text>
+
+          {/* Asset Value vs Cash breakdown */}
+          <View style={styles.valueBreakdown}>
+            <View style={styles.valueBreakdownItem}>
+              <Text style={styles.breakdownValue}>{formatIRR(snapshot.holdingsIRR)}</Text>
+              <Text style={styles.breakdownLabel}>Asset Value</Text>
+            </View>
+            <View style={styles.valueBreakdownDivider} />
+            <View style={styles.valueBreakdownItem}>
+              <Text style={styles.breakdownValue}>{formatIRR(cashIRR)}</Text>
+              <Text style={styles.breakdownLabel}>Cash</Text>
+            </View>
+          </View>
+
+          {/* View Portfolio Link */}
+          <TouchableOpacity
+            style={styles.viewPortfolioLink}
+            onPress={handleViewPortfolio}
+          >
+            <Text style={styles.viewPortfolioText}>View Portfolio →</Text>
+          </TouchableOpacity>
+
+          {/* Price Feed Status */}
+          <PriceFeedStatus
+            isConnected={priceConnected}
+            lastUpdate={priceLastUpdate}
+          />
+        </View>
+
+        {/* ================================================================ */}
+        {/* ACTIVITY LOG: Last 3-5 entries */}
+        {/* ================================================================ */}
         <View style={styles.activitySection}>
-          <Text style={styles.sectionTitle}>📋 Recent Activity</Text>
+          <View style={styles.activityHeader}>
+            <Text style={styles.sectionTitle}>Activity Log</Text>
+            {activities.length > 0 && (
+              <TouchableOpacity onPress={handleViewActivity}>
+                <Text style={styles.viewAllLink}>View all →</Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
           {isLoadingActivities ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={COLORS.brand.primary} />
             </View>
           ) : activities.length === 0 ? (
-            <EmptyState
-              icon="time-outline"
-              title="No Recent Activity"
-              description="Your transactions will appear here"
-              compact
-            />
+            <View style={styles.emptyActivity}>
+              <Text style={styles.emptyActivityText}>No activity yet</Text>
+            </View>
           ) : (
-            activities.map((entry: ActionLogEntry) => (
-              <ActivityCard
-                key={entry.id}
-                id={entry.id}
-                type={entry.type}
-                title={entry.message}
-                timestamp={formatRelativeTime(entry.timestamp)}
-                boundary={entry.boundary}
-                deepLink={
-                  entry.type === 'TRADE'
-                    ? { label: 'View in Portfolio →', onPress: handleDeepLinkPortfolio }
-                    : entry.type === 'BORROW' || entry.type === 'REPAY'
-                    ? { label: 'View Loan →', onPress: () => handleDeepLinkServices('loans') }
-                    : entry.type === 'PROTECT' || entry.type === 'CANCEL_PROTECTION'
-                    ? { label: 'View Protection →', onPress: () => handleDeepLinkServices('protection') }
-                    : undefined
-                }
-              />
+            activities.slice(0, 5).map((entry: ActionLogEntry) => (
+              <View key={entry.id} style={styles.activityItem}>
+                <View style={[
+                  styles.activityDot,
+                  { backgroundColor: entry.boundary === 'SAFE' ? '#4ade80' :
+                    entry.boundary === 'DRIFT' ? '#fde047' : '#f87171' }
+                ]} />
+                <Text style={styles.activityMessage} numberOfLines={1}>
+                  {formatActivityMessage(entry)}
+                </Text>
+                <Text style={styles.activityTime}>
+                  {formatRelativeTime(entry.timestamp)}
+                </Text>
+              </View>
             ))
           )}
 
@@ -325,145 +515,58 @@ const HomeScreen: React.FC = () => {
               id="loan-payment-alert"
               type="LOAN_PAYMENT"
               title={`Loan payment due in ${nextLoanPayment.daysUntil} days`}
-              subtitle={`${nextLoanPayment.installment.totalIRR.toLocaleString()} IRR`}
+              subtitle={`${nextLoanPayment.installment.totalIRR?.toLocaleString()} IRR`}
               timestamp=""
               primaryAction={{
                 label: 'Pay Now',
                 onPress: () => handleDeepLinkServices('loans', nextLoanPayment.loan.id),
               }}
-              deepLink={{
-                label: 'View Loan →',
-                onPress: () => handleDeepLinkServices('loans', nextLoanPayment.loan.id),
-              }}
-            />
-          )}
-
-          {/* Drift Alert */}
-          {showDriftAlert && !driftAlertDismissed && (
-            <ActivityCard
-              id="drift-alert"
-              type="ALERT"
-              title={`Portfolio drifted from target`}
-              timestamp=""
-              boundary={calculatedStatus === 'ATTENTION_REQUIRED' ? 'STRUCTURAL' : 'DRIFT'}
-              primaryAction={{
-                label: 'Rebalance Now',
-                onPress: () => setRebalanceSheetVisible(true),
-              }}
-              secondaryAction={{
-                label: 'Later',
-                onPress: () => setDriftAlertDismissed(true),
-              }}
             />
           )}
         </View>
 
-        {/* Portfolio Value */}
-        <View style={styles.valueSection}>
-          <Text style={styles.valueAmount}>
-            {formatNumber(totalValueIRR)} <Text style={styles.valueCurrency}>IRR</Text>
-          </Text>
-          {/* USD Equivalent */}
-          {fxRate > 0 && (
-            <Text style={styles.usdEquivalent}>
-              {formatDualCurrency(totalValueIRR, fxRate).usd}
-            </Text>
-          )}
-          {/* Daily Change Chip */}
-          {(() => {
-            const changeInfo = formatDailyChange(portfolioDailyChange);
-            return (
-              <View style={[styles.changeChip, { backgroundColor: changeInfo.backgroundColor }]}>
-                <Text style={styles.changeIcon}>{changeInfo.icon}</Text>
-                <Text style={[styles.changeText, { color: changeInfo.color }]}>
-                  {changeInfo.text}
-                </Text>
-              </View>
-            );
-          })()}
-        </View>
+        {/* ================================================================ */}
+        {/* MAIN ACTIONS */}
+        {/* ================================================================ */}
+        <View style={styles.actionsSection}>
+          <Text style={styles.sectionTitle}>MAIN ACTIONS</Text>
 
-        {/* Allocation Bar - Tappable */}
-        <TouchableOpacity
-          style={styles.allocationSection}
-          onPress={() => setAllocationDetailVisible(true)}
-          activeOpacity={0.7}
-        >
-          <AllocationBar current={currentAllocation} target={targetLayerPct} />
-          <Text style={styles.allocationHint}>Tap for details</Text>
-        </TouchableOpacity>
-
-        {/* Quick Actions */}
-        <View style={styles.quickActionsSection}>
-          <QuickActionButton icon="➕" label="Add Funds" onPress={() => setAddFundsSheetVisible(true)} />
-          <QuickActionButton icon="↔️" label="Trade" onPress={() => setTradeSheetVisible(true)} />
-          <QuickActionButton icon="🛡️" label="Protect" onPress={() => handleDeepLinkServices('protection')} />
-        </View>
-
-        {/* Holdings Preview */}
-        <View style={styles.holdingsSection}>
-          <View style={styles.holdingsHeader}>
-            <Text style={styles.holdingsTitle}>Holdings</Text>
-            {topHoldings.length > 0 && (
-              <TouchableOpacity onPress={handleDeepLinkPortfolio}>
-                <Text style={styles.viewAllLink}>View All →</Text>
-              </TouchableOpacity>
-            )}
+          {/* Row 1: Rebalance, Add Funds, Buy/Sell */}
+          <View style={styles.actionsRow}>
+            <MainActionButton
+              label="Rebalance"
+              onPress={() => setRebalanceSheetVisible(true)}
+              disabled={portfolioStatusResult.status === 'BALANCED'}
+            />
+            <MainActionButton
+              label="Add Funds"
+              onPress={() => setAddFundsSheetVisible(true)}
+            />
+            <MainActionButton
+              label="Buy/Sell"
+              onPress={() => setTradeSheetVisible(true)}
+            />
           </View>
 
-          {topHoldings.length === 0 ? (
-            <EmptyState
-              icon="wallet-outline"
-              title="Start Your Journey"
-              description="Add funds to begin investing in crypto assets"
-              actionLabel="Add Funds"
-              onAction={() => setAddFundsSheetVisible(true)}
-              compact
+          {/* Row 2: Borrow IRR, Insure Assets */}
+          <View style={styles.actionsRowWide}>
+            <WideActionButton
+              label="Borrow IRR"
+              onPress={() => setLoanSheetVisible(true)}
+              disabled={snapshot.holdingsIRR === 0}
             />
-          ) : topHoldings.map((holding) => (
-            <TouchableOpacity
-              key={holding.assetId}
-              style={styles.holdingRow}
-              onPress={handleDeepLinkPortfolio}
-            >
-              <View style={styles.holdingLeft}>
-                <View style={[styles.holdingIcon, { backgroundColor: `${COLORS.layers[holding.asset?.layer?.toLowerCase() as keyof typeof COLORS.layers]}40` }]}>
-                  <Text style={styles.holdingIconText}>
-                    {holding.asset?.symbol?.slice(0, 2) || '?'}
-                  </Text>
-                </View>
-                <View>
-                  <Text style={styles.holdingName}>{holding.asset?.name || holding.assetId}</Text>
-                  <Text style={styles.holdingSymbol}>{holding.asset?.symbol || holding.assetId}</Text>
-                </View>
-              </View>
-              <View style={styles.holdingRight}>
-                <Text style={styles.holdingValue}>{formatNumber(holding.value)} IRR</Text>
-                {/* USD Equivalent - except for IRR_FIXED_INCOME */}
-                {shouldShowUsdEquivalent(holding.assetId) && fxRate > 0 && (
-                  <Text style={styles.holdingUsd}>
-                    {formatDualCurrency(holding.value, fxRate).usd}
-                  </Text>
-                )}
-                <Text style={[
-                  styles.holdingChange,
-                  change24h?.[holding.assetId] !== undefined
-                    ? change24h[holding.assetId]! >= 0
-                      ? styles.changePositive
-                      : styles.changeNegative
-                    : styles.changeNeutral,
-                ]}>
-                  {change24h?.[holding.assetId] !== undefined
-                    ? `${change24h[holding.assetId]! >= 0 ? '+' : ''}${change24h[holding.assetId]!.toFixed(1)}%`
-                    : '--'}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+            <WideActionButton
+              label="Insure Assets"
+              onPress={() => setProtectionSheetVisible(true)}
+              disabled={snapshot.holdingsIRR === 0}
+            />
+          </View>
         </View>
       </ScrollView>
 
-      {/* Bottom Sheets */}
+      {/* ================================================================ */}
+      {/* BOTTOM SHEETS */}
+      {/* ================================================================ */}
       <TradeBottomSheet
         visible={tradeSheetVisible}
         onClose={() => setTradeSheetVisible(false)}
@@ -476,17 +579,21 @@ const HomeScreen: React.FC = () => {
         visible={rebalanceSheetVisible}
         onClose={() => setRebalanceSheetVisible(false)}
       />
-      <AllocationDetailSheet
-        visible={allocationDetailVisible}
-        onClose={() => setAllocationDetailVisible(false)}
-        current={currentAllocation}
-        target={targetLayerPct}
-        layerValues={layerValues}
-        totalValue={totalValueIRR}
+      <LoanSheet
+        visible={loanSheetVisible}
+        onClose={() => setLoanSheetVisible(false)}
+      />
+      <ProtectionSheet
+        visible={protectionSheetVisible}
+        onClose={() => setProtectionSheetVisible(false)}
       />
     </SafeAreaView>
   );
 };
+
+// =============================================================================
+// STYLES
+// =============================================================================
 
 const styles = StyleSheet.create({
   container: {
@@ -499,15 +606,16 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 120,
   },
+
   // Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: SPACING[4],
-    paddingVertical: SPACING[4],
+    paddingVertical: SPACING[3],
   },
-  statusChip: {
+  statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING[3],
@@ -521,17 +629,18 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginRight: SPACING[2],
   },
-  statusText: {
+  statusLabel: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    fontWeight: '600',
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING[4],
+    gap: SPACING[3],
   },
   notificationButton: {
     position: 'relative',
+    padding: SPACING[1],
   },
   notificationIcon: {
     fontSize: 24,
@@ -563,19 +672,110 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    fontWeight: '700',
     color: COLORS.text.primary,
   },
+
+  // Value Section
+  valueSection: {
+    alignItems: 'center',
+    paddingHorizontal: SPACING[4],
+    paddingTop: SPACING[6],
+    paddingBottom: SPACING[4],
+  },
+  totalValueAmount: {
+    fontSize: 40,
+    fontWeight: '700',
+    color: COLORS.text.primary,
+    letterSpacing: -1,
+  },
+  totalValueCurrency: {
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontWeight: '600',
+    color: COLORS.text.muted,
+  },
+  totalValueLabel: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.text.secondary,
+    marginTop: SPACING[1],
+  },
+  valueBreakdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: SPACING[5],
+    backgroundColor: COLORS.background.elevated,
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING[4],
+    paddingHorizontal: SPACING[5],
+  },
+  valueBreakdownItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  valueBreakdownDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: COLORS.background.surface,
+    marginHorizontal: SPACING[4],
+  },
+  breakdownValue: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: '700',
+    color: COLORS.text.primary,
+  },
+  breakdownLabel: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.muted,
+    marginTop: SPACING[1],
+  },
+  viewPortfolioLink: {
+    marginTop: SPACING[4],
+    paddingVertical: SPACING[2],
+  },
+  viewPortfolioText: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: '600',
+    color: COLORS.brand.primary,
+  },
+  priceFeedContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: SPACING[3],
+    opacity: 0.7,
+  },
+  priceFeedDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: SPACING[2],
+  },
+  priceFeedText: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.text.muted,
+  },
+
   // Activity Section
   activitySection: {
     paddingHorizontal: SPACING[4],
-    marginTop: SPACING[2],
+    marginTop: SPACING[4],
+  },
+  activityHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING[3],
   },
   sectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '600',
     color: COLORS.text.secondary,
-    marginBottom: SPACING[3],
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  viewAllLink: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '500',
+    color: COLORS.brand.primary,
   },
   loadingContainer: {
     padding: SPACING[6],
@@ -584,174 +784,91 @@ const styles = StyleSheet.create({
   emptyActivity: {
     backgroundColor: COLORS.background.elevated,
     borderRadius: RADIUS.lg,
-    padding: SPACING[6],
+    padding: SPACING[4],
     alignItems: 'center',
   },
   emptyActivityText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.text.muted,
   },
-  // Value Section
-  valueSection: {
-    alignItems: 'center',
-    paddingHorizontal: SPACING[4],
-    marginTop: SPACING[6],
-  },
-  valueAmount: {
-    fontSize: 32,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
-    letterSpacing: -1,
-  },
-  valueCurrency: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.muted,
-  },
-  usdEquivalent: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.text.secondary,
-    marginTop: SPACING[1],
-  },
-  changeChip: {
+  activityItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: `${COLORS.semantic.success}15`,
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[1],
-    borderRadius: RADIUS.full,
-    marginTop: SPACING[2],
-  },
-  changeIcon: {
-    fontSize: 14,
-    marginRight: SPACING[1],
-  },
-  changeText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.semantic.success,
-  },
-  // Allocation Section
-  allocationSection: {
-    paddingHorizontal: SPACING[4],
-    marginTop: SPACING[6],
-  },
-  allocationHint: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.muted,
-    textAlign: 'center',
-    marginTop: SPACING[2],
-  },
-  // Quick Actions
-  quickActionsSection: {
-    flexDirection: 'row',
-    paddingHorizontal: SPACING[4],
-    marginTop: SPACING[6],
-    gap: SPACING[3],
-  },
-  quickAction: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
     paddingVertical: SPACING[3],
-    borderRadius: RADIUS.lg,
+    paddingHorizontal: SPACING[3],
     backgroundColor: COLORS.background.elevated,
-  },
-  quickActionIcon: {
-    fontSize: 20,
+    borderRadius: RADIUS.md,
     marginBottom: SPACING[2],
   },
-  quickActionLabel: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
-  },
-  // Holdings Section
-  holdingsSection: {
-    paddingHorizontal: SPACING[4],
-    marginTop: SPACING[6],
-  },
-  holdingsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING[3],
-  },
-  holdingsTitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
-  },
-  viewAllLink: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
-    color: COLORS.brand.primary,
-  },
-  holdingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: COLORS.background.elevated,
-    padding: SPACING[4],
-    borderRadius: RADIUS.lg,
-    marginBottom: SPACING[2],
-  },
-  holdingLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  holdingIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
+  activityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     marginRight: SPACING[3],
   },
-  holdingIconText: {
-    fontSize: 16,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
-  },
-  holdingName: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-  },
-  holdingSymbol: {
+  activityMessage: {
+    flex: 1,
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.muted,
-  },
-  holdingRight: {
-    alignItems: 'flex-end',
-  },
-  holdingValue: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
     color: COLORS.text.primary,
   },
-  holdingUsd: {
+  activityTime: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.secondary,
+    color: COLORS.text.muted,
+    marginLeft: SPACING[2],
   },
-  holdingChange: {
+
+  // Actions Section
+  actionsSection: {
+    paddingHorizontal: SPACING[4],
+    marginTop: SPACING[6],
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: SPACING[2],
+    marginTop: SPACING[3],
+  },
+  actionsRowWide: {
+    flexDirection: 'row',
+    gap: SPACING[2],
+    marginTop: SPACING[2],
+  },
+  mainActionButton: {
+    flex: 1,
+    backgroundColor: COLORS.background.elevated,
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING[4],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mainActionButtonDisabled: {
+    opacity: 0.5,
+  },
+  mainActionLabel: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
+    fontWeight: '600',
+    color: COLORS.text.primary,
   },
-  changePositive: {
-    color: COLORS.semantic.success,
-  },
-  changeNegative: {
-    color: COLORS.semantic.error,
-  },
-  changeNeutral: {
+  mainActionLabelDisabled: {
     color: COLORS.text.muted,
   },
-  changeChipNegative: {
-    backgroundColor: `${COLORS.semantic.error}15`,
+  wideActionButton: {
+    flex: 1,
+    backgroundColor: COLORS.background.elevated,
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING[4],
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  changeTextNegative: {
-    color: COLORS.semantic.error,
+  wideActionButtonDisabled: {
+    opacity: 0.5,
+  },
+  wideActionLabel: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '600',
+    color: COLORS.text.primary,
+  },
+  wideActionLabelDisabled: {
+    color: COLORS.text.muted,
   },
 });
 
