@@ -121,27 +121,29 @@ const quoteCache = new Map<string, CachedQuote>();
 /** Index of quotes by holdingId for fast invalidation */
 const quotesByHolding = new Map<string, Set<string>>();
 
-/** Reservation timeout - release reservation if transaction takes too long (30s) */
-const RESERVATION_TIMEOUT_MS = 30_000;
-
-/** Clean up expired quotes and stale reservations periodically */
+/**
+ * Clean up expired quotes periodically.
+ *
+ * Reservation expiration is tied to quote validity (not a fixed timeout) to prevent
+ * releasing a reservation while a transaction is still running. This is safer because:
+ * 1. Quote validity (5 min) is longer than any reasonable transaction time
+ * 2. If quote expires during transaction, the transaction will fail on quote validation anyway
+ * 3. DB-level check for existing active protection provides additional safety net
+ */
 function cleanupExpiredQuotes(): void {
   const now = new Date();
   for (const [quoteId, cached] of quoteCache.entries()) {
-    // Remove expired quotes
+    // Remove expired quotes (this also handles reserved quotes that expired)
+    // When a quote expires, any reservation on it is implicitly released
     if (now > cached.quote.validUntil) {
       removeQuoteFromCache(quoteId, cached.quote.holdingId);
       continue;
     }
-    // Release stale reservations (transaction timeout)
-    if (
-      cached.status === 'reserved' &&
-      cached.reservedAt &&
-      now.getTime() - cached.reservedAt.getTime() > RESERVATION_TIMEOUT_MS
-    ) {
-      cached.status = 'available';
-      cached.reservedAt = undefined;
-    }
+    // Note: We intentionally do NOT release reservations based on a fixed timeout.
+    // Reserved quotes remain reserved until:
+    // 1. Transaction succeeds (consumeQuote called)
+    // 2. Transaction fails (releaseQuote called)
+    // 3. Quote expires (removed by cleanup above)
   }
 }
 
@@ -707,14 +709,26 @@ export function isQuoteValid(quote: ProtectionQuote): boolean {
 }
 
 /**
- * Validate premium hasn't changed too much
+ * Validate that client-provided premium is within tolerance of server-quoted premium.
+ *
+ * IMPORTANT: The server-quoted premium MUST be the first parameter (baseline) to:
+ * 1. Prevent divide-by-zero if client sends 0
+ * 2. Ensure tolerance calculation is server-controlled, not client-controlled
+ *
+ * @param serverQuotedPremiumIrr - The premium from the server's cached quote (baseline)
+ * @param clientProvidedPremiumIrr - The premium sent by the client for validation
+ * @returns true if within PREMIUM_TOLERANCE (5%)
  */
 export function isPremiumWithinTolerance(
-  quotedPremiumIrr: number,
-  currentPremiumIrr: number
+  serverQuotedPremiumIrr: number,
+  clientProvidedPremiumIrr: number
 ): boolean {
-  const diff = Math.abs(quotedPremiumIrr - currentPremiumIrr);
-  return diff / quotedPremiumIrr <= PREMIUM_TOLERANCE;
+  // Guard against divide-by-zero (server quote should never be 0, but be safe)
+  if (serverQuotedPremiumIrr <= 0) {
+    return false;
+  }
+  const diff = Math.abs(serverQuotedPremiumIrr - clientProvidedPremiumIrr);
+  return diff / serverQuotedPremiumIrr <= PREMIUM_TOLERANCE;
 }
 
 /**

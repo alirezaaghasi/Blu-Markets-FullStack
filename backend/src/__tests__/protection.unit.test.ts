@@ -478,7 +478,60 @@ describe('Edge Cases', () => {
 });
 
 // ============================================================================
-// SUITE 7: MATHEMATICAL ACCURACY
+// SUITE 7: PREMIUM TOLERANCE VALIDATION
+// ============================================================================
+
+describe('Premium Tolerance Validation', () => {
+  it('should accept premium within 5% tolerance', async () => {
+    const { isPremiumWithinTolerance } = await import('../services/protection-pricing.service.js');
+
+    // Server quoted 1,000,000 IRR, client sends values within tolerance
+    expect(isPremiumWithinTolerance(1_000_000, 1_000_000)).toBe(true);  // exact
+    expect(isPremiumWithinTolerance(1_000_000, 1_040_000)).toBe(true);  // 4% higher
+    expect(isPremiumWithinTolerance(1_000_000, 960_000)).toBe(true);    // 4% lower
+    expect(isPremiumWithinTolerance(1_000_000, 1_050_000)).toBe(true);  // exactly 5%
+  });
+
+  it('should reject premium outside 5% tolerance', async () => {
+    const { isPremiumWithinTolerance } = await import('../services/protection-pricing.service.js');
+
+    // Server quoted 1,000,000 IRR, client sends values outside tolerance
+    expect(isPremiumWithinTolerance(1_000_000, 1_060_000)).toBe(false); // 6% higher
+    expect(isPremiumWithinTolerance(1_000_000, 940_000)).toBe(false);   // 6% lower
+    expect(isPremiumWithinTolerance(1_000_000, 1_100_000)).toBe(false); // 10% higher
+    expect(isPremiumWithinTolerance(1_000_000, 500_000)).toBe(false);   // 50% lower
+  });
+
+  it('should reject when server-quoted premium is zero (divide-by-zero guard)', async () => {
+    const { isPremiumWithinTolerance } = await import('../services/protection-pricing.service.js');
+
+    // Server quote of 0 should always reject (guards against divide-by-zero)
+    expect(isPremiumWithinTolerance(0, 0)).toBe(false);
+    expect(isPremiumWithinTolerance(0, 1_000_000)).toBe(false);
+    expect(isPremiumWithinTolerance(-100, 100)).toBe(false);
+  });
+
+  it('should use server-quoted premium as baseline (not client-provided)', async () => {
+    const { isPremiumWithinTolerance } = await import('../services/protection-pricing.service.js');
+
+    // If client sends 0 but server quoted non-zero, tolerance calc uses server value
+    // 0 is 100% different from 1,000,000, so should be rejected
+    expect(isPremiumWithinTolerance(1_000_000, 0)).toBe(false);
+
+    // Key security test: tolerance should be % of server value, not client value
+    // If we had it backwards (client as baseline), this would be different
+    const serverQuote = 100_000;
+    const clientValue = 95_000; // 5% lower than server
+    expect(isPremiumWithinTolerance(serverQuote, clientValue)).toBe(true);
+
+    // 5% of 100,000 = 5,000, so values from 95,000 to 105,000 should pass
+    expect(isPremiumWithinTolerance(100_000, 94_999)).toBe(false); // just over 5%
+    expect(isPremiumWithinTolerance(100_000, 105_001)).toBe(false); // just over 5%
+  });
+});
+
+// ============================================================================
+// SUITE 8: MATHEMATICAL ACCURACY
 // ============================================================================
 
 describe('Mathematical Accuracy', () => {

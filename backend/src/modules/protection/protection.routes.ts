@@ -269,7 +269,9 @@ export const protectionRoutes: FastifyPluginAsync = async (app: FastifyInstance)
         }
 
         // Validate premium matches (within tolerance for minor display rounding)
-        if (!isPremiumWithinTolerance(body.premiumIrr, reservedQuote.premiumIrr)) {
+        // IMPORTANT: Server-quoted premium must be the baseline (first param) to prevent
+        // divide-by-zero if client sends 0 and to ensure tolerance is server-controlled
+        if (!isPremiumWithinTolerance(reservedQuote.premiumIrr, body.premiumIrr)) {
           throw new AppError('VALIDATION_ERROR', 'Premium does not match quote', 400, {
             quotedPremium: reservedQuote.premiumIrr,
             providedPremium: body.premiumIrr,
