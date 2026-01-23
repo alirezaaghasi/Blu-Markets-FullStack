@@ -28,11 +28,15 @@ import { ASSETS } from '../../constants/assets';
 import { FIXED_INCOME_UNIT_PRICE } from '../../constants/business';
 import { ActivityCard } from '../../components/ActivityCard';
 import AllocationBar from '../../components/AllocationBar';
+import { AllocationDetailSheet } from '../../components/AllocationDetailSheet';
 import { TradeBottomSheet } from '../../components/TradeBottomSheet';
 import { AddFundsSheet } from '../../components/AddFundsSheet';
 import RebalanceSheet from '../../components/RebalanceSheet';
 import { EmptyState } from '../../components/EmptyState';
 import { ActionLogEntry } from '../../types';
+import { formatRelativeTime } from '../../utils/dateUtils';
+import { formatDualCurrency, shouldShowUsdEquivalent } from '../../utils/currency';
+import { formatDailyChange } from '../../utils/formatters';
 
 // Format number with commas
 const formatNumber = (num: number): string => {
@@ -43,22 +47,6 @@ const formatNumber = (num: number): string => {
     return `${(num / 1_000_000).toFixed(1)}M`;
   }
   return num.toLocaleString('en-US');
-};
-
-// Format relative time
-const formatRelativeTime = (timestamp: string): string => {
-  const now = Date.now();
-  const time = new Date(timestamp).getTime();
-  const diff = now - time;
-
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  if (days === 1) return 'Yesterday';
-  return `${days}d ago`;
 };
 
 // Status Chip Component
@@ -107,6 +95,7 @@ const HomeScreen: React.FC = () => {
   const [tradeSheetVisible, setTradeSheetVisible] = useState(false);
   const [addFundsSheetVisible, setAddFundsSheetVisible] = useState(false);
   const [rebalanceSheetVisible, setRebalanceSheetVisible] = useState(false);
+  const [allocationDetailVisible, setAllocationDetailVisible] = useState(false);
   const [driftAlertDismissed, setDriftAlertDismissed] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -374,28 +363,35 @@ const HomeScreen: React.FC = () => {
           <Text style={styles.valueAmount}>
             {formatNumber(totalValueIRR)} <Text style={styles.valueCurrency}>IRR</Text>
           </Text>
-          <View style={[
-            styles.changeChip,
-            portfolioDailyChange !== null && portfolioDailyChange < 0 && styles.changeChipNegative,
-          ]}>
-            <Text style={styles.changeIcon}>
-              {portfolioDailyChange === null ? '📊' : portfolioDailyChange >= 0 ? '📈' : '📉'}
+          {/* USD Equivalent */}
+          {fxRate > 0 && (
+            <Text style={styles.usdEquivalent}>
+              {formatDualCurrency(totalValueIRR, fxRate).usd}
             </Text>
-            <Text style={[
-              styles.changeText,
-              portfolioDailyChange !== null && portfolioDailyChange < 0 && styles.changeTextNegative,
-            ]}>
-              {portfolioDailyChange !== null
-                ? `${portfolioDailyChange >= 0 ? '+' : ''}${portfolioDailyChange.toFixed(1)}% Today`
-                : '-- Today'}
-            </Text>
-          </View>
+          )}
+          {/* Daily Change Chip */}
+          {(() => {
+            const changeInfo = formatDailyChange(portfolioDailyChange);
+            return (
+              <View style={[styles.changeChip, { backgroundColor: changeInfo.backgroundColor }]}>
+                <Text style={styles.changeIcon}>{changeInfo.icon}</Text>
+                <Text style={[styles.changeText, { color: changeInfo.color }]}>
+                  {changeInfo.text}
+                </Text>
+              </View>
+            );
+          })()}
         </View>
 
-        {/* Allocation Bar */}
-        <View style={styles.allocationSection}>
+        {/* Allocation Bar - Tappable */}
+        <TouchableOpacity
+          style={styles.allocationSection}
+          onPress={() => setAllocationDetailVisible(true)}
+          activeOpacity={0.7}
+        >
           <AllocationBar current={currentAllocation} target={targetLayerPct} />
-        </View>
+          <Text style={styles.allocationHint}>Tap for details</Text>
+        </TouchableOpacity>
 
         {/* Quick Actions */}
         <View style={styles.quickActionsSection}>
@@ -443,6 +439,12 @@ const HomeScreen: React.FC = () => {
               </View>
               <View style={styles.holdingRight}>
                 <Text style={styles.holdingValue}>{formatNumber(holding.value)} IRR</Text>
+                {/* USD Equivalent - except for IRR_FIXED_INCOME */}
+                {shouldShowUsdEquivalent(holding.assetId) && fxRate > 0 && (
+                  <Text style={styles.holdingUsd}>
+                    {formatDualCurrency(holding.value, fxRate).usd}
+                  </Text>
+                )}
                 <Text style={[
                   styles.holdingChange,
                   change24h?.[holding.assetId] !== undefined
@@ -473,6 +475,14 @@ const HomeScreen: React.FC = () => {
       <RebalanceSheet
         visible={rebalanceSheetVisible}
         onClose={() => setRebalanceSheetVisible(false)}
+      />
+      <AllocationDetailSheet
+        visible={allocationDetailVisible}
+        onClose={() => setAllocationDetailVisible(false)}
+        current={currentAllocation}
+        target={targetLayerPct}
+        layerValues={layerValues}
+        totalValue={totalValueIRR}
       />
     </SafeAreaView>
   );
@@ -598,6 +608,11 @@ const styles = StyleSheet.create({
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
     color: COLORS.text.muted,
   },
+  usdEquivalent: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.text.secondary,
+    marginTop: SPACING[1],
+  },
   changeChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -620,6 +635,12 @@ const styles = StyleSheet.create({
   allocationSection: {
     paddingHorizontal: SPACING[4],
     marginTop: SPACING[6],
+  },
+  allocationHint: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.text.muted,
+    textAlign: 'center',
+    marginTop: SPACING[2],
   },
   // Quick Actions
   quickActionsSection: {
@@ -708,6 +729,10 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.base,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
     color: COLORS.text.primary,
+  },
+  holdingUsd: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.text.secondary,
   },
   holdingChange: {
     fontSize: TYPOGRAPHY.fontSize.sm,

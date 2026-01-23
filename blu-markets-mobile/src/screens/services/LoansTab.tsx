@@ -79,6 +79,68 @@ export function LoansTab({ loanId }: LoansTabProps) {
           actionLabel="Explore Borrowing"
           onAction={() => createLoan(5000000, 3)}
         />
+
+        {/* How It Works Section */}
+        <View style={styles.howItWorksSection}>
+          <Text style={styles.howItWorksTitle}>How Crypto-Backed Loans Work</Text>
+
+          <View style={styles.stepCard}>
+            <View style={styles.stepNumber}>
+              <Text style={styles.stepNumberText}>1</Text>
+            </View>
+            <View style={styles.stepContent}>
+              <Text style={styles.stepTitle}>Choose Collateral</Text>
+              <Text style={styles.stepDescription}>
+                Select crypto assets from your portfolio to use as collateral
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.stepCard}>
+            <View style={styles.stepNumber}>
+              <Text style={styles.stepNumberText}>2</Text>
+            </View>
+            <View style={styles.stepContent}>
+              <Text style={styles.stepTitle}>Get Instant IRR</Text>
+              <Text style={styles.stepDescription}>
+                Receive up to 50% of your collateral value as an IRR loan
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.stepCard}>
+            <View style={styles.stepNumber}>
+              <Text style={styles.stepNumberText}>3</Text>
+            </View>
+            <View style={styles.stepContent}>
+              <Text style={styles.stepTitle}>Repay & Unlock</Text>
+              <Text style={styles.stepDescription}>
+                Pay back in installments to unlock your crypto collateral
+              </Text>
+            </View>
+          </View>
+
+          {/* Benefits */}
+          <View style={styles.benefitsCard}>
+            <Text style={styles.benefitsTitle}>Benefits</Text>
+            <View style={styles.benefitRow}>
+              <Text style={styles.benefitIcon}>✓</Text>
+              <Text style={styles.benefitText}>Keep your crypto exposure</Text>
+            </View>
+            <View style={styles.benefitRow}>
+              <Text style={styles.benefitIcon}>✓</Text>
+              <Text style={styles.benefitText}>No credit check required</Text>
+            </View>
+            <View style={styles.benefitRow}>
+              <Text style={styles.benefitIcon}>✓</Text>
+              <Text style={styles.benefitText}>Competitive interest rates</Text>
+            </View>
+            <View style={styles.benefitRow}>
+              <Text style={styles.benefitIcon}>✓</Text>
+              <Text style={styles.benefitText}>Flexible repayment options</Text>
+            </View>
+          </View>
+        </View>
       </ScrollView>
     );
   }
@@ -368,6 +430,81 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
     color: COLORS.text.inverse,
+  },
+  // How It Works Section
+  howItWorksSection: {
+    padding: SPACING[5],
+    paddingTop: SPACING[2],
+  },
+  howItWorksTitle: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text.primary,
+    marginBottom: SPACING[4],
+    textAlign: 'center',
+  },
+  stepCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: COLORS.background.elevated,
+    borderRadius: RADIUS.lg,
+    padding: SPACING[4],
+    marginBottom: SPACING[3],
+  },
+  stepNumber: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.brand.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING[3],
+  },
+  stepNumberText: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text.inverse,
+  },
+  stepContent: {
+    flex: 1,
+  },
+  stepTitle: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.primary,
+    marginBottom: SPACING[1],
+  },
+  stepDescription: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
+    lineHeight: 20,
+  },
+  benefitsCard: {
+    backgroundColor: COLORS.background.elevated,
+    borderRadius: RADIUS.lg,
+    padding: SPACING[4],
+    marginTop: SPACING[2],
+  },
+  benefitsTitle: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.primary,
+    marginBottom: SPACING[3],
+  },
+  benefitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING[2],
+  },
+  benefitIcon: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.semantic.success,
+    marginRight: SPACING[2],
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+  },
+  benefitText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
   },
 });
 

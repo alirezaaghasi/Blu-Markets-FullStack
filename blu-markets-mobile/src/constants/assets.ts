@@ -216,3 +216,10 @@ export const LAYER_NAMES: Record<Layer, string> = {
   GROWTH: 'Growth',
   UPSIDE: 'Upside',
 };
+
+// Layer descriptions for detail views
+export const LAYER_DESCRIPTIONS: Record<Layer, string> = {
+  FOUNDATION: 'Stable assets for capital preservation',
+  GROWTH: 'Established assets for steady growth',
+  UPSIDE: 'High-potential assets for maximum returns',
+};

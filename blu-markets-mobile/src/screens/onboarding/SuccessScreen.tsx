@@ -250,7 +250,7 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
           <View style={styles.divider} />
 
           <View style={styles.allocationSection}>
-            <Text style={styles.allocationTitle}>Your allocation</Text>
+            <Text style={styles.allocationTitle}>Your target allocation</Text>
             <View style={styles.allocationBar}>
               <View
                 style={[
@@ -280,19 +280,27 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
                 ]}
               />
             </View>
-            <View style={styles.allocationLabels}>
-              <AllocationLabel
+
+            {/* Allocation breakdown with amounts */}
+            <View style={styles.allocationBreakdown}>
+              <AllocationBreakdownItem
                 label="Foundation"
+                description="Stable assets (USDT, PAXG)"
+                amount={Math.floor(initialInvestment * allocation.FOUNDATION)}
                 percentage={Math.round(allocation.FOUNDATION * 100)}
                 color={COLORS.layers.foundation}
               />
-              <AllocationLabel
+              <AllocationBreakdownItem
                 label="Growth"
+                description="Major crypto (BTC, ETH)"
+                amount={Math.floor(initialInvestment * allocation.GROWTH)}
                 percentage={Math.round(allocation.GROWTH * 100)}
                 color={COLORS.layers.growth}
               />
-              <AllocationLabel
+              <AllocationBreakdownItem
                 label="Upside"
+                description="High-potential (SOL, etc.)"
+                amount={initialInvestment - Math.floor(initialInvestment * allocation.FOUNDATION) - Math.floor(initialInvestment * allocation.GROWTH)}
                 percentage={Math.round(allocation.UPSIDE * 100)}
                 color={COLORS.layers.upside}
               />
@@ -332,17 +340,25 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
   );
 };
 
-// Allocation Label Component
-const AllocationLabel: React.FC<{
+// Allocation Breakdown Item Component (shows asset layer with amount)
+const AllocationBreakdownItem: React.FC<{
   label: string;
+  description: string;
+  amount: number;
   percentage: number;
   color: string;
-}> = ({ label, percentage, color }) => (
-  <View style={styles.allocationLabelItem}>
-    <View style={[styles.labelDot, { backgroundColor: color }]} />
-    <Text style={styles.labelText}>
-      {label} <Text style={[styles.labelPercentage, { color }]}>{percentage}%</Text>
-    </Text>
+}> = ({ label, description, amount, percentage, color }) => (
+  <View style={styles.breakdownItem}>
+    <View style={styles.breakdownLeft}>
+      <View style={[styles.breakdownDot, { backgroundColor: color }]} />
+      <View>
+        <Text style={styles.breakdownLabel}>
+          {label} <Text style={[styles.breakdownPercentage, { color }]}>({percentage}%)</Text>
+        </Text>
+        <Text style={styles.breakdownDescription}>{description}</Text>
+      </View>
+    </View>
+    <Text style={styles.breakdownAmount}>{formatNumber(amount)} IRR</Text>
   </View>
 );
 
@@ -444,31 +460,47 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     flexDirection: 'row',
     overflow: 'hidden',
-    marginBottom: SPACING[3],
+    marginBottom: SPACING[4],
   },
   allocationSegment: {
     height: '100%',
   },
-  allocationLabels: {
+  allocationBreakdown: {
+    gap: SPACING[3],
+  },
+  breakdownItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-  },
-  allocationLabelItem: {
-    flexDirection: 'row',
     alignItems: 'center',
   },
-  labelDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: SPACING[1],
+  breakdownLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
-  labelText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.secondary,
+  breakdownDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: SPACING[2],
   },
-  labelPercentage: {
+  breakdownLabel: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.primary,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
+  },
+  breakdownPercentage: {
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
+  },
+  breakdownDescription: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.text.muted,
+    marginTop: 1,
+  },
+  breakdownAmount: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.primary,
   },
   activityPreview: {
     backgroundColor: COLORS.background.elevated,

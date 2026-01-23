@@ -21,6 +21,7 @@ import { resetOnboarding } from '../../store/slices/onboardingSlice';
 import { RISK_PROFILE_NAMES } from '../../constants/business';
 import { useBiometricAuth } from '../../hooks/useBiometricAuth';
 import { clearAllState } from '../../utils/storage';
+import { formatPhoneDisplay, formatMemberSince } from '../../utils/formatters';
 
 const ProfileScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -161,8 +162,8 @@ const ProfileScreen: React.FC = () => {
               {phone ? phone.slice(-2) : '👤'}
             </Text>
           </View>
-          <Text style={styles.phoneNumber}>{phone || 'No phone'}</Text>
-          <Text style={styles.memberSince}>Member since January 2026</Text>
+          <Text style={styles.phoneNumber}>{formatPhoneDisplay(phone)}</Text>
+          <Text style={styles.memberSince}>{formatMemberSince()}</Text>
         </View>
 
         {/* Risk Profile Section */}
