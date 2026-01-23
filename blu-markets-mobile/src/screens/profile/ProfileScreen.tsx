@@ -12,15 +12,18 @@ import {
   Switch,
   Linking,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { colors, typography, spacing, borderRadius } from '../../constants/theme';
 import { useAppSelector, useAppDispatch } from '../../hooks/useStore';
 import { logout } from '../../store/slices/authSlice';
 import { resetPortfolio } from '../../store/slices/portfolioSlice';
+import { resetOnboarding } from '../../store/slices/onboardingSlice';
 import { RISK_PROFILE_NAMES } from '../../constants/business';
 import { useBiometricAuth } from '../../hooks/useBiometricAuth';
 import { clearAllState } from '../../utils/storage';
 
 const ProfileScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
   const dispatch = useAppDispatch();
   const { phone } = useAppSelector((state) => state.auth);
   const { targetLayerPct } = useAppSelector((state) => state.portfolio);
@@ -89,15 +92,16 @@ const ProfileScreen: React.FC = () => {
 
   const handleRetakeQuiz = () => {
     Alert.alert(
-      'Retake Risk Quiz',
-      'This will update your risk profile and target allocation. Continue?',
+      'Retake Risk Assessment',
+      'This will update your investment profile based on new answers. Your current portfolio will be adjusted to match your new risk profile.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Continue',
           onPress: () => {
-            // TODO: Navigate to questionnaire when navigation is available
-            Alert.alert('Coming Soon', 'Risk quiz will be available in a future update.');
+            // Reset questionnaire state before retaking
+            dispatch(resetOnboarding());
+            navigation.navigate('RetakeQuiz');
           },
         },
       ],
