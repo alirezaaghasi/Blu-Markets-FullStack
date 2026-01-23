@@ -36,6 +36,8 @@ export const usePriceWebSocket = (options: UsePriceWebSocketOptions = {}) => {
 
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isWebSocketActive = useRef(false);
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const appStateListenerRef = useRef<{ remove: () => void } | null>(null);
 
   // Handle WebSocket messages
   const handleMessage = useCallback(
@@ -141,8 +143,49 @@ export const usePriceWebSocket = (options: UsePriceWebSocketOptions = {}) => {
     }
   }, []);
 
+  // Handle app state changes to pause/resume polling when app goes to background
+  // This prevents battery drain when the app is not visible
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      const wasActive = appStateRef.current === 'active';
+      const isActive = nextAppState === 'active';
+      appStateRef.current = nextAppState;
+
+      if (wasActive && !isActive) {
+        // App going to background - pause polling and disconnect WebSocket
+        console.log('App going to background, pausing price updates');
+        stopPollingFallback();
+        if (WEBSOCKET_ENABLED) {
+          priceWebSocket.disconnect();
+        }
+      } else if (!wasActive && isActive && enabled && isAuthenticated) {
+        // App coming to foreground - resume
+        console.log('App coming to foreground, resuming price updates');
+        if (WEBSOCKET_ENABLED) {
+          priceWebSocket.connect();
+        } else if (fallbackToPolling) {
+          startPollingFallback();
+        }
+      }
+    };
+
+    // Subscribe to AppState changes
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    appStateListenerRef.current = subscription;
+
+    return () => {
+      subscription.remove();
+      appStateListenerRef.current = null;
+    };
+  }, [enabled, isAuthenticated, fallbackToPolling, startPollingFallback, stopPollingFallback]);
+
   // Connect/disconnect based on enabled state and auth
   useEffect(() => {
+    // Don't connect if app is in background
+    if (appStateRef.current !== 'active') {
+      return;
+    }
+
     if (!enabled || !isAuthenticated) {
       priceWebSocket.disconnect();
       stopPollingFallback();

@@ -237,14 +237,30 @@ export async function executeTrade(
   const { quantity, priceIrr, spreadAmountIrr } = preview.preview;
   const layer = getAssetLayer(assetId);
 
-  // Execute trade within transaction
+  // Execute trade within transaction with re-validation
   const result = await prisma.$transaction(async (tx) => {
+    // CRITICAL: Re-fetch and validate balances inside transaction to prevent race conditions
+    const currentPortfolio = await tx.portfolio.findUnique({
+      where: { id: portfolio.id },
+      include: { holdings: true },
+    });
+
+    if (!currentPortfolio) {
+      throw new AppError('NOT_FOUND', 'Portfolio not found', 404);
+    }
+
     let newCashIrr: number;
     let holdingQuantity: number;
 
     if (action === 'BUY') {
+      // Re-validate cash balance inside transaction
+      const currentCash = Number(currentPortfolio.cashIrr);
+      if (currentCash < amountIrr) {
+        throw new AppError('INSUFFICIENT_CASH', 'Insufficient cash balance (concurrent modification)', 400);
+      }
+
       // Deduct cash (including spread)
-      newCashIrr = Number(portfolio.cashIrr) - amountIrr;
+      newCashIrr = currentCash - amountIrr;
 
       await tx.portfolio.update({
         where: { id: portfolio.id },
@@ -252,7 +268,7 @@ export async function executeTrade(
       });
 
       // Add or update holding
-      const existingHolding = portfolio.holdings.find((h) => h.assetId === assetId);
+      const existingHolding = currentPortfolio.holdings.find((h) => h.assetId === assetId);
 
       if (existingHolding) {
         const updatedHolding = await tx.holding.update({
@@ -274,9 +290,24 @@ export async function executeTrade(
       }
     } else {
       // SELL
+      // Re-validate holding inside transaction
+      const existingHolding = currentPortfolio.holdings.find((h) => h.assetId === assetId);
+      if (!existingHolding) {
+        throw new AppError('NOT_FOUND', 'Holding not found', 404);
+      }
+
+      const currentQuantity = Number(existingHolding.quantity);
+      if (currentQuantity < quantity) {
+        throw new AppError('INSUFFICIENT_HOLDINGS', 'Insufficient holdings (concurrent modification)', 400);
+      }
+
+      if (existingHolding.frozen) {
+        throw new AppError('ASSET_FROZEN', 'Asset is frozen as loan collateral', 400);
+      }
+
       // Add cash (minus spread)
       const cashReceived = amountIrr - spreadAmountIrr;
-      newCashIrr = Number(portfolio.cashIrr) + cashReceived;
+      newCashIrr = Number(currentPortfolio.cashIrr) + cashReceived;
 
       await tx.portfolio.update({
         where: { id: portfolio.id },
@@ -284,12 +315,7 @@ export async function executeTrade(
       });
 
       // Reduce holding
-      const existingHolding = portfolio.holdings.find((h) => h.assetId === assetId);
-      if (!existingHolding) {
-        throw new AppError('NOT_FOUND', 'Holding not found', 404);
-      }
-
-      const newQuantity = Number(existingHolding.quantity) - quantity;
+      const newQuantity = currentQuantity - quantity;
 
       if (newQuantity <= 0.00000001) {
         // Remove holding if negligible

@@ -76,7 +76,8 @@ async function runLoanLiquidationCheck(): Promise<void> {
 
       // Calculate current collateral value
       const collateralValueIrr = Number(loan.collateralQuantity) * price.priceIrr;
-      const remainingDue = Number(loan.totalDueIrr) - Number(loan.paidIrr);
+      // Guard against negative remaining due (e.g., overpayment edge case)
+      const remainingDue = Math.max(0, Number(loan.totalDueIrr) - Number(loan.paidIrr));
 
       // Guard against division by zero
       if (collateralValueIrr <= 0) {
@@ -119,10 +120,21 @@ async function liquidateLoan(
   remainingDue: number
 ): Promise<void> {
   await prisma.$transaction(async (tx) => {
-    const loan = await tx.loan.findUniqueOrThrow({
-      where: { id: loanId },
+    // CRITICAL: Re-fetch loan with status check to prevent race conditions
+    // Another process might have already liquidated or repaid this loan
+    const loan = await tx.loan.findFirst({
+      where: {
+        id: loanId,
+        status: 'ACTIVE', // Only liquidate if still active
+      },
       include: { portfolio: true },
     });
+
+    // If loan not found or not active, it was already processed
+    if (!loan) {
+      console.log(`[LIQUIDATION] Loan ${loanId} already processed or not found, skipping`);
+      return;
+    }
 
     // Calculate proceeds (collateral value minus any excess)
     const proceeds = Math.min(collateralValueIrr, remainingDue);

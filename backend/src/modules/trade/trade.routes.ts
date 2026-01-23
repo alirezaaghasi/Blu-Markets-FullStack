@@ -156,12 +156,19 @@ export const tradeRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       },
     },
     handler: async (request, reply) => {
+      // Return spreads as decimals (matching internal usage) with percentage display values
       return {
         minTradeIrr: 1000000,
         spreadsByLayer: {
-          FOUNDATION: 0.15,  // 0.15% spread for Foundation layer
-          GROWTH: 0.30,      // 0.30% spread for Growth layer
-          UPSIDE: 0.60,      // 0.60% spread for Upside layer
+          FOUNDATION: 0.0015,  // 0.15% spread for Foundation layer (decimal)
+          GROWTH: 0.003,       // 0.30% spread for Growth layer (decimal)
+          UPSIDE: 0.006,       // 0.60% spread for Upside layer (decimal)
+        },
+        // Also provide display-friendly percentages for UI
+        spreadsDisplayPct: {
+          FOUNDATION: 0.15,  // 0.15%
+          GROWTH: 0.30,      // 0.30%
+          UPSIDE: 0.60,      // 0.60%
         },
       };
     },

@@ -229,8 +229,12 @@ describe('Trade Service', () => {
 
       vi.mocked(prisma.portfolio.findUnique).mockResolvedValue(mockPortfolio as any);
       vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) => {
+        // Transaction client needs findUnique for re-validation inside transaction
         return callback({
-          portfolio: { update: vi.fn() },
+          portfolio: {
+            findUnique: vi.fn().mockResolvedValue(mockPortfolio),
+            update: vi.fn(),
+          },
           holding: { update: vi.fn().mockResolvedValue({ quantity: 0.003 }), create: vi.fn() },
           ledgerEntry: { create: vi.fn().mockResolvedValue({ id: 'ledger-123' }) },
           actionLog: { create: vi.fn() },
@@ -285,19 +289,31 @@ describe('Trade Service', () => {
 
     it('should return per-layer spreads in limits endpoint', async () => {
       // Test the expected structure from GET /api/v1/trade/limits
-      // These are percentage values (0.15 = 0.15%)
+      // spreadsByLayer returns decimals (0.0015 = 0.15%)
+      // spreadsDisplayPct returns percentages for UI (0.15 = 0.15%)
       const expectedLimits = {
         minTradeIrr: 1000000,
         spreadsByLayer: {
-          FOUNDATION: 0.15,  // 0.15%
-          GROWTH: 0.30,      // 0.30%
-          UPSIDE: 0.60,      // 0.60%
+          FOUNDATION: 0.0015,  // 0.15% as decimal
+          GROWTH: 0.003,       // 0.30% as decimal
+          UPSIDE: 0.006,       // 0.60% as decimal
+        },
+        spreadsDisplayPct: {
+          FOUNDATION: 0.15,  // 0.15% for UI display
+          GROWTH: 0.30,      // 0.30% for UI display
+          UPSIDE: 0.60,      // 0.60% for UI display
         },
       };
 
-      expect(expectedLimits.spreadsByLayer.FOUNDATION).toBe(0.15);
-      expect(expectedLimits.spreadsByLayer.GROWTH).toBe(0.30);
-      expect(expectedLimits.spreadsByLayer.UPSIDE).toBe(0.60);
+      // Decimal values (for calculations)
+      expect(expectedLimits.spreadsByLayer.FOUNDATION).toBe(0.0015);
+      expect(expectedLimits.spreadsByLayer.GROWTH).toBe(0.003);
+      expect(expectedLimits.spreadsByLayer.UPSIDE).toBe(0.006);
+
+      // Display percentages (for UI)
+      expect(expectedLimits.spreadsDisplayPct.FOUNDATION).toBe(0.15);
+      expect(expectedLimits.spreadsDisplayPct.GROWTH).toBe(0.30);
+      expect(expectedLimits.spreadsDisplayPct.UPSIDE).toBe(0.60);
     });
   });
 });

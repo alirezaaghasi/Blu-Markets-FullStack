@@ -173,6 +173,15 @@ async function processProtectionExpiry(
 
   const strikeUsd = Number(protection.strikeUsd);
   const notionalUsd = Number(protection.notionalUsd);
+
+  // Guard against division by zero for FX rate calculation
+  if (expiryPriceUsd <= 0) {
+    console.error(
+      `[EXPIRY] Invalid expiry price USD (${expiryPriceUsd}) for protection ${protection.id}, skipping`
+    );
+    result.errors++;
+    return false;
+  }
   const fxRate = expiryPriceIrr / expiryPriceUsd;
 
   // Calculate settlement using expiry price
@@ -212,9 +221,13 @@ async function exerciseProtection(
   const now = new Date();
 
   await prisma.$transaction(async (tx) => {
-    // Update protection status
-    await tx.protection.update({
-      where: { id: protection.id },
+    // CRITICAL: Use conditional update to prevent double-processing
+    // Only update if status is still ACTIVE (guards against race conditions)
+    const updateResult = await tx.protection.updateMany({
+      where: {
+        id: protection.id,
+        status: 'ACTIVE', // Only process if still active
+      },
       data: {
         status: 'EXERCISED',
         settlementIrr,
@@ -222,6 +235,12 @@ async function exerciseProtection(
         settlementDate: now,
       },
     });
+
+    // If no rows updated, protection was already processed
+    if (updateResult.count === 0) {
+      console.warn(`[EXPIRY] Protection ${protection.id} already processed, skipping`);
+      return;
+    }
 
     // Credit user's cash balance
     await tx.portfolio.update({
@@ -283,9 +302,13 @@ async function markProtectionExpired(protection: ProtectionWithPortfolio, settle
   const now = new Date();
 
   await prisma.$transaction(async (tx) => {
-    // Update protection status
-    await tx.protection.update({
-      where: { id: protection.id },
+    // CRITICAL: Use conditional update to prevent double-processing
+    // Only update if status is still ACTIVE (guards against race conditions)
+    const updateResult = await tx.protection.updateMany({
+      where: {
+        id: protection.id,
+        status: 'ACTIVE', // Only process if still active
+      },
       data: {
         status: 'EXPIRED',
         settlementIrr: 0,
@@ -293,6 +316,12 @@ async function markProtectionExpired(protection: ProtectionWithPortfolio, settle
         settlementDate: now,
       },
     });
+
+    // If no rows updated, protection was already processed
+    if (updateResult.count === 0) {
+      console.warn(`[EXPIRY] Protection ${protection.id} already processed, skipping`);
+      return;
+    }
 
     // Create ledger entry
     await tx.ledgerEntry.create({

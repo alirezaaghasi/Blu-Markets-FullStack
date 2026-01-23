@@ -794,6 +794,12 @@ export function calculateSettlement(
   notionalUsd: number,
   fxRate: number
 ): { isITM: boolean; payoutUsd: number; payoutIrr: number } {
+  // Guard against invalid strike price (prevents division by zero)
+  if (strikeUsd <= 0) {
+    console.error(`Invalid strike price for settlement: ${strikeUsd}`);
+    return { isITM: false, payoutUsd: 0, payoutIrr: 0 };
+  }
+
   const isITM = currentPriceUsd < strikeUsd;
 
   if (!isITM) {
