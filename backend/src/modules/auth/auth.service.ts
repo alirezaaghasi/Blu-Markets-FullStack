@@ -1,11 +1,37 @@
 import { randomBytes, createHash } from 'crypto';
+import { createSigner, createVerifier } from 'fast-jwt';
 import { prisma } from '../../config/database.js';
 import { env } from '../../config/env.js';
 import { AppError } from '../../middleware/error-handler.js';
 import type { AuthTokens } from '../../types/api.js';
-import type { FastifyInstance } from 'fastify';
 
 const REFRESH_TOKEN_EXPIRY_DAYS = 7;
+
+function parseExpiry(expiry: string): number {
+  const match = expiry.match(/^(\d+)([smhd])$/);
+  if (!match) return 900; // Default 15 minutes
+
+  const value = parseInt(match[1], 10);
+  const unit = match[2];
+
+  switch (unit) {
+    case 's':
+      return value;
+    case 'm':
+      return value * 60;
+    case 'h':
+      return value * 3600;
+    case 'd':
+      return value * 86400;
+    default:
+      return 900;
+  }
+}
+
+// Create JWT signers and verifiers with separate secrets for access and refresh tokens
+const signAccessToken = createSigner({ key: env.JWT_ACCESS_SECRET, expiresIn: parseExpiry(env.JWT_ACCESS_EXPIRY) * 1000 });
+const signRefreshToken = createSigner({ key: env.JWT_REFRESH_SECRET, expiresIn: parseExpiry(env.JWT_REFRESH_EXPIRY) * 1000 });
+const verifyRefreshToken = createVerifier({ key: env.JWT_REFRESH_SECRET });
 
 interface TokenPayload {
   sub: string;
@@ -19,7 +45,6 @@ interface RefreshPayload {
 }
 
 export class AuthService {
-  constructor(private app: FastifyInstance) {}
 
   async findOrCreateUser(phone: string): Promise<{
     user: { id: string; phone: string };
@@ -91,25 +116,18 @@ export class AuthService {
       },
     });
 
-    // Generate access token
     // Generate access JWT with access secret
-    const accessToken = this.app.access.sign(
-      {
-        sub: userId,
-        phone,
-        portfolioId,
-      } as TokenPayload,
-      { expiresIn: env.JWT_ACCESS_EXPIRY }
-    );
+    const accessToken = signAccessToken({
+      sub: userId,
+      phone,
+      portfolioId,
+    } as TokenPayload);
 
     // Generate refresh JWT with separate refresh secret (security: isolates token compromise)
-    const refreshJwt = this.app.refresh.sign(
-      {
-        sub: userId,
-        sessionId: session.id,
-      } as RefreshPayload,
-      { expiresIn: env.JWT_REFRESH_EXPIRY }
-    );
+    const refreshJwt = signRefreshToken({
+      sub: userId,
+      sessionId: session.id,
+    } as RefreshPayload);
 
     return {
       accessToken,
@@ -122,7 +140,7 @@ export class AuthService {
     // Verify refresh token with refresh secret
     let payload: RefreshPayload;
     try {
-      payload = this.app.refresh.verify<RefreshPayload>(refreshToken);
+      payload = verifyRefreshToken(refreshToken) as RefreshPayload;
     } catch {
       throw new AppError('UNAUTHORIZED', 'Invalid refresh token', 401);
     }
@@ -169,26 +187,5 @@ export class AuthService {
         revokedAt: new Date(),
       },
     });
-  }
-}
-
-function parseExpiry(expiry: string): number {
-  const match = expiry.match(/^(\d+)([smhd])$/);
-  if (!match) return 900; // Default 15 minutes
-
-  const value = parseInt(match[1], 10);
-  const unit = match[2];
-
-  switch (unit) {
-    case 's':
-      return value;
-    case 'm':
-      return value * 60;
-    case 'h':
-      return value * 3600;
-    case 'd':
-      return value * 86400;
-    default:
-      return 900;
   }
 }

@@ -3,7 +3,7 @@ import { AuthController } from './auth.controller.js';
 import { authenticate } from '../../middleware/auth.js';
 
 export const authRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
-  const controller = new AuthController(app);
+  const controller = new AuthController();
 
   // POST /api/v1/auth/send-otp
   app.post('/send-otp', {

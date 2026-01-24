@@ -1,7 +1,6 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
-import jwt from '@fastify/jwt';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
@@ -72,21 +71,6 @@ export async function buildApp(): Promise<FastifyInstance> {
         message: 'Too many requests, please try again later',
       },
     }),
-  });
-
-  // JWT - Access tokens (default instance)
-  await app.register(jwt, {
-    secret: env.JWT_ACCESS_SECRET,
-    sign: { expiresIn: env.JWT_ACCESS_EXPIRY },
-    namespace: 'access',
-  });
-
-  // JWT - Refresh tokens (separate secret for security)
-  // Using a different secret prevents access token compromise from affecting refresh tokens
-  await app.register(jwt, {
-    secret: env.JWT_REFRESH_SECRET,
-    sign: { expiresIn: env.JWT_REFRESH_EXPIRY },
-    namespace: 'refresh',
   });
 
   // WebSocket support

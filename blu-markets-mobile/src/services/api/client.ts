@@ -12,6 +12,7 @@ export const apiClient: AxiosInstance = axios.create({
   timeout: API_TIMEOUT,
   headers: {
     'Content-Type': 'application/json',
+    'Bypass-Tunnel-Reminder': 'true', // Required for localtunnel
   },
 });
 

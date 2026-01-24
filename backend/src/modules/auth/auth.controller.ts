@@ -1,15 +1,11 @@
-import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { FastifyReply, FastifyRequest } from 'fastify';
 import { sendOtpSchema, verifyOtpSchema, refreshTokenSchema } from './auth.schemas.js';
 import { sendOtp, verifyOtp } from './otp.service.js';
 import { AuthService } from './auth.service.js';
 import type { SendOtpResponse, VerifyOtpResponse, AuthTokens } from '../../types/api.js';
 
 export class AuthController {
-  private authService: AuthService;
-
-  constructor(app: FastifyInstance) {
-    this.authService = new AuthService(app);
-  }
+  private authService = new AuthService();
 
   async sendOtp(
     request: FastifyRequest<{ Body: { phone: string } }>,

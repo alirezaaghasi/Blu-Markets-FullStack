@@ -196,10 +196,12 @@ function EligibleAssetsGrid({
 }: {
   assets: Array<{
     assetId: AssetId;
-    holdingQuantity: number;
-    holdingValueIrr: number;
-    premiumRatePerMonth: number;
-    estimatedPremiumIrr: number;
+    quantity?: number;
+    valueIrr?: number;
+    indicativePremium?: {
+      thirtyDayPct: number;
+      thirtyDayIrr: number;
+    };
   }>;
   onProtect: (assetId: AssetId) => void;
 }) {
@@ -207,15 +209,17 @@ function EligibleAssetsGrid({
     <View style={styles.eligibleGrid}>
       {assets.map((item) => {
         const asset = ASSETS[item.assetId];
+        const quantity = item.quantity ?? 0;
+        const premiumIrr = item.indicativePremium?.thirtyDayIrr ?? 0;
         return (
           <View key={item.assetId} style={styles.eligibleCard}>
             <Text style={styles.eligibleIcon}>{asset?.symbol?.slice(0, 2) || '?'}</Text>
             <Text style={styles.eligibleName}>{asset?.name || item.assetId}</Text>
             <Text style={styles.eligibleQuantity}>
-              {item.holdingQuantity.toFixed(4)} {asset?.symbol}
+              {quantity.toFixed(4)} {asset?.symbol}
             </Text>
             <Text style={styles.eligiblePremium}>
-              ~{item.estimatedPremiumIrr.toLocaleString()} IRR/mo
+              ~{premiumIrr.toLocaleString()} IRR/mo
             </Text>
             <TouchableOpacity
               style={styles.protectButton}
