@@ -110,30 +110,33 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
   const status = determineStatus(driftPct, allocation);
 
   // MONEY FIX M-02: Build holdings response with values using Decimal
-  const holdingsResponse: HoldingResponse[] = portfolio.holdings.map((h) => {
-    const assetId = h.assetId as AssetId;
-    const price = prices.get(assetId);
-    const quantity = Number(h.quantity);
-    const valueIrrDecimal = price ? multiply(quantity, price.priceIrr) : toDecimal(0);
-    const valueUsdDecimal = price ? multiply(quantity, price.priceUsd) : toDecimal(0);
-    const valueIrr = toNumber(roundIrr(valueIrrDecimal));
-    const valueUsd = toNumber(valueUsdDecimal);
+  // HIGH-2 FIX: Filter out zero-balance holdings from response
+  const holdingsResponse: HoldingResponse[] = portfolio.holdings
+    .filter((h) => Number(h.quantity) > 0) // Exclude zero-balance holdings
+    .map((h) => {
+      const assetId = h.assetId as AssetId;
+      const price = prices.get(assetId);
+      const quantity = Number(h.quantity);
+      const valueIrrDecimal = price ? multiply(quantity, price.priceIrr) : toDecimal(0);
+      const valueUsdDecimal = price ? multiply(quantity, price.priceUsd) : toDecimal(0);
+      const valueIrr = toNumber(roundIrr(valueIrrDecimal));
+      const valueUsd = toNumber(valueUsdDecimal);
 
-    return {
-      id: h.id,
-      assetId,
-      name: ASSET_NAMES[assetId] || assetId,
-      quantity,
-      layer: h.layer as Layer,
-      frozen: h.frozen,
-      valueIrr,
-      valueUsd,
-      priceIrr: price?.priceIrr || 0,
-      priceUsd: price?.priceUsd || 0,
-      change24hPct: price?.change24hPct || 0,
-      pctOfPortfolio: totalValueIrr > 0 ? toNumber(multiply(divide(valueIrrDecimal, totalValueIrr), 100)) : 0,
-    };
-  });
+      return {
+        id: h.id,
+        assetId,
+        name: ASSET_NAMES[assetId] || assetId,
+        quantity,
+        layer: h.layer as Layer,
+        frozen: h.frozen,
+        valueIrr,
+        valueUsd,
+        priceIrr: price?.priceIrr || 0,
+        priceUsd: price?.priceUsd || 0,
+        change24hPct: price?.change24hPct || 0,
+        pctOfPortfolio: totalValueIrr > 0 ? toNumber(multiply(divide(valueIrrDecimal, totalValueIrr), 100)) : 0,
+      };
+    });
 
   return {
     id: portfolio.id,
@@ -173,30 +176,33 @@ export async function getPortfolioHoldings(userId: string): Promise<HoldingRespo
   }
   const totalValueIrr = toNumber(roundIrr(totalValueDecimal));
 
-  const holdings: HoldingResponse[] = portfolio.holdings.map((h) => {
-    const assetId = h.assetId as AssetId;
-    const price = prices.get(assetId);
-    const quantity = Number(h.quantity);
-    const valueIrrDecimal = price ? multiply(quantity, price.priceIrr) : toDecimal(0);
-    const valueUsdDecimal = price ? multiply(quantity, price.priceUsd) : toDecimal(0);
-    const valueIrr = toNumber(roundIrr(valueIrrDecimal));
-    const valueUsd = toNumber(valueUsdDecimal);
+  // HIGH-2 FIX: Filter out zero-balance holdings from response
+  const holdings: HoldingResponse[] = portfolio.holdings
+    .filter((h) => Number(h.quantity) > 0) // Exclude zero-balance holdings
+    .map((h) => {
+      const assetId = h.assetId as AssetId;
+      const price = prices.get(assetId);
+      const quantity = Number(h.quantity);
+      const valueIrrDecimal = price ? multiply(quantity, price.priceIrr) : toDecimal(0);
+      const valueUsdDecimal = price ? multiply(quantity, price.priceUsd) : toDecimal(0);
+      const valueIrr = toNumber(roundIrr(valueIrrDecimal));
+      const valueUsd = toNumber(valueUsdDecimal);
 
-    return {
-      id: h.id,
-      assetId,
-      name: ASSET_NAMES[assetId] || assetId,
-      quantity,
-      layer: h.layer as Layer,
-      frozen: h.frozen,
-      valueIrr,
-      valueUsd,
-      priceUsd: price?.priceUsd || 0,
-      priceIrr: price?.priceIrr || 0,
-      change24hPct: price?.change24hPct,
-      pctOfPortfolio: isGreaterThan(totalValueDecimal, 0) ? toNumber(multiply(divide(valueIrrDecimal, totalValueDecimal), 100)) : 0,
-    };
-  });
+      return {
+        id: h.id,
+        assetId,
+        name: ASSET_NAMES[assetId] || assetId,
+        quantity,
+        layer: h.layer as Layer,
+        frozen: h.frozen,
+        valueIrr,
+        valueUsd,
+        priceUsd: price?.priceUsd || 0,
+        priceIrr: price?.priceIrr || 0,
+        change24hPct: price?.change24hPct,
+        pctOfPortfolio: isGreaterThan(totalValueDecimal, 0) ? toNumber(multiply(divide(valueIrrDecimal, totalValueDecimal), 100)) : 0,
+      };
+    });
 
   return holdings;
 }

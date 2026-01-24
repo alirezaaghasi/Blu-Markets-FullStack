@@ -15,6 +15,21 @@ export const RISK_FREE_RATE = 0.045;
 /** Days per year for time conversion */
 export const DAYS_PER_YEAR = 365;
 
+/** Precision for percentage calculations (8 decimal places) */
+const PCT_PRECISION = 8;
+
+/** Precision for monetary calculations (2 decimal places) */
+const MONEY_PRECISION = 2;
+
+/**
+ * Round to specified decimal places to avoid floating-point precision issues
+ * MEDIUM-3 FIX: Added to prevent floating-point accumulation errors
+ */
+function roundToDecimal(value: number, decimals: number): number {
+  const factor = Math.pow(10, decimals);
+  return Math.round(value * factor) / factor;
+}
+
 // ============================================================================
 // STATISTICAL FUNCTIONS
 // ============================================================================
@@ -107,7 +122,8 @@ export function blackScholesPut(
 
   const putPrice = strike * discountFactor * normalCDF(-d2) - spot * normalCDF(-d1);
 
-  return Math.max(0, putPrice);
+  // MEDIUM-3 FIX: Round to avoid floating-point precision issues
+  return roundToDecimal(Math.max(0, putPrice), PCT_PRECISION);
 }
 
 /**
@@ -308,13 +324,13 @@ export function calculatePremiumWithSpreads(
 ): PremiumBreakdown {
   // Fair value as percentage of spot (which equals notional for ATM)
   const fairValuePct = blackScholesPut(1, strike / spot, timeYears, vol, rate);
-  const fairValue = fairValuePct * notionalUsd;
+  const fairValue = roundToDecimal(fairValuePct * notionalUsd, MONEY_PRECISION);
 
-  const executionSpread = notionalUsd * executionSpreadPct;
-  const profitMargin = notionalUsd * profitMarginPct;
+  const executionSpread = roundToDecimal(notionalUsd * executionSpreadPct, MONEY_PRECISION);
+  const profitMargin = roundToDecimal(notionalUsd * profitMarginPct, MONEY_PRECISION);
 
-  const totalPremium = fairValue + executionSpread + profitMargin;
-  const totalPremiumPct = totalPremium / notionalUsd;
+  const totalPremium = roundToDecimal(fairValue + executionSpread + profitMargin, MONEY_PRECISION);
+  const totalPremiumPct = roundToDecimal(totalPremium / notionalUsd, PCT_PRECISION);
 
   return {
     fairValue,

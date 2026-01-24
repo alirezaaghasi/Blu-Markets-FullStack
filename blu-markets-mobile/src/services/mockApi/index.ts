@@ -11,6 +11,7 @@ import {
   addLoan,
   updateLoan,
   logAction,
+  setLastSync,
 } from '../../store/slices/portfolioSlice';
 import { enableDemoMode, completeOnboarding, logout } from '../../store/slices/authSlice';
 import { setRiskProfile } from '../../store/slices/onboardingSlice';
@@ -186,6 +187,9 @@ export const portfolio = {
     const { holdings, targetLayerPct, status, cashIRR } = state.portfolio;
     const { prices, fxRate } = state.prices;
     const totalValue = calculatePortfolioValue(holdings, prices, fxRate) + cashIRR;
+
+    // MEDIUM-4 FIX: Update lastSyncTimestamp on each portfolio fetch in demo mode
+    store.dispatch(setLastSync(Date.now()));
 
     return {
       cashIrr: cashIRR,

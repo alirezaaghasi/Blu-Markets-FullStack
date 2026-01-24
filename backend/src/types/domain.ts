@@ -154,7 +154,7 @@ export interface Loan {
 export const LTV_BY_LAYER: Record<Layer, number> = {
   FOUNDATION: 0.70,
   GROWTH: 0.50,
-  UPSIDE: 0.30,
+  UPSIDE: 0.25,
 };
 
 // ============================================================================

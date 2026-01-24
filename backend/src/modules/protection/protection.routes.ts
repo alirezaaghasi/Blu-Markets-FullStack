@@ -244,6 +244,16 @@ export const protectionRoutes: FastifyPluginAsync = async (app: FastifyInstance)
       const body = purchaseSchema.parse(request.body);
       const userId = request.userId;
 
+      // CRITICAL: Reject demo holding IDs - they must NOT persist to database
+      if (body.holdingId.startsWith('demo-')) {
+        throw new AppError(
+          'VALIDATION_ERROR',
+          'Demo holdings cannot be protected. Please use real holdings.',
+          400,
+          { holdingId: body.holdingId, reason: 'Demo holding IDs are not allowed in purchases' }
+        );
+      }
+
       // CRITICAL: Atomically reserve the quote BEFORE starting any transaction
       // This prevents race conditions where multiple requests use the same quote
       const reservedQuote = reserveQuote(body.quoteId, userId);
@@ -327,6 +337,17 @@ export const protectionRoutes: FastifyPluginAsync = async (app: FastifyInstance)
               'This holding already has active protection',
               409,
               { existingProtectionId: existingProtection.id }
+            );
+          }
+
+          // HIGH-3 FIX: Re-validate quote expiry inside transaction before DB write
+          // Quote might have expired between reservation and reaching this point
+          if (!isQuoteValid(freshQuote)) {
+            throw new AppError(
+              'QUOTE_EXPIRED',
+              'Quote expired during transaction, please request a new quote',
+              410,
+              { quoteId: body.quoteId, expiredAt: freshQuote.validUntil.toISOString() }
             );
           }
 

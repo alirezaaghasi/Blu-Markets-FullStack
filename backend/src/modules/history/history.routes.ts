@@ -154,8 +154,9 @@ export const historyRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
       });
 
       const hasMore = actions.length > limit;
+      // MEDIUM-1 FIX: Return id as number to match mobile ActionLogEntry type
       const activities = actions.slice(0, limit).map((a) => ({
-        id: String(a.id),
+        id: Number(a.id),             // Fixed: mobile expects number, not string
         type: a.actionType,           // Map actionType → type for frontend
         boundary: a.boundary,
         message: a.message,
@@ -197,8 +198,13 @@ export const historyRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
 
       const { cursor, limit = 20 } = request.query;
 
+      // MEDIUM-2 FIX: Validate cursor is a valid positive integer before use
       const where: any = { portfolioId: portfolio.id };
       if (cursor) {
+        const cursorNum = parseInt(cursor, 10);
+        if (isNaN(cursorNum) || cursorNum < 0 || !Number.isInteger(cursorNum)) {
+          throw new AppError('VALIDATION_ERROR', 'Invalid cursor format', 400, { cursor });
+        }
         where.id = { lt: BigInt(cursor) };
       }
 
@@ -209,8 +215,9 @@ export const historyRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
       });
 
       const hasMore = actions.length > limit;
+      // MEDIUM-1 FIX: Return id as number to match mobile ActionLogEntry type
       const activities = actions.slice(0, limit).map((a) => ({
-        id: String(a.id),
+        id: Number(a.id),             // Fixed: mobile expects number, not string
         type: a.actionType,           // Map actionType → type for frontend
         boundary: a.boundary,
         message: a.message,

@@ -52,6 +52,9 @@ export const MAX_QUOTE_CACHE_SIZE = 10_000;
 /** Minimum notional in IRR */
 export const MIN_NOTIONAL_IRR = 1_000_000;
 
+/** Global minimum premium floor (2.5% per 30 days, non-negotiable) */
+export const GLOBAL_MIN_PREMIUM_FLOOR_30D = 0.025;
+
 /** Assets eligible for protection */
 export const PROTECTION_ELIGIBLE_ASSETS: AssetId[] = ['BTC', 'ETH', 'PAXG', 'KAG', 'QQQ', 'SOL'];
 
@@ -79,14 +82,15 @@ const PROFIT_MARGIN_PER_DAY: Record<Layer, number> = {
 /**
  * Premium bounds (per 30 days)
  * These prevent unrealistic pricing in edge cases
+ * IMPORTANT: All values must be >= GLOBAL_MIN_PREMIUM_FLOOR_30D (2.5%)
  */
 const MIN_PREMIUM_30D: Record<string, number> = {
-  BTC: 0.015, // 1.5%
-  ETH: 0.018, // 1.8%
-  SOL: 0.025, // 2.5%
-  PAXG: 0.004, // 0.4%
-  KAG: 0.005, // 0.5%
-  QQQ: 0.006, // 0.6%
+  BTC: 0.025, // 2.5% (floor)
+  ETH: 0.025, // 2.5% (floor)
+  SOL: 0.025, // 2.5% (floor)
+  PAXG: 0.025, // 2.5% (floor)
+  KAG: 0.025, // 2.5% (floor)
+  QQQ: 0.025, // 2.5% (floor)
 };
 
 const MAX_PREMIUM_30D: Record<string, number> = {
@@ -572,8 +576,10 @@ export async function getProtectionQuote(
   // Total premium
   let totalPremiumPct = fairValuePct + executionSpreadPct + profitMarginPct;
 
-  // Apply bounds
-  const minPremium = (MIN_PREMIUM_30D[assetId] || 0.015) * (durationDays / 30);
+  // Apply bounds with global floor enforcement
+  const assetMinPremium = MIN_PREMIUM_30D[assetId] || GLOBAL_MIN_PREMIUM_FLOOR_30D;
+  const effectiveMinPremium = Math.max(assetMinPremium, GLOBAL_MIN_PREMIUM_FLOOR_30D);
+  const minPremium = effectiveMinPremium * (durationDays / 30);
   const maxPremium = (MAX_PREMIUM_30D[assetId] || 0.10) * (durationDays / 30);
   totalPremiumPct = Math.max(minPremium, Math.min(maxPremium, totalPremiumPct));
 
@@ -731,8 +737,10 @@ export async function getPremiumCurve(
 
       let totalPremiumPct = fairValuePct + executionSpreadPct + profitMarginPct;
 
-      // Apply bounds
-      const minPremium = (MIN_PREMIUM_30D[assetId] || 0.015) * (durationDays / 30);
+      // Apply bounds with global floor enforcement
+      const assetMinPremium = MIN_PREMIUM_30D[assetId] || GLOBAL_MIN_PREMIUM_FLOOR_30D;
+      const effectiveMinPremium = Math.max(assetMinPremium, GLOBAL_MIN_PREMIUM_FLOOR_30D);
+      const minPremium = effectiveMinPremium * (durationDays / 30);
       const maxPremium = (MAX_PREMIUM_30D[assetId] || 0.10) * (durationDays / 30);
       totalPremiumPct = Math.max(minPremium, Math.min(maxPremium, totalPremiumPct));
 
@@ -815,10 +823,11 @@ export async function getProtectableHoldings(userId: string): Promise<HoldingFor
     const profitMargin = PROFIT_MARGIN_PER_DAY[layer] * 30;
     let estimatedPremiumPct = fairValue + executionSpread + profitMargin;
 
-    // Apply bounds
-    const minPremium = MIN_PREMIUM_30D[assetId] || 0.015;
+    // Apply bounds with global floor enforcement
+    const assetMinPremium = MIN_PREMIUM_30D[assetId] || GLOBAL_MIN_PREMIUM_FLOOR_30D;
+    const effectiveMinPremium = Math.max(assetMinPremium, GLOBAL_MIN_PREMIUM_FLOOR_30D);
     const maxPremium = MAX_PREMIUM_30D[assetId] || 0.10;
-    estimatedPremiumPct = Math.max(minPremium, Math.min(maxPremium, estimatedPremiumPct));
+    estimatedPremiumPct = Math.max(effectiveMinPremium, Math.min(maxPremium, estimatedPremiumPct));
 
     result.push({
       holdingId: holding.id,
