@@ -29,8 +29,9 @@ const LAYER_ASSETS: Record<Layer, Array<{ assetId: AssetId; weight: number }>> =
 // Minimum trade amount in IRR (1 million IRR)
 const MIN_TRADE_AMOUNT_IRR = 1_000_000;
 
-// Cash buffer percentage to keep for fees/slippage
-const CASH_BUFFER_PCT = 0.02; // 2%
+// No cash buffer during onboarding - invest 100% into assets
+// When user adds funds later, 100% goes to cash wallet
+const CASH_BUFFER_PCT = 0; // 0%
 
 export async function submitQuestionnaire(
   userId: string,
