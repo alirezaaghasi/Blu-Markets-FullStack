@@ -24,6 +24,7 @@ import {
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
 import { addLoan, freezeHolding, addCash, logAction } from '../store/slices/portfolioSlice';
 import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
+import { loans as loansApi } from '../services/api';
 
 interface LoanSheetProps {
   visible: boolean;
@@ -146,54 +147,23 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
 
     setIsSubmitting(true);
     try {
-      const now = new Date();
-      const dueDate = new Date(now);
-      dueDate.setMonth(dueDate.getMonth() + durationMonths);
+      // Call backend API to create loan
+      const loan = await loansApi.create(selectedAssetId, amountIRR, durationMonths);
 
-      // Generate installments
-      const daysPerInstallment = (durationMonths * 30) / LOAN_INSTALLMENT_COUNT;
-      const principalPerInst = Math.floor(amountIRR / LOAN_INSTALLMENT_COUNT);
-      const interestPerInst = Math.floor(totalInterest / LOAN_INSTALLMENT_COUNT);
-
-      const installments: LoanInstallment[] = [];
-      for (let i = 0; i < LOAN_INSTALLMENT_COUNT; i++) {
-        const installmentDate = new Date(now);
-        installmentDate.setDate(installmentDate.getDate() + Math.round(daysPerInstallment * (i + 1)));
-
-        const isLast = i === LOAN_INSTALLMENT_COUNT - 1;
-        const principal = isLast
-          ? amountIRR - principalPerInst * (LOAN_INSTALLMENT_COUNT - 1)
-          : principalPerInst;
-        const interest = isLast
-          ? totalInterest - interestPerInst * (LOAN_INSTALLMENT_COUNT - 1)
-          : interestPerInst;
-
-        installments.push({
-          number: i + 1,
-          dueISO: installmentDate.toISOString(),
-          principalIRR: principal,
-          interestIRR: interest,
-          totalIRR: principal + interest,
-          paidIRR: 0,
-          status: 'PENDING',
-        });
-      }
-
-      const loan: Loan = {
-        id: `loan-${Date.now()}`,
-        collateralAssetId: selectedAssetId,
-        collateralQuantity: selectedHolding.quantity,
-        amountIRR,
-        interestRate: LOAN_ANNUAL_INTEREST_RATE,
-        durationMonths,
-        startISO: now.toISOString(),
-        dueISO: dueDate.toISOString(),
+      // Update local Redux state with response
+      dispatch(addLoan({
+        id: loan.id,
+        collateralAssetId: loan.collateralAssetId,
+        collateralQuantity: loan.collateralQuantity || selectedHolding.quantity,
+        amountIRR: loan.amountIRR || amountIRR,
+        interestRate: loan.interestRate || LOAN_ANNUAL_INTEREST_RATE,
+        durationMonths: loan.durationMonths || durationMonths,
+        startISO: loan.startISO || new Date().toISOString(),
+        dueISO: loan.dueISO || new Date(Date.now() + durationMonths * 30 * 24 * 60 * 60 * 1000).toISOString(),
         status: 'ACTIVE',
-        installments,
+        installments: loan.installments || [],
         installmentsPaid: 0,
-      };
-
-      dispatch(addLoan(loan));
+      }));
       dispatch(freezeHolding(selectedAssetId));
       dispatch(addCash(amountIRR));
       dispatch(

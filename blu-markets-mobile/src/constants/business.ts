@@ -123,11 +123,16 @@ export const API_BASE_URL = getApiBaseUrl();
 const getWebSocketUrl = () => {
   if (!__DEV__) return 'wss://api.blumarkets.ir/api/v1/prices/stream';
 
-  // Note: window.location is undefined in React Native/Expo Go
-  if (typeof window !== 'undefined' && typeof window.location !== 'undefined' && window.location.hostname?.includes('github.dev')) {
-    const baseUrl = window.location.origin.replace('-8081.', '-3000.').replace('https://', 'wss://');
-    return `${baseUrl}/api/v1/prices/stream`;
+  // Derive WebSocket URL from API_BASE_URL for proper Codespaces support
+  // API_BASE_URL like: https://xxx-3000.app.github.dev/api/v1
+  // Becomes: wss://xxx-3000.app.github.dev/api/v1/prices/stream
+  const apiUrl = API_BASE_URL;
+  if (apiUrl.includes('github.dev') || apiUrl.includes('codespaces')) {
+    const wsUrl = apiUrl.replace('https://', 'wss://').replace('http://', 'ws://');
+    return `${wsUrl}/prices/stream`;
   }
+
+  // Local development fallback
   return 'ws://localhost:3000/api/v1/prices/stream';
 };
 

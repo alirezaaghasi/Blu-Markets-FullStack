@@ -87,6 +87,7 @@ export interface PortfolioSummary {
 }
 
 export interface HoldingResponse {
+  id: string;
   assetId: AssetId;
   name: string;
   quantity: number;

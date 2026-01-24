@@ -381,7 +381,8 @@ const HomeScreen: React.FC = () => {
       dispatch(setStatus(portfolioResponse.status));
       dispatch(setTargetLayerPct(portfolioResponse.targetAllocation));
       if (portfolioResponse.holdings) {
-        dispatch(setHoldings(portfolioResponse.holdings.map((h: Holding) => ({
+        dispatch(setHoldings(portfolioResponse.holdings.map((h: any) => ({
+          id: h.id,
           assetId: h.assetId,
           quantity: h.quantity,
           frozen: h.frozen,
@@ -411,7 +412,8 @@ const HomeScreen: React.FC = () => {
         dispatch(setStatus(portfolioResponse.status));
         dispatch(setTargetLayerPct(portfolioResponse.targetAllocation));
         if (portfolioResponse.holdings) {
-          dispatch(setHoldings(portfolioResponse.holdings.map((h: Holding) => ({
+          dispatch(setHoldings(portfolioResponse.holdings.map((h: any) => ({
+            id: h.id,
             assetId: h.assetId,
             quantity: h.quantity,
             frozen: h.frozen,
@@ -532,21 +534,27 @@ const HomeScreen: React.FC = () => {
               <Text style={styles.emptyActivityText}>No activity yet</Text>
             </View>
           ) : (
-            activities.slice(0, 5).map((entry: ActionLogEntry) => (
-              <View key={entry.id} style={styles.activityItem}>
-                <View style={[
-                  styles.activityDot,
-                  { backgroundColor: entry.boundary === 'SAFE' ? '#4ade80' :
-                    entry.boundary === 'DRIFT' ? '#fde047' : '#f87171' }
-                ]} />
-                <Text style={styles.activityMessage} numberOfLines={1}>
-                  {formatActivityMessage(entry)}
-                </Text>
-                <Text style={styles.activityTime}>
-                  {formatRelativeTime(entry.timestamp)}
-                </Text>
-              </View>
-            ))
+            <View style={styles.chatContainer}>
+              {activities.slice(0, 5).map((entry: ActionLogEntry) => (
+                <View key={entry.id} style={styles.chatBubble}>
+                  <View style={styles.chatBubbleContent}>
+                    <View style={[
+                      styles.activityDot,
+                      { backgroundColor: entry.boundary === 'SAFE' ? '#4ade80' :
+                        entry.boundary === 'DRIFT' ? '#fde047' : '#f87171' }
+                    ]} />
+                    <View style={styles.chatTextContainer}>
+                      <Text style={styles.chatMessage}>
+                        {formatActivityMessage(entry)}
+                      </Text>
+                      <Text style={styles.chatTime}>
+                        {formatRelativeTime(entry.timestamp)}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
           )}
 
           {/* Loan Payment Due Alert */}
@@ -564,45 +572,43 @@ const HomeScreen: React.FC = () => {
             />
           )}
         </View>
-
-        {/* ================================================================ */}
-        {/* MAIN ACTIONS */}
-        {/* ================================================================ */}
-        <View style={styles.actionsSection}>
-          <Text style={styles.sectionTitle}>MAIN ACTIONS</Text>
-
-          {/* Row 1: Rebalance, Add Funds, Buy/Sell */}
-          <View style={styles.actionsRow}>
-            <MainActionButton
-              label="Rebalance"
-              onPress={() => setRebalanceSheetVisible(true)}
-              disabled={portfolioStatusResult.status === 'BALANCED'}
-            />
-            <MainActionButton
-              label="Add Funds"
-              onPress={() => setAddFundsSheetVisible(true)}
-            />
-            <MainActionButton
-              label="Buy/Sell"
-              onPress={() => setTradeSheetVisible(true)}
-            />
-          </View>
-
-          {/* Row 2: Borrow IRR, Insure Assets */}
-          <View style={styles.actionsRowWide}>
-            <WideActionButton
-              label="Borrow IRR"
-              onPress={() => setLoanSheetVisible(true)}
-              disabled={snapshot.holdingsIRR === 0}
-            />
-            <WideActionButton
-              label="Insure Assets"
-              onPress={() => setProtectionSheetVisible(true)}
-              disabled={snapshot.holdingsIRR === 0}
-            />
-          </View>
-        </View>
       </ScrollView>
+
+      {/* ================================================================ */}
+      {/* FIXED MAIN ACTIONS AT BOTTOM */}
+      {/* ================================================================ */}
+      <View style={styles.fixedActionsContainer}>
+        {/* Row 1: Rebalance, Add Funds, Buy/Sell */}
+        <View style={styles.actionsRow}>
+          <MainActionButton
+            label="Rebalance"
+            onPress={() => setRebalanceSheetVisible(true)}
+            disabled={portfolioStatusResult.status === 'BALANCED'}
+          />
+          <MainActionButton
+            label="Add Funds"
+            onPress={() => setAddFundsSheetVisible(true)}
+          />
+          <MainActionButton
+            label="Buy/Sell"
+            onPress={() => setTradeSheetVisible(true)}
+          />
+        </View>
+
+        {/* Row 2: Borrow IRR, Insure Assets */}
+        <View style={styles.actionsRowWide}>
+          <WideActionButton
+            label="Borrow IRR"
+            onPress={() => setLoanSheetVisible(true)}
+            disabled={snapshot.holdingsIRR === 0}
+          />
+          <WideActionButton
+            label="Insure Assets"
+            onPress={() => setProtectionSheetVisible(true)}
+            disabled={snapshot.holdingsIRR === 0}
+          />
+        </View>
+      </View>
 
       {/* ================================================================ */}
       {/* BOTTOM SHEETS */}
@@ -644,7 +650,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 120,
+    paddingBottom: 160, // Account for fixed action buttons at bottom
   },
 
   // Header
@@ -831,41 +837,60 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.text.muted,
   },
-  activityItem: {
+  // Chat UI Styles for Activity Log
+  chatContainer: {
+    gap: SPACING[2],
+  },
+  chatBubble: {
+    alignSelf: 'flex-start',
+    maxWidth: '85%',
+  },
+  chatBubbleContent: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: SPACING[3],
-    paddingHorizontal: SPACING[3],
+    alignItems: 'flex-start',
     backgroundColor: COLORS.background.elevated,
-    borderRadius: RADIUS.md,
-    marginBottom: SPACING[2],
+    borderRadius: RADIUS.lg,
+    borderTopLeftRadius: RADIUS.sm,
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[4],
+  },
+  chatTextContainer: {
+    flex: 1,
   },
   activityDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
     marginRight: SPACING[3],
+    marginTop: 4,
   },
-  activityMessage: {
-    flex: 1,
+  chatMessage: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.text.primary,
+    lineHeight: 20,
   },
-  activityTime: {
+  chatTime: {
     fontSize: TYPOGRAPHY.fontSize.xs,
     color: COLORS.text.muted,
-    marginLeft: SPACING[2],
+    marginTop: SPACING[1],
   },
 
-  // Actions Section
-  actionsSection: {
+  // Fixed Actions Container
+  fixedActionsContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: COLORS.background.primary,
     paddingHorizontal: SPACING[4],
-    marginTop: SPACING[6],
+    paddingTop: SPACING[3],
+    paddingBottom: SPACING[6],
+    borderTopWidth: 1,
+    borderTopColor: COLORS.background.elevated,
   },
   actionsRow: {
     flexDirection: 'row',
     gap: SPACING[2],
-    marginTop: SPACING[3],
   },
   actionsRowWide: {
     flexDirection: 'row',

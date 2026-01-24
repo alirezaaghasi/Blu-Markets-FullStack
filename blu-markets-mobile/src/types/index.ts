@@ -71,6 +71,7 @@ export interface RiskProfile {
 
 // Portfolio Types
 export interface Holding {
+  id?: string; // Database ID for API calls (protection, loans)
   assetId: AssetId;
   quantity: number;
   frozen: boolean;

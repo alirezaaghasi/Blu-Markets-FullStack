@@ -7,22 +7,29 @@ import type { SubmitQuestionnaireInput, RecordConsentInput, InitialFundingInput 
 
 // ============================================================
 // INITIAL ALLOCATION CONFIGURATION
-// Define which assets to buy for each layer and their weights
+// All 15 assets allocated across 3 layers per PRD
 // ============================================================
 const LAYER_ASSETS: Record<Layer, Array<{ assetId: AssetId; weight: number }>> = {
   FOUNDATION: [
-    { assetId: 'PAXG', weight: 0.50 },   // PAX Gold - 50% of foundation
-    { assetId: 'USDT', weight: 0.50 },   // Tether USD - 50% of foundation
+    { assetId: 'USDT', weight: 0.40 },           // Tether USD - 40%
+    { assetId: 'PAXG', weight: 0.30 },           // PAX Gold - 30%
+    { assetId: 'IRR_FIXED_INCOME', weight: 0.30 }, // Fixed Income - 30%
   ],
   GROWTH: [
-    { assetId: 'BTC', weight: 0.45 },    // Bitcoin - 45% of growth
-    { assetId: 'ETH', weight: 0.35 },    // Ethereum - 35% of growth
-    { assetId: 'BNB', weight: 0.20 },    // BNB - 20% of growth
+    { assetId: 'BTC', weight: 0.25 },    // Bitcoin - 25%
+    { assetId: 'ETH', weight: 0.20 },    // Ethereum - 20%
+    { assetId: 'BNB', weight: 0.15 },    // BNB - 15%
+    { assetId: 'XRP', weight: 0.10 },    // XRP - 10%
+    { assetId: 'KAG', weight: 0.15 },    // Kinesis Silver - 15%
+    { assetId: 'QQQ', weight: 0.15 },    // Nasdaq ETF - 15%
   ],
   UPSIDE: [
-    { assetId: 'SOL', weight: 0.40 },    // Solana - 40% of upside
-    { assetId: 'TON', weight: 0.30 },    // Toncoin - 30% of upside
-    { assetId: 'LINK', weight: 0.30 },   // Chainlink - 30% of upside
+    { assetId: 'SOL', weight: 0.20 },    // Solana - 20%
+    { assetId: 'TON', weight: 0.18 },    // Toncoin - 18%
+    { assetId: 'LINK', weight: 0.18 },   // Chainlink - 18%
+    { assetId: 'AVAX', weight: 0.16 },   // Avalanche - 16%
+    { assetId: 'MATIC', weight: 0.14 },  // Polygon - 14%
+    { assetId: 'ARB', weight: 0.14 },    // Arbitrum - 14%
   ],
 };
 

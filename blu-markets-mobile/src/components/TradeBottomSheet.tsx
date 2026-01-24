@@ -50,8 +50,8 @@ interface TradeBottomSheetProps {
 }
 
 // Trade validation constants
-const MIN_BUY_AMOUNT_IRR = 100_000; // Minimum buy amount in IRR
-const MIN_SELL_QUANTITY = 0.0001; // Minimum sell quantity in units
+const MIN_BUY_AMOUNT_IRR = 1_000_000; // Minimum buy amount in IRR (1M)
+// No minimum for sells - user can sell any amount
 
 // Quick amount chips as percentages
 const QUICK_AMOUNTS = [
@@ -170,9 +170,7 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
         if (holding.frozen) {
           errors.push('This asset is locked as loan collateral');
         }
-        if (tradeQuantity > 0 && tradeQuantity < MIN_SELL_QUANTITY) {
-          errors.push(`Minimum sell quantity is ${MIN_SELL_QUANTITY} ${asset.symbol}`);
-        }
+        // No minimum for sells - user can sell any quantity
         if (tradeQuantity > holdingQuantity) {
           errors.push('Exceeds available balance');
         }

@@ -107,6 +107,7 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
     const valueUsd = price ? quantity * price.priceUsd : 0;
 
     return {
+      id: h.id,
       assetId,
       name: ASSET_NAMES[assetId] || assetId,
       quantity,
@@ -166,6 +167,7 @@ export async function getPortfolioHoldings(userId: string): Promise<HoldingRespo
     const valueUsd = price ? quantity * price.priceUsd : 0;
 
     return {
+      id: h.id,
       assetId,
       name: ASSET_NAMES[assetId] || assetId,
       quantity,

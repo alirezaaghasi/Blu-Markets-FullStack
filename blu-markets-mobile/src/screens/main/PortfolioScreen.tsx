@@ -98,7 +98,8 @@ const PortfolioScreen: React.FC = () => {
         dispatch(setStatus(portfolioResponse.status));
         dispatch(setTargetLayerPct(portfolioResponse.targetAllocation));
         if (portfolioResponse.holdings) {
-          dispatch(setHoldings(portfolioResponse.holdings.map((h: Holding) => ({
+          dispatch(setHoldings(portfolioResponse.holdings.map((h: any) => ({
+            id: h.id,
             assetId: h.assetId,
             quantity: h.quantity,
             frozen: h.frozen,
@@ -127,7 +128,8 @@ const PortfolioScreen: React.FC = () => {
       dispatch(setStatus(portfolioResponse.status));
       dispatch(setTargetLayerPct(portfolioResponse.targetAllocation));
       if (portfolioResponse.holdings) {
-        dispatch(setHoldings(portfolioResponse.holdings.map((h: Holding) => ({
+        dispatch(setHoldings(portfolioResponse.holdings.map((h: any) => ({
+          id: h.id,
           assetId: h.assetId,
           quantity: h.quantity,
           frozen: h.frozen,
