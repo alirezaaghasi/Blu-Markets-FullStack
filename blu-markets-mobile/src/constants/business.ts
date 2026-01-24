@@ -2,7 +2,6 @@
 // Based on PRD Section 25 - Configuration Constants
 
 import { Layer, TargetLayerPct } from '../types';
-import { API_BASE_URL as CONFIGURED_API_URL } from '../config/api';
 
 // Currency & Pricing
 export const DEFAULT_FX_RATE = 1_456_000; // IRR per USD
@@ -111,8 +110,8 @@ export const PRICE_HEARTBEAT_MS = 5_000; // 5 seconds
 const getWebSocketUrl = () => {
   if (!__DEV__) return 'wss://api.blumarkets.ir/api/v1/prices/stream';
 
-  // Use the configured API URL from config/api.ts which includes EXPO_PUBLIC_API_URL
-  const apiUrl = CONFIGURED_API_URL;
+  // Use EXPO_PUBLIC_API_URL environment variable directly to avoid circular imports
+  const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
   // Derive WebSocket URL from API_BASE_URL for proper Codespaces support
   // API_BASE_URL like: https://xxx-3000.app.github.dev/api/v1
