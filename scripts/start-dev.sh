@@ -61,7 +61,7 @@ done
 if [ "$CLEAN_ALL" = true ]; then
     info "Cleaning ALL user data..."
     docker exec backend-db-1 psql -U postgres -d blumarkets -c "
-    TRUNCATE sessions, action_logs, ledger_entries, holdings, protections, loans, portfolios, otp_codes, users CASCADE;
+    TRUNCATE sessions, action_log, ledger, holdings, protections, loan_installments, loans, portfolios, otp_codes, users CASCADE;
     " >/dev/null 2>&1 || warn "Could not clean database"
 
     USER_COUNT=$(docker exec backend-db-1 psql -U postgres -d blumarkets -t -c "SELECT COUNT(*) FROM users;" 2>/dev/null | tr -d ' ')

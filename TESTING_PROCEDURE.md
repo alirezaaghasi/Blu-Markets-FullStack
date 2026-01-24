@@ -52,7 +52,7 @@ Expected: `/var/run/postgresql:5432 - accepting connections`
 
 ```bash
 docker exec backend-db-1 psql -U postgres -d blumarkets -c "
-TRUNCATE sessions, action_logs, ledger_entries, holdings, protections, loans, portfolios, otp_codes, users CASCADE;
+TRUNCATE sessions, action_log, ledger, holdings, protections, loan_installments, loans, portfolios, otp_codes, users CASCADE;
 "
 ```
 
