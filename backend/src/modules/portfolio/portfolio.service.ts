@@ -1,4 +1,4 @@
-import { Decimal } from '@prisma/client/runtime/library';
+import { Decimal as PrismaDecimal } from '@prisma/client/runtime/library';
 import { prisma } from '../../config/database.js';
 import { AppError } from '../../middleware/error-handler.js';
 import { getCurrentPrices } from '../../services/price-fetcher.service.js';
@@ -11,6 +11,16 @@ import type {
   Boundary,
 } from '../../types/domain.js';
 import type { PortfolioSummary, HoldingResponse } from '../../types/api.js';
+import {
+  toDecimal,
+  multiply,
+  add,
+  divide,
+  roundIrr,
+  toNumber,
+  isGreaterThan,
+  Decimal,
+} from '../../utils/money.js';
 
 // Asset layer mapping per PRD (synced with frontend assets.ts)
 const ASSET_LAYERS: Record<AssetId, Layer> = {
@@ -70,17 +80,18 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
 
   const prices = await getCurrentPrices();
 
-  // Calculate holdings value
-  let holdingsValueIrr = 0;
+  // MONEY FIX M-02: Calculate holdings value using Decimal arithmetic
+  let holdingsValueDecimal = toDecimal(0);
   for (const holding of portfolio.holdings) {
     const price = prices.get(holding.assetId as AssetId);
     if (price) {
-      holdingsValueIrr += Number(holding.quantity) * price.priceIrr;
+      holdingsValueDecimal = add(holdingsValueDecimal, multiply(holding.quantity, price.priceIrr));
     }
   }
 
   const cashIrr = Number(portfolio.cashIrr);
-  const totalValueIrr = cashIrr + holdingsValueIrr;
+  const holdingsValueIrr = toNumber(roundIrr(holdingsValueDecimal));
+  const totalValueIrr = toNumber(roundIrr(add(cashIrr, holdingsValueDecimal)));
 
   // Calculate allocation
   const allocation = calculateAllocation(portfolio.holdings, prices, totalValueIrr);
@@ -98,13 +109,15 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
   // Determine status
   const status = determineStatus(driftPct, allocation);
 
-  // Build holdings response with values
+  // MONEY FIX M-02: Build holdings response with values using Decimal
   const holdingsResponse: HoldingResponse[] = portfolio.holdings.map((h) => {
     const assetId = h.assetId as AssetId;
     const price = prices.get(assetId);
     const quantity = Number(h.quantity);
-    const valueIrr = price ? quantity * price.priceIrr : 0;
-    const valueUsd = price ? quantity * price.priceUsd : 0;
+    const valueIrrDecimal = price ? multiply(quantity, price.priceIrr) : toDecimal(0);
+    const valueUsdDecimal = price ? multiply(quantity, price.priceUsd) : toDecimal(0);
+    const valueIrr = toNumber(roundIrr(valueIrrDecimal));
+    const valueUsd = toNumber(valueUsdDecimal);
 
     return {
       id: h.id,
@@ -118,7 +131,7 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
       priceIrr: price?.priceIrr || 0,
       priceUsd: price?.priceUsd || 0,
       change24hPct: price?.change24hPct || 0,
-      pctOfPortfolio: totalValueIrr > 0 ? (valueIrr / totalValueIrr) * 100 : 0,
+      pctOfPortfolio: totalValueIrr > 0 ? toNumber(multiply(divide(valueIrrDecimal, totalValueIrr), 100)) : 0,
     };
   });
 
@@ -150,21 +163,24 @@ export async function getPortfolioHoldings(userId: string): Promise<HoldingRespo
 
   const prices = await getCurrentPrices();
 
-  // Calculate total for percentage
-  let totalValueIrr = Number(portfolio.cashIrr);
+  // MONEY FIX M-02: Calculate total for percentage using Decimal
+  let totalValueDecimal = toDecimal(portfolio.cashIrr);
   for (const holding of portfolio.holdings) {
     const price = prices.get(holding.assetId as AssetId);
     if (price) {
-      totalValueIrr += Number(holding.quantity) * price.priceIrr;
+      totalValueDecimal = add(totalValueDecimal, multiply(holding.quantity, price.priceIrr));
     }
   }
+  const totalValueIrr = toNumber(roundIrr(totalValueDecimal));
 
   const holdings: HoldingResponse[] = portfolio.holdings.map((h) => {
     const assetId = h.assetId as AssetId;
     const price = prices.get(assetId);
     const quantity = Number(h.quantity);
-    const valueIrr = price ? quantity * price.priceIrr : 0;
-    const valueUsd = price ? quantity * price.priceUsd : 0;
+    const valueIrrDecimal = price ? multiply(quantity, price.priceIrr) : toDecimal(0);
+    const valueUsdDecimal = price ? multiply(quantity, price.priceUsd) : toDecimal(0);
+    const valueIrr = toNumber(roundIrr(valueIrrDecimal));
+    const valueUsd = toNumber(valueUsdDecimal);
 
     return {
       id: h.id,
@@ -178,7 +194,7 @@ export async function getPortfolioHoldings(userId: string): Promise<HoldingRespo
       priceUsd: price?.priceUsd || 0,
       priceIrr: price?.priceIrr || 0,
       change24hPct: price?.change24hPct,
-      pctOfPortfolio: totalValueIrr > 0 ? (valueIrr / totalValueIrr) * 100 : 0,
+      pctOfPortfolio: isGreaterThan(totalValueDecimal, 0) ? toNumber(multiply(divide(valueIrrDecimal, totalValueDecimal), 100)) : 0,
     };
   });
 
@@ -226,8 +242,9 @@ export async function addFunds(
     throw new AppError('VALIDATION_ERROR', 'Minimum deposit is 1,000,000 IRR', 400);
   }
 
+  // MONEY FIX M-02: Use Decimal for cash calculation
   const beforeCash = Number(portfolio.cashIrr);
-  const newCashIrr = beforeCash + amountIrr;
+  const newCashIrr = toNumber(roundIrr(add(beforeCash, amountIrr)));
 
   // Update portfolio
   await prisma.portfolio.update({
@@ -265,8 +282,9 @@ export async function addFunds(
   return { newCashIrr, ledgerEntryId: ledgerEntry.id };
 }
 
+// MONEY FIX M-02: Use Decimal for allocation calculations
 function calculateAllocation(
-  holdings: { assetId: string; quantity: Decimal; layer: string }[],
+  holdings: { assetId: string; quantity: PrismaDecimal; layer: string }[],
   prices: Map<AssetId, { priceIrr: number }>,
   totalValueIrr: number
 ): TargetAllocation {
@@ -274,20 +292,25 @@ function calculateAllocation(
     return { foundation: 0, growth: 0, upside: 0 };
   }
 
-  const layerValues = { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
+  const layerValues = {
+    FOUNDATION: toDecimal(0),
+    GROWTH: toDecimal(0),
+    UPSIDE: toDecimal(0),
+  };
 
   for (const holding of holdings) {
     const price = prices.get(holding.assetId as AssetId);
     if (price) {
-      const value = Number(holding.quantity) * price.priceIrr;
-      layerValues[holding.layer as Layer] += value;
+      const valueDecimal = multiply(holding.quantity, price.priceIrr);
+      layerValues[holding.layer as Layer] = add(layerValues[holding.layer as Layer], valueDecimal);
     }
   }
 
+  const totalDecimal = toDecimal(totalValueIrr);
   return {
-    foundation: (layerValues.FOUNDATION / totalValueIrr) * 100,
-    growth: (layerValues.GROWTH / totalValueIrr) * 100,
-    upside: (layerValues.UPSIDE / totalValueIrr) * 100,
+    foundation: toNumber(multiply(divide(layerValues.FOUNDATION, totalDecimal), 100)),
+    growth: toNumber(multiply(divide(layerValues.GROWTH, totalDecimal), 100)),
+    upside: toNumber(multiply(divide(layerValues.UPSIDE, totalDecimal), 100)),
   };
 }
 
@@ -355,8 +378,9 @@ export async function getAssetHolding(
   const prices = await getCurrentPrices();
   const price = prices.get(assetId as AssetId);
 
+  // MONEY FIX M-02: Use Decimal for value calculation
   const quantity = Number(holding.quantity);
-  const valueIrr = price ? quantity * price.priceIrr : 0;
+  const valueIrr = price ? toNumber(roundIrr(multiply(quantity, price.priceIrr))) : 0;
 
   return {
     holding: {

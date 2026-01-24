@@ -14,6 +14,20 @@ import type {
   Layer,
 } from '../../types/domain.js';
 import type { TradePreviewResponse, TradeExecuteResponse } from '../../types/api.js';
+import {
+  toDecimal,
+  multiply,
+  subtract,
+  add,
+  divide,
+  roundIrr,
+  roundCrypto,
+  toNumber,
+  isGreaterThan,
+  isLessThan,
+  isLessThanOrEqual,
+  Decimal,
+} from '../../utils/money.js';
 
 // Spread rates per PRD Section 21 - Layer-based
 const SPREAD_BY_LAYER: Record<Layer, number> = {
@@ -77,11 +91,17 @@ export async function previewTrade(
     };
   }
 
+  // MONEY FIX M-02: Use Decimal arithmetic for money calculations
   // Calculate trade details with layer-based spread
   const spread = getSpreadForAsset(assetId);
-  const spreadAmountIrr = amountIrr * spread;
-  const effectiveAmountIrr = action === 'BUY' ? amountIrr - spreadAmountIrr : amountIrr;
-  const quantity = effectiveAmountIrr / price.priceIrr;
+  const amountDecimal = toDecimal(amountIrr);
+  const spreadAmountDecimal = roundIrr(multiply(amountDecimal, spread));
+  const spreadAmountIrr = toNumber(spreadAmountDecimal);
+  const effectiveAmountDecimal = action === 'BUY'
+    ? subtract(amountDecimal, spreadAmountDecimal)
+    : amountDecimal;
+  const quantityDecimal = roundCrypto(divide(effectiveAmountDecimal, price.priceIrr));
+  const quantity = toNumber(quantityDecimal);
 
   // Validate sufficient funds/holdings
   if (action === 'BUY' && amountIrr > snapshot.cashIrr) {
@@ -255,11 +275,16 @@ export async function executeTrade(
       throw new AppError('SERVICE_UNAVAILABLE', 'Current price not available', 503);
     }
 
-    // Recalculate trade values with current price
+    // MONEY FIX M-02: Recalculate trade values with current price using Decimal arithmetic
     const spread = getSpreadForAsset(assetId);
-    const spreadAmountIrr = amountIrr * spread;
-    const effectiveAmountIrr = action === 'BUY' ? amountIrr - spreadAmountIrr : amountIrr;
-    const quantity = effectiveAmountIrr / currentPrice.priceIrr;
+    const amountDecimal = toDecimal(amountIrr);
+    const spreadAmountDecimal = roundIrr(multiply(amountDecimal, spread));
+    const spreadAmountIrr = toNumber(spreadAmountDecimal);
+    const effectiveAmountDecimal = action === 'BUY'
+      ? subtract(amountDecimal, spreadAmountDecimal)
+      : amountDecimal;
+    const quantityDecimal = roundCrypto(divide(effectiveAmountDecimal, currentPrice.priceIrr));
+    const quantity = toNumber(quantityDecimal);
     const priceIrr = currentPrice.priceIrr;
 
     let newCashIrr: number;
@@ -272,8 +297,8 @@ export async function executeTrade(
         throw new AppError('INSUFFICIENT_CASH', 'Insufficient cash balance (concurrent modification)', 400);
       }
 
-      // Deduct cash (including spread)
-      newCashIrr = currentCash - amountIrr;
+      // MONEY FIX M-02: Deduct cash (including spread) using Decimal
+      newCashIrr = toNumber(roundIrr(subtract(currentCash, amountIrr)));
 
       await tx.portfolio.update({
         where: { id: portfolio.id },
@@ -318,17 +343,17 @@ export async function executeTrade(
         throw new AppError('ASSET_FROZEN', 'Asset is frozen as loan collateral', 400);
       }
 
-      // Add cash (minus spread)
-      const cashReceived = amountIrr - spreadAmountIrr;
-      newCashIrr = Number(currentPortfolio.cashIrr) + cashReceived;
+      // MONEY FIX M-02: Add cash (minus spread) using Decimal
+      const cashReceivedDecimal = subtract(amountIrr, spreadAmountIrr);
+      newCashIrr = toNumber(roundIrr(add(currentPortfolio.cashIrr, cashReceivedDecimal)));
 
       await tx.portfolio.update({
         where: { id: portfolio.id },
         data: { cashIrr: newCashIrr },
       });
 
-      // Reduce holding
-      const newQuantity = currentQuantity - quantity;
+      // MONEY FIX M-02: Reduce holding using Decimal
+      const newQuantity = toNumber(roundCrypto(subtract(currentQuantity, quantity)));
 
       if (newQuantity <= 0.00000001) {
         // Remove holding if negligible
@@ -423,31 +448,38 @@ function calculateAfterAllocation(
     return zeroAllocation;
   }
 
-  // Clone current allocation
-  const newAllocation = { ...snapshot.allocation };
+  // MONEY FIX M-02: Use Decimal for allocation calculations
+  // Clone current allocation as Decimals
+  let foundationDec = toDecimal(snapshot.allocation.foundation);
+  let growthDec = toDecimal(snapshot.allocation.growth);
+  let upsideDec = toDecimal(snapshot.allocation.upside);
 
   // Calculate value change for the layer
-  const valueChange = action === 'BUY' ? amountIrr : -amountIrr;
-  const layerPctChange = (valueChange / totalValue) * 100;
+  const valueChangeDecimal = action === 'BUY' ? toDecimal(amountIrr) : toDecimal(-amountIrr);
+  const layerPctChangeDecimal = multiply(divide(valueChangeDecimal, totalValue), 100);
 
   // Adjust allocation
   if (layer === 'FOUNDATION') {
-    newAllocation.foundation += layerPctChange;
+    foundationDec = add(foundationDec, layerPctChangeDecimal);
   } else if (layer === 'GROWTH') {
-    newAllocation.growth += layerPctChange;
+    growthDec = add(growthDec, layerPctChangeDecimal);
   } else {
-    newAllocation.upside += layerPctChange;
+    upsideDec = add(upsideDec, layerPctChangeDecimal);
   }
 
   // Normalize (ensure sums to ~100%)
-  const total = newAllocation.foundation + newAllocation.growth + newAllocation.upside;
-  if (total > 0) {
-    newAllocation.foundation = (newAllocation.foundation / total) * 100;
-    newAllocation.growth = (newAllocation.growth / total) * 100;
-    newAllocation.upside = (newAllocation.upside / total) * 100;
+  const totalDec = add(foundationDec, growthDec, upsideDec);
+  if (isGreaterThan(totalDec, 0)) {
+    foundationDec = multiply(divide(foundationDec, totalDec), 100);
+    growthDec = multiply(divide(growthDec, totalDec), 100);
+    upsideDec = multiply(divide(upsideDec, totalDec), 100);
   }
 
-  return newAllocation;
+  return {
+    foundation: toNumber(foundationDec),
+    growth: toNumber(growthDec),
+    upside: toNumber(upsideDec),
+  };
 }
 
 function isMovingTowardTarget(

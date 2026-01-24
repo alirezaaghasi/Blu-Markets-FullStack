@@ -4,6 +4,19 @@ import { calculateRiskScore } from '../../services/risk-scoring.service.js';
 import { getCurrentPrices } from '../../services/price-fetcher.service.js';
 import type { RiskProfile, TargetAllocation, AssetId, Layer } from '../../types/domain.js';
 import type { SubmitQuestionnaireInput, RecordConsentInput, InitialFundingInput } from './onboarding.schemas.js';
+import {
+  toDecimal,
+  multiply,
+  subtract,
+  add,
+  divide,
+  roundIrr,
+  roundCrypto,
+  toNumber,
+  isGreaterThan,
+  isLessThan,
+  Decimal,
+} from '../../utils/money.js';
 
 // ============================================================
 // INITIAL ALLOCATION CONFIGURATION
@@ -140,15 +153,21 @@ export async function createInitialPortfolio(
     upside: Number(user.targetUpside) || 15,
   };
 
-  // Calculate investable amount (total - cash buffer)
-  const totalAmount = input.amountIrr;
-  const cashBuffer = Math.floor(totalAmount * CASH_BUFFER_PCT);
-  const investableAmount = totalAmount - cashBuffer;
+  // MONEY FIX M-02: Calculate investable amount using Decimal arithmetic
+  const totalAmountDecimal = toDecimal(input.amountIrr);
+  const cashBufferDecimal = roundIrr(multiply(totalAmountDecimal, CASH_BUFFER_PCT));
+  const investableAmountDecimal = subtract(totalAmountDecimal, cashBufferDecimal);
 
-  // Calculate amount per layer
-  const foundationAmount = Math.floor(investableAmount * (targetAllocation.foundation / 100));
-  const growthAmount = Math.floor(investableAmount * (targetAllocation.growth / 100));
-  const upsideAmount = Math.floor(investableAmount * (targetAllocation.upside / 100));
+  // Calculate amount per layer using Decimal
+  const foundationAmountDecimal = roundIrr(multiply(investableAmountDecimal, divide(targetAllocation.foundation, 100)));
+  const growthAmountDecimal = roundIrr(multiply(investableAmountDecimal, divide(targetAllocation.growth, 100)));
+  const upsideAmountDecimal = roundIrr(multiply(investableAmountDecimal, divide(targetAllocation.upside, 100)));
+
+  // Convert to numbers for processing
+  const totalAmount = toNumber(totalAmountDecimal);
+  const foundationAmount = toNumber(foundationAmountDecimal);
+  const growthAmount = toNumber(growthAmountDecimal);
+  const upsideAmount = toNumber(upsideAmountDecimal);
 
   // Prepare holdings to create
   const holdingsToCreate: Array<{
@@ -158,14 +177,16 @@ export async function createInitialPortfolio(
     valueIrr: number;
   }> = [];
 
-  // Process each layer
+  // MONEY FIX M-02: Process each layer using Decimal arithmetic
   const processLayer = (layerAmount: number, layer: Layer) => {
     const assets = LAYER_ASSETS[layer];
+    const layerAmountDecimal = toDecimal(layerAmount);
     for (const asset of assets) {
-      const assetAmountIrr = Math.floor(layerAmount * asset.weight);
+      const assetAmountDecimal = roundIrr(multiply(layerAmountDecimal, asset.weight));
+      const assetAmountIrr = toNumber(assetAmountDecimal);
 
       // Skip if below minimum trade amount
-      if (assetAmountIrr < MIN_TRADE_AMOUNT_IRR) continue;
+      if (isLessThan(assetAmountDecimal, MIN_TRADE_AMOUNT_IRR)) continue;
 
       // Get price for this asset
       const price = prices.get(asset.assetId);
@@ -174,8 +195,9 @@ export async function createInitialPortfolio(
         continue;
       }
 
-      // Calculate quantity
-      const quantity = assetAmountIrr / price.priceIrr;
+      // Calculate quantity using Decimal
+      const quantityDecimal = roundCrypto(divide(assetAmountDecimal, price.priceIrr));
+      const quantity = toNumber(quantityDecimal);
 
       holdingsToCreate.push({
         assetId: asset.assetId,
@@ -190,24 +212,35 @@ export async function createInitialPortfolio(
   processLayer(growthAmount, 'GROWTH');
   processLayer(upsideAmount, 'UPSIDE');
 
-  // Calculate total holdings value
-  const totalHoldingsValue = holdingsToCreate.reduce((sum, h) => sum + h.valueIrr, 0);
-  const remainingCash = totalAmount - totalHoldingsValue;
+  // MONEY FIX M-02: Calculate total holdings value using Decimal
+  const totalHoldingsValueDecimal = holdingsToCreate.reduce(
+    (sum, h) => add(sum, h.valueIrr),
+    toDecimal(0)
+  );
+  const totalHoldingsValue = toNumber(roundIrr(totalHoldingsValueDecimal));
+  const remainingCashDecimal = subtract(totalAmountDecimal, totalHoldingsValueDecimal);
+  const remainingCash = toNumber(roundIrr(remainingCashDecimal));
 
-  // Calculate actual allocation percentages
-  const foundationValue = holdingsToCreate
+  // Calculate actual allocation percentages using Decimal
+  const foundationValueDecimal = holdingsToCreate
     .filter(h => h.layer === 'FOUNDATION')
-    .reduce((sum, h) => sum + h.valueIrr, 0);
-  const growthValue = holdingsToCreate
+    .reduce((sum, h) => add(sum, h.valueIrr), toDecimal(0));
+  const growthValueDecimal = holdingsToCreate
     .filter(h => h.layer === 'GROWTH')
-    .reduce((sum, h) => sum + h.valueIrr, 0);
-  const upsideValue = holdingsToCreate
+    .reduce((sum, h) => add(sum, h.valueIrr), toDecimal(0));
+  const upsideValueDecimal = holdingsToCreate
     .filter(h => h.layer === 'UPSIDE')
-    .reduce((sum, h) => sum + h.valueIrr, 0);
+    .reduce((sum, h) => add(sum, h.valueIrr), toDecimal(0));
 
-  const actualFoundationPct = totalAmount > 0 ? (foundationValue / totalAmount) * 100 : 0;
-  const actualGrowthPct = totalAmount > 0 ? (growthValue / totalAmount) * 100 : 0;
-  const actualUpsidePct = totalAmount > 0 ? (upsideValue / totalAmount) * 100 : 0;
+  const actualFoundationPct = isGreaterThan(totalAmountDecimal, 0)
+    ? toNumber(multiply(divide(foundationValueDecimal, totalAmountDecimal), 100))
+    : 0;
+  const actualGrowthPct = isGreaterThan(totalAmountDecimal, 0)
+    ? toNumber(multiply(divide(growthValueDecimal, totalAmountDecimal), 100))
+    : 0;
+  const actualUpsidePct = isGreaterThan(totalAmountDecimal, 0)
+    ? toNumber(multiply(divide(upsideValueDecimal, totalAmountDecimal), 100))
+    : 0;
 
   // Create portfolio with holdings in a transaction
   const portfolio = await prisma.$transaction(async (tx) => {

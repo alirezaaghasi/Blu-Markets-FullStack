@@ -11,6 +11,23 @@ import {
   PORTFOLIO_LOAN_LIMIT,
   type AssetId,
 } from '../../types/domain.js';
+import {
+  toDecimal,
+  multiply,
+  add,
+  subtract,
+  divide,
+  roundIrr,
+  toNumber,
+  calculateLtv,
+  calculateMaxLoan,
+  calculateSimpleInterestMonthly,
+  isGreaterThan,
+  isGreaterThanOrEqual,
+  min,
+  max,
+  Decimal,
+} from '../../utils/money.js';
 
 const createLoanSchema = z.object({
   collateralAssetId: z.string().min(1),
@@ -52,30 +69,39 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         orderBy: { createdAt: 'desc' },
       });
 
-      return loans.map((loan) => ({
-        id: loan.id,
-        collateralAssetId: loan.collateralAssetId,
-        collateralQuantity: Number(loan.collateralQuantity),
-        collateralValueIrr: Number(loan.collateralValueIrr),
-        principalIrr: Number(loan.principalIrr),
-        interestRate: Number(loan.interestRate),
-        totalInterestIrr: Number(loan.totalInterestIrr),
-        totalDueIrr: Number(loan.totalDueIrr),
-        durationMonths: loan.durationMonths,
-        startDate: loan.startDate.toISOString(),
-        dueDate: loan.dueDate.toISOString(),
-        paidIrr: Number(loan.paidIrr),
-        remainingIrr: Number(loan.totalDueIrr) - Number(loan.paidIrr),
-        ltv: Number(loan.currentLtv || loan.maxLtv) * 100,
-        status: loan.status,
-        installments: loan.installments.map((inst) => ({
-          number: inst.number,
-          dueDate: inst.dueDate.toISOString(),
-          totalIrr: Number(inst.totalIrr),
-          paidIrr: Number(inst.paidIrr),
-          status: inst.status,
-        })),
-      }));
+      return loans.map((loan) => {
+        // MONEY FIX M-02: Use Decimal arithmetic for money calculations
+        const totalDue = toDecimal(loan.totalDueIrr);
+        const paid = toDecimal(loan.paidIrr);
+        const remainingIrr = toNumber(subtract(totalDue, paid));
+        const ltvValue = toDecimal(loan.currentLtv || loan.maxLtv);
+        const ltvPct = toNumber(multiply(ltvValue, 100));
+
+        return {
+          id: loan.id,
+          collateralAssetId: loan.collateralAssetId,
+          collateralQuantity: Number(loan.collateralQuantity),
+          collateralValueIrr: Number(loan.collateralValueIrr),
+          principalIrr: Number(loan.principalIrr),
+          interestRate: Number(loan.interestRate),
+          totalInterestIrr: Number(loan.totalInterestIrr),
+          totalDueIrr: Number(loan.totalDueIrr),
+          durationMonths: loan.durationMonths,
+          startDate: loan.startDate.toISOString(),
+          dueDate: loan.dueDate.toISOString(),
+          paidIrr: Number(loan.paidIrr),
+          remainingIrr,
+          ltv: ltvPct,
+          status: loan.status,
+          installments: loan.installments.map((inst) => ({
+            number: inst.number,
+            dueDate: inst.dueDate.toISOString(),
+            totalIrr: Number(inst.totalIrr),
+            paidIrr: Number(inst.paidIrr),
+            status: inst.status,
+          })),
+        };
+      });
     },
   });
 
@@ -101,22 +127,24 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
 
       const prices = await getCurrentPrices();
 
+      // MONEY FIX M-02: Use Decimal arithmetic for money calculations
       // Calculate portfolio total
-      let totalValueIrr = Number(portfolio.cashIrr);
+      let totalValueDecimal = toDecimal(portfolio.cashIrr);
       for (const holding of portfolio.holdings) {
         const price = prices.get(holding.assetId as AssetId);
         if (price) {
-          totalValueIrr += Number(holding.quantity) * price.priceIrr;
+          const holdingValue = multiply(holding.quantity, price.priceIrr);
+          totalValueDecimal = totalValueDecimal.plus(holdingValue);
         }
       }
 
       // 25% portfolio limit
-      const maxPortfolioLoanIrr = totalValueIrr * PORTFOLIO_LOAN_LIMIT;
+      const maxPortfolioLoanDecimal = roundIrr(multiply(totalValueDecimal, PORTFOLIO_LOAN_LIMIT));
 
       // Current loans total
-      const currentLoansIrr = portfolio.loans.reduce(
-        (sum, loan) => sum + Number(loan.principalIrr),
-        0
+      const currentLoansDecimal = portfolio.loans.reduce(
+        (sum, loan) => sum.plus(toDecimal(loan.principalIrr)),
+        new Decimal(0)
       );
 
       // Per-asset capacity
@@ -127,31 +155,36 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           const layer = getAssetLayer(assetId);
           const maxLtv = LTV_BY_LAYER[layer];
           const price = prices.get(assetId);
-          const holdingValueIrr = price ? Number(holding.quantity) * price.priceIrr : 0;
-          const maxLoanIrr = holdingValueIrr * maxLtv;
+          const holdingValueDecimal = price
+            ? roundIrr(multiply(holding.quantity, price.priceIrr))
+            : new Decimal(0);
+          const maxLoanDecimal = roundIrr(calculateMaxLoan(holdingValueDecimal, maxLtv));
 
           // Check existing loan on this asset
           const existingLoan = portfolio.loans.find(
             (l) => l.collateralAssetId === assetId
           );
-          const existingLoanIrr = existingLoan ? Number(existingLoan.principalIrr) : 0;
+          const existingLoanDecimal = existingLoan ? toDecimal(existingLoan.principalIrr) : new Decimal(0);
+          const availableLoanDecimal = max(0, subtract(maxLoanDecimal, existingLoanDecimal));
 
           return {
             assetId,
             layer,
             maxLtv,
-            holdingValueIrr,
-            maxLoanIrr,
-            existingLoanIrr,
-            availableLoanIrr: Math.max(0, maxLoanIrr - existingLoanIrr),
+            holdingValueIrr: toNumber(holdingValueDecimal),
+            maxLoanIrr: toNumber(maxLoanDecimal),
+            existingLoanIrr: toNumber(existingLoanDecimal),
+            availableLoanIrr: toNumber(availableLoanDecimal),
             frozen: holding.frozen,
           };
         });
 
+      const availableDecimal = max(0, subtract(maxPortfolioLoanDecimal, currentLoansDecimal));
+
       return {
-        maxPortfolioLoanIrr,
-        currentLoansIrr,
-        availableIrr: Math.max(0, maxPortfolioLoanIrr - currentLoansIrr),
+        maxPortfolioLoanIrr: toNumber(maxPortfolioLoanDecimal),
+        currentLoansIrr: toNumber(currentLoansDecimal),
+        availableIrr: toNumber(availableDecimal),
         perAsset,
       };
     },
@@ -227,16 +260,18 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           throw new AppError('VALIDATION_ERROR', 'Price not available', 400);
         }
 
-        const collateralValueIrr = Number(holding.quantity) * price.priceIrr;
+        // MONEY FIX M-02: Use Decimal arithmetic for money calculations
+        const collateralValueDecimal = roundIrr(multiply(holding.quantity, price.priceIrr));
         const layer = getAssetLayer(collateralAssetId as AssetId);
         const maxLtv = LTV_BY_LAYER[layer];
-        const maxLoanIrr = collateralValueIrr * maxLtv;
+        const maxLoanDecimal = roundIrr(calculateMaxLoan(collateralValueDecimal, maxLtv));
+        const amountDecimal = toDecimal(amountIrr);
 
         // Re-validate LTV with fresh data inside transaction
-        if (amountIrr > maxLoanIrr) {
+        if (isGreaterThan(amountDecimal, maxLoanDecimal)) {
           throw new AppError(
             'EXCEEDS_ASSET_LTV',
-            `Maximum loan for this asset is ${Math.floor(maxLoanIrr).toLocaleString()} IRR`,
+            `Maximum loan for this asset is ${toNumber(maxLoanDecimal).toLocaleString()} IRR`,
             400
           );
         }
@@ -255,27 +290,33 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         }
 
         // Calculate portfolio total value with fresh prices
-        let totalValueIrr = Number(portfolio.cashIrr);
+        let totalValueDecimal = toDecimal(portfolio.cashIrr);
         for (const h of portfolio.holdings) {
           const priceData = prices.get(h.assetId as AssetId);
-          if (priceData) totalValueIrr += Number(h.quantity) * priceData.priceIrr;
+          if (priceData) {
+            totalValueDecimal = totalValueDecimal.plus(multiply(h.quantity, priceData.priceIrr));
+          }
         }
 
-        const maxPortfolioLoanIrr = totalValueIrr * PORTFOLIO_LOAN_LIMIT;
-        const currentLoansIrr = portfolio.loans.reduce((sum, loan) => sum + Number(loan.principalIrr), 0);
+        const maxPortfolioLoanDecimal = roundIrr(multiply(totalValueDecimal, PORTFOLIO_LOAN_LIMIT));
+        const currentLoansDecimal = portfolio.loans.reduce(
+          (sum, loan) => sum.plus(toDecimal(loan.principalIrr)),
+          new Decimal(0)
+        );
 
-        if (currentLoansIrr + amountIrr > maxPortfolioLoanIrr) {
+        const totalWithNewLoan = add(currentLoansDecimal, amountDecimal);
+        if (isGreaterThan(totalWithNewLoan, maxPortfolioLoanDecimal)) {
+          const availableDecimal = subtract(maxPortfolioLoanDecimal, currentLoansDecimal);
           throw new AppError(
             'EXCEEDS_PORTFOLIO_LIMIT',
-            `Portfolio loan limit exceeded. Maximum available: ${Math.floor(maxPortfolioLoanIrr - currentLoansIrr).toLocaleString()} IRR`,
+            `Portfolio loan limit exceeded. Maximum available: ${toNumber(availableDecimal).toLocaleString()} IRR`,
             400
           );
         }
 
         // Calculate interest (simple interest per PRD)
-        const annualInterest = amountIrr * INTEREST_RATE;
-        const totalInterestIrr = (annualInterest * durationMonths) / 12;
-        const totalDueIrr = amountIrr + totalInterestIrr;
+        const totalInterestDecimal = roundIrr(calculateSimpleInterestMonthly(amountDecimal, INTEREST_RATE, durationMonths));
+        const totalDueDecimal = roundIrr(add(amountDecimal, totalInterestDecimal));
 
         const startDate = new Date();
         const dueDate = new Date(startDate);
@@ -293,29 +334,32 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           data: { cashIrr: { increment: amountIrr } },
         });
 
+        // Calculate LTV ratio
+        const currentLtvDecimal = calculateLtv(amountDecimal, collateralValueDecimal);
+
         // Create loan
         const loan = await tx.loan.create({
           data: {
             portfolioId: portfolio.id,
             collateralAssetId,
             collateralQuantity: holding.quantity,
-            collateralValueIrr,
+            collateralValueIrr: toNumber(collateralValueDecimal),
             principalIrr: amountIrr,
             interestRate: INTEREST_RATE,
             durationMonths,
-            totalInterestIrr,
-            totalDueIrr,
+            totalInterestIrr: toNumber(totalInterestDecimal),
+            totalDueIrr: toNumber(totalDueDecimal),
             startDate,
             dueDate,
             maxLtv,
-            currentLtv: amountIrr / collateralValueIrr,
+            currentLtv: toNumber(currentLtvDecimal),
           },
         });
 
-        // Create installments (monthly)
-        const installmentPrincipal = amountIrr / durationMonths;
-        const installmentInterest = totalInterestIrr / durationMonths;
-        const installmentTotal = installmentPrincipal + installmentInterest;
+        // Create installments (monthly) with safe arithmetic
+        const installmentPrincipalDecimal = roundIrr(divide(amountDecimal, durationMonths));
+        const installmentInterestDecimal = roundIrr(divide(totalInterestDecimal, durationMonths));
+        const installmentTotalDecimal = roundIrr(add(installmentPrincipalDecimal, installmentInterestDecimal));
 
         for (let i = 1; i <= durationMonths; i++) {
           const installmentDueDate = new Date(startDate);
@@ -326,9 +370,9 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
               loanId: loan.id,
               number: i,
               dueDate: installmentDueDate,
-              principalIrr: installmentPrincipal,
-              interestIrr: installmentInterest,
-              totalIrr: installmentTotal,
+              principalIrr: toNumber(installmentPrincipalDecimal),
+              interestIrr: toNumber(installmentInterestDecimal),
+              totalIrr: toNumber(installmentTotalDecimal),
             },
           });
         }
@@ -383,6 +427,13 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         throw new AppError('NOT_FOUND', 'Loan not found', 404);
       }
 
+      // MONEY FIX M-02: Use Decimal arithmetic for money calculations
+      const totalDueDecimal = toDecimal(loan.totalDueIrr);
+      const paidDecimal = toDecimal(loan.paidIrr);
+      const remainingDecimal = subtract(totalDueDecimal, paidDecimal);
+      const ltvDecimal = toDecimal(loan.currentLtv || loan.maxLtv);
+      const ltvPctDecimal = multiply(ltvDecimal, 100);
+
       return {
         id: loan.id,
         collateralAssetId: loan.collateralAssetId,
@@ -396,8 +447,8 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         startDate: loan.startDate.toISOString(),
         dueDate: loan.dueDate.toISOString(),
         paidIrr: Number(loan.paidIrr),
-        remainingIrr: Number(loan.totalDueIrr) - Number(loan.paidIrr),
-        ltv: Number(loan.currentLtv || loan.maxLtv) * 100,
+        remainingIrr: toNumber(remainingDecimal),
+        ltv: toNumber(ltvPctDecimal),
         status: loan.status,
         installments: loan.installments
           .sort((a, b) => a.number - b.number)
@@ -480,15 +531,20 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           where: { id: loan.portfolio_id },
         });
 
-        if (!portfolio || amountIrr > Number(portfolio.cashIrr)) {
+        // MONEY FIX M-02: Use Decimal arithmetic for money calculations
+        const amountDecimal = toDecimal(amountIrr);
+        const cashDecimal = toDecimal(portfolio?.cashIrr || 0);
+
+        if (!portfolio || isGreaterThan(amountDecimal, cashDecimal)) {
           throw new AppError('INSUFFICIENT_CASH', 'Not enough cash balance', 400);
         }
 
         // Calculate with fresh data from locked row
-        const totalDueIrr = Number(loan.total_due_irr);
-        const currentPaidIrr = Number(loan.paid_irr);
-        const remainingDue = totalDueIrr - currentPaidIrr;
-        const amountToApply = Math.min(amountIrr, remainingDue);
+        const totalDueDecimal = toDecimal(loan.total_due_irr);
+        const currentPaidDecimal = toDecimal(loan.paid_irr);
+        const remainingDueDecimal = subtract(totalDueDecimal, currentPaidDecimal);
+        const amountToApplyDecimal = min(amountDecimal, remainingDueDecimal);
+        const amountToApply = toNumber(amountToApplyDecimal);
 
         // Deduct from cash
         await tx.portfolio.update({
@@ -497,42 +553,44 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         });
 
         // Update loan with fresh calculations
-        const newPaidIrr = currentPaidIrr + amountToApply;
-        const isFullySettled = newPaidIrr >= totalDueIrr;
+        const newPaidDecimal = add(currentPaidDecimal, amountToApplyDecimal);
+        const isFullySettled = isGreaterThanOrEqual(newPaidDecimal, totalDueDecimal);
 
         await tx.loan.update({
           where: { id: loan.id },
           data: {
-            paidIrr: newPaidIrr,
+            paidIrr: toNumber(newPaidDecimal),
             status: isFullySettled ? 'REPAID' : 'ACTIVE',
           },
         });
 
         // Apply to installments
-        let remainingPayment = amountToApply;
+        let remainingPaymentDecimal = amountToApplyDecimal;
         let installmentsPaid = 0;
 
         for (const inst of installments) {
-          if (remainingPayment <= 0) break;
+          if (remainingPaymentDecimal.lessThanOrEqualTo(0)) break;
           if (inst.status === 'PAID') continue;
 
-          const instRemaining = Number(inst.totalIrr) - Number(inst.paidIrr);
-          const paymentToInst = Math.min(remainingPayment, instRemaining);
+          const instTotalDecimal = toDecimal(inst.totalIrr);
+          const instPaidDecimal = toDecimal(inst.paidIrr);
+          const instRemainingDecimal = subtract(instTotalDecimal, instPaidDecimal);
+          const paymentToInstDecimal = min(remainingPaymentDecimal, instRemainingDecimal);
 
-          const newInstPaid = Number(inst.paidIrr) + paymentToInst;
-          const instFullyPaid = newInstPaid >= Number(inst.totalIrr);
+          const newInstPaidDecimal = add(instPaidDecimal, paymentToInstDecimal);
+          const instFullyPaid = isGreaterThanOrEqual(newInstPaidDecimal, instTotalDecimal);
 
           await tx.loanInstallment.update({
             where: { id: inst.id },
             data: {
-              paidIrr: newInstPaid,
-              status: instFullyPaid ? 'PAID' : newInstPaid > 0 ? 'PARTIAL' : 'PENDING',
+              paidIrr: toNumber(newInstPaidDecimal),
+              status: instFullyPaid ? 'PAID' : isGreaterThan(newInstPaidDecimal, 0) ? 'PARTIAL' : 'PENDING',
               paidAt: instFullyPaid ? new Date() : null,
             },
           });
 
           if (instFullyPaid) installmentsPaid++;
-          remainingPayment -= paymentToInst;
+          remainingPaymentDecimal = remainingPaymentDecimal.minus(paymentToInstDecimal);
         }
 
         // Update installmentsPaid counter on loan
@@ -561,8 +619,8 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           data: {
             portfolioId: loan.portfolio_id,
             entryType: 'LOAN_REPAY',
-            beforeSnapshot: { paidIrr: currentPaidIrr },
-            afterSnapshot: { paidIrr: newPaidIrr },
+            beforeSnapshot: { paidIrr: toNumber(currentPaidDecimal) },
+            afterSnapshot: { paidIrr: toNumber(newPaidDecimal) },
             amountIrr: amountToApply,
             loanId: loan.id,
             boundary: 'SAFE',
@@ -570,10 +628,13 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           },
         });
 
+        // Calculate remaining due after payment
+        const remainingAfterPayment = subtract(remainingDueDecimal, amountToApplyDecimal);
+
         return {
           success: true,
           amountApplied: amountToApply,
-          remainingDue: remainingDue - amountToApply,
+          remainingDue: toNumber(remainingAfterPayment),
           installmentsPaid,
           isFullySettled,
           collateralUnfrozen: isFullySettled,

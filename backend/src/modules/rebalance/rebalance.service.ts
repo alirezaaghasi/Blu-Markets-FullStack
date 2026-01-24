@@ -12,6 +12,20 @@ import type {
   Boundary,
 } from '../../types/domain.js';
 import type { RebalancePreviewResponse, RebalanceTrade, GapAnalysis } from '../../types/api.js';
+import {
+  toDecimal,
+  multiply,
+  subtract,
+  add,
+  divide,
+  roundIrr,
+  roundCrypto,
+  toNumber,
+  isGreaterThan,
+  isLessThan,
+  min,
+  Decimal,
+} from '../../utils/money.js';
 
 // Rebalance modes per PRD Section 18.3
 export type RebalanceMode = 'HOLDINGS_ONLY' | 'HOLDINGS_PLUS_CASH' | 'SMART';
@@ -201,6 +215,7 @@ export async function executeRebalance(
 
       const spread = SPREAD_BY_LAYER[getAssetLayer(trade.assetId as AssetId)];
 
+      // MONEY FIX M-02: Use Decimal arithmetic for rebalance trades
       if (trade.side === 'SELL') {
         const holding = holdingsMap.get(trade.assetId);
         if (!holding) continue;
@@ -211,11 +226,12 @@ export async function executeRebalance(
           continue;
         }
 
-        const quantityToSell = trade.amountIrr / price.priceIrr;
-        const newQuantity = holding.quantity - quantityToSell;
-        const netProceeds = trade.amountIrr * (1 - spread);
+        const quantityToSellDecimal = roundCrypto(divide(trade.amountIrr, price.priceIrr));
+        const newQuantityDecimal = subtract(holding.quantity, quantityToSellDecimal);
+        const newQuantity = toNumber(newQuantityDecimal);
+        const netProceedsDecimal = roundIrr(multiply(trade.amountIrr, subtract(1, spread)));
 
-        if (newQuantity < 0.00000001) {
+        if (isLessThan(newQuantityDecimal, 0.00000001)) {
           await tx.holding.delete({ where: { id: holding.id } });
           holdingsMap.delete(trade.assetId);
         } else {
@@ -226,20 +242,22 @@ export async function executeRebalance(
           holding.quantity = newQuantity;
         }
 
-        cashIrr += netProceeds;
+        cashIrr = toNumber(roundIrr(add(cashIrr, netProceedsDecimal)));
       } else {
         // BUY
         // Cash guard: ensure sufficient cash after spreads before deduction
-        if (cashIrr < trade.amountIrr) {
+        if (isLessThan(cashIrr, trade.amountIrr)) {
           throw new AppError('INSUFFICIENT_FUNDS', 'Insufficient cash after spreads', 400);
         }
 
-        const netAmount = trade.amountIrr * (1 - spread);
-        const quantityToBuy = netAmount / price.priceIrr;
+        const netAmountDecimal = roundIrr(multiply(trade.amountIrr, subtract(1, spread)));
+        const quantityToBuyDecimal = roundCrypto(divide(netAmountDecimal, price.priceIrr));
+        const quantityToBuy = toNumber(quantityToBuyDecimal);
         const holding = holdingsMap.get(trade.assetId);
 
         if (holding) {
-          const newQuantity = holding.quantity + quantityToBuy;
+          const newQuantityDecimal = add(holding.quantity, quantityToBuyDecimal);
+          const newQuantity = toNumber(newQuantityDecimal);
           await tx.holding.update({
             where: { id: holding.id },
             data: { quantity: newQuantity },
@@ -258,7 +276,7 @@ export async function executeRebalance(
           holdingsMap.set(trade.assetId, { id: newHolding.id, quantity: quantityToBuy, frozen: false });
         }
 
-        cashIrr -= trade.amountIrr;
+        cashIrr = toNumber(roundIrr(subtract(cashIrr, trade.amountIrr)));
       }
     }
 
@@ -315,6 +333,7 @@ export async function executeRebalance(
   };
 }
 
+// MONEY FIX M-02: Use Decimal arithmetic for holding partitioning
 function partitionHoldingsByLayer(
   snapshot: PortfolioSnapshot,
   prices: Map<AssetId, { priceIrr: number }>
@@ -325,43 +344,56 @@ function partitionHoldingsByLayer(
     UPSIDE: { frozen: [], unfrozen: [], totalValue: 0, frozenValue: 0, unfrozenValue: 0 },
   };
 
-  // Add cash to Foundation (cash is never frozen)
-  result.FOUNDATION.unfrozenValue += snapshot.cashIrr;
-  result.FOUNDATION.totalValue += snapshot.cashIrr;
+  // Track values as Decimals for accumulation
+  const layerTotals: Record<Layer, { frozen: Decimal; unfrozen: Decimal; total: Decimal }> = {
+    FOUNDATION: { frozen: toDecimal(0), unfrozen: toDecimal(snapshot.cashIrr), total: toDecimal(snapshot.cashIrr) },
+    GROWTH: { frozen: toDecimal(0), unfrozen: toDecimal(0), total: toDecimal(0) },
+    UPSIDE: { frozen: toDecimal(0), unfrozen: toDecimal(0), total: toDecimal(0) },
+  };
 
   for (const holding of snapshot.holdings) {
     const layer = holding.layer as Layer;
     const price = prices.get(holding.assetId as AssetId);
     if (!price) continue;
 
-    const valueIrr = holding.quantity * price.priceIrr;
+    const valueIrrDecimal = roundIrr(multiply(holding.quantity, price.priceIrr));
+    const valueIrr = toNumber(valueIrrDecimal);
     const item = { assetId: holding.assetId as AssetId, quantity: holding.quantity, valueIrr };
 
     if (holding.frozen) {
       result[layer].frozen.push(item);
-      result[layer].frozenValue += valueIrr;
+      layerTotals[layer].frozen = add(layerTotals[layer].frozen, valueIrrDecimal);
     } else {
       result[layer].unfrozen.push(item);
-      result[layer].unfrozenValue += valueIrr;
+      layerTotals[layer].unfrozen = add(layerTotals[layer].unfrozen, valueIrrDecimal);
     }
-    result[layer].totalValue += valueIrr;
+    layerTotals[layer].total = add(layerTotals[layer].total, valueIrrDecimal);
+  }
+
+  // Convert Decimals to numbers for result
+  for (const layer of ['FOUNDATION', 'GROWTH', 'UPSIDE'] as Layer[]) {
+    result[layer].frozenValue = toNumber(roundIrr(layerTotals[layer].frozen));
+    result[layer].unfrozenValue = toNumber(roundIrr(layerTotals[layer].unfrozen));
+    result[layer].totalValue = toNumber(roundIrr(layerTotals[layer].total));
   }
 
   return result;
 }
 
+// MONEY FIX M-02: Use Decimal arithmetic for gap analysis
 function calculateGapAnalysis(
   snapshot: PortfolioSnapshot,
   holdingsByLayer: Record<Layer, LayerHoldings>
 ): GapAnalysis[] {
-  const totalValue = snapshot.totalValueIrr;
+  const totalValueDecimal = toDecimal(snapshot.totalValueIrr);
   const layers: Layer[] = ['FOUNDATION', 'GROWTH', 'UPSIDE'];
 
   return layers.map((layer) => {
     const currentPct = snapshot.allocation[layer.toLowerCase() as keyof typeof snapshot.allocation];
     const targetPct = snapshot.targetAllocation[layer.toLowerCase() as keyof typeof snapshot.targetAllocation];
     const gap = targetPct - currentPct;
-    const gapIrr = (gap / 100) * totalValue;
+    const gapIrrDecimal = roundIrr(multiply(divide(gap, 100), totalValueDecimal));
+    const gapIrr = toNumber(gapIrrDecimal);
     const sellableIrr = holdingsByLayer[layer].unfrozenValue;
     const frozenIrr = holdingsByLayer[layer].frozenValue;
 
@@ -504,23 +536,25 @@ function selectAssetToBuy(
   return defaultAssets[layer];
 }
 
+// MONEY FIX M-02: Use Decimal arithmetic for after allocation calculation
 function calculateAfterAllocation(
   snapshot: PortfolioSnapshot,
   trades: RebalanceTrade[],
   prices: Map<AssetId, { priceIrr: number }>
 ): { foundation: number; growth: number; upside: number } {
-  // Start with current values
+  // Start with current values as Decimals
   const layerValues = {
-    FOUNDATION: snapshot.cashIrr,
-    GROWTH: 0,
-    UPSIDE: 0,
+    FOUNDATION: toDecimal(snapshot.cashIrr),
+    GROWTH: toDecimal(0),
+    UPSIDE: toDecimal(0),
   };
 
   // Add holdings values
   for (const holding of snapshot.holdings) {
     const price = prices.get(holding.assetId as AssetId);
     if (price) {
-      layerValues[holding.layer as Layer] += holding.quantity * price.priceIrr;
+      const valueDecimal = multiply(holding.quantity, price.priceIrr);
+      layerValues[holding.layer as Layer] = add(layerValues[holding.layer as Layer], valueDecimal);
     }
   }
 
@@ -528,24 +562,24 @@ function calculateAfterAllocation(
   for (const trade of trades) {
     const spread = SPREAD_BY_LAYER[trade.layer as Layer];
     if (trade.side === 'SELL') {
-      const netProceeds = trade.amountIrr * (1 - spread);
-      layerValues[trade.layer as Layer] -= trade.amountIrr;
+      const netProceedsDecimal = roundIrr(multiply(trade.amountIrr, subtract(1, spread)));
+      layerValues[trade.layer as Layer] = subtract(layerValues[trade.layer as Layer], trade.amountIrr);
       // Proceeds go to Foundation (cash)
-      layerValues.FOUNDATION += netProceeds;
+      layerValues.FOUNDATION = add(layerValues.FOUNDATION, netProceedsDecimal);
     } else {
-      const netAmount = trade.amountIrr * (1 - spread);
-      layerValues[trade.layer as Layer] += netAmount;
+      const netAmountDecimal = roundIrr(multiply(trade.amountIrr, subtract(1, spread)));
+      layerValues[trade.layer as Layer] = add(layerValues[trade.layer as Layer], netAmountDecimal);
       // Cash used from Foundation
-      layerValues.FOUNDATION -= trade.amountIrr;
+      layerValues.FOUNDATION = subtract(layerValues.FOUNDATION, trade.amountIrr);
     }
   }
 
-  const total = layerValues.FOUNDATION + layerValues.GROWTH + layerValues.UPSIDE;
+  const totalDecimal = add(layerValues.FOUNDATION, layerValues.GROWTH, layerValues.UPSIDE);
 
   return {
-    foundation: total > 0 ? (layerValues.FOUNDATION / total) * 100 : 0,
-    growth: total > 0 ? (layerValues.GROWTH / total) * 100 : 0,
-    upside: total > 0 ? (layerValues.UPSIDE / total) * 100 : 0,
+    foundation: isGreaterThan(totalDecimal, 0) ? toNumber(multiply(divide(layerValues.FOUNDATION, totalDecimal), 100)) : 0,
+    growth: isGreaterThan(totalDecimal, 0) ? toNumber(multiply(divide(layerValues.GROWTH, totalDecimal), 100)) : 0,
+    upside: isGreaterThan(totalDecimal, 0) ? toNumber(multiply(divide(layerValues.UPSIDE, totalDecimal), 100)) : 0,
   };
 }
 
