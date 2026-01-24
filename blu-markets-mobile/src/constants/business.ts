@@ -2,6 +2,7 @@
 // Based on PRD Section 25 - Configuration Constants
 
 import { Layer, TargetLayerPct } from '../types';
+import { API_BASE_URL as CONFIGURED_API_URL } from '../config/api';
 
 // Currency & Pricing
 export const DEFAULT_FX_RATE = 1_456_000; // IRR per USD
@@ -103,31 +104,20 @@ export const PRICE_MAX_BACKOFF_MS = 300_000; // 5 minutes
 export const PRICE_BACKOFF_MULTIPLIER = 1.5;
 export const PRICE_HEARTBEAT_MS = 5_000; // 5 seconds
 
-// API Configuration
-// In Codespaces, use the forwarded URL; locally use localhost
-const getApiBaseUrl = () => {
-  if (!__DEV__) return 'https://api.blumarkets.ir';
-
-  // Check if running in Codespaces (browser will have the codespace hostname)
-  // Note: window.location is undefined in React Native/Expo Go
-  if (typeof window !== 'undefined' && typeof window.location !== 'undefined' && window.location.hostname?.includes('github.dev')) {
-    // Replace port 8081 with 3000 in the current URL
-    return window.location.origin.replace('-8081.', '-3000.');
-  }
-  return 'http://localhost:3000';
-};
-
-export const API_BASE_URL = getApiBaseUrl();
+// API Configuration is now centralized in config/api.ts
+// Use CONFIGURED_API_URL from there for WebSocket derivation
 
 // WebSocket Configuration
 const getWebSocketUrl = () => {
   if (!__DEV__) return 'wss://api.blumarkets.ir/api/v1/prices/stream';
 
+  // Use the configured API URL from config/api.ts which includes EXPO_PUBLIC_API_URL
+  const apiUrl = CONFIGURED_API_URL;
+
   // Derive WebSocket URL from API_BASE_URL for proper Codespaces support
   // API_BASE_URL like: https://xxx-3000.app.github.dev/api/v1
   // Becomes: wss://xxx-3000.app.github.dev/api/v1/prices/stream
-  const apiUrl = API_BASE_URL;
-  if (apiUrl.includes('github.dev') || apiUrl.includes('codespaces')) {
+  if (apiUrl.includes('github.dev') || apiUrl.includes('codespaces') || apiUrl.includes('exp.direct')) {
     const wsUrl = apiUrl.replace('https://', 'wss://').replace('http://', 'ws://');
     return `${wsUrl}/prices/stream`;
   }

@@ -426,16 +426,48 @@ export async function getProtectionQuote(
   }
 
   // Get holding with portfolio
-  const holding = await prisma.holding.findUnique({
-    where: { id: holdingId },
-    include: {
+  // Handle both UUID holdingId and demo-prefixed IDs (e.g., "demo-ETH")
+  let holding;
+  const isDemoHoldingId = holdingId.startsWith('demo-');
+
+  if (isDemoHoldingId) {
+    // Extract assetId from demo holding ID (e.g., "demo-ETH" -> "ETH")
+    const extractedAssetId = holdingId.replace('demo-', '');
+
+    // Look up by portfolio + assetId
+    const portfolio = await prisma.portfolio.findUnique({
+      where: { userId },
+      include: {
+        holdings: { where: { assetId: extractedAssetId } },
+        protections: { where: { status: 'ACTIVE' } },
+      },
+    });
+
+    if (!portfolio || portfolio.holdings.length === 0) {
+      throw new AppError('NOT_FOUND', 'Holding not found', 404, { holdingId, assetId: extractedAssetId });
+    }
+
+    // Construct the holding object with the portfolio reference for compatibility
+    holding = {
+      ...portfolio.holdings[0],
       portfolio: {
-        include: {
-          protections: { where: { status: 'ACTIVE' } },
+        userId: portfolio.userId,
+        protections: portfolio.protections,
+      },
+    };
+  } else {
+    // Standard UUID lookup
+    holding = await prisma.holding.findUnique({
+      where: { id: holdingId },
+      include: {
+        portfolio: {
+          include: {
+            protections: { where: { status: 'ACTIVE' } },
+          },
         },
       },
-    },
-  });
+    });
+  }
 
   if (!holding) {
     throw new AppError('NOT_FOUND', 'Holding not found', 404, { holdingId });
@@ -609,11 +641,36 @@ export async function getPremiumCurve(
   // OPTIMIZATION: Fetch holding and prices once, then compute all durations in memory
   // This avoids redundant DB and price lookups for each duration variant
 
-  // Fetch holding once
-  const holding = await prisma.holding.findUnique({
-    where: { id: holdingId },
-    include: { portfolio: true },
-  });
+  // Fetch holding once - handle both UUID and demo-prefixed IDs
+  let holding;
+  const isDemoHoldingId = holdingId.startsWith('demo-');
+
+  if (isDemoHoldingId) {
+    // Extract assetId from demo holding ID (e.g., "demo-ETH" -> "ETH")
+    const extractedAssetId = holdingId.replace('demo-', '');
+
+    // Look up by portfolio + assetId
+    const portfolio = await prisma.portfolio.findUnique({
+      where: { userId },
+      include: {
+        holdings: { where: { assetId: extractedAssetId } },
+      },
+    });
+
+    if (!portfolio || portfolio.holdings.length === 0) {
+      throw new AppError('NOT_FOUND', 'Holding not found', 404, { holdingId, assetId: extractedAssetId });
+    }
+
+    holding = {
+      ...portfolio.holdings[0],
+      portfolio: { userId: portfolio.userId },
+    };
+  } else {
+    holding = await prisma.holding.findUnique({
+      where: { id: holdingId },
+      include: { portfolio: true },
+    });
+  }
 
   if (!holding) {
     throw new AppError('NOT_FOUND', 'Holding not found', 404, { holdingId });

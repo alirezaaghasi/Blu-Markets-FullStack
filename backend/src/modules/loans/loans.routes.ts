@@ -15,7 +15,12 @@ import {
 const createLoanSchema = z.object({
   collateralAssetId: z.string().min(1),
   amountIrr: z.number().min(1000000),
-  durationMonths: z.enum(['3', '6']).transform(Number) as unknown as z.ZodLiteral<3 | 6>,
+  // Accept both number and string, normalize to number
+  durationMonths: z.union([
+    z.literal(3),
+    z.literal(6),
+    z.enum(['3', '6']).transform(Number),
+  ]).transform((v) => Number(v) as 3 | 6),
 });
 
 const repaySchema = z.object({
@@ -166,7 +171,11 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         properties: {
           collateralAssetId: { type: 'string' },
           amountIrr: { type: 'number', minimum: 1000000 },
-          durationMonths: { type: 'number', enum: [3, 6] },
+          // Accept both number and string for durationMonths
+          durationMonths: { oneOf: [
+            { type: 'number', enum: [3, 6] },
+            { type: 'string', enum: ['3', '6'] },
+          ]},
         },
       },
     },

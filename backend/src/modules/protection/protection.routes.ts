@@ -38,8 +38,11 @@ import type { AssetId } from '../../types/domain.js';
 // SCHEMAS
 // ============================================================================
 
+// holdingId can be UUID or a prefixed ID like "demo-BTC" for development
+const holdingIdSchema = z.string().min(1);
+
 const getQuoteSchema = z.object({
-  holdingId: z.string().uuid(),
+  holdingId: holdingIdSchema,
   coveragePct: z.number().min(MIN_COVERAGE_PCT).max(MAX_COVERAGE_PCT).default(1.0),
   durationDays: z.number().refine((d) => DURATION_PRESETS.includes(d as any), {
     message: `Duration must be one of: ${DURATION_PRESETS.join(', ')}`,
@@ -47,13 +50,13 @@ const getQuoteSchema = z.object({
 });
 
 const getQuoteCurveSchema = z.object({
-  holdingId: z.string().uuid(),
+  holdingId: holdingIdSchema,
   coveragePct: z.number().min(MIN_COVERAGE_PCT).max(MAX_COVERAGE_PCT).default(1.0),
 });
 
 const purchaseSchema = z.object({
   quoteId: z.string().min(1),
-  holdingId: z.string().uuid(),
+  holdingId: holdingIdSchema,
   coveragePct: z.number().min(MIN_COVERAGE_PCT).max(MAX_COVERAGE_PCT),
   durationDays: z.number().refine((d) => DURATION_PRESETS.includes(d as any)),
   premiumIrr: z.number().min(0),
