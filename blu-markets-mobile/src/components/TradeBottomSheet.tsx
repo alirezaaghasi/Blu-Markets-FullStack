@@ -347,7 +347,7 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
             >
               <View style={styles.assetInfo}>
                 <View style={[styles.assetIcon, { backgroundColor: `${LAYER_COLORS[asset.layer]}20` }]}>
-                  <Text style={styles.assetIconText}>{asset.symbol.slice(0, 2)}</Text>
+                  <Text style={styles.assetIconText}>{asset.symbol}</Text>
                 </View>
                 <View>
                   <Text style={styles.assetName}>{asset.name}</Text>

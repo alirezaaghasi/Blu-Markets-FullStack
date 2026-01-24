@@ -84,13 +84,13 @@ export function ProtectionTab({ protectionId }: ProtectionTabProps) {
         </>
       )}
 
-      {/* Eligible Assets */}
+      {/* Eligible Assets - filter out zero-balance holdings */}
       <Text style={[styles.sectionTitle, hasProtections && { marginTop: SPACING[6] }]}>
         Protect Your Assets
       </Text>
-      {eligibleAssets.length > 0 ? (
+      {eligibleAssets.filter(a => (a.quantity ?? 0) > 0).length > 0 ? (
         <EligibleAssetsGrid
-          assets={eligibleAssets}
+          assets={eligibleAssets.filter(a => (a.quantity ?? 0) > 0)}
           onProtect={(assetId) => purchaseProtection(assetId, 3)}
         />
       ) : (
@@ -137,7 +137,7 @@ function ProtectionCard({
     <View style={[styles.protectionCard, highlighted && styles.protectionCardHighlighted]}>
       <View style={styles.protectionHeader}>
         <View style={styles.protectionAsset}>
-          <Text style={styles.protectionAssetIcon}>{asset?.symbol?.slice(0, 2) || '?'}</Text>
+          <Text style={styles.protectionAssetIcon}>{asset?.symbol || protection.assetId}</Text>
           <View>
             <Text style={styles.protectionAssetName}>{asset?.name || protection.assetId}</Text>
             <Text style={styles.protectionAssetSymbol}>{protection.assetId}</Text>
@@ -213,7 +213,7 @@ function EligibleAssetsGrid({
         const premiumIrr = item.indicativePremium?.thirtyDayIrr ?? 0;
         return (
           <View key={item.assetId} style={styles.eligibleCard}>
-            <Text style={styles.eligibleIcon}>{asset?.symbol?.slice(0, 2) || '?'}</Text>
+            <Text style={styles.eligibleIcon}>{asset?.symbol || item.assetId}</Text>
             <Text style={styles.eligibleName}>{asset?.name || item.assetId}</Text>
             <Text style={styles.eligibleQuantity}>
               {quantity.toFixed(4)} {asset?.symbol}

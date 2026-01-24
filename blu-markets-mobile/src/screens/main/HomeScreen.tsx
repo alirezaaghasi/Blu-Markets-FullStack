@@ -165,18 +165,26 @@ const StatusBadge: React.FC<{ status: PortfolioStatus }> = ({ status }) => {
 
 /**
  * Price Feed Status Indicator
+ * Shows "Last updated: HH:MM" with yellow dot if stale (>5min), "Connecting..." if never fetched
  */
-const PriceFeedStatus: React.FC<{ isConnected: boolean; lastUpdate?: Date }> = ({ isConnected, lastUpdate }) => {
+const PriceFeedStatus: React.FC<{ lastUpdate?: Date }> = ({ lastUpdate }) => {
+  const now = new Date();
+  const isStale = lastUpdate ? (now.getTime() - lastUpdate.getTime()) > 5 * 60 * 1000 : true;
+  const neverFetched = !lastUpdate;
+
   const timeString = lastUpdate
     ? lastUpdate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-    : '--:--';
+    : null;
+
+  const dotColor = neverFetched ? '#fde047' : isStale ? '#fde047' : '#4ade80';
+  const statusText = neverFetched
+    ? 'Connecting...'
+    : `Last updated: ${timeString}`;
 
   return (
     <View style={styles.priceFeedContainer}>
-      <View style={[styles.priceFeedDot, { backgroundColor: isConnected ? '#4ade80' : '#f87171' }]} />
-      <Text style={styles.priceFeedText}>
-        {isConnected ? 'Live prices' : 'Offline'} · {timeString}
-      </Text>
+      <View style={[styles.priceFeedDot, { backgroundColor: dotColor }]} />
+      <Text style={styles.priceFeedText}>{statusText}</Text>
     </View>
   );
 };
@@ -506,10 +514,7 @@ const HomeScreen: React.FC = () => {
           </TouchableOpacity>
 
           {/* Price Feed Status */}
-          <PriceFeedStatus
-            isConnected={priceConnected}
-            lastUpdate={priceLastUpdate}
-          />
+          <PriceFeedStatus lastUpdate={priceLastUpdate} />
         </View>
 
         {/* ================================================================ */}

@@ -282,7 +282,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
                         ]}
                       >
                         <Text style={styles.assetIconText}>
-                          {asset.symbol.slice(0, 2)}
+                          {asset.symbol}
                         </Text>
                       </View>
                       <View>

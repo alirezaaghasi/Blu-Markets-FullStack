@@ -103,7 +103,7 @@ export function LoansTab({ loanId }: LoansTabProps) {
             <View style={styles.stepContent}>
               <Text style={styles.stepTitle}>Get Instant IRR</Text>
               <Text style={styles.stepDescription}>
-                Receive up to 50% of your collateral value as an IRR loan
+                Receive up to 70% of your collateral value as an IRR loan
               </Text>
             </View>
           </View>

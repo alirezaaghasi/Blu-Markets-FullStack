@@ -125,7 +125,7 @@ export const ConfirmTradeModal: React.FC<ConfirmTradeModalProps> = ({
                   {/* Asset Info */}
                   <View style={styles.assetRow}>
                     <View style={[styles.assetIcon, { backgroundColor: `${COLORS.layers[asset.layer.toLowerCase() as 'foundation' | 'growth' | 'upside']}20` }]}>
-                      <Text style={styles.assetIconText}>{asset.symbol.slice(0, 2)}</Text>
+                      <Text style={styles.assetIconText}>{asset.symbol}</Text>
                     </View>
                     <View style={styles.assetInfo}>
                       <Text style={styles.assetName}>{asset.name}</Text>

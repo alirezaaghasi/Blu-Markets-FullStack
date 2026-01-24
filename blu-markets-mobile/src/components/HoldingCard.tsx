@@ -5,13 +5,14 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../constants/theme';
 import { Holding, AssetId } from '../types';
 import { ASSETS, LAYER_COLORS } from '../constants/assets';
-import { FIXED_INCOME_UNIT_PRICE } from '../constants/business';
+import { calculateFixedIncomeValue, FixedIncomeBreakdown } from '../utils/fixedIncome';
 
 interface HoldingCardProps {
   holding: Holding;
   priceUSD: number;
   fxRate: number;
   change24h?: number;
+  purchasedAt?: string | Date;  // For Fixed Income accrued interest calculation
   onPress?: () => void;
 }
 
@@ -48,12 +49,20 @@ export const HoldingCard: React.FC<HoldingCardProps> = ({
   priceUSD,
   fxRate,
   change24h,
+  purchasedAt,
   onPress,
 }) => {
   const asset = ASSETS[holding.assetId];
-  // Fixed Income uses fixed IRR price, not USD conversion
-  const valueIRR = holding.assetId === 'IRR_FIXED_INCOME'
-    ? holding.quantity * FIXED_INCOME_UNIT_PRICE
+  const isFixedIncome = holding.assetId === 'IRR_FIXED_INCOME';
+
+  // Calculate Fixed Income breakdown with accrued interest
+  const fixedIncomeBreakdown: FixedIncomeBreakdown | null = isFixedIncome
+    ? calculateFixedIncomeValue(holding.quantity, purchasedAt)
+    : null;
+
+  // Fixed Income uses calculated total (principal + accrued), others use USD conversion
+  const valueIRR = isFixedIncome
+    ? (fixedIncomeBreakdown?.total || 0)
     : holding.quantity * priceUSD * fxRate;
 
   return (
@@ -71,7 +80,7 @@ export const HoldingCard: React.FC<HoldingCardProps> = ({
             { backgroundColor: `${LAYER_COLORS[asset.layer]}20` },
           ]}
         >
-          <Text style={styles.iconText}>{asset.symbol.slice(0, 2)}</Text>
+          <Text style={styles.iconText}>{asset.symbol}</Text>
         </View>
 
         {/* Asset info */}
@@ -94,22 +103,33 @@ export const HoldingCard: React.FC<HoldingCardProps> = ({
       <View style={styles.rightSection}>
         <Text style={styles.valueIRR}>{formatNumber(valueIRR)} IRR</Text>
         <View style={styles.valueRow}>
-          {holding.assetId === 'IRR_FIXED_INCOME' ? (
-            <Text style={styles.valueUSD}>Fixed Income</Text>
+          {isFixedIncome && fixedIncomeBreakdown ? (
+            <View style={styles.fixedIncomeDetails}>
+              <Text style={styles.fixedIncomePrincipal}>
+                {formatNumber(fixedIncomeBreakdown.principal)} principal
+              </Text>
+              {fixedIncomeBreakdown.daysHeld > 0 && (
+                <Text style={styles.fixedIncomeAccrued}>
+                  + {formatNumber(fixedIncomeBreakdown.accrued)} accrued ({fixedIncomeBreakdown.daysHeld}d)
+                </Text>
+              )}
+            </View>
           ) : (
-            <Text style={styles.valueUSD}>
-              ${formatNumber(holding.quantity * priceUSD)}
-            </Text>
-          )}
-          {change24h !== undefined ? (
-            <Text style={[
-              styles.changeText,
-              change24h >= 0 ? styles.changePositive : styles.changeNegative,
-            ]}>
-              {change24h >= 0 ? '+' : ''}{change24h.toFixed(1)}%
-            </Text>
-          ) : (
-            <Text style={styles.changeNeutral}>--</Text>
+            <>
+              <Text style={styles.valueUSD}>
+                ${formatNumber(holding.quantity * priceUSD)}
+              </Text>
+              {change24h !== undefined ? (
+                <Text style={[
+                  styles.changeText,
+                  change24h >= 0 ? styles.changePositive : styles.changeNegative,
+                ]}>
+                  {change24h >= 0 ? '+' : ''}{change24h.toFixed(1)}%
+                </Text>
+              ) : (
+                <Text style={styles.changeNeutral}>--</Text>
+              )}
+            </>
           )}
         </View>
       </View>
@@ -198,6 +218,19 @@ const styles = StyleSheet.create({
   changeNeutral: {
     fontSize: typography.fontSize.sm,
     color: colors.textSecondary,
+  },
+  // Fixed Income breakdown styles
+  fixedIncomeDetails: {
+    alignItems: 'flex-end',
+  },
+  fixedIncomePrincipal: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textSecondary,
+  },
+  fixedIncomeAccrued: {
+    fontSize: typography.fontSize.xs,
+    color: colors.success,
+    marginTop: 1,
   },
 });
 

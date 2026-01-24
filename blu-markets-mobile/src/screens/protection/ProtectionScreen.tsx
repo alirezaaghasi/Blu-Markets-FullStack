@@ -207,7 +207,7 @@ const ProtectionScreen: React.FC = () => {
                         ]}
                       >
                         <Text style={styles.assetIconText}>
-                          {asset?.symbol?.slice(0, 2) || protection.assetId.slice(0, 2)}
+                          {asset?.symbol || protection.assetId}
                         </Text>
                       </View>
                       <View>
@@ -295,7 +295,7 @@ const ProtectionScreen: React.FC = () => {
                       ]}
                     >
                       <Text style={styles.assetIconText}>
-                        {asset.symbol.slice(0, 2)}
+                        {asset.symbol}
                       </Text>
                     </View>
                     <View>

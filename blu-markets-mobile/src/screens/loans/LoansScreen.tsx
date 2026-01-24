@@ -208,7 +208,7 @@ const LoansScreen: React.FC = () => {
                         ]}
                       >
                         <Text style={styles.assetIconText}>
-                          {asset.symbol.slice(0, 2)}
+                          {asset.symbol}
                         </Text>
                       </View>
                       <View>

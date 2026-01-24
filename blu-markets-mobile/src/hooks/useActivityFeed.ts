@@ -56,7 +56,14 @@ export function useActivityFeed(initialLimit = 10): UseActivityFeedResult {
       setError(null);
 
       const response = await activity.getRecent(initialLimit);
-      setActivities(response?.activities || []);
+      // Map backend field names to frontend expected names (fallback for any field mismatches)
+      const mappedActivities = (response?.activities || []).map((a: any) => ({
+        ...a,
+        type: a.type || a.actionType,           // Support both field names
+        timestamp: a.timestamp || a.createdAt,  // Support both field names
+        amountIRR: a.amountIRR ?? a.amountIrr,  // Support both field names
+      }));
+      setActivities(mappedActivities);
       setHasMore(response?.hasMore || false);
       setCursor(response?.nextCursor);
     } catch (err) {
@@ -74,7 +81,14 @@ export function useActivityFeed(initialLimit = 10): UseActivityFeedResult {
 
     try {
       const response = await activity.getAll(cursor);
-      setActivities((prev) => [...prev, ...response.activities]);
+      // Map backend field names to frontend expected names
+      const mappedActivities = (response?.activities || []).map((a: any) => ({
+        ...a,
+        type: a.type || a.actionType,
+        timestamp: a.timestamp || a.createdAt,
+        amountIRR: a.amountIRR ?? a.amountIrr,
+      }));
+      setActivities((prev) => [...prev, ...mappedActivities]);
       setHasMore(response.hasMore);
       setCursor(response.nextCursor);
     } catch (err) {

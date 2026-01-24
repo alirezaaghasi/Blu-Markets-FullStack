@@ -156,12 +156,12 @@ export const historyRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
       const hasMore = actions.length > limit;
       const activities = actions.slice(0, limit).map((a) => ({
         id: String(a.id),
-        actionType: a.actionType,
+        type: a.actionType,           // Map actionType → type for frontend
         boundary: a.boundary,
         message: a.message,
-        amountIrr: a.amountIrr ? Number(a.amountIrr) : undefined,
+        amountIRR: a.amountIrr ? Number(a.amountIrr) : undefined,  // Map amountIrr → amountIRR
         assetId: a.assetId,
-        createdAt: a.createdAt.toISOString(),
+        timestamp: a.createdAt.toISOString(),  // Map createdAt → timestamp for frontend
       }));
 
       return {
@@ -211,12 +211,12 @@ export const historyRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
       const hasMore = actions.length > limit;
       const activities = actions.slice(0, limit).map((a) => ({
         id: String(a.id),
-        actionType: a.actionType,
+        type: a.actionType,           // Map actionType → type for frontend
         boundary: a.boundary,
         message: a.message,
-        amountIrr: a.amountIrr ? Number(a.amountIrr) : undefined,
+        amountIRR: a.amountIrr ? Number(a.amountIrr) : undefined,  // Map amountIrr → amountIRR
         assetId: a.assetId,
-        createdAt: a.createdAt.toISOString(),
+        timestamp: a.createdAt.toISOString(),  // Map createdAt → timestamp for frontend
       }));
 
       return {
