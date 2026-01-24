@@ -1,26 +1,26 @@
 {
-  "name": "blu-markets-agent-simulation-v3",
-  "version": "3.0.0",
-  "description": "Generative Agent Simulation for Blu Markets - a16z AI Market Research Framework",
-  "main": "test.js",
+  "name": "blu-markets-simulation-v4",
+  "version": "4.0.0",
+  "description": "Generative Agent Simulation for Blu Markets using a16z AI Market Research Framework",
+  "main": "simulate.js",
   "scripts": {
-    "test": "node test.js",
-    "trust": "node test.js trust",
-    "pricing": "node test.js pricing",
-    "shutdown": "node test.js shutdown",
-    "first-session": "node test.js first-session",
-    "gold": "node test.js gold",
-    "all": "node test.js all"
+    "cross-sell": "node simulate.js cross-sell",
+    "value-prop": "node simulate.js value-prop",
+    "premium": "node simulate.js premium",
+    "gold": "node simulate.js gold",
+    "cold-trust": "node simulate.js cold-trust",
+    "all": "node simulate.js all"
   },
   "keywords": [
-    "ai-testing",
     "generative-agents",
+    "user-research",
     "a16z",
+    "simulation",
     "fintech",
-    "user-research"
+    "iran"
   ],
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
+    "@anthropic-ai/sdk": "^0.27.0",
     "dotenv": "^17.2.3"
   }
 }
