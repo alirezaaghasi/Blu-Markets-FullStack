@@ -83,6 +83,7 @@ export interface PortfolioSummary {
   holdingsCount: number;
   activeLoansCount: number;
   activeProtectionsCount: number;
+  holdings: HoldingResponse[];
 }
 
 export interface HoldingResponse {

@@ -98,6 +98,29 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
   // Determine status
   const status = determineStatus(driftPct, allocation);
 
+  // Build holdings response with values
+  const holdingsResponse: HoldingResponse[] = portfolio.holdings.map((h) => {
+    const assetId = h.assetId as AssetId;
+    const price = prices.get(assetId);
+    const quantity = Number(h.quantity);
+    const valueIrr = price ? quantity * price.priceIrr : 0;
+    const valueUsd = price ? quantity * price.priceUsd : 0;
+
+    return {
+      assetId,
+      name: ASSET_NAMES[assetId] || assetId,
+      quantity,
+      layer: h.layer as Layer,
+      frozen: h.frozen,
+      valueIrr,
+      valueUsd,
+      priceIrr: price?.priceIrr || 0,
+      priceUsd: price?.priceUsd || 0,
+      change24hPct: price?.change24hPct || 0,
+      pctOfPortfolio: totalValueIrr > 0 ? (valueIrr / totalValueIrr) * 100 : 0,
+    };
+  });
+
   return {
     id: portfolio.id,
     cashIrr,
@@ -110,6 +133,7 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
     holdingsCount: portfolio.holdings.length,
     activeLoansCount: portfolio.loans.length,
     activeProtectionsCount: portfolio.protections.length,
+    holdings: holdingsResponse,
   };
 }
 

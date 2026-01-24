@@ -11,7 +11,7 @@
  * - What requires my attention?
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -394,6 +394,36 @@ const HomeScreen: React.FC = () => {
       setIsRefreshing(false);
     }
   }, [dispatch, refreshActivities, isDemoMode]);
+
+  // Fetch portfolio from backend on mount (not in demo mode)
+  useEffect(() => {
+    if (isDemoMode) return;
+
+    const fetchData = async () => {
+      try {
+        const [portfolioResponse] = await Promise.all([
+          portfolioApi.get(),
+          dispatch(fetchPrices()),
+          dispatch(fetchFxRate()),
+        ]);
+
+        dispatch(updateCash(portfolioResponse.cashIrr));
+        dispatch(setStatus(portfolioResponse.status));
+        dispatch(setTargetLayerPct(portfolioResponse.targetAllocation));
+        if (portfolioResponse.holdings) {
+          dispatch(setHoldings(portfolioResponse.holdings.map((h: Holding) => ({
+            assetId: h.assetId,
+            quantity: h.quantity,
+            frozen: h.frozen,
+            layer: h.layer,
+          }))));
+        }
+      } catch (error) {
+        console.error('Failed to fetch portfolio on mount:', error);
+      }
+    };
+    fetchData();
+  }, [dispatch, isDemoMode]);
 
   // ==========================================================================
   // RENDER

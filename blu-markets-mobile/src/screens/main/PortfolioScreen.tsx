@@ -83,6 +83,35 @@ const PortfolioScreen: React.FC = () => {
     setExpandedLayers((prev) => ({ ...prev, [layer]: !prev[layer] }));
   };
 
+  // Fetch portfolio from backend on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [portfolioResponse] = await Promise.all([
+          portfolioApi.get(),
+          dispatch(fetchPrices()),
+          dispatch(fetchFxRate()),
+        ]);
+
+        // Sync backend data to Redux
+        dispatch(updateCash(portfolioResponse.cashIrr));
+        dispatch(setStatus(portfolioResponse.status));
+        dispatch(setTargetLayerPct(portfolioResponse.targetAllocation));
+        if (portfolioResponse.holdings) {
+          dispatch(setHoldings(portfolioResponse.holdings.map((h: Holding) => ({
+            assetId: h.assetId,
+            quantity: h.quantity,
+            frozen: h.frozen,
+            layer: h.layer,
+          }))));
+        }
+      } catch (error) {
+        console.error('Failed to fetch portfolio:', error);
+      }
+    };
+    fetchData();
+  }, [dispatch]);
+
   const onRefresh = async () => {
     setRefreshing(true);
     try {
