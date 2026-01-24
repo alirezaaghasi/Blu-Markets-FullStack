@@ -60,9 +60,14 @@ export async function sendOtp(phone: string): Promise<{ expiresIn: number }> {
 }
 
 export async function verifyOtp(phone: string, code: string): Promise<boolean> {
-  // Development bypass: allow 999999 for any phone in development
-  if (env.NODE_ENV === 'development' && code === '999999') {
-    console.log(`📱 OTP bypass used for ${phone}`);
+  // SECURITY FIX L-02: OTP bypass requires EXPLICIT feature flag AND development mode
+  // This prevents accidental bypass in production if NODE_ENV is misconfigured
+  const isDevBypassAllowed =
+    env.ALLOW_OTP_BYPASS === 'true' &&
+    env.NODE_ENV === 'development';
+
+  if (isDevBypassAllowed && code === '999999') {
+    console.warn(`⚠️ OTP bypass used for ${phone} - dev only`);
     return true;
   }
 

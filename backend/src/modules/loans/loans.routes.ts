@@ -173,78 +173,106 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     handler: async (request, reply) => {
       const { collateralAssetId, amountIrr, durationMonths } = request.body;
 
-      const portfolio = await prisma.portfolio.findUnique({
+      // Basic portfolio validation outside transaction (non-critical)
+      const portfolioCheck = await prisma.portfolio.findUnique({
         where: { userId: request.userId },
-        include: {
-          holdings: true,
-          loans: { where: { status: 'ACTIVE' } },
-        },
       });
 
-      if (!portfolio) {
+      if (!portfolioCheck) {
         throw new AppError('NOT_FOUND', 'Portfolio not found', 404);
       }
 
-      // Find holding
-      const holding = portfolio.holdings.find((h) => h.assetId === collateralAssetId);
-      if (!holding) {
-        throw new AppError('NOT_FOUND', 'Holding not found', 404);
-      }
-
-      if (holding.frozen) {
-        throw new AppError('ASSET_FROZEN', 'Asset is already used as collateral', 400);
-      }
-
-      // Get price
-      const prices = await getCurrentPrices();
-      const price = prices.get(collateralAssetId as AssetId);
-      if (!price) {
-        throw new AppError('VALIDATION_ERROR', 'Price not available', 400);
-      }
-
-      const collateralValueIrr = Number(holding.quantity) * price.priceIrr;
-      const layer = getAssetLayer(collateralAssetId as AssetId);
-      const maxLtv = LTV_BY_LAYER[layer];
-      const maxLoanIrr = collateralValueIrr * maxLtv;
-
-      if (amountIrr > maxLoanIrr) {
-        throw new AppError(
-          'EXCEEDS_ASSET_LTV',
-          `Maximum loan for this asset is ${Math.floor(maxLoanIrr).toLocaleString()} IRR`,
-          400
-        );
-      }
-
-      // Calculate portfolio total value and enforce 25% portfolio limit
-      let totalValueIrr = Number(portfolio.cashIrr);
-      for (const h of portfolio.holdings) {
-        const priceData = prices.get(h.assetId as AssetId);
-        if (priceData) totalValueIrr += Number(h.quantity) * priceData.priceIrr;
-      }
-
-      const maxPortfolioLoanIrr = totalValueIrr * PORTFOLIO_LOAN_LIMIT;
-      const currentLoansIrr = portfolio.loans.reduce((sum, loan) => sum + Number(loan.principalIrr), 0);
-
-      if (currentLoansIrr + amountIrr > maxPortfolioLoanIrr) {
-        throw new AppError(
-          'EXCEEDS_PORTFOLIO_LIMIT',
-          `Portfolio loan limit exceeded. Maximum available: ${Math.floor(maxPortfolioLoanIrr - currentLoansIrr).toLocaleString()} IRR`,
-          400
-        );
-      }
-
-      // Calculate interest (simple interest per PRD)
-      const annualInterest = amountIrr * INTEREST_RATE;
-      const totalInterestIrr = (annualInterest * durationMonths) / 12;
-      const totalDueIrr = amountIrr + totalInterestIrr;
-
-      const startDate = new Date();
-      const dueDate = new Date(startDate);
-      dueDate.setMonth(dueDate.getMonth() + durationMonths);
-
-      // Create loan with installments
+      // SECURITY FIX H-02: All critical validations moved INSIDE transaction
+      // to prevent race conditions where concurrent requests could both see
+      // frozen=false and collateralize the same asset twice
       const result = await prisma.$transaction(async (tx) => {
-        // Freeze holding
+        // Lock the holding row with FOR UPDATE to prevent concurrent modifications
+        const holdings = await tx.$queryRaw<Array<{
+          id: string;
+          portfolio_id: string;
+          asset_id: string;
+          quantity: any;
+          frozen: boolean;
+          layer: string;
+        }>>`
+          SELECT id, portfolio_id, asset_id, quantity, frozen, layer
+          FROM holdings
+          WHERE portfolio_id = ${portfolioCheck.id} AND asset_id = ${collateralAssetId}
+          FOR UPDATE
+        `;
+
+        const holding = holdings[0];
+        if (!holding) {
+          throw new AppError('NOT_FOUND', 'Holding not found', 404);
+        }
+
+        // CRITICAL: Check frozen status inside transaction after acquiring lock
+        if (holding.frozen) {
+          throw new AppError('ASSET_FROZEN', 'Asset is already used as collateral', 400);
+        }
+
+        // Re-fetch current price inside transaction
+        const prices = await getCurrentPrices();
+        const price = prices.get(collateralAssetId as AssetId);
+        if (!price) {
+          throw new AppError('VALIDATION_ERROR', 'Price not available', 400);
+        }
+
+        const collateralValueIrr = Number(holding.quantity) * price.priceIrr;
+        const layer = getAssetLayer(collateralAssetId as AssetId);
+        const maxLtv = LTV_BY_LAYER[layer];
+        const maxLoanIrr = collateralValueIrr * maxLtv;
+
+        // Re-validate LTV with fresh data inside transaction
+        if (amountIrr > maxLoanIrr) {
+          throw new AppError(
+            'EXCEEDS_ASSET_LTV',
+            `Maximum loan for this asset is ${Math.floor(maxLoanIrr).toLocaleString()} IRR`,
+            400
+          );
+        }
+
+        // Fetch portfolio with loans inside transaction for accurate limits
+        const portfolio = await tx.portfolio.findUnique({
+          where: { id: portfolioCheck.id },
+          include: {
+            holdings: true,
+            loans: { where: { status: 'ACTIVE' } },
+          },
+        });
+
+        if (!portfolio) {
+          throw new AppError('NOT_FOUND', 'Portfolio not found', 404);
+        }
+
+        // Calculate portfolio total value with fresh prices
+        let totalValueIrr = Number(portfolio.cashIrr);
+        for (const h of portfolio.holdings) {
+          const priceData = prices.get(h.assetId as AssetId);
+          if (priceData) totalValueIrr += Number(h.quantity) * priceData.priceIrr;
+        }
+
+        const maxPortfolioLoanIrr = totalValueIrr * PORTFOLIO_LOAN_LIMIT;
+        const currentLoansIrr = portfolio.loans.reduce((sum, loan) => sum + Number(loan.principalIrr), 0);
+
+        if (currentLoansIrr + amountIrr > maxPortfolioLoanIrr) {
+          throw new AppError(
+            'EXCEEDS_PORTFOLIO_LIMIT',
+            `Portfolio loan limit exceeded. Maximum available: ${Math.floor(maxPortfolioLoanIrr - currentLoansIrr).toLocaleString()} IRR`,
+            400
+          );
+        }
+
+        // Calculate interest (simple interest per PRD)
+        const annualInterest = amountIrr * INTEREST_RATE;
+        const totalInterestIrr = (annualInterest * durationMonths) / 12;
+        const totalDueIrr = amountIrr + totalInterestIrr;
+
+        const startDate = new Date();
+        const dueDate = new Date(startDate);
+        dueDate.setMonth(dueDate.getMonth() + durationMonths);
+
+        // Now safe to freeze - we hold the lock
         await tx.holding.update({
           where: { id: holding.id },
           data: { frozen: true },
@@ -393,40 +421,75 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     },
     handler: async (request, reply) => {
       const { amountIrr } = repaySchema.parse(request.body);
+      const loanId = request.params.id;
 
-      const loan = await prisma.loan.findUnique({
-        where: { id: request.params.id },
-        include: {
-          installments: { orderBy: { number: 'asc' } },
-          portfolio: true,
-        },
+      // Basic ownership check outside transaction
+      const loanCheck = await prisma.loan.findUnique({
+        where: { id: loanId },
+        include: { portfolio: true },
       });
 
-      if (!loan || loan.portfolio.userId !== request.userId) {
+      if (!loanCheck || loanCheck.portfolio.userId !== request.userId) {
         throw new AppError('NOT_FOUND', 'Loan not found', 404);
       }
 
-      if (loan.status !== 'ACTIVE') {
-        throw new AppError('VALIDATION_ERROR', 'Loan is not active', 400);
-      }
-
-      if (amountIrr > Number(loan.portfolio.cashIrr)) {
-        throw new AppError('INSUFFICIENT_CASH', 'Not enough cash balance', 400);
-      }
-
-      const remainingDue = Number(loan.totalDueIrr) - Number(loan.paidIrr);
-      const amountToApply = Math.min(amountIrr, remainingDue);
-
+      // SECURITY FIX M-01: All critical operations inside transaction
+      // to prevent concurrent repayments from using stale data
       const result = await prisma.$transaction(async (tx) => {
+        // Lock loan row with FOR UPDATE to prevent concurrent modifications
+        const loans = await tx.$queryRaw<Array<{
+          id: string;
+          portfolio_id: string;
+          collateral_asset_id: string;
+          total_due_irr: any;
+          paid_irr: any;
+          status: string;
+        }>>`
+          SELECT id, portfolio_id, collateral_asset_id, total_due_irr, paid_irr, status
+          FROM loans
+          WHERE id = ${loanId}
+          FOR UPDATE
+        `;
+
+        const loan = loans[0];
+        if (!loan) {
+          throw new AppError('NOT_FOUND', 'Loan not found', 404);
+        }
+
+        if (loan.status !== 'ACTIVE') {
+          throw new AppError('VALIDATION_ERROR', 'Loan is not active', 400);
+        }
+
+        // Fetch installments inside transaction
+        const installments = await tx.loanInstallment.findMany({
+          where: { loanId: loan.id },
+          orderBy: { number: 'asc' },
+        });
+
+        // Check cash balance inside transaction
+        const portfolio = await tx.portfolio.findUnique({
+          where: { id: loan.portfolio_id },
+        });
+
+        if (!portfolio || amountIrr > Number(portfolio.cashIrr)) {
+          throw new AppError('INSUFFICIENT_CASH', 'Not enough cash balance', 400);
+        }
+
+        // Calculate with fresh data from locked row
+        const totalDueIrr = Number(loan.total_due_irr);
+        const currentPaidIrr = Number(loan.paid_irr);
+        const remainingDue = totalDueIrr - currentPaidIrr;
+        const amountToApply = Math.min(amountIrr, remainingDue);
+
         // Deduct from cash
         await tx.portfolio.update({
-          where: { id: loan.portfolioId },
+          where: { id: loan.portfolio_id },
           data: { cashIrr: { decrement: amountToApply } },
         });
 
-        // Update loan
-        const newPaidIrr = Number(loan.paidIrr) + amountToApply;
-        const isFullySettled = newPaidIrr >= Number(loan.totalDueIrr);
+        // Update loan with fresh calculations
+        const newPaidIrr = currentPaidIrr + amountToApply;
+        const isFullySettled = newPaidIrr >= totalDueIrr;
 
         await tx.loan.update({
           where: { id: loan.id },
@@ -440,7 +503,7 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         let remainingPayment = amountToApply;
         let installmentsPaid = 0;
 
-        for (const inst of loan.installments) {
+        for (const inst of installments) {
           if (remainingPayment <= 0) break;
           if (inst.status === 'PAID') continue;
 
@@ -476,8 +539,8 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         if (isFullySettled) {
           await tx.holding.updateMany({
             where: {
-              portfolioId: loan.portfolioId,
-              assetId: loan.collateralAssetId,
+              portfolioId: loan.portfolio_id,
+              assetId: loan.collateral_asset_id,
               frozen: true,
             },
             data: { frozen: false },
@@ -487,9 +550,9 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         // Create ledger entry
         await tx.ledgerEntry.create({
           data: {
-            portfolioId: loan.portfolioId,
+            portfolioId: loan.portfolio_id,
             entryType: 'LOAN_REPAY',
-            beforeSnapshot: { paidIrr: Number(loan.paidIrr) },
+            beforeSnapshot: { paidIrr: currentPaidIrr },
             afterSnapshot: { paidIrr: newPaidIrr },
             amountIrr: amountToApply,
             loanId: loan.id,

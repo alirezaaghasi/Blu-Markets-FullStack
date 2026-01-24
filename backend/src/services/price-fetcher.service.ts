@@ -1,7 +1,77 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { env } from '../config/env.js';
 import { FALLBACK_FX_RATE, type AssetId } from '../types/domain.js';
 import { priceBroadcaster } from './price-broadcaster.service.js';
+
+// =============================================================================
+// SECURITY FIX M-03: Fetch utilities with timeout and retry
+// =============================================================================
+
+const DEFAULT_TIMEOUT_MS = 5000; // 5 seconds
+const MAX_RETRIES = 3;
+
+/**
+ * Fetch with timeout using AbortController
+ */
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
+ * Fetch with retry and exponential backoff
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit = {},
+  maxRetries: number = MAX_RETRIES,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS
+): Promise<Response> {
+  let lastError: Error = new Error('Unknown error');
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fetchWithTimeout(url, options, timeoutMs);
+    } catch (error) {
+      lastError = error as Error;
+      if ((error as Error).name === 'AbortError') {
+        console.warn(`Request timeout for ${url}, attempt ${attempt + 1}/${maxRetries}`);
+      } else {
+        console.warn(`Request failed for ${url}, attempt ${attempt + 1}/${maxRetries}:`, (error as Error).message);
+      }
+
+      // Don't wait after the last attempt
+      if (attempt < maxRetries - 1) {
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = Math.pow(2, attempt) * 1000;
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+/**
+ * Check if a price is stale (older than maxAgeMinutes)
+ */
+export function isPriceStale(fetchedAt: Date, maxAgeMinutes: number = 5): boolean {
+  const ageMs = Date.now() - fetchedAt.getTime();
+  return ageMs > maxAgeMinutes * 60 * 1000;
+}
+
+// =============================================================================
 
 // Price cache configuration
 const PRICE_CACHE_TTL_MS = 5000; // 5 seconds cache
@@ -61,7 +131,8 @@ interface FxRate {
 // Fetch USD/IRR rate from Bonbast
 export async function fetchFxRate(): Promise<FxRate> {
   try {
-    const response = await fetch('https://bonbast.amirhn.com/latest', {
+    // SECURITY FIX M-03: Use fetch with timeout and retry
+    const response = await fetchWithRetry('https://bonbast.amirhn.com/latest', {
       headers: { 'User-Agent': 'BluMarkets/1.0' },
     });
 
@@ -97,7 +168,8 @@ export async function fetchCryptoPrices(): Promise<FetchedPrice[]> {
       headers['x-cg-demo-api-key'] = env.COINGECKO_API_KEY;
     }
 
-    const response = await fetch(url, { headers });
+    // SECURITY FIX M-03: Use fetch with timeout and retry
+    const response = await fetchWithRetry(url, { headers });
 
     if (!response.ok) {
       throw new Error(`CoinGecko API error: ${response.status}`);
@@ -138,7 +210,8 @@ export async function fetchStockPrices(): Promise<FetchedPrice[]> {
     try {
       // SECURITY: Use header authentication instead of URL parameter
       // API keys in URLs can be logged in server access logs and browser history
-      const response = await fetch(
+      // SECURITY FIX M-03: Use fetch with timeout and retry
+      const response = await fetchWithRetry(
         `https://finnhub.io/api/v1/quote?symbol=${symbol}`,
         {
           headers: {
@@ -238,33 +311,35 @@ export async function updateAllPrices(): Promise<void> {
     });
   }
 
-  // PERFORMANCE: Single bulk upsert instead of N individual upserts
-  // Uses PostgreSQL INSERT ... ON CONFLICT DO UPDATE (UPSERT) for efficiency
+  // SECURITY FIX L-01: Replace $executeRawUnsafe with safe Prisma transaction
+  // Uses individual upserts within a transaction for safety while maintaining atomicity
   if (upsertData.length > 0) {
-    const values = upsertData.map((d, i) => {
-      const offset = i * 5;
-      return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${upsertData.length * 5 + 1}, $${upsertData.length * 5 + 2}, $${upsertData.length * 5 + 3})`;
-    }).join(', ');
-
-    const params: (string | number | null | Date)[] = [];
-    for (const d of upsertData) {
-      params.push(d.assetId, d.priceUsd, d.priceIrr, d.change24hPct, d.source);
-    }
-    // Add shared params for all rows
-    params.push(fetchedAt, fxRate.usdIrr, fxRate.source);
-
-    await prisma.$executeRawUnsafe(`
-      INSERT INTO prices (asset_id, price_usd, price_irr, change_24h_pct, source, fetched_at, fx_rate, fx_source)
-      VALUES ${values}
-      ON CONFLICT (asset_id) DO UPDATE SET
-        price_usd = EXCLUDED.price_usd,
-        price_irr = EXCLUDED.price_irr,
-        change_24h_pct = EXCLUDED.change_24h_pct,
-        source = EXCLUDED.source,
-        fetched_at = EXCLUDED.fetched_at,
-        fx_rate = EXCLUDED.fx_rate,
-        fx_source = EXCLUDED.fx_source
-    `, ...params);
+    await prisma.$transaction(
+      upsertData.map((d) =>
+        prisma.price.upsert({
+          where: { assetId: d.assetId },
+          update: {
+            priceUsd: d.priceUsd,
+            priceIrr: d.priceIrr,
+            change24hPct: d.change24hPct,
+            source: d.source,
+            fetchedAt: fetchedAt,
+            fxRate: fxRate.usdIrr,
+            fxSource: fxRate.source,
+          },
+          create: {
+            assetId: d.assetId,
+            priceUsd: d.priceUsd,
+            priceIrr: d.priceIrr,
+            change24hPct: d.change24hPct,
+            source: d.source,
+            fetchedAt: fetchedAt,
+            fxRate: fxRate.usdIrr,
+            fxSource: fxRate.source,
+          },
+        })
+      )
+    );
   }
 
   // Invalidate cache after update

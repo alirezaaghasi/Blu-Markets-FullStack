@@ -31,6 +31,9 @@ const envSchema = z.object({
   ENABLE_PRICE_WEBSOCKET: z.string().default('true').transform((v) => v === 'true'),
   ENABLE_PUSH_NOTIFICATIONS: z.string().default('false').transform((v) => v === 'true'),
 
+  // SECURITY: OTP bypass flag - must be explicitly enabled AND in development mode
+  ALLOW_OTP_BYPASS: z.string().default('false'),
+
   // Price polling
   PRICE_POLL_INTERVAL_MS: z.string().default('30000').transform(Number), // 30 seconds default
   PRICE_POLL_ENABLED: z.string().default('true').transform((v) => v === 'true'),

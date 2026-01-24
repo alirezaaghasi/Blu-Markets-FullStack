@@ -98,36 +98,58 @@ export class AuthService {
     phone: string,
     portfolioId?: string,
     deviceInfo?: Record<string, unknown>,
-    ipAddress?: string
+    ipAddress?: string,
+    existingSessionId?: string // For rotation - update existing session instead of creating new
   ): Promise<AuthTokens> {
-    // Generate refresh token
-    const refreshToken = randomBytes(32).toString('hex');
-    const refreshTokenHash = createHash('sha256').update(refreshToken).digest('hex');
     const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
 
-    // Store session
-    const session = await prisma.session.create({
-      data: {
-        userId,
-        refreshTokenHash,
-        deviceInfo: deviceInfo ? JSON.parse(JSON.stringify(deviceInfo)) : undefined,
-        ipAddress,
-        expiresAt,
-      },
-    });
-
-    // Generate access JWT with access secret
+    // Generate access JWT
     const accessToken = signAccessToken({
       sub: userId,
       phone,
       portfolioId,
     } as TokenPayload);
 
-    // Generate refresh JWT with separate refresh secret (security: isolates token compromise)
+    let sessionId: string;
+
+    if (existingSessionId) {
+      // SECURITY FIX H-01: Token rotation - update existing session
+      sessionId = existingSessionId;
+    } else {
+      // Create new session with placeholder hash (will be updated below)
+      const session = await prisma.session.create({
+        data: {
+          userId,
+          refreshTokenHash: 'pending', // Will be updated after JWT is signed
+          deviceInfo: deviceInfo ? JSON.parse(JSON.stringify(deviceInfo)) : undefined,
+          ipAddress,
+          expiresAt,
+        },
+      });
+      sessionId = session.id;
+    }
+
+    // Generate refresh JWT with session ID embedded
     const refreshJwt = signRefreshToken({
       sub: userId,
-      sessionId: session.id,
+      sessionId,
     } as RefreshPayload);
+
+    // SECURITY FIX H-01: Store hash of actual JWT (not a separate random token)
+    // This enables verification that the exact token presented matches what was issued
+    const refreshJwtHash = createHash('sha256').update(refreshJwt).digest('hex');
+
+    // Update session with actual JWT hash
+    await prisma.session.update({
+      where: { id: sessionId },
+      data: {
+        refreshTokenHash: refreshJwtHash,
+        expiresAt,
+        // Reset revoked status on rotation
+        revoked: false,
+        revokedAt: null,
+      },
+    });
 
     return {
       accessToken,
@@ -137,7 +159,7 @@ export class AuthService {
   }
 
   async refreshTokens(refreshToken: string): Promise<AuthTokens> {
-    // Verify refresh token with refresh secret
+    // Verify refresh token JWT signature with refresh secret
     let payload: RefreshPayload;
     try {
       payload = verifyRefreshToken(refreshToken) as RefreshPayload;
@@ -155,17 +177,35 @@ export class AuthService {
       },
     });
 
-    if (!session || session.revoked || session.expiresAt < new Date()) {
-      throw new AppError('UNAUTHORIZED', 'Session expired or revoked', 401);
+    if (!session || session.expiresAt < new Date()) {
+      throw new AppError('UNAUTHORIZED', 'Session expired', 401);
     }
 
-    // Generate new tokens
+    if (session.revoked) {
+      throw new AppError('UNAUTHORIZED', 'Session has been revoked', 401);
+    }
+
+    // SECURITY FIX H-01: Verify the presented token matches the stored hash
+    // This prevents replay attacks with previously valid tokens
+    const presentedTokenHash = createHash('sha256').update(refreshToken).digest('hex');
+
+    if (session.refreshTokenHash !== presentedTokenHash) {
+      // SECURITY: Token reuse detected - this token was already rotated
+      // An attacker may have stolen the old token. Revoke ALL user sessions as precaution.
+      console.warn(`🚨 Token reuse detected for user ${session.userId}. Revoking all sessions.`);
+      await this.revokeAllUserSessions(session.userId);
+      throw new AppError('UNAUTHORIZED', 'Token reuse detected. All sessions revoked for security.', 401);
+    }
+
+    // SECURITY FIX H-01: Rotate token - issue new token and update hash
+    // The old token is now invalid because the hash will change
     return this.createSession(
       session.userId,
       session.user.phone,
       session.user.portfolio?.id,
       session.deviceInfo as Record<string, unknown> | undefined,
-      session.ipAddress ?? undefined
+      session.ipAddress ?? undefined,
+      session.id // Pass existing session ID for rotation
     );
   }
 
