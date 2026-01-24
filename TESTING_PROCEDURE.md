@@ -1,155 +1,171 @@
 # Blu Markets Testing Procedure
 
-## Quick Start Command
+## Pre-Test Checklist (MANDATORY)
 
-Run this single command to start everything for testing:
+Before every Expo Go test, Claude must verify:
 
-```bash
-cd /workspaces/Blu-Markets && ./scripts/start-dev.sh
+- [ ] **Database**: Docker PostgreSQL is running and healthy
+- [ ] **Backend**: API server running at port 3000
+- [ ] **API Integration**: Backend can connect to database, prices are updating
+- [ ] **Ports Public**: Port 3000 is public (Codespaces)
+- [ ] **Clean Database**: ALL user records deleted for fresh test
+- [ ] **Expo Running**: Tunnel is active and URL is available
+
+## Expected User Flow
+
 ```
+Phone Number → OTP → Questionnaire → Risk Profile → Asset Allocation → Initial Funding → Portfolio Home (Chat UI)
+```
+
+**This flow must complete without skipping any step.**
 
 ---
 
-## Manual Steps (if script not available)
-
-### 1. Start Database (Docker)
+## Quick Start
 
 ```bash
-cd /workspaces/Blu-Markets/backend
-docker-compose up -d
+./scripts/start-dev.sh --clean-all
 ```
 
-Wait for healthy status:
+This command:
+1. Starts Docker database
+2. Cleans ALL user data from database
+3. Starts backend
+4. Makes port 3000 public
+5. Starts Expo with tunnel
+6. Outputs the Expo URL
+
+---
+
+## Manual Verification Steps
+
+### 1. Database Running
+
 ```bash
-docker ps | grep backend-db-1
+docker-compose -f backend/docker-compose.yml up -d
+docker exec backend-db-1 pg_isready -U postgres
 ```
 
-### 2. Start Backend
+Expected: `/var/run/postgresql:5432 - accepting connections`
+
+### 2. Clean ALL User Data
 
 ```bash
-cd /workspaces/Blu-Markets/backend
-npm run dev
+docker exec backend-db-1 psql -U postgres -d blumarkets -c "
+TRUNCATE sessions, action_logs, ledger_entries, holdings, protections, loans, portfolios, otp_codes, users CASCADE;
+"
 ```
 
-Verify it's running:
+### 3. Backend Running
+
 ```bash
-curl -s http://localhost:3000/api/v1/auth/send-otp -X POST -H "Content-Type: application/json" -d '{"phone": "+989123456789"}'
+cd backend && npm run dev &
 ```
 
-### 3. Make Backend Port Public (Codespaces)
+Verify:
+```bash
+curl -s http://localhost:3000/docs | head -5
+```
+
+### 4. API Integration Test
+
+```bash
+# Test OTP endpoint
+curl -s http://localhost:3000/api/v1/auth/send-otp \
+  -X POST -H "Content-Type: application/json" \
+  -d '{"phone": "+989123456789"}'
+```
+
+Expected: `{"success":true,"message":"OTP sent","expiresIn":120}`
+
+### 5. Port Public (Codespaces)
 
 ```bash
 gh codespace ports visibility 3000:public -c $CODESPACE_NAME
 ```
 
-### 4. Start Expo
-
+Verify:
 ```bash
-cd /workspaces/Blu-Markets/blu-markets-mobile
-npx expo start --tunnel --clear
+curl -s https://${CODESPACE_NAME}-3000.app.github.dev/api/v1/auth/send-otp \
+  -X POST -H "Content-Type: application/json" \
+  -d '{"phone": "+989123456789"}'
 ```
 
-Get the Expo URL from ngrok:
+### 6. Expo Running
+
+```bash
+cd blu-markets-mobile && npx expo start --tunnel --clear &
+```
+
+Get URL:
 ```bash
 curl -s http://localhost:4040/api/tunnels | jq -r '.tunnels[] | select(.proto=="https") | .public_url' | sed 's/https:/exp:/'
 ```
 
 ---
 
-## Testing Fresh Onboarding
+## Test Credentials
 
-To test the full questionnaire flow, you need a NEW user (phone number not in database).
+| Field | Value |
+|-------|-------|
+| Phone | `+989123456789` |
+| OTP | `999999` (dev bypass) |
 
-### Option A: Use a new phone number
+---
 
-Use any phone number not already in the database, e.g.:
-- `+989111111111`
-- `+989222222222`
+## Flow Verification
 
-### Option B: Delete existing user
-
-To reset a specific user for fresh onboarding:
+After user completes onboarding, verify in database:
 
 ```bash
-PHONE="+989123456789"
-
 docker exec backend-db-1 psql -U postgres -d blumarkets -c "
-DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE phone = '$PHONE');
-DELETE FROM action_logs WHERE portfolio_id IN (SELECT id FROM portfolios WHERE user_id IN (SELECT id FROM users WHERE phone = '$PHONE'));
-DELETE FROM ledger_entries WHERE portfolio_id IN (SELECT id FROM portfolios WHERE user_id IN (SELECT id FROM users WHERE phone = '$PHONE'));
-DELETE FROM holdings WHERE portfolio_id IN (SELECT id FROM portfolios WHERE user_id IN (SELECT id FROM users WHERE phone = '$PHONE'));
-DELETE FROM protections WHERE portfolio_id IN (SELECT id FROM portfolios WHERE user_id IN (SELECT id FROM users WHERE phone = '$PHONE'));
-DELETE FROM loans WHERE portfolio_id IN (SELECT id FROM portfolios WHERE user_id IN (SELECT id FROM users WHERE phone = '$PHONE'));
-DELETE FROM portfolios WHERE user_id IN (SELECT id FROM users WHERE phone = '$PHONE');
-DELETE FROM otp_codes WHERE phone = '$PHONE';
-DELETE FROM users WHERE phone = '$PHONE';
+SELECT
+  u.phone,
+  u.risk_score,
+  u.consent_risk,
+  p.cash_irr,
+  p.total_value_irr,
+  (SELECT COUNT(*) FROM holdings WHERE portfolio_id = p.id) as holdings_count
+FROM users u
+JOIN portfolios p ON u.id = p.user_id
+WHERE u.phone = '+989123456789';
 "
 ```
 
-### Option C: Reset entire database (nuclear option)
+Expected:
+- `risk_score`: 1-10 (from questionnaire)
+- `consent_risk`: true
+- `holdings_count`: 8 (PAXG, USDT, BTC, ETH, BNB, SOL, TON, LINK)
 
-```bash
-cd /workspaces/Blu-Markets/backend
-npx prisma migrate reset --force
-npx prisma db seed
+---
+
+## Troubleshooting
+
+| Issue | Cause | Fix |
+|-------|-------|-----|
+| Skipped questionnaire | User already exists | Run `--clean-all` |
+| 404 on OTP | Backend not running or port not public | Check backend + port visibility |
+| Holdings empty | Prices not available during allocation | Check backend logs for price errors |
+| WebSocket errors | Non-fatal, ignore | Backend connectivity warnings |
+
+---
+
+## Claude's Checklist Output
+
+When starting Expo Go test, Claude should output:
+
 ```
+✅ Database: Running (backend-db-1 healthy)
+✅ Backend: Running at http://localhost:3000
+✅ API Test: OTP endpoint responding
+✅ Port 3000: Public
+✅ Database: Cleaned (0 users)
+✅ Expo: Running with tunnel
 
----
+📱 Expo URL: exp://xxx-anonymous-8081.exp.direct
+📞 Test Phone: +989123456789
+🔑 OTP Code: 999999
 
-## OTP Codes
-
-### Development Bypass Code
-In development, use `999999` as OTP for any phone number.
-
-### Real OTP
-Check backend logs for the actual OTP:
+Expected Flow:
+Phone → OTP → Questionnaire → Profile → Allocation → Funding → Portfolio Home
 ```
-📱 OTP for +989123456789: 574806
-```
-
----
-
-## Checklist Before Testing
-
-- [ ] Docker database is running (`docker ps | grep postgres`)
-- [ ] Backend is running (`curl http://localhost:3000/docs`)
-- [ ] Port 3000 is public (for Codespaces)
-- [ ] Expo is running with tunnel
-- [ ] Test user is clean (if testing onboarding)
-
----
-
-## Common Issues
-
-### "Request failed with status code 404"
-- Backend not running, or
-- Port 3000 not public
-
-### Skipped questionnaire / went straight to portfolio
-- User already exists with completed onboarding
-- Delete user (see Option B above) and try again
-
-### "Cannot read property 'toFixed' of undefined"
-- Stale app bundle - restart Expo with `--clear` flag
-- Force close Expo Go app and reopen
-
-### WebSocket errors
-- Backend not running or network issue
-- These are non-fatal warnings
-
----
-
-## Phone Numbers for Testing
-
-| Phone | Purpose |
-|-------|---------|
-| `+989123456789` | General testing |
-| `+989999999999` | Pre-seeded demo user |
-| `+989111111111` | Fresh user testing |
-
----
-
-## Environment
-
-- **Backend URL**: `https://literate-space-cod-g5pjrgj6q453jg6-3000.app.github.dev/api/v1`
-- **Expo URL**: Check ngrok tunnels at `http://localhost:4040`
