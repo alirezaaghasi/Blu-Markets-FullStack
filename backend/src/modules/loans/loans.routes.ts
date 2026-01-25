@@ -32,12 +32,8 @@ import {
 const createLoanSchema = z.object({
   collateralAssetId: z.string().min(1),
   amountIrr: z.number().min(1000000),
-  // Accept both number and string, normalize to number
-  durationMonths: z.union([
-    z.literal(3),
-    z.literal(6),
-    z.enum(['3', '6']).transform(Number),
-  ]).transform((v) => Number(v) as 3 | 6),
+  // Fastify coerces to number, so just validate as number literal
+  durationMonths: z.union([z.literal(3), z.literal(6)]),
 });
 
 const repaySchema = z.object({
@@ -206,11 +202,8 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         properties: {
           collateralAssetId: { type: 'string' },
           amountIrr: { type: 'number', minimum: 1000000 },
-          // Accept both number and string for durationMonths
-          durationMonths: { oneOf: [
-            { type: 'number', enum: [3, 6] },
-            { type: 'string', enum: ['3', '6'] },
-          ]},
+          // Note: Fastify coerces string to number, so just accept number with enum
+          durationMonths: { type: 'number', enum: [3, 6] },
         },
       },
     },
@@ -241,7 +234,7 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         }>>`
           SELECT id, portfolio_id, asset_id, quantity, frozen, layer
           FROM holdings
-          WHERE portfolio_id = ${portfolioCheck.id} AND asset_id = ${collateralAssetId}
+          WHERE portfolio_id = ${portfolioCheck.id}::uuid AND asset_id = ${collateralAssetId}
           FOR UPDATE
         `;
 
@@ -509,7 +502,7 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         }>>`
           SELECT id, portfolio_id, collateral_asset_id, total_due_irr, paid_irr, status
           FROM loans
-          WHERE id = ${loanId}
+          WHERE id = ${loanId}::uuid
           FOR UPDATE
         `;
 
