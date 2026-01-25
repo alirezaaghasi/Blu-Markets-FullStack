@@ -16,6 +16,7 @@ import { colors, typography, spacing, borderRadius } from '../constants/theme';
 import { Holding, Loan, LoanInstallment, AssetId } from '../types';
 import { ASSETS, LAYER_COLORS } from '../constants/assets';
 import {
+  LOAN_DAILY_INTEREST_RATE,
   LOAN_ANNUAL_INTEREST_RATE,
   LOAN_INSTALLMENT_COUNT,
   LOAN_DURATION_OPTIONS,
@@ -53,7 +54,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
 
   const [selectedAssetId, setSelectedAssetId] = useState<AssetId | null>(null);
   const [amountInput, setAmountInput] = useState('');
-  const [durationMonths, setDurationMonths] = useState<3 | 6>(3);
+  const [durationDays, setDurationDays] = useState<30 | 60 | 90>(30);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successResult, setSuccessResult] = useState<TransactionSuccessResult | null>(null);
@@ -102,10 +103,10 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
   // Parse amount
   const amountIRR = parseInt(amountInput.replace(/,/g, ''), 10) || 0;
 
-  // Calculate interest
+  // Calculate interest using daily rate
   const totalInterest = useMemo(() => {
-    return amountIRR * LOAN_ANNUAL_INTEREST_RATE * (durationMonths / 12);
-  }, [amountIRR, durationMonths]);
+    return amountIRR * LOAN_DAILY_INTEREST_RATE * durationDays;
+  }, [amountIRR, durationDays]);
 
   // Calculate installments
   const installmentAmount = useMemo(() => {
@@ -147,8 +148,8 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
 
     setIsSubmitting(true);
     try {
-      // Call backend API to create loan
-      const loan = await loansApi.create(selectedAssetId, amountIRR, durationMonths);
+      // Call backend API to create loan (API expects durationDays)
+      const loan = await loansApi.create(selectedAssetId, amountIRR, durationDays);
 
       // Update local Redux state with response
       dispatch(addLoan({
@@ -156,10 +157,10 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
         collateralAssetId: loan.collateralAssetId,
         collateralQuantity: loan.collateralQuantity || selectedHolding.quantity,
         amountIRR: loan.amountIRR || amountIRR,
-        interestRate: loan.interestRate || LOAN_ANNUAL_INTEREST_RATE,
-        durationMonths: loan.durationMonths || durationMonths,
+        dailyInterestRate: loan.dailyInterestRate || LOAN_DAILY_INTEREST_RATE,
+        durationDays: loan.durationDays || durationDays,
         startISO: loan.startISO || new Date().toISOString(),
-        dueISO: loan.dueISO || new Date(Date.now() + durationMonths * 30 * 24 * 60 * 60 * 1000).toISOString(),
+        dueISO: loan.dueISO || new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString(),
         status: 'ACTIVE',
         installments: loan.installments || [],
         installmentsPaid: 0,
@@ -183,7 +184,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
         items: [
           { label: 'Amount Borrowed', value: `${formatNumber(amountIRR)} IRR`, highlight: true },
           { label: 'Collateral', value: `${selectedAsset.name} (Frozen)` },
-          { label: 'Duration', value: `${durationMonths} months` },
+          { label: 'Duration', value: `${durationDays} days` },
           { label: 'Interest Rate', value: `${(LOAN_ANNUAL_INTEREST_RATE * 100).toFixed(0)}% annual` },
           { label: 'Total to Repay', value: `${formatNumber(Math.round(amountIRR + totalInterest))} IRR` },
         ],
@@ -337,22 +338,22 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Loan Duration</Text>
                 <View style={styles.durationOptions}>
-                  {LOAN_DURATION_OPTIONS.map((months) => (
+                  {LOAN_DURATION_OPTIONS.map((days) => (
                     <TouchableOpacity
-                      key={months}
+                      key={days}
                       style={[
                         styles.durationChip,
-                        durationMonths === months && styles.durationChipActive,
+                        durationDays === days && styles.durationChipActive,
                       ]}
-                      onPress={() => setDurationMonths(months)}
+                      onPress={() => setDurationDays(days)}
                     >
                       <Text
                         style={[
                           styles.durationChipText,
-                          durationMonths === months && styles.durationChipTextActive,
+                          durationDays === days && styles.durationChipTextActive,
                         ]}
                       >
-                        {months} months
+                        {days} days
                       </Text>
                     </TouchableOpacity>
                   ))}

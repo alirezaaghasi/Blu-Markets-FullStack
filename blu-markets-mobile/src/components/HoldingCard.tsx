@@ -4,8 +4,9 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../constants/theme';
 import { Holding, AssetId } from '../types';
-import { ASSETS, LAYER_COLORS } from '../constants/assets';
+import { ASSETS, LAYER_COLORS, LAYER_NAMES } from '../constants/assets';
 import { calculateFixedIncomeValue, FixedIncomeBreakdown } from '../utils/fixedIncome';
+import { AssetIcon } from './AssetIcon';
 
 interface HoldingCardProps {
   holding: Holding;
@@ -74,19 +75,26 @@ export const HoldingCard: React.FC<HoldingCardProps> = ({
     >
       <View style={styles.leftSection}>
         {/* Asset icon/symbol */}
-        <View
-          style={[
-            styles.iconContainer,
-            { backgroundColor: `${LAYER_COLORS[asset.layer]}20` },
-          ]}
-        >
-          <Text style={styles.iconText}>{asset.symbol}</Text>
-        </View>
+        <AssetIcon assetId={holding.assetId} size={44} />
 
         {/* Asset info */}
         <View style={styles.infoContainer}>
           <View style={styles.nameRow}>
             <Text style={styles.assetName}>{asset.name}</Text>
+
+            {/* Layer Badge */}
+            <View style={[
+              styles.layerBadge,
+              { backgroundColor: `${LAYER_COLORS[asset.layer]}20` }
+            ]}>
+              <Text style={[
+                styles.layerBadgeText,
+                { color: LAYER_COLORS[asset.layer] }
+              ]}>
+                {LAYER_NAMES[asset.layer].toUpperCase()}
+              </Text>
+            </View>
+
             {holding.frozen && (
               <View style={styles.frozenBadge}>
                 <Text style={styles.frozenText}>🔒</Text>
@@ -175,6 +183,17 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.semibold,
     color: colors.textPrimaryDark,
+  },
+  layerBadge: {
+    marginLeft: spacing[2],
+    paddingHorizontal: spacing[2],
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  layerBadgeText: {
+    fontSize: 10,
+    fontWeight: typography.fontWeight.semibold,
+    letterSpacing: 0.5,
   },
   frozenBadge: {
     marginLeft: spacing[2],

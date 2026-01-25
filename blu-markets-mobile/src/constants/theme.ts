@@ -2,24 +2,25 @@
 // Based on PRD Section 10 - Design System
 
 export const colors = {
-  // Primary
-  primary: '#0f49bd',
-  primaryLight: '#135bec',
+  // Primary - ALIGNED WITH colors.ts
+  primary: '#6FAAF8',
+  primaryLight: '#8FBFFF',
+  primaryDark: '#5B9AE8',  // Darker variant for pressed states
 
-  // Background
+  // Background - ALIGNED WITH colors.ts
   bgLight: '#f6f6f8',
-  bgDark: '#111722',
+  bgDark: '#0E1420',       // Aligned with COLORS.background.primary
 
-  // Surface
-  surfaceDark: '#232f48',
-  cardDark: '#1a2230',
-  borderDark: '#232f48',
+  // Surface - ALIGNED WITH colors.ts
+  surfaceDark: '#151C28',  // Aligned with COLORS.background.surface
+  cardDark: '#1C2433',     // Aligned with COLORS.background.elevated
+  borderDark: '#1C2433',
 
-  // Text
+  // Text - ALIGNED WITH colors.ts
   textPrimaryLight: '#0f172a',
-  textPrimaryDark: '#ffffff',
-  textSecondary: '#92a4c9',
-  textMuted: '#6B7482',
+  textPrimaryDark: '#FFFFFF',
+  textSecondary: '#9CA3AF', // Aligned with COLORS.text.secondary
+  textMuted: '#6B7280',
 
   // Semantic
   success: '#22c55e',

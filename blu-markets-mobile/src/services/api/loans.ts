@@ -26,9 +26,9 @@ export const loans = {
     };
   },
 
-  // Create a loan with collateral asset
-  create: (collateralAssetId: string, amountIrr: number, durationMonths: 3 | 6): Promise<Loan> =>
-    apiClient.post('/loans', { collateralAssetId, amountIrr, durationMonths }) as unknown as Promise<Loan>,
+  // Create a loan with collateral asset (duration in days)
+  create: (collateralAssetId: string, amountIrr: number, durationDays: 30 | 60 | 90): Promise<Loan> =>
+    apiClient.post('/loans', { collateralAssetId, amountIrr, durationDays }) as unknown as Promise<Loan>,
 
   repay: (loanId: string, amountIrr: number): Promise<{
     success: boolean;

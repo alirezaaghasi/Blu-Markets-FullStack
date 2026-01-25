@@ -946,8 +946,8 @@ export const loans = {
     };
   },
 
-  // Hook calls with (amountIrr, durationMonths) - we auto-select best collateral
-  create: async (amountIrr: number, durationMonths: 3 | 6): Promise<Loan> => {
+  // Hook calls with (amountIrr, durationDays) - we auto-select best collateral
+  create: async (amountIrr: number, durationDays: 30 | 60 | 90): Promise<Loan> => {
     await delay(MOCK_DELAY);
 
     const state = getState();
@@ -974,21 +974,22 @@ export const loans = {
 
     const collateralAssetId = collateralHolding.assetId;
 
-    const interestRate = 0.30;
-    const monthlyRate = interestRate / 12;
+    const dailyRate = 0.0005; // 0.05% daily (per mockup)
     const now = new Date();
     const dueDate = new Date(now);
-    dueDate.setMonth(dueDate.getMonth() + durationMonths);
+    dueDate.setDate(dueDate.getDate() + durationDays);
 
     const installments: LoanInstallment[] = [];
-    const principalPerInstallment = amountIrr / durationMonths;
+    const numInstallments = durationDays === 30 ? 1 : durationDays === 60 ? 2 : 3; // Monthly installments
+    const principalPerInstallment = amountIrr / numInstallments;
 
-    for (let i = 1; i <= durationMonths; i++) {
+    for (let i = 1; i <= numInstallments; i++) {
       const installmentDate = new Date(now);
       installmentDate.setMonth(installmentDate.getMonth() + i);
 
       const remainingPrincipal = amountIrr - (principalPerInstallment * (i - 1));
-      const interestIrr = remainingPrincipal * monthlyRate;
+      const daysInPeriod = 30; // ~1 month
+      const interestIrr = remainingPrincipal * dailyRate * daysInPeriod;
 
       installments.push({
         number: i,
@@ -1001,16 +1002,19 @@ export const loans = {
       });
     }
 
+    const totalInterest = amountIrr * dailyRate * durationDays;
     const newLoan: Loan = {
       id: `loan_${Date.now()}`,
       collateralAssetId,
       collateralQuantity: collateralHolding.quantity * 0.5,
       amountIRR: amountIrr,
-      interestRate,
-      durationMonths,
+      dailyInterestRate: dailyRate,
+      durationDays: durationDays as 30 | 60 | 90,
       startISO: now.toISOString(),
       dueISO: dueDate.toISOString(),
       status: 'ACTIVE',
+      totalInterestIRR: totalInterest,
+      totalRepaymentIRR: amountIrr + totalInterest,
       installments,
       installmentsPaid: 0,
     };

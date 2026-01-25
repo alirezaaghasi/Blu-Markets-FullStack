@@ -143,25 +143,24 @@ export const TransactionSuccessModal: React.FC<TransactionSuccessModalProps> = (
                 ))}
               </Animated.View>
 
-              {/* Actions */}
+              {/* Actions - Side by side layout */}
               <Animated.View style={[styles.actions, { opacity: fadeAnim }]}>
-                <Button
-                  label={result.primaryAction?.label || 'Done'}
-                  variant="primary"
-                  size="lg"
-                  fullWidth
-                  onPress={result.primaryAction?.onPress || onClose}
-                />
                 {result.secondaryAction && (
                   <Button
                     label={result.secondaryAction.label}
                     variant="secondary"
                     size="lg"
-                    fullWidth
                     onPress={result.secondaryAction.onPress}
-                    style={styles.secondaryButton}
+                    style={styles.actionButton}
                   />
                 )}
+                <Button
+                  label={result.primaryAction?.label || 'Done'}
+                  variant="primary"
+                  size="lg"
+                  onPress={result.primaryAction?.onPress || onClose}
+                  style={styles.actionButton}
+                />
               </Animated.View>
             </View>
           </TouchableWithoutFeedback>
@@ -249,9 +248,11 @@ const styles = StyleSheet.create({
   },
   actions: {
     width: '100%',
+    flexDirection: 'row',
+    gap: spacing[3],
   },
-  secondaryButton: {
-    marginTop: spacing[2],
+  actionButton: {
+    flex: 1,
   },
 });
 

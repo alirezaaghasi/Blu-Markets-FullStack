@@ -204,11 +204,13 @@ export interface Loan {
   collateralAssetId: AssetId;
   collateralQuantity: number;
   amountIRR: number;
-  interestRate: number;
-  durationMonths: 3 | 6;
+  dailyInterestRate: number; // Changed from interestRate
+  durationDays: 30 | 60 | 90; // Updated duration options
   startISO: string;
   dueISO: string;
   status: LoanStatus;
+  totalInterestIRR?: number; // Pre-calculated total interest
+  totalRepaymentIRR?: number; // Principal + interest
   installments: LoanInstallment[];
   installmentsPaid: number;
 }
