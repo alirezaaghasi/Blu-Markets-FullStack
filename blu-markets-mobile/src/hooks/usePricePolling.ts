@@ -48,35 +48,43 @@ export const usePricePolling = (options: UsePricePollingOptions = {}) => {
     }
   }, [dispatch]);
 
-  // Schedule next poll
-  const scheduleNextPoll = useCallback(() => {
+  // Start polling with interval (non-recursive pattern to prevent stack overflow)
+  const startPolling = useCallback(() => {
+    // Don't start if already polling
     if (pollingIntervalRef.current) {
-      clearTimeout(pollingIntervalRef.current);
+      return;
     }
 
-    pollingIntervalRef.current = setTimeout(async () => {
+    // Fetch immediately on start
+    fetchAllPrices();
+
+    // Use setInterval instead of recursive setTimeout to prevent stack buildup
+    // The interval uses the current backoff value at each tick
+    pollingIntervalRef.current = setInterval(async () => {
       if (appStateRef.current === 'active') {
         await fetchAllPrices();
       }
-      scheduleNextPoll();
-    }, backoffRef.current);
+    }, PRICE_POLLING_INTERVAL_MS);
   }, [fetchAllPrices]);
-
-  // Start polling
-  const startPolling = useCallback(() => {
-    // Fetch immediately on start
-    fetchAllPrices();
-    // Then schedule periodic updates
-    scheduleNextPoll();
-  }, [fetchAllPrices, scheduleNextPoll]);
 
   // Stop polling
   const stopPolling = useCallback(() => {
     if (pollingIntervalRef.current) {
-      clearTimeout(pollingIntervalRef.current);
+      clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
   }, []);
+
+  // Restart polling with new backoff (called after errors)
+  const restartWithBackoff = useCallback(() => {
+    stopPolling();
+    // Schedule next poll with backoff delay, then resume normal interval
+    const backoffTimeout = setTimeout(() => {
+      startPolling();
+    }, backoffRef.current);
+    // Store timeout so it can be cleared if needed
+    pollingIntervalRef.current = backoffTimeout;
+  }, [startPolling, stopPolling]);
 
   // Handle app state changes (pause when backgrounded)
   useEffect(() => {

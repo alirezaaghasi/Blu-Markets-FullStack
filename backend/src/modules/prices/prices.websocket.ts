@@ -9,6 +9,11 @@ import type { AssetId } from '../../types/domain.js';
 const HEARTBEAT_INTERVAL_MS = 30000; // 30 seconds
 const CLIENT_TIMEOUT_MS = 35000; // 35 seconds (slightly longer than heartbeat)
 
+// Rate limiting constants
+const MESSAGE_RATE_LIMIT = 30; // max messages per window
+const MESSAGE_RATE_WINDOW_MS = 10000; // 10 seconds
+const MAX_CONNECTIONS_PER_USER = 5; // prevent resource exhaustion
+
 interface SubscriptionMessage {
   type: 'subscribe' | 'unsubscribe';
   assets?: AssetId[]; // Subscribe to specific assets, or all if empty
@@ -18,11 +23,32 @@ interface ClientState {
   subscribedAssets: Set<AssetId>;
   subscribeAll: boolean;
   isAlive: boolean;
+  userId: string;
+  // Rate limiting state
+  messageCount: number;
+  messageWindowStart: number;
+}
+
+/**
+ * Check if client is within rate limit
+ * Returns true if request is allowed, false if rate limited
+ */
+function checkRateLimit(state: ClientState): boolean {
+  const now = Date.now();
+  // Reset window if expired
+  if (now - state.messageWindowStart > MESSAGE_RATE_WINDOW_MS) {
+    state.messageCount = 0;
+    state.messageWindowStart = now;
+  }
+  state.messageCount++;
+  return state.messageCount <= MESSAGE_RATE_LIMIT;
 }
 
 export async function registerPriceWebSocket(app: FastifyInstance): Promise<void> {
   // Track connected clients
   const clients = new Map<WebSocket, ClientState>();
+  // Track connections per user for rate limiting
+  const userConnectionCounts = new Map<string, number>();
 
   // Heartbeat interval to detect stale connections
   const heartbeatInterval = setInterval(() => {
@@ -45,21 +71,32 @@ export async function registerPriceWebSocket(app: FastifyInstance): Promise<void
     clients.clear();
   });
 
-  // Allowed WebSocket origins for production
-  const allowedWsOrigins = [
+  // Allowed WebSocket origins - always validate, but include dev origins in development
+  const productionOrigins = [
     'https://blumarkets.ir',
     'https://www.blumarkets.ir',
     'https://api.blumarkets.ir',
   ];
+  const developmentOrigins = [
+    'http://localhost:3000',
+    'http://localhost:8081',
+    'http://localhost:19006',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:8081',
+  ];
+  const isDev = process.env.NODE_ENV === 'development';
+  const allowedWsOrigins = isDev
+    ? [...productionOrigins, ...developmentOrigins]
+    : productionOrigins;
 
   // WebSocket endpoint: /api/v1/prices/stream
   app.get('/stream', { websocket: true }, async (socket: WebSocket, req: FastifyRequest) => {
-    // SECURITY: Validate origin in production to prevent cross-site WebSocket hijacking
+    // SECURITY: Always validate origin to prevent cross-site WebSocket hijacking
+    // In development, we allow localhost origins in addition to production origins
     const origin = req.headers.origin;
-    const isDev = process.env.NODE_ENV === 'development';
 
-    if (!isDev && origin && !allowedWsOrigins.includes(origin)) {
-      logger.warn('WebSocket connection rejected: Invalid origin', { origin });
+    if (origin && !allowedWsOrigins.includes(origin)) {
+      logger.warn('WebSocket connection rejected: Invalid origin', { origin, allowedOrigins: allowedWsOrigins });
       socket.close(4003, 'Origin not allowed');
       return;
     }
@@ -72,7 +109,9 @@ export async function registerPriceWebSocket(app: FastifyInstance): Promise<void
     const queryToken = (req.query as Record<string, string>).token;
 
     if (queryToken && !headerToken) {
-      logger.warn('WebSocket using query string token (deprecated)');
+      logger.warn('DEPRECATED: WebSocket using query string token. This will be removed in v2.0', {
+        clientIp: req.ip,
+      });
     }
 
     const token = headerToken || queryToken;
@@ -83,22 +122,40 @@ export async function registerPriceWebSocket(app: FastifyInstance): Promise<void
       return;
     }
 
+    let userId: string;
     try {
       // Verify token using the same verifier as REST endpoints
-      verifyAccessTokenPayload(token);
+      const payload = verifyAccessTokenPayload(token);
+      userId = payload.sub || 'unknown';
     } catch (error) {
       logger.warn('WebSocket connection rejected: Invalid token');
       socket.close(4001, 'Invalid token');
       return;
     }
 
-    logger.info('WebSocket client connected (authenticated)');
+    // SECURITY: Enforce per-user connection limit to prevent resource exhaustion
+    const currentConnections = userConnectionCounts.get(userId) || 0;
+    if (currentConnections >= MAX_CONNECTIONS_PER_USER) {
+      logger.warn('WebSocket connection rejected: Max connections exceeded', {
+        userId,
+        currentConnections,
+        maxAllowed: MAX_CONNECTIONS_PER_USER,
+      });
+      socket.close(4429, 'Too many connections');
+      return;
+    }
+    userConnectionCounts.set(userId, currentConnections + 1);
 
-    // Initialize client state
+    logger.info('WebSocket client connected (authenticated)', { userId });
+
+    // Initialize client state with rate limiting fields
     const clientState: ClientState = {
       subscribedAssets: new Set(),
       subscribeAll: true, // Default: subscribe to all prices
       isAlive: true,
+      userId,
+      messageCount: 0,
+      messageWindowStart: Date.now(),
     };
     clients.set(socket, clientState);
 
@@ -150,6 +207,16 @@ export async function registerPriceWebSocket(app: FastifyInstance): Promise<void
 
     // Handle incoming messages (subscriptions)
     socket.on('message', (message: Buffer) => {
+      // SECURITY: Check rate limit before processing
+      if (!checkRateLimit(clientState)) {
+        socket.send(JSON.stringify({
+          type: 'error',
+          message: 'Rate limit exceeded. Please slow down.',
+        }));
+        logger.warn('WebSocket rate limit exceeded', { userId: clientState.userId });
+        return;
+      }
+
       try {
         const data = JSON.parse(message.toString()) as SubscriptionMessage;
 
@@ -188,15 +255,30 @@ export async function registerPriceWebSocket(app: FastifyInstance): Promise<void
       }
     });
 
+    // Helper to cleanup client state and decrement connection count
+    const cleanupClient = () => {
+      const state = clients.get(socket);
+      if (state) {
+        // Decrement user connection count
+        const count = userConnectionCounts.get(state.userId) || 1;
+        if (count <= 1) {
+          userConnectionCounts.delete(state.userId);
+        } else {
+          userConnectionCounts.set(state.userId, count - 1);
+        }
+      }
+      clients.delete(socket);
+    };
+
     // Handle disconnect
     socket.on('close', () => {
-      logger.debug('WebSocket client disconnected');
-      clients.delete(socket);
+      logger.debug('WebSocket client disconnected', { userId: clientState.userId });
+      cleanupClient();
     });
 
     socket.on('error', (error: Error) => {
-      logger.error('WebSocket error', error);
-      clients.delete(socket);
+      logger.error('WebSocket error', error, { userId: clientState.userId });
+      cleanupClient();
     });
   });
 

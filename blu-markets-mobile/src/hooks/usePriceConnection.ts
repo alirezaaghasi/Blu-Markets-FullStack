@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react';
 import { priceWebSocket, ConnectionStatus } from '../services/priceWebSocket';
 import { useAppSelector } from './useStore';
+import { DEMO_TOKEN } from '../constants/business';
 
 interface PriceConnectionState {
   isConnected: boolean;
@@ -23,8 +24,9 @@ export function usePriceConnection(): PriceConnectionState {
   const [lastUpdate, setLastUpdate] = useState<Date | undefined>(undefined);
 
   // Check if we're in demo mode (runtime check via Redux)
+  // Uses centralized DEMO_TOKEN constant to avoid hardcoded strings
   const authToken = useAppSelector((state) => state.auth.authToken);
-  const isDemoMode = authToken === 'demo-token';
+  const isDemoMode = authToken === DEMO_TOKEN;
 
   useEffect(() => {
     // In demo mode, skip WebSocket connection and return static "connected" status

@@ -129,6 +129,10 @@ export const WEBSOCKET_URL = getWebSocketUrl();
 export const WEBSOCKET_RECONNECT_INTERVAL_MS = 3_000; // 3 seconds
 export const WEBSOCKET_ENABLED = true;
 
+// Demo Mode Configuration
+// Token used to identify demo mode - centralized to avoid hardcoded strings
+export const DEMO_TOKEN = 'demo-token';
+
 // Risk Profile Allocations by Score
 export const RISK_PROFILE_ALLOCATIONS: Record<number, TargetLayerPct> = {
   1: { FOUNDATION: 0.85, GROWTH: 0.12, UPSIDE: 0.03 },

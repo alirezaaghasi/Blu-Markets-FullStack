@@ -1,6 +1,6 @@
 // Price WebSocket Hook
 // Connects to real-time price updates via WebSocket with REST polling fallback
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { useAppDispatch, useAppSelector } from './useStore';
 import {
@@ -38,6 +38,13 @@ export const usePriceWebSocket = (options: UsePriceWebSocketOptions = {}) => {
   const isWebSocketActive = useRef(false);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const appStateListenerRef = useRef<{ remove: () => void } | null>(null);
+
+  // Refs to store latest callback versions - prevents useEffect infinite loops
+  // by breaking the dependency chain between callbacks and effects
+  const handleMessageRef = useRef<(message: WebSocketMessage) => void>(() => {});
+  const handleStatusChangeRef = useRef<(status: ConnectionStatus) => void>(() => {});
+  const startPollingFallbackRef = useRef<() => void>(() => {});
+  const stopPollingFallbackRef = useRef<() => void>(() => {});
 
   // Handle WebSocket messages
   const handleMessage = useCallback(
@@ -143,8 +150,18 @@ export const usePriceWebSocket = (options: UsePriceWebSocketOptions = {}) => {
     }
   }, []);
 
+  // Keep refs updated with latest callback versions
+  // This runs synchronously before effects to ensure refs are always current
+  useLayoutEffect(() => {
+    handleMessageRef.current = handleMessage;
+    handleStatusChangeRef.current = handleStatusChange;
+    startPollingFallbackRef.current = startPollingFallback;
+    stopPollingFallbackRef.current = stopPollingFallback;
+  });
+
   // Handle app state changes to pause/resume polling when app goes to background
   // This prevents battery drain when the app is not visible
+  // Uses refs for callbacks to prevent dependency array issues
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       const wasActive = appStateRef.current === 'active';
@@ -154,7 +171,7 @@ export const usePriceWebSocket = (options: UsePriceWebSocketOptions = {}) => {
       if (wasActive && !isActive) {
         // App going to background - pause polling and disconnect WebSocket
         console.log('App going to background, pausing price updates');
-        stopPollingFallback();
+        stopPollingFallbackRef.current();
         if (WEBSOCKET_ENABLED) {
           priceWebSocket.disconnect();
         }
@@ -164,7 +181,7 @@ export const usePriceWebSocket = (options: UsePriceWebSocketOptions = {}) => {
         if (WEBSOCKET_ENABLED) {
           priceWebSocket.connect();
         } else if (fallbackToPolling) {
-          startPollingFallback();
+          startPollingFallbackRef.current();
         }
       }
     };
@@ -177,9 +194,11 @@ export const usePriceWebSocket = (options: UsePriceWebSocketOptions = {}) => {
       subscription.remove();
       appStateListenerRef.current = null;
     };
-  }, [enabled, isAuthenticated, fallbackToPolling, startPollingFallback, stopPollingFallback]);
+  }, [enabled, isAuthenticated, fallbackToPolling]); // Only primitive dependencies
 
   // Connect/disconnect based on enabled state and auth
+  // Uses refs instead of callbacks in dependency array to prevent infinite loops
+  // The refs are updated synchronously via useLayoutEffect above
   useEffect(() => {
     // Don't connect if app is in background
     if (appStateRef.current !== 'active') {
@@ -188,14 +207,15 @@ export const usePriceWebSocket = (options: UsePriceWebSocketOptions = {}) => {
 
     if (!enabled || !isAuthenticated) {
       priceWebSocket.disconnect();
-      stopPollingFallback();
+      stopPollingFallbackRef.current();
       return;
     }
 
     if (WEBSOCKET_ENABLED) {
-      // Subscribe to WebSocket events
-      const unsubMessage = priceWebSocket.onMessage(handleMessage);
-      const unsubStatus = priceWebSocket.onStatusChange(handleStatusChange);
+      // Subscribe to WebSocket events using refs to break dependency chain
+      // This prevents infinite re-renders when callbacks change
+      const unsubMessage = priceWebSocket.onMessage((msg) => handleMessageRef.current(msg));
+      const unsubStatus = priceWebSocket.onStatusChange((status) => handleStatusChangeRef.current(status));
 
       // Connect
       priceWebSocket.connect();
@@ -204,24 +224,17 @@ export const usePriceWebSocket = (options: UsePriceWebSocketOptions = {}) => {
         unsubMessage();
         unsubStatus();
         priceWebSocket.disconnect();
-        stopPollingFallback();
+        stopPollingFallbackRef.current();
       };
     } else {
       // WebSocket disabled, use polling only
-      startPollingFallback();
+      startPollingFallbackRef.current();
 
       return () => {
-        stopPollingFallback();
+        stopPollingFallbackRef.current();
       };
     }
-  }, [
-    enabled,
-    isAuthenticated,
-    handleMessage,
-    handleStatusChange,
-    startPollingFallback,
-    stopPollingFallback,
-  ]);
+  }, [enabled, isAuthenticated]); // Only primitive dependencies - refs handle callback changes
 
   // Manual refresh - force fetch via REST regardless of WebSocket status
   const refresh = useCallback(async () => {

@@ -1,5 +1,6 @@
 // Auth Slice
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { DEMO_TOKEN } from '../../constants/business';
 
 interface AuthState {
   phone: string | null;
@@ -31,7 +32,7 @@ const authSlice = createSlice({
     },
     // Demo mode: skip directly to main app with mock data
     enableDemoMode: (state) => {
-      state.authToken = 'demo-token';
+      state.authToken = DEMO_TOKEN;
       state.isAuthenticated = true;
       state.onboardingComplete = true;
       state.phone = '+989123456789';

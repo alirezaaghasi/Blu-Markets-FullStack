@@ -59,27 +59,32 @@ export async function triggerPriceUpdate(): Promise<void> {
 
 /**
  * Fetch prices with basic retry logic
+ * Uses iterative loop instead of tail recursion to prevent stack overflow
  */
-async function fetchPricesWithRetry(retries = 2): Promise<void> {
+async function fetchPricesWithRetry(maxRetries = 2): Promise<void> {
   if (isPolling) {
     logger.debug('Price fetch already in progress, skipping');
     return;
   }
 
   isPolling = true;
+  let attempts = 0;
 
-  try {
-    await updateAllPrices();
-  } catch (error) {
-    logger.error('Failed to fetch prices', error);
-
-    if (retries > 0) {
-      logger.info('Retrying price fetch', { retriesLeft: retries });
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+  while (attempts <= maxRetries) {
+    try {
+      await updateAllPrices();
       isPolling = false;
-      return fetchPricesWithRetry(retries - 1);
+      return; // Success - exit the function
+    } catch (error) {
+      attempts++;
+      logger.error('Failed to fetch prices', error);
+
+      if (attempts <= maxRetries) {
+        logger.info('Retrying price fetch', { attempt: attempts, maxRetries });
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
     }
-  } finally {
-    isPolling = false;
   }
+
+  isPolling = false;
 }
