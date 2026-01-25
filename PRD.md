@@ -606,6 +606,24 @@ function buildInitialHoldings(
 | | MATIC | 15% | 14% | 2,100,000 | 3.21 MATIC |
 | | ARB | 15% | 14% | 2,100,000 | 1.80 ARB |
 
+### 5.2 Funding Rules
+
+| Funding Type | Asset Allocation | Cash Wallet |
+|--------------|------------------|-------------|
+| **Initial Funding** (onboarding) | 100% | 0% |
+| **Add Funds** (post-onboarding) | 0% | 100% |
+
+**Initial Funding Behavior:**
+- User's entire initial investment is converted to assets according to their risk profile
+- No cash buffer is maintained
+- Any remainder from rounding is redistributed proportionally to holdings
+- Result: Portfolio starts fully invested with cashIrr = 0
+
+**Add Funds Behavior:**
+- When user adds funds after onboarding, 100% goes to cash wallet
+- User can then manually trade to acquire assets
+- This allows user control over timing and asset selection
+
 ---
 
 # PART E: INTRA-LAYER BALANCING (HRAM)

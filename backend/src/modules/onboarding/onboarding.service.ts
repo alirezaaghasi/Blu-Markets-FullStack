@@ -50,9 +50,10 @@ const LAYER_ASSETS: Record<Layer, Array<{ assetId: AssetId; weight: number }>> =
 // Minimum trade amount in IRR (1 million IRR)
 const MIN_TRADE_AMOUNT_IRR = 1_000_000;
 
-// No cash buffer during onboarding - invest 100% into assets
-// When user adds funds later, 100% goes to cash wallet
-const CASH_BUFFER_PCT = 0; // 0%
+// FUNDING RULES:
+// - Initial Funding: 100% goes to assets, 0% to cash (remaining from rounding is redistributed)
+// - Add Funds: 100% goes to cash wallet (user then trades manually)
+const CASH_BUFFER_PCT = 0; // 0% - not used, kept for reference
 
 export async function submitQuestionnaire(
   userId: string,
@@ -214,13 +215,45 @@ export async function createInitialPortfolio(
   processLayer(upsideAmount, 'UPSIDE');
 
   // MONEY FIX M-02: Calculate total holdings value using Decimal
-  const totalHoldingsValueDecimal = holdingsToCreate.reduce(
+  let totalHoldingsValueDecimal = holdingsToCreate.reduce(
     (sum, h) => add(sum, h.valueIrr),
     toDecimal(0)
   );
+
+  // INITIAL FUNDING: 100% goes to assets, 0% to cash
+  // Redistribute any remaining amount (from rounding) proportionally to holdings
+  let remainingCashDecimal = subtract(totalAmountDecimal, totalHoldingsValueDecimal);
+
+  if (isGreaterThan(remainingCashDecimal, 0) && holdingsToCreate.length > 0) {
+    // Distribute remaining cash proportionally to each holding
+    const remainingAmount = toNumber(remainingCashDecimal);
+    const totalValue = toNumber(totalHoldingsValueDecimal);
+
+    for (const holding of holdingsToCreate) {
+      const proportion = holding.valueIrr / totalValue;
+      const additionalValue = roundIrr(multiply(remainingAmount, proportion));
+      const additionalValueNum = toNumber(additionalValue);
+
+      // Get price to calculate additional quantity
+      const price = prices.get(holding.assetId as AssetId);
+      if (price && price.priceIrr > 0) {
+        const additionalQuantity = toNumber(roundCrypto(divide(additionalValue, price.priceIrr)));
+        holding.quantity += additionalQuantity;
+        holding.valueIrr += additionalValueNum;
+      }
+    }
+
+    // Recalculate totals after redistribution
+    totalHoldingsValueDecimal = holdingsToCreate.reduce(
+      (sum, h) => add(sum, h.valueIrr),
+      toDecimal(0)
+    );
+    remainingCashDecimal = subtract(totalAmountDecimal, totalHoldingsValueDecimal);
+  }
+
   const totalHoldingsValue = toNumber(roundIrr(totalHoldingsValueDecimal));
-  const remainingCashDecimal = subtract(totalAmountDecimal, totalHoldingsValueDecimal);
-  const remainingCash = toNumber(roundIrr(remainingCashDecimal));
+  // Any tiny remaining due to rounding goes to the first holding
+  const remainingCash = 0; // Initial funding: 0% cash
 
   // Calculate actual allocation percentages using Decimal
   const foundationValueDecimal = holdingsToCreate
