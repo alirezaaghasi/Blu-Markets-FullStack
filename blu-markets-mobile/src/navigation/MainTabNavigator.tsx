@@ -1,16 +1,16 @@
 // Main Tab Navigator
 // Based on UI Restructure Specification - 4 Tabs Only
-// Home, Portfolio, Services, Profile
+// Home, Portfolio, Market, Profile
 
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Home, PieChart, Briefcase, User } from 'lucide-react-native';
+import { Home, PieChart, TrendingUp, User } from 'lucide-react-native';
 import { MainTabParamList } from './types';
 
 // Import screens
 import HomeScreen from '../screens/main/HomeScreen';
 import PortfolioScreen from '../screens/main/PortfolioScreen';
-import ServicesScreen from '../screens/services/ServicesScreen';
+import MarketScreen from '../screens/services/ServicesScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -51,10 +51,10 @@ export function MainTabNavigator() {
         }}
       />
       <Tab.Screen
-        name="Services"
-        component={ServicesScreen}
+        name="Market"
+        component={MarketScreen}
         options={{
-          tabBarIcon: ({ color }) => <Briefcase color={color} size={24} />,
+          tabBarIcon: ({ color }) => <TrendingUp color={color} size={24} />,
         }}
       />
       <Tab.Screen

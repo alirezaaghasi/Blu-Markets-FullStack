@@ -22,11 +22,11 @@ export type OnboardingStackParamList = {
 };
 
 // Main Tab Navigator (4 tabs per UI Restructure Spec)
-// Home, Portfolio, Services, Profile - NO History or Market tabs
+// Home, Portfolio, Market, Profile
 export type MainTabParamList = {
   Home: undefined;
   Portfolio: undefined;
-  Services: {
+  Market: {
     initialTab?: 'loans' | 'protection';
     loanId?: string;
     protectionId?: string;
