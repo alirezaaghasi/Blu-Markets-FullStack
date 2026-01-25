@@ -17,6 +17,7 @@ import {
   isLessThan,
   Decimal,
 } from '../../utils/money.js';
+import { logger } from '../../utils/logger.js';
 
 // ============================================================
 // INITIAL ALLOCATION CONFIGURATION
@@ -191,7 +192,7 @@ export async function createInitialPortfolio(
       // Get price for this asset
       const price = prices.get(asset.assetId);
       if (!price || price.priceIrr <= 0) {
-        console.error(`Price not available for ${asset.assetId}, skipping`);
+        logger.error('Price not available, skipping asset', undefined, { assetId: asset.assetId });
         continue;
       }
 

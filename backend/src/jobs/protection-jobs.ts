@@ -9,6 +9,7 @@ import cron from 'node-cron';
 import { prisma } from '../config/database.js';
 import { getCurrentPrices } from '../services/price-fetcher.service.js';
 import { calculateSettlement } from '../services/protection-pricing.service.js';
+import { logger } from '../utils/logger.js';
 import type { AssetId } from '../types/domain.js';
 import type { Protection } from '@prisma/client';
 
@@ -30,18 +31,18 @@ interface PriceData {
  * Initialize all protection-related scheduled jobs
  */
 export function initializeProtectionJobs(): void {
-  console.log('[PROTECTION JOBS] Initializing scheduled jobs...');
+  logger.info('Initializing protection scheduled jobs');
 
   // Process expired protections daily at midnight UTC
   cron.schedule(
     '0 0 * * *',
     async () => {
-      console.log('[CRON] Running protection expiry processing...');
+      logger.info('Running protection expiry processing');
       try {
         const result = await processExpiredProtections();
-        console.log('[CRON] Expiry processing completed:', result);
+        logger.info('Expiry processing completed', { ...result });
       } catch (error) {
-        console.error('[CRON] Expiry processing failed:', error);
+        logger.error('Expiry processing failed', error);
       }
     },
     { timezone: 'UTC' }
@@ -51,18 +52,18 @@ export function initializeProtectionJobs(): void {
   cron.schedule(
     '0 */6 * * *',
     async () => {
-      console.log('[CRON] Running risk exposure check...');
+      logger.info('Running risk exposure check');
       try {
         const exposure = await checkRiskExposure();
-        console.log('[CRON] Risk exposure:', exposure);
+        logger.info('Risk exposure calculated', { ...exposure });
       } catch (error) {
-        console.error('[CRON] Risk exposure check failed:', error);
+        logger.error('Risk exposure check failed', error);
       }
     },
     { timezone: 'UTC' }
   );
 
-  console.log('[PROTECTION JOBS] Scheduled jobs initialized');
+  logger.info('Protection scheduled jobs initialized');
 }
 
 // ============================================================================
@@ -104,7 +105,7 @@ export async function processExpiredProtections(): Promise<ExpiryResult> {
     },
   });
 
-  console.log(`[EXPIRY] Found ${expiredProtections.length} expired protections to process`);
+  logger.info('Found expired protections to process', { count: expiredProtections.length });
 
   // Get current prices
   const prices = await getCurrentPrices();
@@ -116,7 +117,7 @@ export async function processExpiredProtections(): Promise<ExpiryResult> {
         result.processed++;
       }
     } catch (error) {
-      console.error(`[EXPIRY] Failed to process protection ${protection.id}:`, error);
+      logger.error('Failed to process protection', error, { protectionId: protection.id });
       result.errors++;
     }
   }
@@ -139,10 +140,11 @@ async function processProtectionExpiry(
   if (!priceData) {
     // IMPORTANT: Do not expire protections when price data is unavailable.
     // This could be a transient price feed outage - retry on next job run.
-    console.warn(
-      `[EXPIRY] No price data for ${assetId}, skipping protection ${protection.id}. ` +
-        `Will retry on next scheduled run.`
-    );
+    logger.warn('No price data for asset, skipping protection', {
+      assetId,
+      protectionId: protection.id,
+      note: 'Will retry on next scheduled run',
+    });
     result.pendingPriceData++;
     return false; // Not processed - will retry
   }
@@ -172,9 +174,10 @@ async function processProtectionExpiry(
 
   // Guard against division by zero for FX rate calculation
   if (expiryPriceUsd <= 0) {
-    console.error(
-      `[EXPIRY] Invalid expiry price USD (${expiryPriceUsd}) for protection ${protection.id}, skipping`
-    );
+    logger.error('Invalid expiry price USD, skipping protection', undefined, {
+      expiryPriceUsd,
+      protectionId: protection.id,
+    });
     result.errors++;
     return false;
   }
@@ -189,18 +192,20 @@ async function processProtectionExpiry(
     result.exercised++;
     result.totalSettlementIrr += settlement.payoutIrr;
 
-    console.log(
-      `[EXPIRY] Protection ${protection.id} exercised: ${assetId} dropped below strike. ` +
-        `Payout: ${settlement.payoutIrr.toLocaleString()} IRR`
-    );
+    logger.info('Protection exercised', {
+      protectionId: protection.id,
+      assetId,
+      payoutIrr: settlement.payoutIrr,
+    });
   } else {
     // Protection expired worthless
     await markProtectionExpired(protection, 0);
     result.expired++;
 
-    console.log(
-      `[EXPIRY] Protection ${protection.id} expired worthless: ${assetId} above strike`
-    );
+    logger.info('Protection expired worthless', {
+      protectionId: protection.id,
+      assetId,
+    });
   }
 
   return true; // Successfully processed
@@ -234,7 +239,7 @@ async function exerciseProtection(
 
     // If no rows updated, protection was already processed
     if (updateResult.count === 0) {
-      console.warn(`[EXPIRY] Protection ${protection.id} already processed, skipping`);
+      logger.warn('Protection already processed, skipping', { protectionId: protection.id });
       return;
     }
 
@@ -315,7 +320,7 @@ async function markProtectionExpired(protection: ProtectionRecord, settlementIrr
 
     // If no rows updated, protection was already processed
     if (updateResult.count === 0) {
-      console.warn(`[EXPIRY] Protection ${protection.id} already processed, skipping`);
+      logger.warn('Protection already processed, skipping', { protectionId: protection.id });
       return;
     }
 
@@ -420,10 +425,10 @@ export async function checkRiskExposure(): Promise<RiskExposure> {
   // Log warning if exposure is high
   const WARN_THRESHOLD_USD = 100_000;
   if (exposure.totalNotionalUsd > WARN_THRESHOLD_USD) {
-    console.warn(
-      `[RISK] High naked exposure: $${exposure.totalNotionalUsd.toFixed(0)} ` +
-        `(threshold: $${WARN_THRESHOLD_USD})`
-    );
+    logger.warn('High naked exposure', {
+      totalNotionalUsd: exposure.totalNotionalUsd,
+      thresholdUsd: WARN_THRESHOLD_USD,
+    });
   }
 
   return exposure;
@@ -437,7 +442,7 @@ export async function checkRiskExposure(): Promise<RiskExposure> {
  * Manually trigger expiry processing (for testing)
  */
 export async function triggerExpiryProcessing(): Promise<ExpiryResult> {
-  console.log('[MANUAL] Triggering expiry processing...');
+  logger.info('Manually triggering expiry processing');
   return processExpiredProtections();
 }
 

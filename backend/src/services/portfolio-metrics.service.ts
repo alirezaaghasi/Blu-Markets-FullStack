@@ -1,9 +1,14 @@
 // Portfolio Metrics Worker
 // Periodically recalculates portfolio metrics (allocation, drift, status)
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { env } from '../config/env.js';
 import { getCurrentPrices } from './price-fetcher.service.js';
+import { logger } from '../utils/logger.js';
 import type { AssetId, Layer, TargetAllocation, PortfolioStatus } from '../types/domain.js';
+
+// Prisma Decimal type alias for cleaner signatures
+type Decimal = Prisma.Decimal;
 
 let metricsInterval: NodeJS.Timeout | null = null;
 
@@ -12,12 +17,12 @@ let metricsInterval: NodeJS.Timeout | null = null;
  */
 export function startPortfolioMetricsWorker(): void {
   if (!env.ENABLE_PORTFOLIO_METRICS) {
-    console.log('Portfolio metrics worker disabled');
+    logger.info('Portfolio metrics worker disabled');
     return;
   }
 
   const intervalMs = env.PORTFOLIO_METRICS_INTERVAL_MS || 60000; // 1 minute default
-  console.log('Starting portfolio metrics worker (interval: ' + (intervalMs / 1000) + 's)');
+  logger.info('Starting portfolio metrics worker', { intervalSec: intervalMs / 1000 });
 
   // Run immediately
   updateAllPortfolioMetrics();
@@ -33,7 +38,7 @@ export function stopPortfolioMetricsWorker(): void {
   if (metricsInterval) {
     clearInterval(metricsInterval);
     metricsInterval = null;
-    console.log('Portfolio metrics worker stopped');
+    logger.info('Portfolio metrics worker stopped');
   }
 }
 
@@ -81,10 +86,10 @@ async function updateAllPortfolioMetrics(): Promise<void> {
 
     const duration = Date.now() - startTime;
     if (updatedCount > 0 || statusChangedCount > 0) {
-      console.log('Portfolio metrics updated: ' + updatedCount + ' portfolios, ' + statusChangedCount + ' status changes (' + duration + 'ms)');
+      logger.info('Portfolio metrics updated', { updatedCount, statusChangedCount, durationMs: duration });
     }
   } catch (error) {
-    console.error('Portfolio metrics update error:', error);
+    logger.error('Portfolio metrics update error', error);
   }
 }
 
@@ -94,13 +99,13 @@ async function updateAllPortfolioMetrics(): Promise<void> {
 async function updatePortfolioMetrics(
   portfolio: {
     id: string;
-    cashIrr: any;
+    cashIrr: Decimal | number | string;
     status: PortfolioStatus;
-    holdings: { assetId: string; quantity: any; layer: string }[];
+    holdings: { assetId: string; quantity: Decimal | number | string; layer: string }[];
     user: {
-      targetFoundation: any;
-      targetGrowth: any;
-      targetUpside: any;
+      targetFoundation: Decimal | number | string | null;
+      targetGrowth: Decimal | number | string | null;
+      targetUpside: Decimal | number | string | null;
     };
   },
   prices: Map<AssetId, { priceIrr: number; priceUsd: number }>

@@ -216,6 +216,8 @@ model Loan {
 
   @@index([portfolioId])
   @@index([status])
+  @@index([portfolioId, status]) // Compound index for active loans by portfolio
+  @@index([status, dueDate])     // Compound index for overdue loan checks
   @@map("loans")
 }
 

@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
+import { Prisma } from '@prisma/client';
 import { authenticate } from '../../middleware/auth.js';
 import { prisma } from '../../config/database.js';
 import { AppError } from '../../middleware/error-handler.js';
@@ -43,10 +44,10 @@ export const historyRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
       const { page = 1, limit = 20, type, from, to } = request.query;
       const skip = (page - 1) * limit;
 
-      const where: any = { portfolioId: portfolio.id };
+      const where: Prisma.LedgerEntryWhereInput = { portfolioId: portfolio.id };
 
       if (type) {
-        where.entryType = type;
+        where.entryType = type as Prisma.EnumLedgerEntryTypeFilter;
       }
 
       if (from || to) {
@@ -199,7 +200,7 @@ export const historyRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
       const { cursor, limit = 20 } = request.query;
 
       // MEDIUM-2 FIX: Validate cursor is a valid positive integer before use
-      const where: any = { portfolioId: portfolio.id };
+      const where: Prisma.ActionLogWhereInput = { portfolioId: portfolio.id };
       if (cursor) {
         const cursorNum = parseInt(cursor, 10);
         if (isNaN(cursorNum) || cursorNum < 0 || !Number.isInteger(cursorNum)) {

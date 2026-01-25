@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { env } from '../config/env.js';
 import { FALLBACK_FX_RATE, type AssetId } from '../types/domain.js';
 import { priceBroadcaster } from './price-broadcaster.service.js';
+import { logger } from '../utils/logger.js';
 
 // =============================================================================
 // SECURITY FIX M-03: Fetch utilities with timeout and retry
@@ -46,9 +47,9 @@ async function fetchWithRetry(
     } catch (error) {
       lastError = error as Error;
       if ((error as Error).name === 'AbortError') {
-        console.warn(`Request timeout for ${url}, attempt ${attempt + 1}/${maxRetries}`);
+        logger.warn('Request timeout', { url, attempt: attempt + 1, maxRetries });
       } else {
-        console.warn(`Request failed for ${url}, attempt ${attempt + 1}/${maxRetries}:`, (error as Error).message);
+        logger.warn('Request failed', { url, attempt: attempt + 1, maxRetries, error: (error as Error).message });
       }
 
       // Don't wait after the last attempt
@@ -149,7 +150,7 @@ export async function fetchFxRate(): Promise<FxRate> {
 
     throw new Error('Invalid Bonbast response');
   } catch (error) {
-    console.error('Failed to fetch FX rate:', error);
+    logger.error('Failed to fetch FX rate', error);
     return { usdIrr: FALLBACK_FX_RATE, source: 'fallback' };
   }
 }
@@ -192,7 +193,7 @@ export async function fetchCryptoPrices(): Promise<FetchedPrice[]> {
 
     return prices;
   } catch (error) {
-    console.error('Failed to fetch crypto prices:', error);
+    logger.error('Failed to fetch crypto prices', error);
     return [];
   }
 }
@@ -200,7 +201,7 @@ export async function fetchCryptoPrices(): Promise<FetchedPrice[]> {
 // Fetch stock/ETF prices from Finnhub
 export async function fetchStockPrices(): Promise<FetchedPrice[]> {
   if (!env.FINNHUB_API_KEY) {
-    console.warn('FINNHUB_API_KEY not configured');
+    logger.warn('FINNHUB_API_KEY not configured');
     return [];
   }
 
@@ -233,7 +234,7 @@ export async function fetchStockPrices(): Promise<FetchedPrice[]> {
         });
       }
     } catch (error) {
-      console.error(`Failed to fetch ${symbol} price:`, error);
+      logger.error('Failed to fetch stock price', error, { symbol });
     }
   }
 
@@ -366,7 +367,7 @@ export async function updateAllPrices(): Promise<void> {
   priceBroadcaster.broadcastAllPrices(priceUpdates);
 
   const duration = Date.now() - startTime;
-  console.log(`✅ Updated ${allPrices.length} prices in ${duration}ms (broadcast sent)`);
+  logger.info('Updated prices', { count: allPrices.length, durationMs: duration });
 }
 
 // Get current prices from database with 5-second in-memory cache

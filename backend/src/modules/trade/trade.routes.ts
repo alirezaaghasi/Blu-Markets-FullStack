@@ -105,6 +105,7 @@ export const tradeRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
                 quantity: { type: 'number' },
                 amountIrr: { type: 'number' },
                 priceIrr: { type: 'number' },
+                priceUsd: { type: 'number' },
               },
             },
             newBalance: {

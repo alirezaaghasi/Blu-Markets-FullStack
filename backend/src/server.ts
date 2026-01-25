@@ -5,27 +5,27 @@ import { connectDatabase, disconnectDatabase } from './config/database.js';
 import { startPricePolling, stopPricePolling } from './services/price-polling.service.js';
 import { startBackgroundJobs, stopBackgroundJobs } from './services/background-jobs.service.js';
 import { startPortfolioMetricsWorker, stopPortfolioMetricsWorker } from './services/portfolio-metrics.service.js';
+import { setupGracefulShutdown, registerShutdownHandler } from './utils/shutdown.js';
 
 async function main() {
+  // Setup graceful shutdown handlers first
+  setupGracefulShutdown();
+
   // Connect to database
   await connectDatabase();
 
   // Build Fastify app
   const app = await buildApp();
 
-  // Graceful shutdown
-  const signals = ['SIGINT', 'SIGTERM'];
-  signals.forEach((signal) => {
-    process.on(signal, async () => {
-      app.log.info(`Received ${signal}, shutting down gracefully...`);
-      stopPricePolling();
-      stopBackgroundJobs();
-      stopPortfolioMetricsWorker();
-      await app.close();
-      await disconnectDatabase();
-      process.exit(0);
-    });
-  });
+  // Register shutdown handlers in priority order
+  // 1. Stop accepting new requests
+  registerShutdownHandler('http-server', () => app.close(), 1);
+  // 2. Stop background workers (setInterval-based)
+  registerShutdownHandler('price-polling', stopPricePolling, 5);
+  registerShutdownHandler('background-jobs', stopBackgroundJobs, 5);
+  registerShutdownHandler('portfolio-metrics', stopPortfolioMetricsWorker, 5);
+  // 3. Close database connection last
+  registerShutdownHandler('database', disconnectDatabase, 10);
 
   // Start server
   try {

@@ -3,6 +3,7 @@ import { createSigner, createVerifier } from 'fast-jwt';
 import { prisma } from '../../config/database.js';
 import { env } from '../../config/env.js';
 import { AppError } from '../../middleware/error-handler.js';
+import { logger } from '../../utils/logger.js';
 import type { AuthTokens } from '../../types/api.js';
 
 const REFRESH_TOKEN_EXPIRY_DAYS = 7;
@@ -192,7 +193,7 @@ export class AuthService {
     if (session.refreshTokenHash !== presentedTokenHash) {
       // SECURITY: Token reuse detected - this token was already rotated
       // An attacker may have stolen the old token. Revoke ALL user sessions as precaution.
-      console.warn(`🚨 Token reuse detected for user ${session.userId}. Revoking all sessions.`);
+      logger.warn('Token reuse detected, revoking all sessions', { userId: session.userId });
       await this.revokeAllUserSessions(session.userId);
       throw new AppError('UNAUTHORIZED', 'Token reuse detected. All sessions revoked for security.', 401);
     }

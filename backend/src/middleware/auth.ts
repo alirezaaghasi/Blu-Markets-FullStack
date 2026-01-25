@@ -59,3 +59,12 @@ export async function optionalAuth(
     // Token not required, continue without auth
   }
 }
+
+/**
+ * Verify an access token and return the payload.
+ * Use this for WebSocket or other contexts where you have a raw token.
+ * Throws if token is invalid or expired.
+ */
+export function verifyAccessTokenPayload(token: string): JwtPayload {
+  return verifyAccessToken(token) as JwtPayload;
+}

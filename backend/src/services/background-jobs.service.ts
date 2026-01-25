@@ -3,6 +3,7 @@
 import { prisma } from '../config/database.js';
 import { env } from '../config/env.js';
 import { getCurrentPrices } from './price-fetcher.service.js';
+import { logger } from '../utils/logger.js';
 import type { AssetId } from '../types/domain.js';
 
 // Critical LTV threshold for auto-liquidation (90%)
@@ -19,17 +20,17 @@ let jobIntervals: {
  */
 export function startBackgroundJobs(): void {
   if (!env.ENABLE_BACKGROUND_JOBS) {
-    console.log('Background jobs disabled');
+    logger.info('Background jobs disabled');
     return;
   }
 
-  console.log('Starting background jobs');
+  logger.info('Starting background jobs');
 
   // Loan liquidation check every 5 minutes
   const loanIntervalMs = env.LOAN_CHECK_INTERVAL_MS || 5 * 60 * 1000;
   runLoanLiquidationCheck(); // Run immediately
   jobIntervals.loanCheck = setInterval(runLoanLiquidationCheck, loanIntervalMs);
-  console.log('  Loan liquidation check: every ' + (loanIntervalMs / 1000) + 's');
+  logger.info('Loan liquidation check scheduled', { intervalSec: loanIntervalMs / 1000 });
 
   // Note: Protection expiry is handled by protection-jobs.ts cron job (settlement-aware)
 }
@@ -42,7 +43,7 @@ export function stopBackgroundJobs(): void {
     clearInterval(jobIntervals.loanCheck);
     jobIntervals.loanCheck = null;
   }
-  console.log('Background jobs stopped');
+  logger.info('Background jobs stopped');
 }
 
 /**
@@ -74,7 +75,7 @@ async function runLoanLiquidationCheck(): Promise<void> {
       const price = prices.get(assetId);
 
       if (!price) {
-        console.warn('No price available for ' + assetId + ', skipping LTV check');
+        logger.warn('No price available, skipping LTV check', { assetId });
         continue;
       }
 
@@ -85,7 +86,7 @@ async function runLoanLiquidationCheck(): Promise<void> {
 
       // Guard against division by zero
       if (collateralValueIrr <= 0) {
-        console.warn(`Invalid collateral value for loan ${loan.id}`);
+        logger.warn('Invalid collateral value for loan', { loanId: loan.id });
         await prisma.loan.update({ where: { id: loan.id }, data: { currentLtv: 1.0 } });
         continue;
       }
@@ -101,17 +102,17 @@ async function runLoanLiquidationCheck(): Promise<void> {
 
       // Check if liquidation is needed
       if (currentLtv >= CRITICAL_LTV_THRESHOLD) {
-        console.log('Liquidating loan ' + loan.id + ': LTV ' + (currentLtv * 100).toFixed(1) + '%');
+        logger.info('Liquidating loan', { loanId: loan.id, ltvPct: (currentLtv * 100).toFixed(1) });
         await liquidateLoan(loan.id, collateralValueIrr, remainingDue);
         liquidatedCount++;
       }
     }
 
     if (liquidatedCount > 0) {
-      console.log('Liquidated ' + liquidatedCount + ' loan(s)');
+      logger.info('Loans liquidated', { count: liquidatedCount });
     }
   } catch (error) {
-    console.error('Loan liquidation check error:', error);
+    logger.error('Loan liquidation check error', error);
   }
 }
 
@@ -136,7 +137,7 @@ async function liquidateLoan(
 
     // If loan not found or not active, it was already processed
     if (!loan) {
-      console.log(`[LIQUIDATION] Loan ${loanId} already processed or not found, skipping`);
+      logger.info('Loan already processed or not found, skipping', { loanId });
       return;
     }
 

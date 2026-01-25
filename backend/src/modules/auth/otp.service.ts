@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import { prisma } from '../../config/database.js';
 import { env } from '../../config/env.js';
 import { AppError } from '../../middleware/error-handler.js';
+import { logger } from '../../utils/logger.js';
 
 const BCRYPT_SALT_ROUNDS = 10;
 
@@ -67,7 +68,7 @@ export async function verifyOtp(phone: string, code: string): Promise<boolean> {
     env.NODE_ENV === 'development';
 
   if (isDevBypassAllowed && code === '999999') {
-    console.warn(`⚠️ OTP bypass used for ${phone} - dev only`);
+    logger.warn('OTP bypass used (dev only)', { phone });
     return true;
   }
 
@@ -115,15 +116,16 @@ export async function verifyOtp(phone: string, code: string): Promise<boolean> {
 }
 
 async function sendSms(phone: string, code: string): Promise<void> {
-  // In development, log the code
+  // In development, log that OTP was generated (but not the actual code for security)
   if (env.NODE_ENV === 'development') {
-    console.log(`📱 OTP for ${phone}: ${code}`);
+    // SECURITY: Never log actual OTP codes, even in development
+    logger.debug('OTP generated for development', { phone, codeLength: code.length });
     return;
   }
 
   // Production: Send via Kavenegar
   if (!env.KAVENEGAR_API_KEY) {
-    console.warn('KAVENEGAR_API_KEY not configured, OTP not sent');
+    logger.warn('KAVENEGAR_API_KEY not configured, OTP not sent');
     return;
   }
 
@@ -142,10 +144,10 @@ async function sendSms(phone: string, code: string): Promise<void> {
     );
 
     if (!response.ok) {
-      console.error('Kavenegar SMS failed:', await response.text());
+      logger.error('Kavenegar SMS failed', undefined, { response: await response.text() });
     }
   } catch (error) {
-    console.error('Failed to send SMS:', error);
+    logger.error('Failed to send SMS', error);
   }
 }
 

@@ -22,6 +22,7 @@ import {
 } from './volatility.service.js';
 import { getCurrentPrices } from './price-fetcher.service.js';
 import { AppError } from '../middleware/error-handler.js';
+import { logger } from '../utils/logger.js';
 import type { AssetId, Layer } from '../types/domain.js';
 
 // ============================================================================
@@ -755,7 +756,7 @@ export async function getPremiumCurve(
       });
     } catch (error) {
       // Skip invalid durations
-      console.error(`Failed to generate quote for ${durationDays} days:`, error);
+      logger.error('Failed to generate quote', error, { durationDays });
     }
   }
 
@@ -943,7 +944,7 @@ export function calculateSettlement(
 ): { isITM: boolean; payoutUsd: number; payoutIrr: number } {
   // Guard against invalid strike price (prevents division by zero)
   if (strikeUsd <= 0) {
-    console.error(`Invalid strike price for settlement: ${strikeUsd}`);
+    logger.error('Invalid strike price for settlement', undefined, { strikeUsd });
     return { isITM: false, payoutUsd: 0, payoutIrr: 0 };
   }
 

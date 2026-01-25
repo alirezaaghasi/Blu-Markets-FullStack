@@ -26,6 +26,7 @@ import {
   min,
   Decimal,
 } from '../../utils/money.js';
+import { logger } from '../../utils/logger.js';
 
 // Rebalance modes per PRD Section 18.3
 export type RebalanceMode = 'HOLDINGS_ONLY' | 'HOLDINGS_PLUS_CASH' | 'SMART';
@@ -222,7 +223,7 @@ export async function executeRebalance(
 
         // CRITICAL: Check frozen status - can't sell collateral
         if (holding.frozen) {
-          console.warn(`[REBALANCE] Skipping frozen asset ${trade.assetId}`);
+          logger.warn('Skipping frozen asset in rebalance', { assetId: trade.assetId });
           continue;
         }
 

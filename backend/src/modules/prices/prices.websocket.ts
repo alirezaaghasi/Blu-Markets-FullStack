@@ -2,6 +2,8 @@ import { FastifyInstance, FastifyRequest } from 'fastify';
 import { WebSocket } from 'ws';
 import { priceBroadcaster, PriceUpdate, FxUpdate } from '../../services/price-broadcaster.service.js';
 import { getCurrentPrices, getCurrentFxRate } from '../../services/price-fetcher.service.js';
+import { verifyAccessTokenPayload } from '../../middleware/auth.js';
+import { logger } from '../../utils/logger.js';
 import type { AssetId } from '../../types/domain.js';
 
 const HEARTBEAT_INTERVAL_MS = 30000; // 30 seconds
@@ -26,7 +28,7 @@ export async function registerPriceWebSocket(app: FastifyInstance): Promise<void
   const heartbeatInterval = setInterval(() => {
     clients.forEach((state, socket) => {
       if (!state.isAlive) {
-        console.log('📡 Terminating inactive WebSocket client');
+        logger.debug('Terminating inactive WebSocket client');
         clients.delete(socket);
         return socket.terminate();
       }
@@ -57,7 +59,7 @@ export async function registerPriceWebSocket(app: FastifyInstance): Promise<void
     const isDev = process.env.NODE_ENV === 'development';
 
     if (!isDev && origin && !allowedWsOrigins.includes(origin)) {
-      console.log(`📡 WebSocket connection rejected: Invalid origin ${origin}`);
+      logger.warn('WebSocket connection rejected: Invalid origin', { origin });
       socket.close(4003, 'Origin not allowed');
       return;
     }
@@ -70,27 +72,27 @@ export async function registerPriceWebSocket(app: FastifyInstance): Promise<void
     const queryToken = (req.query as Record<string, string>).token;
 
     if (queryToken && !headerToken) {
-      console.warn('📡 WebSocket using query string token (deprecated) - consider using Authorization header');
+      logger.warn('WebSocket using query string token (deprecated)');
     }
 
     const token = headerToken || queryToken;
 
     if (!token) {
-      console.log('📡 WebSocket connection rejected: No token provided');
+      logger.warn('WebSocket connection rejected: No token provided');
       socket.close(4001, 'Authentication required');
       return;
     }
 
     try {
-      // Use access namespace for token verification (separate from refresh tokens)
-      await (req as any).accessVerify({ token });
+      // Verify token using the same verifier as REST endpoints
+      verifyAccessTokenPayload(token);
     } catch (error) {
-      console.log('📡 WebSocket connection rejected: Invalid token');
+      logger.warn('WebSocket connection rejected: Invalid token');
       socket.close(4001, 'Invalid token');
       return;
     }
 
-    console.log('📡 WebSocket client connected (authenticated)');
+    logger.info('WebSocket client connected (authenticated)');
 
     // Initialize client state
     const clientState: ClientState = {
@@ -143,7 +145,7 @@ export async function registerPriceWebSocket(app: FastifyInstance): Promise<void
         }));
       }
     } catch (error) {
-      console.error('Failed to send initial prices:', error);
+      logger.error('Failed to send initial prices', error);
     }
 
     // Handle incoming messages (subscriptions)
@@ -188,12 +190,12 @@ export async function registerPriceWebSocket(app: FastifyInstance): Promise<void
 
     // Handle disconnect
     socket.on('close', () => {
-      console.log('📡 WebSocket client disconnected');
+      logger.debug('WebSocket client disconnected');
       clients.delete(socket);
     });
 
     socket.on('error', (error: Error) => {
-      console.error('WebSocket error:', error);
+      logger.error('WebSocket error', error);
       clients.delete(socket);
     });
   });
@@ -243,5 +245,5 @@ export async function registerPriceWebSocket(app: FastifyInstance): Promise<void
     });
   });
 
-  console.log('✅ Price WebSocket registered at /api/v1/prices/stream');
+  logger.info('Price WebSocket registered', { path: '/api/v1/prices/stream' });
 }

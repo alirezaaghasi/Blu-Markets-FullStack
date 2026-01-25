@@ -1,5 +1,6 @@
 import { env } from '../config/env.js';
 import { updateAllPrices } from './price-fetcher.service.js';
+import { logger } from '../utils/logger.js';
 
 let pollingInterval: NodeJS.Timeout | null = null;
 let isPolling = false;
@@ -10,17 +11,17 @@ let isPolling = false;
  */
 export function startPricePolling(): void {
   if (!env.PRICE_POLL_ENABLED) {
-    console.log('⏸️  Price polling disabled via PRICE_POLL_ENABLED');
+    logger.info('Price polling disabled via PRICE_POLL_ENABLED');
     return;
   }
 
   if (pollingInterval) {
-    console.warn('Price polling already running');
+    logger.warn('Price polling already running');
     return;
   }
 
   const intervalMs = env.PRICE_POLL_INTERVAL_MS;
-  console.log(`🔄 Starting price polling (interval: ${intervalMs}ms)`);
+  logger.info('Starting price polling', { intervalMs });
 
   // Fetch immediately on start
   fetchPricesWithRetry();
@@ -38,7 +39,7 @@ export function stopPricePolling(): void {
   if (pollingInterval) {
     clearInterval(pollingInterval);
     pollingInterval = null;
-    console.log('🛑 Price polling stopped');
+    logger.info('Price polling stopped');
   }
 }
 
@@ -61,7 +62,7 @@ export async function triggerPriceUpdate(): Promise<void> {
  */
 async function fetchPricesWithRetry(retries = 2): Promise<void> {
   if (isPolling) {
-    console.log('⏳ Price fetch already in progress, skipping');
+    logger.debug('Price fetch already in progress, skipping');
     return;
   }
 
@@ -70,10 +71,10 @@ async function fetchPricesWithRetry(retries = 2): Promise<void> {
   try {
     await updateAllPrices();
   } catch (error) {
-    console.error('Failed to fetch prices:', error);
+    logger.error('Failed to fetch prices', error);
 
     if (retries > 0) {
-      console.log(`Retrying price fetch (${retries} retries left)...`);
+      logger.info('Retrying price fetch', { retriesLeft: retries });
       await new Promise((resolve) => setTimeout(resolve, 2000));
       isPolling = false;
       return fetchPricesWithRetry(retries - 1);

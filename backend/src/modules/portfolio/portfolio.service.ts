@@ -144,7 +144,18 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
     totalValueIrr,
     holdingsValueIrr,
     allocation,
+    // Uppercase aliases for mobile compatibility
+    Allocation: {
+      Foundation: allocation.foundation,
+      Growth: allocation.growth,
+      Upside: allocation.upside,
+    },
     targetAllocation,
+    TargetAllocation: {
+      Foundation: targetAllocation.foundation,
+      Growth: targetAllocation.growth,
+      Upside: targetAllocation.upside,
+    },
     status,
     driftPct,
     holdingsCount: portfolio.holdings.length,

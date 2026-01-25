@@ -20,6 +20,7 @@
     "worker": "tsx src/workers/index.ts"
   },
   "dependencies": {
+    "fast-jwt": "^4.0.0",
     "@fastify/cors": "^9.0.1",
     "@fastify/helmet": "^11.1.1",
     "@fastify/jwt": "^8.0.0",

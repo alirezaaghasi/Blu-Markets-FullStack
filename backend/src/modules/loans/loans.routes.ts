@@ -183,8 +183,10 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
 
       return {
         maxPortfolioLoanIrr: toNumber(maxPortfolioLoanDecimal),
+        maxCapacityIrr: toNumber(maxPortfolioLoanDecimal), // Alias for frontend
         currentLoansIrr: toNumber(currentLoansDecimal),
         availableIrr: toNumber(availableDecimal),
+        availableCapacityIrr: toNumber(availableDecimal), // Alias for frontend
         perAsset,
       };
     },
@@ -233,7 +235,7 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           id: string;
           portfolio_id: string;
           asset_id: string;
-          quantity: any;
+          quantity: string; // Prisma returns Decimal as string in raw queries
           frozen: boolean;
           layer: string;
         }>>`
@@ -501,8 +503,8 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           id: string;
           portfolio_id: string;
           collateral_asset_id: string;
-          total_due_irr: any;
-          paid_irr: any;
+          total_due_irr: string; // Prisma returns Decimal as string in raw queries
+          paid_irr: string;      // Prisma returns Decimal as string in raw queries
           status: string;
         }>>`
           SELECT id, portfolio_id, collateral_asset_id, total_due_irr, paid_irr, status
@@ -635,6 +637,7 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           success: true,
           amountApplied: amountToApply,
           remainingDue: toNumber(remainingAfterPayment),
+          remainingBalance: toNumber(remainingAfterPayment), // Alias for frontend
           installmentsPaid,
           isFullySettled,
           collateralUnfrozen: isFullySettled,

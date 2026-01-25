@@ -71,13 +71,22 @@ export interface InitialFundingRequest {
 // PORTFOLIO
 // ============================================================================
 
+// Uppercase allocation for mobile compatibility
+interface UppercaseAllocation {
+  Foundation: number;
+  Growth: number;
+  Upside: number;
+}
+
 export interface PortfolioSummary {
   id: string;
   cashIrr: number;
   totalValueIrr: number;
   holdingsValueIrr: number;
   allocation: TargetAllocation;
+  Allocation: UppercaseAllocation; // Alias for mobile compatibility
   targetAllocation: TargetAllocation;
+  TargetAllocation: UppercaseAllocation; // Alias for mobile compatibility
   status: 'BALANCED' | 'SLIGHTLY_OFF' | 'ATTENTION_REQUIRED';
   driftPct: number;
   holdingsCount: number;
@@ -152,11 +161,14 @@ export interface TradeExecuteResponse {
     quantity: number;
     amountIrr: number;
     priceIrr: number;
+    priceUsd: number;
   };
   newBalance: {
     cashIrr: number;
     holdingQuantity: number;
   };
+  // Alias for mobile compatibility
+  newHoldingQuantity: number;
   boundary: Boundary;
   ledgerEntryId: string;
 }

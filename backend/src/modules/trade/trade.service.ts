@@ -286,6 +286,7 @@ export async function executeTrade(
     const quantityDecimal = roundCrypto(divide(effectiveAmountDecimal, currentPrice.priceIrr));
     const quantity = toNumber(quantityDecimal);
     const priceIrr = currentPrice.priceIrr;
+    const priceUsd = currentPrice.priceUsd;
 
     let newCashIrr: number;
     let holdingQuantity: number;
@@ -413,11 +414,14 @@ export async function executeTrade(
         quantity,
         amountIrr,
         priceIrr,
+        priceUsd,
       },
       newBalance: {
         cashIrr: newCashIrr,
         holdingQuantity,
       },
+      // Aliases for mobile client compatibility
+      newHoldingQuantity: holdingQuantity,
       boundary: preview.boundary,
       ledgerEntryId: ledgerEntry.id,
     };
