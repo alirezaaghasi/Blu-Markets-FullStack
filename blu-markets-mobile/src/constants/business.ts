@@ -151,16 +151,16 @@ export const WEBSOCKET_ENABLED = true;
 // Token used to identify demo mode - centralized to avoid hardcoded strings
 export const DEMO_TOKEN = 'demo-token';
 
-// Risk Profile Allocations by Score
+// Risk Profile Allocations by Score (per PRD Section 17)
 export const RISK_PROFILE_ALLOCATIONS: Record<number, TargetLayerPct> = {
   1: { FOUNDATION: 0.85, GROWTH: 0.12, UPSIDE: 0.03 },
   2: { FOUNDATION: 0.80, GROWTH: 0.15, UPSIDE: 0.05 },
-  3: { FOUNDATION: 0.70, GROWTH: 0.25, UPSIDE: 0.05 },
-  4: { FOUNDATION: 0.65, GROWTH: 0.30, UPSIDE: 0.05 },
+  3: { FOUNDATION: 0.75, GROWTH: 0.18, UPSIDE: 0.07 },
+  4: { FOUNDATION: 0.70, GROWTH: 0.22, UPSIDE: 0.08 },
   5: { FOUNDATION: 0.55, GROWTH: 0.35, UPSIDE: 0.10 },
   6: { FOUNDATION: 0.50, GROWTH: 0.35, UPSIDE: 0.15 },
-  7: { FOUNDATION: 0.45, GROWTH: 0.38, UPSIDE: 0.17 },
-  8: { FOUNDATION: 0.40, GROWTH: 0.40, UPSIDE: 0.20 },
+  7: { FOUNDATION: 0.45, GROWTH: 0.37, UPSIDE: 0.18 },
+  8: { FOUNDATION: 0.40, GROWTH: 0.38, UPSIDE: 0.22 },
   9: { FOUNDATION: 0.35, GROWTH: 0.40, UPSIDE: 0.25 },
   10: { FOUNDATION: 0.30, GROWTH: 0.40, UPSIDE: 0.30 },
 };

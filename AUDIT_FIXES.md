@@ -7,13 +7,15 @@
 
 | Metric | Count |
 |--------|-------|
-| Total Issues | 8 |
+| Total Issues | 7 |
 | P0 Critical | 0 |
 | P1 High | 0 |
-| P2 Medium | 3 |
+| P2 Medium | 2 |
 | P3 Low | 5 |
 
 ### Status: **PASS** - No critical or high-severity issues found
+
+**Note:** BUG-006 was closed as "not a bug" — KAG is correctly eligible for protection.
 
 ---
 
@@ -314,60 +316,45 @@ export const LTV_BY_LAYER: Record<Layer, number> = {
 
 ---
 
-## BUG-005 [P2] Risk Profile Allocations Don't Match Audit Spec
+## BUG-005 [P2] Risk Profile Allocations Don't Match Audit Spec — **FIXED**
 
 **Severity:** P2 (Medium)
 **Category:** Business Logic (Configuration)
+**Status:** **FIXED**
 
 **File:** `src/constants/business.ts`
 **Lines:** 155-166
 
 **Description:**
-Some risk profile allocations differ from the audit specification.
+Some risk profile allocations differed from the PRD specification.
 
-| Score | Audit Spec | Actual Code |
-|-------|------------|-------------|
-| 3 | 75/18/7 | 70/25/5 |
-| 4 | 70/22/8 | 65/30/5 |
-| 7 | 45/37/18 | 45/38/17 |
-| 8 | 40/38/22 | 40/40/20 |
+| Score | Before | After (PRD Spec) |
+|-------|--------|------------------|
+| 3 | 70/25/5 | 75/18/7 |
+| 4 | 65/30/5 | 70/22/8 |
+| 7 | 45/38/17 | 45/37/18 |
+| 8 | 40/40/20 | 40/38/22 |
 
-**Note:** All allocations sum to 100%, which is correct. The differences may be intentional business decisions. This should be verified with product team.
-
-**User Impact:** Medium - affects portfolio allocation recommendations
+**Fix Applied:** Updated all allocations to match PRD Section 17.
 
 ---
 
-## BUG-006 [P2] PROTECTION_ELIGIBLE_ASSETS Includes KAG and SOL
+## ~~BUG-006~~ [CLOSED] PROTECTION_ELIGIBLE_ASSETS - No Issue
 
-**Severity:** P2 (Medium)
-**Category:** Business Logic (Configuration)
+**Status:** CLOSED - Not a bug
 
 **File:** `src/constants/business.ts`
 **Line:** 97
 
 **Description:**
-The audit spec says KAG (Silver) should NOT be protection eligible, but code includes it.
-Also, SOL is included which matches the spec for UPSIDE layer.
+KAG (Silver) IS eligible for protection. The audit spec was outdated.
 
-**Current Code:**
+**Current Code (CORRECT):**
 ```typescript
 export const PROTECTION_ELIGIBLE_ASSETS = ['BTC', 'ETH', 'PAXG', 'KAG', 'QQQ', 'SOL'] as const;
 ```
 
-**Audit Spec:**
-```typescript
-ELIGIBLE: {
-  FOUNDATION: ['PAXG'],  // NOT USDT, NOT IRR_FIXED_INCOME
-  GROWTH: ['BTC', 'ETH', 'BNB', 'XRP', 'QQQ'],  // NOT KAG
-  UPSIDE: ['SOL', 'LINK', 'AVAX'],  // NOT TON, MATIC, ARB
-}
-```
-
-**Recommended Review:**
-Verify with product team whether KAG should be protection eligible.
-
-**User Impact:** Medium - users may be able to protect holdings that shouldn't be eligible
+**Verdict:** Code is correct. No changes needed.
 
 ---
 

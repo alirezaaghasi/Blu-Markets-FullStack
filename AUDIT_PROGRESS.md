@@ -100,13 +100,13 @@
 
 ## Issues Found
 
-### P2 Medium Priority (3)
+### P2 Medium Priority (2)
 
 | ID | Issue | File | Status |
 |----|-------|------|--------|
 | BUG-004 | LTV_BY_LAYER.UPSIDE = 0.25 vs assets = 0.30 | business.ts:75 | **FIXED** |
-| BUG-005 | Risk allocations differ from audit spec | business.ts:155-166 | NEEDS VERIFICATION |
-| BUG-006 | KAG in PROTECTION_ELIGIBLE_ASSETS | business.ts:97 | NEEDS VERIFICATION |
+| BUG-005 | Risk allocations differ from audit spec | business.ts:155-166 | **FIXED** |
+| ~~BUG-006~~ | ~~KAG in PROTECTION_ELIGIBLE_ASSETS~~ | business.ts:97 | **CLOSED** (not a bug) |
 
 ### P3 Low Priority (5)
 
