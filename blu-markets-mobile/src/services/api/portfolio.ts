@@ -106,10 +106,19 @@ export const portfolio = {
 
   addFunds: async (amountIrr: number): Promise<PortfolioResponse> => {
     const data = await apiClient.post('/portfolio/add-funds', { amountIrr }) as unknown as Record<string, unknown>;
-    // Backend may return partial response, so fetch full portfolio after add-funds
+    // Preserve add-funds specific fields from response
+    const previousCashIrr = data.previousCashIrr as number | undefined;
+    const amountAdded = data.amountAdded as number | undefined;
+
+    // Backend returns partial response, fetch full portfolio
     if (!data.holdings) {
-      // Fetch full portfolio data
-      return portfolio.get();
+      const fullPortfolio = await portfolio.get();
+      // Merge add-funds specific fields into response
+      return {
+        ...fullPortfolio,
+        previousCashIrr,
+        amountAdded,
+      } as PortfolioResponse;
     }
     return normalizePortfolioResponse(data);
   },

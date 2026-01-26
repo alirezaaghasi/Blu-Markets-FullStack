@@ -554,11 +554,22 @@ export const protection = {
     const newProtection: Protection = {
       id: `protection_${Date.now()}`,
       assetId,
+      // Required fields
+      notionalIrr: notionalIrr,
+      notionalUsd: notionalIrr / fxRate,
+      premiumIrr: premiumIrr,
+      premiumUsd: premiumIrr / fxRate,
+      coveragePct: 1.0,
+      durationDays: durationMonths * 30,
+      strikeUsd: priceUsd * 0.9, // 10% below current price
+      startDate: now.toISOString(),
+      expiryDate: endDate.toISOString(),
+      status: 'ACTIVE',
+      // Aliases for API compatibility
       notionalIRR: notionalIrr,
       premiumIRR: premiumIrr,
       startISO: now.toISOString(),
       endISO: endDate.toISOString(),
-      durationMonths,
     };
 
     store.dispatch(addProtection(newProtection));
@@ -674,11 +685,15 @@ export const loans = {
       collateralAssetId: collateralHolding.assetId,
       collateralQuantity: collateralHolding.quantity * 0.5, // Use 50% as collateral
       amountIRR: amountIrr,
-      interestRate,
-      durationMonths: termMonths,
+      dailyInterestRate: interestRate / 365, // Convert annual to daily
+      interestRate, // Annual rate for display
+      durationDays: (termMonths * 30) as 30 | 60 | 90,
       startISO: now.toISOString(),
       dueISO: dueDate.toISOString(),
       status: 'ACTIVE',
+      totalInterestIRR: installments.reduce((sum, i) => sum + i.interestIRR, 0),
+      totalDueIRR: installments.reduce((sum, i) => sum + i.totalIRR, 0),
+      paidIRR: 0,
       installments,
       installmentsPaid: 0,
     };

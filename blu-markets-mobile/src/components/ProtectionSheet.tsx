@@ -13,7 +13,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../constants/theme';
-import { ProtectableHolding, ProtectionQuote } from '../types';
+import { ProtectableHolding, ProtectionQuote, Holding } from '../types';
 import { ASSETS, LAYER_COLORS } from '../constants/assets';
 import { PROTECTION_DURATION_PRESETS } from '../constants/business';
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
@@ -24,7 +24,7 @@ import { TransactionSuccessModal, TransactionSuccessResult } from './Transaction
 interface ProtectionSheetProps {
   visible: boolean;
   onClose: () => void;
-  holding?: ProtectableHolding;
+  holding?: ProtectableHolding | Holding; // Accept either type
   onPurchaseComplete?: () => void;
 }
 
@@ -38,22 +38,64 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
   const { cashIRR, holdings } = useAppSelector((state) => state.portfolio);
   const { prices, fxRate } = useAppSelector((state) => state.prices);
 
+  // Helper to convert Holding to ProtectableHolding
+  const convertToProtectableHolding = (h: Holding | ProtectableHolding): ProtectableHolding => {
+    // If already has holdingId, assume it's ProtectableHolding
+    if ('holdingId' in h && h.holdingId) {
+      return h as ProtectableHolding;
+    }
+    const asset = ASSETS[h.assetId];
+    const priceUSD = prices[h.assetId] || 0;
+    const priceIRR = priceUSD * fxRate;
+    const valueIRR = h.quantity * priceIRR;
+    const valueUSD = h.quantity * priceUSD;
+    return {
+      holdingId: (h as any).id || `demo-${h.assetId}`,
+      assetId: h.assetId,
+      name: asset?.name || h.assetId,
+      layer: h.layer,
+      quantity: h.quantity,
+      valueIrr: valueIRR,
+      valueUsd: valueUSD,
+      priceUsd: priceUSD,
+      priceIrr: priceIRR,
+      isProtectable: true,
+      hasExistingProtection: false,
+      volatility: { iv: 0.5, regime: 'NORMAL', regimeColor: '#3B82F6' },
+      indicativePremium: { thirtyDayPct: 0.01, thirtyDayIrr: valueIRR * 0.01 },
+    };
+  };
+
   // Derive eligible holdings for protection if not provided
-  const eligibleHoldings: ProtectableHolding[] = React.useMemo(() => {
-    if (propHolding) return [propHolding];
+  // Maps Holding to ProtectableHolding shape with required fields
+  const eligibleHoldings = React.useMemo((): ProtectableHolding[] => {
+    if (propHolding) return [convertToProtectableHolding(propHolding)];
     return holdings
       .filter((h) => {
         const asset = ASSETS[h.assetId];
         // Protectable: crypto assets that aren't frozen and have quantity
         return asset && asset.layer !== 'FOUNDATION' && !h.frozen && h.quantity > 0;
       })
-      .map((h) => {
+      .map((h): ProtectableHolding => {
+        const asset = ASSETS[h.assetId];
         const priceUSD = prices[h.assetId] || 0;
+        const priceIRR = priceUSD * fxRate;
+        const valueIRR = h.quantity * priceIRR;
+        const valueUSD = h.quantity * priceUSD;
         return {
-          ...h,
           holdingId: h.id || `demo-${h.assetId}`,
-          priceUSD,
-          valueIRR: h.quantity * priceUSD * fxRate,
+          assetId: h.assetId,
+          name: asset?.name || h.assetId,
+          layer: h.layer,
+          quantity: h.quantity,
+          valueIrr: valueIRR,
+          valueUsd: valueUSD,
+          priceUsd: priceUSD,
+          priceIrr: priceIRR,
+          isProtectable: true,
+          hasExistingProtection: false,
+          volatility: { iv: 0.5, regime: 'NORMAL', regimeColor: '#3B82F6' },
+          indicativePremium: { thirtyDayPct: 0.01, thirtyDayIrr: valueIRR * 0.01 },
         };
       });
   }, [propHolding, holdings, prices, fxRate]);
@@ -75,7 +117,10 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
     }
   }, [eligibleHoldings, selectedHoldingId]);
 
-  const holding = propHolding || eligibleHoldings.find((h) => h.holdingId === selectedHoldingId);
+  // Get the active holding - convert propHolding to ProtectableHolding if needed
+  const holding: ProtectableHolding | undefined = propHolding
+    ? convertToProtectableHolding(propHolding)
+    : eligibleHoldings.find((h) => h.holdingId === selectedHoldingId);
   const asset = holding ? ASSETS[holding.assetId] : null;
 
   // Fetch quote when parameters change

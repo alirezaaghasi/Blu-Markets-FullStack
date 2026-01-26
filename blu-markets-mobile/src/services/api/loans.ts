@@ -26,8 +26,10 @@ export const loans = {
     };
   },
 
-  // Create a loan with collateral asset (duration in months: 3 or 6)
-  create: async (collateralAssetId: string, amountIrr: number, durationMonths: 3 | 6): Promise<Loan> => {
+  // Create a loan with collateral asset (duration in days: 30, 60, or 90)
+  create: async (collateralAssetId: string, amountIrr: number, durationDays: 30 | 60 | 90): Promise<Loan> => {
+    // Backend may expect durationMonths - convert if needed
+    const durationMonths = Math.round(durationDays / 30) as 1 | 2 | 3;
     const response = await apiClient.post('/loans', { collateralAssetId, amountIrr, durationMonths }) as unknown as ApiResponse<{
       loan?: Loan;
       cashAdded?: number;

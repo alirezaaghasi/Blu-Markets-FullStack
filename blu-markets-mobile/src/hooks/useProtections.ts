@@ -53,12 +53,15 @@ export function useProtections(): UseProtectionsResult {
       ]);
 
       setProtections(activeProtections || []);
-      setProtectableHoldings(holdingsResponse?.holdings || []);
+      // Handle union type - check if response has 'holdings' property
+      const holdings = Array.isArray(holdingsResponse) ? holdingsResponse : (holdingsResponse as any)?.holdings || [];
+      setProtectableHoldings(holdings);
 
-      if (holdingsResponse?.durationPresets) {
+      // Type narrow for optional properties
+      if (!Array.isArray(holdingsResponse) && holdingsResponse?.durationPresets) {
         setDurationPresets(holdingsResponse.durationPresets);
       }
-      if (holdingsResponse?.coverageRange) {
+      if (!Array.isArray(holdingsResponse) && holdingsResponse?.coverageRange) {
         setCoverageRange(holdingsResponse.coverageRange);
       }
     } catch (err) {
@@ -89,7 +92,8 @@ export function useProtections(): UseProtectionsResult {
       setProtections((prev) => [newProtection, ...prev]);
       // Refresh protectable holdings after purchase
       const holdingsResponse = await protectionApi.getHoldings();
-      setProtectableHoldings(holdingsResponse?.holdings || []);
+      const holdings = Array.isArray(holdingsResponse) ? holdingsResponse : (holdingsResponse as any)?.holdings || [];
+      setProtectableHoldings(holdings);
       return newProtection;
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to purchase protection'));
@@ -104,7 +108,8 @@ export function useProtections(): UseProtectionsResult {
       setProtections((prev) => prev.filter((p) => p.id !== protectionId));
       // Refresh protectable holdings after cancellation
       const holdingsResponse = await protectionApi.getHoldings();
-      setProtectableHoldings(holdingsResponse?.holdings || []);
+      const holdings = Array.isArray(holdingsResponse) ? holdingsResponse : (holdingsResponse as any)?.holdings || [];
+      setProtectableHoldings(holdings);
       return true;
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to cancel protection'));
@@ -140,7 +145,8 @@ export function useProtections(): UseProtectionsResult {
       setProtections((prev) => [newProtection, ...prev]);
       // Refresh protectable holdings after purchase
       const holdingsResponse = await protectionApi.getHoldings();
-      setProtectableHoldings(holdingsResponse?.holdings || []);
+      const holdings = Array.isArray(holdingsResponse) ? holdingsResponse : (holdingsResponse as any)?.holdings || [];
+      setProtectableHoldings(holdings);
       return newProtection;
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to purchase protection'));

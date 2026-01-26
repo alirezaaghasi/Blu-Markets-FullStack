@@ -7,6 +7,7 @@ export type RootStackParamList = {
   Onboarding: NavigatorScreenParams<OnboardingStackParamList>;
   Main: NavigatorScreenParams<MainTabParamList>;
   RetakeQuiz: undefined; // Modal screen for retaking risk quiz
+  Questionnaire: { isRetake?: boolean }; // Risk questionnaire (can be accessed from Profile for retake)
 };
 
 // Onboarding Stack

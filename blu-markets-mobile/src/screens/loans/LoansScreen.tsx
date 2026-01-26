@@ -213,7 +213,10 @@ const LoansScreen: React.FC = () => {
                       </View>
                       <View>
                         <View style={styles.assetNameRow}>
-                          <Text style={styles.assetName}>{asset.name}</Text>
+                          <Text style={styles.assetName}>
+                            {asset.name}
+                            <Text style={styles.assetSymbol}> | {asset.symbol}</Text>
+                          </Text>
                           <View style={styles.frozenBadge}>
                             <Text style={styles.frozenBadgeText}>FROZEN</Text>
                           </View>
@@ -242,7 +245,7 @@ const LoansScreen: React.FC = () => {
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Interest Rate</Text>
                       <Text style={styles.detailValue}>
-                        {(loan.interestRate * 100).toFixed(0)}% annual
+                        {((loan.interestRate ?? loan.dailyInterestRate * 365) * 100).toFixed(0)}% annual
                       </Text>
                     </View>
                     <View style={styles.detailRow}>
@@ -312,7 +315,10 @@ const LoansScreen: React.FC = () => {
                   onPress={handleNewLoan}
                 >
                   <View style={styles.collateralInfo}>
-                    <Text style={styles.collateralName}>{asset.name}</Text>
+                    <Text style={styles.collateralName}>
+                      {asset.name}
+                      <Text style={styles.assetSymbol}> | {asset.symbol}</Text>
+                    </Text>
                     <Text style={styles.collateralValue}>
                       Up to {maxBorrowIRR.toLocaleString()} IRR ({(asset.ltv * 100).toFixed(0)}% LTV)
                     </Text>
@@ -479,6 +485,10 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
     color: colors.textPrimaryDark,
     marginRight: spacing[2],
+  },
+  assetSymbol: {
+    fontWeight: typography.fontWeight.medium,
+    color: colors.textSecondary,
   },
   frozenBadge: {
     backgroundColor: `${colors.primary}20`,

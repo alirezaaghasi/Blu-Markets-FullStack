@@ -106,6 +106,11 @@ export interface Protection {
   settlementDate?: string;
   // Calculated fields
   daysRemaining?: number;
+  // Aliases for API compatibility (backend may return different field names)
+  startISO?: string; // Alias for startDate
+  endISO?: string; // Alias for expiryDate
+  notionalIRR?: number; // Alias for notionalIrr
+  premiumIRR?: number; // Alias for premiumIrr
 }
 
 // Protection Quote (from /protection/quote endpoint)
@@ -204,13 +209,16 @@ export interface Loan {
   collateralAssetId: AssetId;
   collateralQuantity: number;
   amountIRR: number;
-  dailyInterestRate: number; // Changed from interestRate
+  dailyInterestRate: number; // Daily interest rate (0.0005 = 0.05%)
+  interestRate?: number; // Annual interest rate for display (0.30 = 30%)
   durationDays: 30 | 60 | 90; // Updated duration options
   startISO: string;
   dueISO: string;
   status: LoanStatus;
   totalInterestIRR?: number; // Pre-calculated total interest
   totalRepaymentIRR?: number; // Principal + interest
+  totalDueIRR?: number; // Total amount due (principal + interest)
+  paidIRR?: number; // Amount already paid
   installments: LoanInstallment[];
   installmentsPaid: number;
 }

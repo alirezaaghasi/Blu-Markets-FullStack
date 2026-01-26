@@ -85,15 +85,18 @@ export const AddFundsSheet: React.FC<AddFundsSheetProps> = ({
     try {
       // Call backend API
       const result = await portfolio.addFunds(amountIRR);
+      // Use values from API response for accurate display
       const newBalance = result.cashIrr;
+      const previousBalance = (result as any).previousCashIrr ?? cashIRR;
+      const actualAmountAdded = (result as any).amountAdded ?? amountIRR;
 
       // Update Redux with new cash balance
       dispatch(updateCash(newBalance));
       dispatch(logAction({
         type: 'ADD_FUNDS',
         boundary: 'SAFE',
-        message: `Added ${formatNumber(amountIRR)} IRR to portfolio`,
-        amountIRR,
+        message: `Added ${formatNumber(actualAmountAdded)} IRR to portfolio`,
+        amountIRR: actualAmountAdded,
       }));
 
       // Show success modal with agency-focused messaging
@@ -102,8 +105,8 @@ export const AddFundsSheet: React.FC<AddFundsSheetProps> = ({
         title: 'Added to Cash Wallet',
         subtitle: 'This amount is available as cash.\nYou decide how to invest it.',
         items: [
-          { label: 'Amount Added', value: `${formatNumber(amountIRR)} IRR` },
-          { label: 'Previous Cash', value: `${formatNumber(cashIRR)} IRR` },
+          { label: 'Amount Added', value: `${formatNumber(actualAmountAdded)} IRR` },
+          { label: 'Previous Cash', value: `${formatNumber(previousBalance)} IRR` },
           { label: 'New Cash Balance', value: `${formatNumber(newBalance)} IRR`, highlight: true },
         ],
       });

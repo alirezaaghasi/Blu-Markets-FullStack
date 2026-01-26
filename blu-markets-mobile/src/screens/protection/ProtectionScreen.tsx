@@ -33,7 +33,8 @@ const ProtectionScreen: React.FC = () => {
 
   // Backend data
   const [protections, setProtections] = useState<Protection[]>([]);
-  const [eligibleAssets, setEligibleAssets] = useState<EligibleAssetsResponse['assets']>([]);
+  // Use any[] type since getEligible may return different shapes
+  const [eligibleAssets, setEligibleAssets] = useState<Array<{ assetId: AssetId; [key: string]: any }>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,8 +50,9 @@ const ProtectionScreen: React.FC = () => {
         protectionApi.getActive(),
         protectionApi.getEligible(),
       ]);
-      setProtections(protectionsRes.protections);
-      setEligibleAssets(eligibleRes.assets);
+      // Handle both array and wrapped response formats
+      setProtections(Array.isArray(protectionsRes) ? protectionsRes : (protectionsRes as any)?.protections || []);
+      setEligibleAssets(eligibleRes?.assets || []);
     } catch (err: any) {
       setError(err?.message || 'Failed to load protection data');
     } finally {
@@ -193,8 +195,10 @@ const ProtectionScreen: React.FC = () => {
             <Text style={styles.sectionTitle}>Active Protections</Text>
             {protections.map((protection) => {
               const asset = ASSETS[protection.assetId as keyof typeof ASSETS];
-              const daysRemaining = getDaysRemaining(protection.endISO);
-              const progress = getProgressPercentage(protection.startISO, protection.endISO);
+              const startDate = protection.startISO || protection.startDate || new Date().toISOString();
+              const endDate = protection.endISO || protection.expiryDate || new Date().toISOString();
+              const daysRemaining = getDaysRemaining(endDate);
+              const progress = getProgressPercentage(startDate, endDate);
 
               return (
                 <View key={protection.id} style={styles.protectionCard}>
@@ -211,30 +215,16 @@ const ProtectionScreen: React.FC = () => {
                         </Text>
                       </View>
                       <View>
-                        <Text style={styles.assetName}>{asset?.name || protection.assetId}</Text>
-                        {asset && (
-                        <View
-                          style={[
-                            styles.layerBadge,
-                            { backgroundColor: `${LAYER_COLORS[asset.layer]}20` },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.layerBadgeText,
-                              { color: LAYER_COLORS[asset.layer] },
-                            ]}
-                          >
-                            {LAYER_NAMES[asset.layer]}
-                          </Text>
-                        </View>
-                        )}
+                        <Text style={styles.assetName}>
+                          {asset?.name || protection.assetId}
+                          <Text style={styles.assetSymbol}> | {asset?.symbol || ''}</Text>
+                        </Text>
                       </View>
                     </View>
                     <View style={styles.protectionValue}>
                       <Text style={styles.protectionValueLabel}>Covered</Text>
                       <Text style={styles.protectionValueAmount}>
-                        {protection.notionalIRR.toLocaleString()} IRR
+                        {(protection.notionalIRR ?? protection.notionalIrr ?? 0).toLocaleString()} IRR
                       </Text>
                     </View>
                   </View>
@@ -255,7 +245,7 @@ const ProtectionScreen: React.FC = () => {
                   <View style={styles.premiumInfo}>
                     <Text style={styles.premiumInfoLabel}>Premium paid</Text>
                     <Text style={styles.premiumInfoValue}>
-                      {protection.premiumIRR.toLocaleString()} IRR
+                      {(protection.premiumIRR ?? protection.premiumIrr ?? 0).toLocaleString()} IRR
                     </Text>
                   </View>
 
@@ -299,7 +289,10 @@ const ProtectionScreen: React.FC = () => {
                       </Text>
                     </View>
                     <View>
-                      <Text style={styles.assetName}>{asset.name}</Text>
+                      <Text style={styles.assetName}>
+                        {asset.name}
+                        <Text style={styles.assetSymbol}> | {asset.symbol}</Text>
+                      </Text>
                       <Text style={styles.assetValue}>
                         {valueIRR.toLocaleString()} IRR
                       </Text>
@@ -512,6 +505,10 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
     color: colors.textPrimaryDark,
     marginBottom: spacing[1],
+  },
+  assetSymbol: {
+    fontWeight: typography.fontWeight.medium,
+    color: colors.textSecondary,
   },
   layerBadge: {
     paddingHorizontal: spacing[2],

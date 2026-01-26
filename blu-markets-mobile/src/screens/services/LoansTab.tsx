@@ -21,8 +21,8 @@ import { useAppSelector } from '../../hooks/useStore';
 import { Loan, AssetId } from '../../types';
 import { EmptyState } from '../../components/EmptyState';
 
-// Assets eligible for loan collateral (crypto assets only)
-const COLLATERAL_ELIGIBLE_ASSETS: AssetId[] = ['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'ADA', 'AVAX', 'LINK', 'DOT', 'TON', 'PAXG', 'KAG'];
+// Assets eligible for loan collateral (crypto assets only - must match AssetId type)
+const COLLATERAL_ELIGIBLE_ASSETS: AssetId[] = ['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'AVAX', 'LINK', 'TON', 'PAXG', 'KAG', 'MATIC', 'ARB'];
 
 interface LoansTabProps {
   loanId?: string;
@@ -43,23 +43,29 @@ export function LoansTab({ loanId }: LoansTabProps) {
   // Get holdings from portfolio to find eligible collateral
   const holdings = useAppSelector((state) => state.portfolio?.holdings || []);
 
-  // Find first eligible collateral asset from user's holdings
+  // Find first eligible collateral asset from user's holdings (not already frozen)
   const eligibleCollateral = holdings.find(
-    (h) => COLLATERAL_ELIGIBLE_ASSETS.includes(h.assetId as AssetId) && h.quantity > 0
+    (h) => COLLATERAL_ELIGIBLE_ASSETS.includes(h.assetId as AssetId) && h.quantity > 0 && !h.frozen
   );
 
   const handleExploreBorrowing = async () => {
     if (!eligibleCollateral) {
+      // Check if there are holdings but all are frozen
+      const hasAnyEligible = holdings.some(
+        (h) => COLLATERAL_ELIGIBLE_ASSETS.includes(h.assetId as AssetId) && h.quantity > 0
+      );
       Alert.alert(
         'No Eligible Collateral',
-        'You need crypto holdings (BTC, ETH, etc.) to use as collateral for a loan.',
+        hasAnyEligible
+          ? 'All your eligible assets are already being used as collateral for existing loans.'
+          : 'You need crypto holdings (BTC, ETH, etc.) to use as collateral for a loan.',
         [{ text: 'OK' }]
       );
       return;
     }
 
-    // Create a loan with default values: first eligible asset, 5M IRR, 3 months
-    const result = await createLoan(eligibleCollateral.assetId, 5_000_000, 3);
+    // Create a loan with default values: first eligible asset, 5M IRR, 90 days (3 months)
+    const result = await createLoan(eligibleCollateral.assetId, 5_000_000, 90);
     if (result) {
       Alert.alert('Loan Created', 'Your loan has been successfully created.');
     }
@@ -275,7 +281,7 @@ function LoanCard({
         </View>
         <View style={styles.loanDetailRow}>
           <Text style={styles.loanDetailLabel}>Interest Rate</Text>
-          <Text style={styles.loanDetailValue}>{(loan.interestRate * 100).toFixed(0)}% APR</Text>
+          <Text style={styles.loanDetailValue}>{((loan.interestRate ?? loan.dailyInterestRate * 365) * 100).toFixed(0)}% APR</Text>
         </View>
       </View>
 

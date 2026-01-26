@@ -140,10 +140,10 @@ export const protection = {
   ): Promise<PremiumCurvePoint[]> => {
     const data = (await apiClient.get('/protection/quote/curve', {
       params: { holdingId, coveragePct },
-    })) as unknown as ApiResponse<PremiumCurveResponse | { quotes: PremiumCurvePoint[] }>;
+    })) as unknown as ApiResponse<PremiumCurveResponse | { quotes: PremiumCurvePoint[] } | { curve: PremiumCurvePoint[] }>;
 
-    // Backend returns 'quotes' not 'curve'
-    return (data as any)?.quotes || data?.curve || [];
+    // Backend may return 'quotes' or 'curve' depending on version
+    return (data as any)?.quotes || (data as any)?.curve || [];
   },
 
   /**

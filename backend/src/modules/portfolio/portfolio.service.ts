@@ -246,7 +246,7 @@ export async function getPortfolioSnapshot(userId: string): Promise<PortfolioSna
 export async function addFunds(
   userId: string,
   amountIrr: number
-): Promise<{ newCashIrr: number; ledgerEntryId: string }> {
+): Promise<{ previousCashIrr: number; newCashIrr: number; amountAdded: number; ledgerEntryId: string }> {
   const portfolio = await prisma.portfolio.findUnique({
     where: { userId },
   });
@@ -296,7 +296,7 @@ export async function addFunds(
     },
   });
 
-  return { newCashIrr, ledgerEntryId: ledgerEntry.id };
+  return { previousCashIrr: beforeCash, newCashIrr, amountAdded: amountIrr, ledgerEntryId: ledgerEntry.id };
 }
 
 // MONEY FIX M-02: Use Decimal for allocation calculations

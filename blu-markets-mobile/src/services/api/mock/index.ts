@@ -655,18 +655,22 @@ export const protection = {
       });
   },
 
-  // Get a quote for protection
-  getQuote: async (assetId: AssetId, coveragePct: number = 1.0, durationDays: number = 30): Promise<any> => {
+  // Get a quote for protection - signature matches real API (uses holdingId)
+  getQuote: async (holdingId: string, coveragePct: number = 1.0, durationDays: number = 30): Promise<any> => {
     await delay(MOCK_DELAY);
 
     const state = getState();
-    const holding = state.portfolio.holdings.find((h: any) => h.assetId === assetId);
+    // holdingId in mock is typically the assetId (e.g., 'demo-BTC' or just 'BTC')
+    const holding = state.portfolio.holdings.find((h: any) =>
+      h.id === holdingId || h.assetId === holdingId || `demo-${h.assetId}` === holdingId
+    );
     const { prices, fxRate } = state.prices;
 
     if (!holding) {
-      throw new Error(`No holding found for ${assetId}`);
+      throw new Error(`No holding found for ${holdingId}`);
     }
 
+    const assetId = holding.assetId as AssetId;
     const priceUsd = prices[assetId] || 0;
     const holdingValueUsd = holding.quantity * priceUsd;
     const holdingValueIrr = holdingValueUsd * fxRate;
@@ -767,17 +771,24 @@ export const protection = {
     });
   },
 
-  // Purchase protection using a quote
-  purchase: async (quoteId: string, _maxPremiumIrr?: number): Promise<Protection> => {
+  // Purchase protection using a quote - signature matches real API
+  purchase: async (params: {
+    quoteId: string;
+    holdingId: string;
+    coveragePct: number;
+    durationDays: number;
+    premiumIrr: number;
+    acknowledgedPremium: boolean;
+  }): Promise<Protection> => {
     await delay(MOCK_DELAY);
 
-    const quote = pendingQuotes.get(quoteId);
+    const quote = pendingQuotes.get(params.quoteId);
     if (!quote) {
       throw new Error('Quote not found or expired');
     }
 
     if (new Date() > quote.expiresAt) {
-      pendingQuotes.delete(quoteId);
+      pendingQuotes.delete(params.quoteId);
       throw new Error('Quote has expired');
     }
 
@@ -801,10 +812,15 @@ export const protection = {
       expiryDate: expiryDate.toISOString(),
       status: 'ACTIVE',
       daysRemaining: quote.durationDays,
+      // Aliases for API compatibility
+      notionalIRR: quote.notionalIrr,
+      premiumIRR: quote.premiumIrr,
+      startISO: now.toISOString(),
+      endISO: expiryDate.toISOString(),
     };
 
     // Clean up quote
-    pendingQuotes.delete(quoteId);
+    pendingQuotes.delete(params.quoteId);
 
     store.dispatch(addProtection(newProtection as any));
     store.dispatch(logAction({
@@ -946,33 +962,38 @@ export const loans = {
     };
   },
 
-  // Hook calls with (amountIrr, durationDays) - we auto-select best collateral
-  create: async (amountIrr: number, durationDays: 30 | 60 | 90): Promise<Loan> => {
+  // Signature matches real API: (collateralAssetId, amountIrr, durationDays)
+  create: async (collateralAssetId: string, amountIrr: number, durationDays: 30 | 60 | 90): Promise<Loan> => {
     await delay(MOCK_DELAY);
 
     const state = getState();
     const { holdings } = state.portfolio;
     const { prices, fxRate } = state.prices;
 
-    // Auto-select the best collateral (highest value unfrozen holding)
-    const availableHoldings = holdings
-      .filter((h) => !h.frozen && h.quantity > 0)
-      .map((h) => {
-        const priceUsd = prices[h.assetId] || 0;
-        const valueIrr = h.assetId === 'IRR_FIXED_INCOME'
-          ? h.quantity * FIXED_INCOME_UNIT_PRICE
-          : h.quantity * priceUsd * fxRate;
-        return { ...h, valueIrr };
-      })
-      .sort((a, b) => b.valueIrr - a.valueIrr);
+    // Find the specified collateral holding, or auto-select if not found
+    let collateralHolding = holdings.find((h) => h.assetId === collateralAssetId && !h.frozen && h.quantity > 0);
 
-    const collateralHolding = availableHoldings[0];
+    if (!collateralHolding) {
+      // Auto-select the best collateral (highest value unfrozen holding)
+      const availableHoldings = holdings
+        .filter((h) => !h.frozen && h.quantity > 0)
+        .map((h) => {
+          const priceUsd = prices[h.assetId] || 0;
+          const valueIrr = h.assetId === 'IRR_FIXED_INCOME'
+            ? h.quantity * FIXED_INCOME_UNIT_PRICE
+            : h.quantity * priceUsd * fxRate;
+          return { ...h, valueIrr };
+        })
+        .sort((a, b) => b.valueIrr - a.valueIrr);
+
+      collateralHolding = availableHoldings[0];
+    }
 
     if (!collateralHolding) {
       throw new Error('No available collateral found');
     }
 
-    const collateralAssetId = collateralHolding.assetId;
+    const finalCollateralAssetId = collateralHolding.assetId;
 
     const dailyRate = 0.0005; // 0.05% daily (per mockup)
     const now = new Date();
@@ -1005,16 +1026,19 @@ export const loans = {
     const totalInterest = amountIrr * dailyRate * durationDays;
     const newLoan: Loan = {
       id: `loan_${Date.now()}`,
-      collateralAssetId,
+      collateralAssetId: finalCollateralAssetId,
       collateralQuantity: collateralHolding.quantity * 0.5,
       amountIRR: amountIrr,
       dailyInterestRate: dailyRate,
+      interestRate: dailyRate * 365, // Annual rate for display
       durationDays: durationDays as 30 | 60 | 90,
       startISO: now.toISOString(),
       dueISO: dueDate.toISOString(),
       status: 'ACTIVE',
       totalInterestIRR: totalInterest,
       totalRepaymentIRR: amountIrr + totalInterest,
+      totalDueIRR: amountIrr + totalInterest,
+      paidIRR: 0,
       installments,
       installmentsPaid: 0,
     };

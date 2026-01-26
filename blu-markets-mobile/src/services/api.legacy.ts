@@ -2,8 +2,7 @@
 // Connects to Blu Markets backend
 // Supports demo mode with mock responses
 import { Platform } from 'react-native';
-import { API_BASE_URL } from '../constants/business';
-import { DEMO_MODE } from '../config/api';
+import { API_BASE_URL, DEMO_MODE } from '../config/api';
 import { store } from '../store';
 import { enableDemoMode } from '../store/slices/authSlice';
 import { loadDemoData } from '../store/slices/portfolioSlice';
