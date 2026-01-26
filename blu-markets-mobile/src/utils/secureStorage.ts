@@ -15,12 +15,17 @@ import { TOKEN_KEYS } from '../config/api';
 
 const isWeb = Platform.OS === 'web';
 
-// Warn if running on web in production
+// BUG-013 FIX: Strengthen warning for web platform security risk
+// Warn if running on web in production - this is a P1 security issue
 if (isWeb && process.env.NODE_ENV === 'production') {
-  console.warn(
-    '[SecureStorage] Running on web platform. Tokens are stored in localStorage ' +
-    'which is NOT secure. Consider implementing HttpOnly cookies or other secure alternatives for production web apps.'
+  console.error(
+    '[SecureStorage] SECURITY WARNING: Running on web platform. ' +
+    'Tokens stored in localStorage are vulnerable to XSS attacks. ' +
+    'PRODUCTION WEB APPS MUST use HttpOnly cookies or disable web builds. ' +
+    'See: https://owasp.org/www-community/HttpOnly'
   );
+  // TODO: Consider throwing an error or blocking token storage on web in production
+  // throw new Error('Web token storage not allowed in production');
 }
 
 /**

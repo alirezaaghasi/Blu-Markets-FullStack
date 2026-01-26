@@ -1,5 +1,17 @@
 // Trade Validation Utilities
 // Based on PRD Section 21 - Trading Rules
+//
+// ⚠️ BUG-006 WARNING: CLIENT-SIDE CALCULATION DEPRECATION NOTICE
+// These utilities perform spread, drift, boundary, and allocation calculations on the client.
+// Per audit requirements, these calculations MUST be performed by the backend only.
+//
+// CURRENT STATUS: Used for instant UI feedback while typing. Backend trade.preview API
+// is authoritative for all trade execution decisions.
+//
+// PRODUCTION REQUIREMENT: Remove or gate these functions behind __DEV__ flag.
+// All trade impact calculations must come from backend trade.preview endpoint.
+//
+// Functions marked @deprecated should not be used for production trade decisions.
 
 import { AssetId, Layer, Boundary, TargetLayerPct, Holding, TradePreview, ValidationResult } from '../types';
 import { ASSETS, LAYER_COLORS } from '../constants/assets';

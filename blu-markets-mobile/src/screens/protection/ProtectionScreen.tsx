@@ -175,21 +175,19 @@ const ProtectionScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
             <Text style={styles.educationText}>
-              Protection acts like insurance for your holdings. You pay a monthly premium
-              based on the asset's layer, and if the price drops below your protection
-              strike price during the coverage period, you're covered.
+              Protection acts like insurance for your holdings. If the price drops below your
+              protection strike price during the coverage period, you're covered for the difference.
             </Text>
+            {/* BUG-011 FIX: Removed static premium rates - premiums are now calculated dynamically
+                using Black-Scholes option pricing based on asset volatility and market conditions.
+                Premium varies by: duration, coverage amount, current price, and implied volatility. */}
             <View style={styles.premiumRates}>
-              <Text style={styles.premiumRatesTitle}>Premium Rates (Monthly)</Text>
-              {(['FOUNDATION', 'GROWTH', 'UPSIDE'] as const).map((layer) => (
-                <View key={layer} style={styles.premiumRow}>
-                  <View style={[styles.layerDot, { backgroundColor: LAYER_COLORS[layer] }]} />
-                  <Text style={styles.premiumLabel}>{LAYER_NAMES[layer]}</Text>
-                  <Text style={styles.premiumValue}>
-                    {(PROTECTION_PREMIUM_BY_LAYER[layer] * 100).toFixed(1)}%
-                  </Text>
-                </View>
-              ))}
+              <Text style={styles.premiumRatesTitle}>Premium Pricing</Text>
+              <Text style={styles.educationText}>
+                Premiums are calculated using Black-Scholes option pricing and vary based on
+                asset volatility, coverage duration, and market conditions. Get a quote to see
+                the current premium for your specific protection.
+              </Text>
             </View>
           </View>
         )}

@@ -136,10 +136,11 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
 
   // NOTE: amountIRR is now parsed in the useEffect above for preview fetching
 
-  // Use backend-derived interest and installment amounts (from loan preview)
-  // Falls back to frontend calculation only if backend preview is not available
-  const totalInterest = loanPreview?.totalInterestIrr ?? (amountIRR * LOAN_DAILY_INTEREST_RATE * durationDays);
-  const installmentAmount = loanPreview?.installmentAmountIrr ?? Math.ceil((amountIRR + totalInterest) / LOAN_INSTALLMENT_COUNT);
+  // BUG-004 FIX: Use backend-derived interest and installment amounts ONLY
+  // Frontend must NOT compute LTV, interest, installments, or due dates
+  // Display 0 until backend preview is available (loading state handles UX)
+  const totalInterest = loanPreview?.totalInterestIrr ?? 0;
+  const installmentAmount = loanPreview?.installmentAmountIrr ?? 0;
 
   // Validation
   const validationErrors: string[] = [];
@@ -181,15 +182,16 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
       const loan = await loansApi.create(selectedAssetId, amountIRR, durationDays);
 
       // Update local Redux state with response
+      // BUG-004 FIX: Use ONLY backend-provided values, no client-side fallback calculations
       dispatch(addLoan({
         id: loan.id,
         collateralAssetId: loan.collateralAssetId,
         collateralQuantity: loan.collateralQuantity || selectedHolding.quantity,
         amountIRR: loan.amountIRR || amountIRR,
-        dailyInterestRate: loan.dailyInterestRate || LOAN_DAILY_INTEREST_RATE,
+        dailyInterestRate: loan.dailyInterestRate || 0, // Backend must provide
         durationDays: loan.durationDays || durationDays,
         startISO: loan.startISO || new Date().toISOString(),
-        dueISO: loan.dueISO || new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString(),
+        dueISO: loan.dueISO || '', // Backend must provide due date
         status: 'ACTIVE',
         installments: loan.installments || [],
         installmentsPaid: 0,

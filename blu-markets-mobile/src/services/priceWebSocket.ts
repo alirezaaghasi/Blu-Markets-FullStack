@@ -1,5 +1,18 @@
 // Price WebSocket Service
 // Connects to backend WebSocket for real-time price updates
+//
+// ⚠️ BUG-012 TODO: WEBSOCKET AUTHENTICATION REQUIRED
+// Current implementation creates unauthenticated WebSocket connections.
+// SECURITY REQUIREMENTS:
+// 1. Include auth token in WebSocket handshake (query param or header)
+// 2. Validate message schema before processing (prevent spoofed data)
+// 3. Backend must verify token and reject unauthorized connections
+//
+// IMPLEMENTATION:
+// - connect() should retrieve token from tokenStorage
+// - Pass token as: new WebSocket(`${WEBSOCKET_URL}?token=${token}`)
+// - Add message schema validation in onmessage handler
+
 import { AppState, AppStateStatus } from 'react-native';
 import { WEBSOCKET_URL, WEBSOCKET_RECONNECT_INTERVAL_MS } from '../constants/business';
 

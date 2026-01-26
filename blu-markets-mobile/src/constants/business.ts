@@ -93,10 +93,11 @@ export const PROTECTION_MIN_COVERAGE_PCT = 0.1;  // 10%
 export const PROTECTION_MAX_COVERAGE_PCT = 1.0;  // 100%
 export const PROTECTION_DEFAULT_COVERAGE_PCT = 1.0; // 100%
 
-// Protection - Eligible assets (per PRD + KAG confirmed eligible)
+// Protection - Eligible assets (per PRD Section 18)
+// NOTE: KAG (Silver) is NOT protection-eligible per business rules
 export const PROTECTION_ELIGIBLE_ASSETS = [
   'PAXG',                          // FOUNDATION
-  'BTC', 'ETH', 'BNB', 'XRP', 'KAG', 'QQQ',  // GROWTH
+  'BTC', 'ETH', 'BNB', 'XRP', 'QQQ',  // GROWTH
   'SOL', 'LINK', 'AVAX',           // UPSIDE
 ] as const;
 

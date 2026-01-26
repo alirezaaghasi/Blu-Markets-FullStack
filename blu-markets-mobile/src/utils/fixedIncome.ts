@@ -1,5 +1,14 @@
 // Fixed Income Calculation Utility
 // Based on PRD Section 17 - Fixed Income Asset
+//
+// ⚠️ BUG-008 WARNING: DEMO/MOCK USE ONLY
+// Fixed income accrual and valuation MUST be computed by the backend.
+// This utility is only for demo mode and UI placeholders.
+//
+// PRODUCTION REQUIREMENT:
+// - Backend portfolio API must return { principal, accrued, total } for fixed income
+// - Frontend displays backend-provided values only
+// - This file should be gated behind __DEV__ or removed in production
 
 export const FIXED_INCOME_UNIT_PRICE = 500_000;  // IRR per unit
 export const FIXED_INCOME_ANNUAL_RATE = 0.30;    // 30% annual simple interest

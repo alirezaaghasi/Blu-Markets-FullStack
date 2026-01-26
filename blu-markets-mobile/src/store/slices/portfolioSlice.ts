@@ -495,7 +495,8 @@ const portfolioSlice = createSlice({
       state.holdings = [
         // Foundation layer (~50% = 2.5B IRR)
         // USDT: 1000 × $1 × 1,456,000 = 1.456B IRR
-        // Fixed Income: 1000 × 1,000,000 = 1B IRR
+        // BUG-015 FIX: Fixed Income unit price is 500,000 IRR per PRD Section 25
+        // Fixed Income: 1000 × 500,000 = 500M IRR
         { assetId: 'USDT', quantity: 1000, frozen: false, layer: 'FOUNDATION' },
         { assetId: 'IRR_FIXED_INCOME', quantity: 1000, frozen: false, layer: 'FOUNDATION' },
         // Growth layer (~35% = 1.75B IRR) - BTC, ETH are GROWTH assets

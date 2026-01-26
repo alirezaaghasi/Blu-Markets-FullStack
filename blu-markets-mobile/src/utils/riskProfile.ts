@@ -1,5 +1,17 @@
 // Risk Profile Calculator
 // Based on PRD Section 17 - Risk Profiling Algorithm
+//
+// ⚠️ BUG-009 CRITICAL: DEMO/MOCK USE ONLY
+// This client-side risk scoring algorithm MUST NOT be used in production.
+// Risk profile scoring MUST be computed by the backend as the single source of truth.
+//
+// PRODUCTION REQUIREMENT:
+// - Onboarding flows must POST answers to /api/v1/risk-profile endpoint
+// - Backend returns { score, profileName, targetAllocation }
+// - This file should be removed or gated behind __DEV__ in production builds
+//
+// REGULATORY CONCERN: Client-side risk scoring could lead to regulatory issues
+// if scores differ from backend calculations.
 
 import { RiskProfile, TargetLayerPct } from '../types';
 import { QUESTIONS } from '../constants/questionnaire';

@@ -1000,6 +1000,11 @@ export const loans = {
   },
 
   // Preview endpoint - returns backend-calculated loan details
+  // ⚠️ BUG-016 WARNING: MOCK/DEMO USE ONLY
+  // This function performs client-side interest calculations (durationDays/30, interest math)
+  // which violates the "no frontend calculations" rule for production.
+  // This mock simulates backend behavior for offline demo mode only.
+  // PRODUCTION: Backend /loans/preview endpoint is authoritative for all loan calculations.
   preview: async (collateralAssetId: string, amountIrr: number, durationDays: 90 | 180) => {
     await delay(MOCK_DELAY / 2); // Faster for preview
 

@@ -18,10 +18,11 @@ interface BackendVerifyOtpResponse {
 
 export const auth = {
   sendOtp: async (phone: string): Promise<{ success: boolean }> => {
-    console.log('[Auth] Sending OTP to:', phone);
+    // BUG-014 FIX: Guard sensitive logs with __DEV__ to prevent PII leakage in production
+    if (__DEV__) console.log('[Auth] Sending OTP to:', phone);
     try {
       const result = await apiClient.post('/auth/send-otp', { phone }) as unknown as { success: boolean };
-      console.log('[Auth] OTP sent successfully:', result);
+      if (__DEV__) console.log('[Auth] OTP sent successfully');
       return result;
     } catch (error) {
       console.error('[Auth] Send OTP error:', error);
@@ -30,13 +31,14 @@ export const auth = {
   },
 
   verifyOtp: async (phone: string, code: string): Promise<AuthResponse> => {
-    console.log('[Auth] Verifying OTP for:', phone);
+    // BUG-014 FIX: Guard sensitive logs with __DEV__ to prevent PII leakage in production
+    if (__DEV__) console.log('[Auth] Verifying OTP for:', phone);
     try {
       const response: BackendVerifyOtpResponse = await apiClient.post('/auth/verify-otp', { phone, code });
-      console.log('[Auth] OTP verified, storing tokens...');
+      if (__DEV__) console.log('[Auth] OTP verified, storing tokens...');
       // Store tokens after successful verification (unwrap from nested structure)
       await setAuthTokens(response.tokens.accessToken, response.tokens.refreshToken);
-      console.log('[Auth] Tokens stored successfully');
+      if (__DEV__) console.log('[Auth] Tokens stored successfully');
       // Return flattened response for frontend consumption
       return {
         accessToken: response.tokens.accessToken,

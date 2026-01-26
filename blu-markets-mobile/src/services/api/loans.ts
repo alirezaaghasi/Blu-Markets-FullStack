@@ -21,27 +21,28 @@ export const loans = {
       availableIrr: data?.availableIrr ?? data?.available_irr ?? 0,
       usedIrr: data?.usedIrr ?? data?.currentLoansIrr ?? data?.used_irr ?? 0,
       maxCapacityIrr: maxCapacity,
-      // Portfolio value is maxCapacity / 0.25 (since limit is 25% of portfolio)
-      portfolioValueIrr: data?.portfolioValueIrr ?? (maxCapacity > 0 ? maxCapacity / 0.25 : 0),
+      // BUG-003 FIX: Always use backend-provided portfolio value, never derive from maxCapacity
+      // The 25% calculation is a business rule that must be computed by backend only
+      portfolioValueIrr: data?.portfolioValueIrr ?? 0,
     };
   },
 
   // Get loan calculation preview from backend (all business logic on server)
+  // BUG-002 FIX: Pass durationDays directly to backend; backend derives months internally
+  // Frontend must NOT convert days to months (durationDays / 30 is prohibited)
   preview: async (collateralAssetId: string, amountIrr: number, durationDays: 90 | 180): Promise<LoanPreviewResponse> => {
-    const durationMonths = (durationDays / 30) as 3 | 6;
     const data = await apiClient.post('/loans/preview', {
       collateralAssetId,
       amountIrr,
-      durationMonths,
+      durationDays, // Pass days directly, backend handles conversion
     }) as unknown as ApiResponse<LoanPreviewResponse>;
     return data;
   },
 
   // Create a loan with collateral asset (duration in days: 90 or 180 = 3 or 6 months)
+  // BUG-002 FIX: Pass durationDays directly to backend; backend derives months internally
   create: async (collateralAssetId: string, amountIrr: number, durationDays: 90 | 180): Promise<Loan> => {
-    // Backend expects durationMonths (3 or 6)
-    const durationMonths = (durationDays / 30) as 3 | 6;
-    const response = await apiClient.post('/loans', { collateralAssetId, amountIrr, durationMonths }) as unknown as ApiResponse<{
+    const response = await apiClient.post('/loans', { collateralAssetId, amountIrr, durationDays }) as unknown as ApiResponse<{
       loan?: Loan;
       cashAdded?: number;
       holdingFrozen?: boolean;
