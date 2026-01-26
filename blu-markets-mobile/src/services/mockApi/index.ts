@@ -17,6 +17,7 @@ import { enableDemoMode, completeOnboarding, logout } from '../../store/slices/a
 import { setRiskProfile } from '../../store/slices/onboardingSlice';
 import { ASSETS } from '../../constants/assets';
 import { DEFAULT_FX_RATE, FIXED_INCOME_UNIT_PRICE, RISK_PROFILE_ALLOCATIONS, RISK_PROFILE_NAMES } from '../../constants/business';
+import { calculateRiskProfile } from '../../utils/riskProfile';
 import type {
   AssetId,
   Holding,
@@ -116,26 +117,26 @@ export const auth = {
 
 // Onboarding APIs
 export const onboarding = {
-  submitQuestionnaire: async (answers: Record<string, number>): Promise<QuestionnaireResponse> => {
+  // Fixed: Accept array of answers and use conservative dominance algorithm
+  submitQuestionnaire: async (answers: Array<{ questionId: string; answerId: string; value: number }>): Promise<QuestionnaireResponse> => {
     await delay(MOCK_DELAY);
 
-    // Calculate risk score from answers (simplified)
-    const totalScore = Object.values(answers).reduce((sum, val) => sum + val, 0);
-    const avgScore = totalScore / Object.keys(answers).length;
-    const riskScore = Math.min(10, Math.max(1, Math.round(avgScore)));
-    const riskTier = Math.ceil(riskScore / 2);
+    // Convert answers array to Record<string, number> for calculateRiskProfile
+    const answerMap: Record<string, number> = {};
+    answers.forEach(a => {
+      answerMap[a.questionId] = a.value;
+    });
 
-    const profileNames = RISK_PROFILE_NAMES[riskScore] || { en: 'Balanced', fa: 'متعادل' };
-    const targetAllocation = RISK_PROFILE_ALLOCATIONS[riskScore] || {
-      FOUNDATION: 0.50,
-      GROWTH: 0.35,
-      UPSIDE: 0.15,
-    };
+    // Use the proper risk profile algorithm with conservative dominance
+    const riskProfile = calculateRiskProfile(answerMap);
+    const riskScore = riskProfile.score;
+    const riskTier = Math.ceil(riskScore / 2);
+    const targetAllocation = riskProfile.targetAllocation;
 
     store.dispatch(setRiskProfile({
       score: riskScore,
-      profileName: profileNames.en,
-      profileNameFarsi: profileNames.fa,
+      profileName: riskProfile.profileName,
+      profileNameFarsi: riskProfile.profileNameFarsi,
       targetAllocation,
     }));
 
@@ -143,8 +144,8 @@ export const onboarding = {
       riskScore,
       riskTier,
       riskProfile: {
-        name: profileNames.en,
-        nameFa: profileNames.fa,
+        name: riskProfile.profileName,
+        nameFa: riskProfile.profileNameFarsi,
       },
       targetAllocation,
     };
