@@ -186,8 +186,11 @@ const LoansScreen: React.FC = () => {
               const asset = ASSETS[loan.collateralAssetId];
               const health = getLoanHealth(loan);
               const paidInstallments = loan.installmentsPaid;
-              const totalInstallments = loan.installments.length;
-              const progressPercentage = (paidInstallments / totalInstallments) * 100;
+              // Guard against empty installments array to prevent NaN/Infinity
+              const totalInstallments = Math.max(1, loan.installments?.length || 0);
+              const progressPercentage = totalInstallments > 0
+                ? (paidInstallments / totalInstallments) * 100
+                : 0;
 
               return (
                 <View key={loan.id} style={styles.loanCard}>

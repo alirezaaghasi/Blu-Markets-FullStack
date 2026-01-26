@@ -20,6 +20,8 @@ import {
   LOAN_ANNUAL_INTEREST_RATE,
   LOAN_INSTALLMENT_COUNT,
   LOAN_DURATION_OPTIONS,
+  LOAN_DURATION_LABELS,
+  LOAN_MIN_AMOUNT,
 } from '../constants/business';
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
 import { addLoan, freezeHolding, addCash, logAction } from '../store/slices/portfolioSlice';
@@ -54,7 +56,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
 
   const [selectedAssetId, setSelectedAssetId] = useState<AssetId | null>(null);
   const [amountInput, setAmountInput] = useState('');
-  const [durationDays, setDurationDays] = useState<30 | 60 | 90>(30);
+  const [durationDays, setDurationDays] = useState<90 | 180>(90);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successResult, setSuccessResult] = useState<TransactionSuccessResult | null>(null);
@@ -123,6 +125,8 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
   const validationErrors: string[] = [];
   if (amountIRR <= 0) {
     validationErrors.push('Enter an amount to borrow');
+  } else if (amountIRR < LOAN_MIN_AMOUNT) {
+    validationErrors.push(`Minimum loan amount is ${LOAN_MIN_AMOUNT.toLocaleString()} IRR`);
   }
   if (amountIRR > effectiveMaxBorrow) {
     if (amountIRR > maxBorrowIRR) {
@@ -189,7 +193,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
         items: [
           { label: 'Amount Borrowed', value: `${formatNumber(amountIRR)} IRR`, highlight: true },
           { label: 'Collateral', value: `${selectedAsset.name} (Frozen)` },
-          { label: 'Duration', value: `${durationDays} days` },
+          { label: 'Duration', value: LOAN_DURATION_LABELS[durationDays] || `${durationDays} days` },
           { label: 'Interest Rate', value: `${(LOAN_ANNUAL_INTEREST_RATE * 100).toFixed(0)}% annual` },
           { label: 'Total to Repay', value: `${formatNumber(Math.round(amountIRR + totalInterest))} IRR` },
         ],
@@ -350,7 +354,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
                         styles.durationChip,
                         durationDays === days && styles.durationChipActive,
                       ]}
-                      onPress={() => setDurationDays(days)}
+                      onPress={() => setDurationDays(days as 90 | 180)}
                     >
                       <Text
                         style={[
@@ -358,7 +362,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
                           durationDays === days && styles.durationChipTextActive,
                         ]}
                       >
-                        {days} days
+                        {LOAN_DURATION_LABELS[days] || `${days} days`}
                       </Text>
                     </TouchableOpacity>
                   ))}

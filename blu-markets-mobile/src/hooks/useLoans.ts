@@ -15,7 +15,7 @@ interface UseLoansResult {
   isRefreshing: boolean;
   error: string | null;
   refresh: () => Promise<void>;
-  createLoan: (collateralAssetId: string, amountIrr: number, durationDays: 30 | 60 | 90) => Promise<Loan | null>;
+  createLoan: (collateralAssetId: string, amountIrr: number, durationDays: 90 | 180) => Promise<Loan | null>;
   repayLoan: (loanId: string, amountIrr: number) => Promise<boolean>;
 }
 
@@ -55,7 +55,7 @@ export function useLoans(): UseLoansResult {
     await fetchLoans(true);
   }, [fetchLoans]);
 
-  const createLoan = useCallback(async (collateralAssetId: string, amountIrr: number, durationDays: 30 | 60 | 90): Promise<Loan | null> => {
+  const createLoan = useCallback(async (collateralAssetId: string, amountIrr: number, durationDays: 90 | 180): Promise<Loan | null> => {
     try {
       setError(null);
       const newLoan = await loansApi.create(collateralAssetId, amountIrr, durationDays);

@@ -14,7 +14,7 @@ export const ASSETS: Record<AssetId, AssetConfig> = {
     layerWeight: 0.40,
     liquidity: 1.00,
     protectionEligible: false,
-    ltv: 0.90,
+    ltv: 0.70, // FOUNDATION layer cap per PRD
     coinGeckoId: 'tether',
   },
   PAXG: {
@@ -99,7 +99,7 @@ export const ASSETS: Record<AssetId, AssetConfig> = {
     layerWeight: 0.15,
     liquidity: 0.75,
     protectionEligible: false,
-    ltv: 0.60,
+    ltv: 0.50, // GROWTH layer cap per PRD
     coinGeckoId: 'kinesis-silver',
   },
   QQQ: {
@@ -111,7 +111,7 @@ export const ASSETS: Record<AssetId, AssetConfig> = {
     layerWeight: 0.15,
     liquidity: 0.95,
     protectionEligible: true,
-    ltv: 0.60,
+    ltv: 0.50, // GROWTH layer cap per PRD
     // Fetched from Finnhub, not CoinGecko
   },
 
@@ -149,7 +149,7 @@ export const ASSETS: Record<AssetId, AssetConfig> = {
     layerWeight: 0.18,
     liquidity: 0.85,
     protectionEligible: false,
-    ltv: 0.35,
+    ltv: 0.30, // UPSIDE layer cap per PRD
     coinGeckoId: 'chainlink',
   },
   AVAX: {

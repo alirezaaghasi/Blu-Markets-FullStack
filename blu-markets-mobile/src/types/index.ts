@@ -211,7 +211,7 @@ export interface Loan {
   amountIRR: number;
   dailyInterestRate: number; // Daily interest rate (0.0005 = 0.05%)
   interestRate?: number; // Annual interest rate for display (0.30 = 30%)
-  durationDays: 30 | 60 | 90; // Updated duration options
+  durationDays: 90 | 180; // 3 or 6 months per PRD
   startISO: string;
   dueISO: string;
   status: LoanStatus;

@@ -16,6 +16,7 @@ import { completeOnboarding, logout } from '../../../store/slices/authSlice';
 import { setRiskProfile } from '../../../store/slices/onboardingSlice';
 import { ASSETS } from '../../../constants/assets';
 import { FIXED_INCOME_UNIT_PRICE, RISK_PROFILE_ALLOCATIONS, RISK_PROFILE_NAMES, SPREAD_BY_LAYER } from '../../../constants/business';
+import { calculateRiskProfile } from '../../../utils/riskProfile';
 import type {
   AssetId,
   Holding,
@@ -138,33 +139,34 @@ export const onboarding = {
   submitQuestionnaire: async (answers: QuestionnaireAnswer[]): Promise<QuestionnaireResponse> => {
     await delay(MOCK_DELAY);
 
-    // Calculate risk score from answers (simplified)
-    const totalScore = answers.reduce((sum, a) => sum + a.value, 0);
-    const avgScore = totalScore / answers.length;
-    const riskScore = Math.min(10, Math.max(1, Math.round(avgScore)));
-    const riskTier = Math.ceil(riskScore / 2);
+    // Convert answers array to Record<string, number> for calculateRiskProfile
+    // Uses option index (value) as the answer for each question
+    const answerMap: Record<string, number> = {};
+    answers.forEach(a => {
+      answerMap[a.questionId] = a.value;
+    });
 
-    const profileNames = RISK_PROFILE_NAMES[riskScore] || { en: 'Balanced', fa: 'متعادل' };
-    const targetAllocation = RISK_PROFILE_ALLOCATIONS[riskScore] || {
-      FOUNDATION: 0.50,
-      GROWTH: 0.35,
-      UPSIDE: 0.15,
-    };
+    // Use the proper risk profile algorithm with conservative dominance
+    // (min of capacity vs willingness, horizon caps, consistency checks, etc.)
+    const riskProfile = calculateRiskProfile(answerMap);
+    const riskScore = riskProfile.score;
+    const riskTier = Math.ceil(riskScore / 2);
+    const targetAllocation = riskProfile.targetAllocation;
 
     store.dispatch(setRiskProfile({
       score: riskScore,
-      profileName: profileNames.en,
-      profileNameFarsi: profileNames.fa,
+      profileName: riskProfile.profileName,
+      profileNameFarsi: riskProfile.profileNameFarsi,
       targetAllocation,
     }));
 
     return {
       riskScore,
       riskTier,
-      profileName: profileNames.en,
+      profileName: riskProfile.profileName,
       riskProfile: {
-        name: profileNames.en,
-        nameFa: profileNames.fa,
+        name: riskProfile.profileName,
+        nameFa: riskProfile.profileNameFarsi,
       },
       targetAllocation,
     };
@@ -998,7 +1000,8 @@ export const loans = {
   },
 
   // Signature matches real API: (collateralAssetId, amountIrr, durationDays)
-  create: async (collateralAssetId: string, amountIrr: number, durationDays: 30 | 60 | 90): Promise<Loan> => {
+  // Per PRD: 30% APR, 3/6 month terms (90/180 days), 6 installments
+  create: async (collateralAssetId: string, amountIrr: number, durationDays: 90 | 180): Promise<Loan> => {
     await delay(MOCK_DELAY);
 
     const state = getState();
@@ -1030,22 +1033,24 @@ export const loans = {
 
     const finalCollateralAssetId = collateralHolding.assetId;
 
-    const dailyRate = 0.0005; // 0.05% daily (per mockup)
+    // PRD: 30% APR
+    const dailyRate = 0.30 / 365;
     const now = new Date();
     const dueDate = new Date(now);
     dueDate.setDate(dueDate.getDate() + durationDays);
 
     const installments: LoanInstallment[] = [];
-    const numInstallments = durationDays === 30 ? 1 : durationDays === 60 ? 2 : 3; // Monthly installments
+    // PRD: Always 6 installments
+    const numInstallments = 6;
     const principalPerInstallment = amountIrr / numInstallments;
+    const daysPerInstallment = durationDays / numInstallments;
 
     for (let i = 1; i <= numInstallments; i++) {
       const installmentDate = new Date(now);
-      installmentDate.setMonth(installmentDate.getMonth() + i);
+      installmentDate.setDate(installmentDate.getDate() + Math.round(daysPerInstallment * i));
 
       const remainingPrincipal = amountIrr - (principalPerInstallment * (i - 1));
-      const daysInPeriod = 30; // ~1 month
-      const interestIrr = remainingPrincipal * dailyRate * daysInPeriod;
+      const interestIrr = remainingPrincipal * dailyRate * daysPerInstallment;
 
       installments.push({
         number: i,
@@ -1065,8 +1070,8 @@ export const loans = {
       collateralQuantity: collateralHolding.quantity * 0.5,
       amountIRR: amountIrr,
       dailyInterestRate: dailyRate,
-      interestRate: dailyRate * 365, // Annual rate for display
-      durationDays: durationDays as 30 | 60 | 90,
+      interestRate: 0.30, // 30% APR per PRD
+      durationDays: durationDays as 90 | 180,
       startISO: now.toISOString(),
       dueISO: dueDate.toISOString(),
       status: 'ACTIVE',

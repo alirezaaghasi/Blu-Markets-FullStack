@@ -9,7 +9,7 @@ export const FIXED_INCOME_UNIT_PRICE = 500_000; // IRR per unit (500K IRR per PR
 export const FIXED_INCOME_ANNUAL_RATE = 0.30; // 30% annual
 
 // Trading
-export const MIN_TRADE_AMOUNT = 1_000_000; // IRR
+export const MIN_TRADE_AMOUNT = 100_000; // IRR per PRD Section 25
 export const MIN_REBALANCE_TRADE = 100_000; // IRR
 
 // Spread by Layer
@@ -51,15 +51,22 @@ export const DRIFT_TOLERANCE = 0.05; // 5%
 export const EMERGENCY_DRIFT = 0.10; // 10% bypasses time requirement
 export const MIN_REBALANCE_INTERVAL_MS = 24 * 60 * 60 * 1000; // 1 day
 
-// Loans - Updated to match mockup's daily interest model
-export const LOAN_DAILY_INTEREST_RATE = 0.0005; // 0.05% daily (as shown in mockup)
-export const LOAN_ANNUAL_INTEREST_RATE = 0.1825; // ~18.25% annual (0.05% × 365)
+// Loans - Per PRD Section 25: 30% APR, 3/6 month terms, 6 installments
+export const LOAN_DAILY_INTEREST_RATE = 0.30 / 365; // ~0.082% daily for 30% APR
+export const LOAN_ANNUAL_INTEREST_RATE = 0.30; // 30% annual per business rules
 export const MAX_PORTFOLIO_LOAN_PCT = 0.25; // 25%
 export const LOAN_INSTALLMENT_COUNT = 6;
-export const LOAN_DURATION_OPTIONS = [30, 60, 90] as const; // Days, not months
-export const LOAN_MIN_DURATION_DAYS = 30;
-export const LOAN_MAX_DURATION_DAYS = 90;
-export const LOAN_DEFAULT_DURATION_DAYS = 30;
+export const LOAN_DURATION_OPTIONS = [90, 180] as const; // 3 and 6 months per PRD
+export const LOAN_MIN_DURATION_DAYS = 90;
+export const LOAN_MAX_DURATION_DAYS = 180;
+export const LOAN_DEFAULT_DURATION_DAYS = 90;
+// Human-readable labels for loan durations
+export const LOAN_DURATION_LABELS: Record<number, string> = {
+  90: '3 Months',
+  180: '6 Months',
+};
+// Minimum loan amount
+export const LOAN_MIN_AMOUNT = 1_000_000; // 1M IRR per PRD
 
 // LTV by Layer (fallback if asset-specific not available)
 export const LTV_BY_LAYER: Record<Layer, number> = {

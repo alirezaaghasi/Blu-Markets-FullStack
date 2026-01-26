@@ -687,7 +687,7 @@ export const loans = {
       amountIRR: amountIrr,
       dailyInterestRate: interestRate / 365, // Convert annual to daily
       interestRate, // Annual rate for display
-      durationDays: (termMonths * 30) as 30 | 60 | 90,
+      durationDays: (termMonths * 30) as 90 | 180,
       startISO: now.toISOString(),
       dueISO: dueDate.toISOString(),
       status: 'ACTIVE',

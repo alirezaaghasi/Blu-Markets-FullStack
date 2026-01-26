@@ -269,7 +269,7 @@ const ProfileScreen: React.FC = () => {
         {
           text: 'Continue',
           onPress: () => {
-            navigation.navigate('Questionnaire', { isRetake: true });
+            navigation.navigate('RetakeQuiz');
           },
         },
       ],

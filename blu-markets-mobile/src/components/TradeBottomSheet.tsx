@@ -49,7 +49,7 @@ interface TradeBottomSheetProps {
 }
 
 // Trade validation constants
-const MIN_BUY_AMOUNT_IRR = 1_000_000; // Minimum buy amount in IRR (1M)
+// MIN_TRADE_AMOUNT imported from business.ts (100,000 IRR per PRD)
 // No minimum for sells - user can sell any amount
 
 // Quick amount chips as percentages
@@ -152,8 +152,8 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
 
     if (side === 'BUY') {
       // Buy validation
-      if (amountIRR > 0 && amountIRR < MIN_BUY_AMOUNT_IRR) {
-        errors.push(`Minimum trade is ${MIN_BUY_AMOUNT_IRR.toLocaleString()} IRR`);
+      if (amountIRR > 0 && amountIRR < MIN_TRADE_AMOUNT) {
+        errors.push(`Minimum trade is ${MIN_TRADE_AMOUNT.toLocaleString()} IRR`);
       }
       if (amountIRR > cashIRR) {
         errors.push('Insufficient funds');
