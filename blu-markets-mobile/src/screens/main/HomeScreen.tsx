@@ -30,12 +30,11 @@ import { SPACING, RADIUS } from '../../constants/spacing';
 import { useAppSelector, useAppDispatch } from '../../hooks/useStore';
 import { useActivityFeed } from '../../hooks/useActivityFeed';
 import { usePriceConnection } from '../../hooks/usePriceConnection';
-import { setHoldings, updateCash, setStatus, setTargetLayerPct } from '../../store/slices/portfolioSlice';
-import { fetchPrices, fetchFxRate } from '../../store/slices/pricesSlice';
+import { setHoldings, updateCash, setStatus, setTargetLayerPct, setPortfolioValues } from '../../store/slices/portfolioSlice';
+// Note: Price fetching removed - backend calculates all values
 import { portfolio as portfolioApi } from '../../services/api';
 import type { Holding, ActionLogEntry } from '../../types';
 import { ASSETS } from '../../constants/assets';
-import { FIXED_INCOME_UNIT_PRICE, DRIFT_TOLERANCE, LAYER_CONSTRAINTS } from '../../constants/business';
 import { ActivityCard } from '../../components/ActivityCard';
 import { TradeBottomSheet } from '../../components/TradeBottomSheet';
 import { AddFundsSheet } from '../../components/AddFundsSheet';
@@ -79,37 +78,7 @@ function formatIRRShort(value: number | undefined): string {
   return `${value.toLocaleString('en-US')} IRR`;
 }
 
-/**
- * Compute portfolio status based on drift from target
- */
-function computePortfolioStatus(
-  layerPct: { FOUNDATION: number; GROWTH: number; UPSIDE: number },
-  targetLayerPct: { FOUNDATION: number; GROWTH: number; UPSIDE: number }
-): PortfolioStatusResult {
-  const issues: string[] = [];
-
-  // Check drift from target for each layer
-  for (const layer of ['FOUNDATION', 'GROWTH', 'UPSIDE'] as const) {
-    const drift = Math.abs(layerPct[layer] - targetLayerPct[layer]);
-    if (drift > DRIFT_TOLERANCE) {
-      issues.push(`${layer}_${layerPct[layer] < targetLayerPct[layer] ? 'BELOW' : 'ABOVE'}_TARGET`);
-    }
-  }
-
-  // Hard safety limits (absolute bounds from PRD)
-  const hardMinFoundation = LAYER_CONSTRAINTS.FOUNDATION.hardMin || 0.30;
-  const hardMaxUpside = LAYER_CONSTRAINTS.UPSIDE.hardMax || 0.25;
-
-  if (layerPct.FOUNDATION < hardMinFoundation) {
-    return { status: 'ATTENTION_REQUIRED', issues: [...issues, 'FOUNDATION_BELOW_HARD_FLOOR'] };
-  }
-  if (layerPct.UPSIDE > hardMaxUpside) {
-    return { status: 'ATTENTION_REQUIRED', issues: [...issues, 'UPSIDE_ABOVE_HARD_CAP'] };
-  }
-
-  if (issues.length > 0) return { status: 'SLIGHTLY_OFF', issues };
-  return { status: 'BALANCED', issues: [] };
-}
+// Portfolio status is calculated by backend - frontend only displays it
 
 /**
  * Format activity log message
@@ -258,67 +227,26 @@ const HomeScreen: React.FC = () => {
   const cashIRR = portfolioState?.cashIRR || 0;
   const targetLayerPct = portfolioState?.targetLayerPct || { FOUNDATION: 0.50, GROWTH: 0.35, UPSIDE: 0.15 };
   const loans = portfolioState?.loans || [];
-  const { prices, fxRate } = useAppSelector((state) => state.prices);
+  // Backend-calculated values (frontend is presentation layer only)
+  const holdingsValueIrr = portfolioState?.holdingsValueIrr || 0;
+  // Total Holdings = Cash + Asset Value (ensure correct sum even if backend value is stale)
+  const totalValueIrr = cashIRR + holdingsValueIrr;
+  const currentAllocation = portfolioState?.currentAllocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
+  const portfolioStatus = portfolioState?.status || 'BALANCED';
   const { phone, authToken } = useAppSelector((state) => state.auth);
 
   // Check if we're in demo mode (runtime check)
   const isDemoMode = authToken === 'demo-token';
 
   // ==========================================================================
-  // COMPUTED VALUES
+  // COMPUTED VALUES (using backend-calculated values from Redux)
   // ==========================================================================
 
-  // Calculate portfolio snapshot
-  const snapshot = useMemo(() => {
-    let holdingsIRR = 0;
-    const layerIRR = { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
-
-    for (const h of holdings) {
-      let valueIRR: number;
-
-      if (h.assetId === 'IRR_FIXED_INCOME') {
-        // Fixed income: quantity × unit price + accrued interest
-        const principal = h.quantity * FIXED_INCOME_UNIT_PRICE;
-        // Note: Full accrued interest calculation would need purchaseDate
-        valueIRR = principal;
-      } else {
-        // Crypto/ETF: quantity × priceUSD × fxRate
-        const priceUSD = prices[h.assetId] || 0;
-        valueIRR = h.quantity * priceUSD * fxRate;
-      }
-
-      holdingsIRR += valueIRR;
-      const asset = ASSETS[h.assetId];
-      const layer = asset?.layer || h.layer;
-      if (layer) layerIRR[layer] += valueIRR;
-    }
-
-    // Cash is part of Foundation for allocation purposes, but tracked separately for display
-    const totalIRR = holdingsIRR + cashIRR;
-    const totalForAllocation = layerIRR.FOUNDATION + layerIRR.GROWTH + layerIRR.UPSIDE + cashIRR;
-
-    // Add cash to Foundation for allocation calculation
-    const layerPct = {
-      FOUNDATION: totalForAllocation > 0 ? (layerIRR.FOUNDATION + cashIRR) / totalForAllocation : 0,
-      GROWTH: totalForAllocation > 0 ? layerIRR.GROWTH / totalForAllocation : 0,
-      UPSIDE: totalForAllocation > 0 ? layerIRR.UPSIDE / totalForAllocation : 0,
-    };
-
-    return { totalIRR, holdingsIRR, cashIRR, layerPct, layerIRR };
-  }, [holdings, cashIRR, prices, fxRate]);
-
-  // Calculate USD equivalent
-  const totalUSD = useMemo(() => {
-    return fxRate > 0 ? snapshot.totalIRR / fxRate : 0;
-  }, [snapshot.totalIRR, fxRate]);
-
-  // Calculate portfolio status
+  // Portfolio status result for UI (using backend status directly)
   const portfolioStatusResult = useMemo(() => {
-    if (snapshot.holdingsIRR === 0 && cashIRR === 0) {
-      return { status: 'BALANCED' as PortfolioStatus, issues: [] };
-    }
-    return computePortfolioStatus(snapshot.layerPct, targetLayerPct);
-  }, [snapshot, targetLayerPct, cashIRR]);
+    // Use backend status directly - no client-side calculation
+    return { status: portfolioStatus as PortfolioStatus, issues: [] };
+  }, [portfolioStatus]);
 
   // Check for pending loan payments
   const nextLoanPayment = useMemo(() => {
@@ -381,13 +309,21 @@ const HomeScreen: React.FC = () => {
       const [portfolioResponse] = await Promise.all([
         portfolioApi.get(),
         refreshActivities(),
-        dispatch(fetchPrices()),
-        dispatch(fetchFxRate()),
       ]);
 
+      // Update cash and target allocation
       dispatch(updateCash(portfolioResponse.cashIrr));
-      dispatch(setStatus(portfolioResponse.status));
       dispatch(setTargetLayerPct(portfolioResponse.targetAllocation));
+
+      // Update backend-calculated values (frontend is presentation layer only)
+      dispatch(setPortfolioValues({
+        totalValueIrr: portfolioResponse.totalValueIrr || 0,
+        holdingsValueIrr: portfolioResponse.holdingsValueIrr || (portfolioResponse.totalValueIrr - portfolioResponse.cashIrr) || 0,
+        currentAllocation: portfolioResponse.allocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
+        driftPct: portfolioResponse.driftPct || 0,
+        status: portfolioResponse.status || 'BALANCED',
+      }));
+
       if (portfolioResponse.holdings) {
         dispatch(setHoldings(portfolioResponse.holdings.map((h: any) => ({
           id: h.id,
@@ -410,15 +346,21 @@ const HomeScreen: React.FC = () => {
 
     const fetchData = async () => {
       try {
-        const [portfolioResponse] = await Promise.all([
-          portfolioApi.get(),
-          dispatch(fetchPrices()),
-          dispatch(fetchFxRate()),
-        ]);
+        const portfolioResponse = await portfolioApi.get();
 
+        // Update cash and target allocation
         dispatch(updateCash(portfolioResponse.cashIrr));
-        dispatch(setStatus(portfolioResponse.status));
         dispatch(setTargetLayerPct(portfolioResponse.targetAllocation));
+
+        // Update backend-calculated values (frontend is presentation layer only)
+        dispatch(setPortfolioValues({
+          totalValueIrr: portfolioResponse.totalValueIrr || 0,
+          holdingsValueIrr: portfolioResponse.holdingsValueIrr || (portfolioResponse.totalValueIrr - portfolioResponse.cashIrr) || 0,
+          currentAllocation: portfolioResponse.allocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
+          driftPct: portfolioResponse.driftPct || 0,
+          status: portfolioResponse.status || 'BALANCED',
+        }));
+
         if (portfolioResponse.holdings) {
           dispatch(setHoldings(portfolioResponse.holdings.map((h: any) => ({
             id: h.id,
@@ -486,16 +428,16 @@ const HomeScreen: React.FC = () => {
         {/* PORTFOLIO VALUE: One Big Number + Asset/Cash Breakdown */}
         {/* ================================================================ */}
         <View style={styles.valueSection}>
-          {/* Total Holdings - ONE number */}
+          {/* Total Holdings - ONE number (backend-calculated) */}
           <Text style={styles.totalValueAmount}>
-            {formatIRR(snapshot.totalIRR)} <Text style={styles.totalValueCurrency}>IRR</Text>
+            {formatIRR(totalValueIrr)} <Text style={styles.totalValueCurrency}>IRR</Text>
           </Text>
           <Text style={styles.totalValueLabel}>Total Holdings</Text>
 
-          {/* Asset Value vs Cash breakdown */}
+          {/* Asset Value vs Cash breakdown (backend-calculated) */}
           <View style={styles.valueBreakdown}>
             <View style={styles.valueBreakdownItem}>
-              <Text style={styles.breakdownValue}>{formatIRR(snapshot.holdingsIRR)}</Text>
+              <Text style={styles.breakdownValue}>{formatIRR(holdingsValueIrr)}</Text>
               <Text style={styles.breakdownLabel}>Asset Value</Text>
             </View>
             <View style={styles.valueBreakdownDivider} />
@@ -605,12 +547,12 @@ const HomeScreen: React.FC = () => {
           <WideActionButton
             label="Borrow IRR"
             onPress={() => setLoanSheetVisible(true)}
-            disabled={snapshot.holdingsIRR === 0}
+            disabled={holdingsValueIrr === 0}
           />
           <WideActionButton
             label="Insure Assets"
             onPress={() => setProtectionSheetVisible(true)}
-            disabled={snapshot.holdingsIRR === 0}
+            disabled={holdingsValueIrr === 0}
           />
         </View>
       </View>
@@ -858,7 +800,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background.surface,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.border.default,
+    borderColor: COLORS.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,

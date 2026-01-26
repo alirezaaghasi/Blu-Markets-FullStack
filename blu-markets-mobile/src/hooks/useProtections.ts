@@ -23,6 +23,8 @@ interface UseProtectionsResult {
     quoteId: string;
     premiumIrr: number;
   }) => Promise<Protection | null>;
+  // Convenience function: gets quote and purchases in one step
+  quickPurchaseProtection: (holdingId: string, durationDays?: number) => Promise<Protection | null>;
   cancelProtection: (protectionId: string) => Promise<boolean>;
 }
 
@@ -110,6 +112,42 @@ export function useProtections(): UseProtectionsResult {
     }
   }, []);
 
+  // Convenience function: get quote and purchase in one step
+  const quickPurchaseProtection = useCallback(async (
+    holdingId: string,
+    durationDays: number = 30
+  ): Promise<Protection | null> => {
+    try {
+      setError(null);
+      // Step 1: Get a quote for the holding
+      const quote = await protectionApi.getQuote(holdingId, 1.0, durationDays);
+
+      if (!quote?.quoteId) {
+        setError('Failed to get protection quote');
+        return null;
+      }
+
+      // Step 2: Purchase using the quote
+      const newProtection = await protectionApi.purchase({
+        quoteId: quote.quoteId,
+        holdingId,
+        coveragePct: quote.coveragePct,
+        durationDays: quote.durationDays,
+        premiumIrr: quote.premiumIrr,
+        acknowledgedPremium: true,
+      });
+
+      setProtections((prev) => [newProtection, ...prev]);
+      // Refresh protectable holdings after purchase
+      const holdingsResponse = await protectionApi.getHoldings();
+      setProtectableHoldings(holdingsResponse?.holdings || []);
+      return newProtection;
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to purchase protection'));
+      return null;
+    }
+  }, []);
+
   // Fetch on screen focus
   useFocusEffect(
     useCallback(() => {
@@ -131,6 +169,7 @@ export function useProtections(): UseProtectionsResult {
     error,
     refresh,
     purchaseProtection,
+    quickPurchaseProtection,
     cancelProtection,
   };
 }

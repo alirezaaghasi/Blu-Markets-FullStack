@@ -111,6 +111,7 @@ const COINGECKO_ASSETS: Record<string, AssetId> = {
   'avalanche-2': 'AVAX',
   'matic-network': 'MATIC',
   arbitrum: 'ARB',
+  'kinesis-silver': 'KAG', // Kinesis Silver for Growth layer
 };
 
 const FINNHUB_ASSETS: Record<string, AssetId> = {

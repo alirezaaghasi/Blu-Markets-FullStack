@@ -42,7 +42,11 @@ export interface PortfolioResponse {
   holdings: Holding[];
   targetAllocation: TargetLayerPct;
   status: PortfolioStatus;
+  // Backend-calculated values (frontend is presentation layer only)
   totalValueIrr: number;
+  holdingsValueIrr?: number;
+  allocation?: TargetLayerPct;
+  driftPct?: number;
   dailyChangePercent: number;
   // Risk profile info (for profile screen)
   riskScore?: number;

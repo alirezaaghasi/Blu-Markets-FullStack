@@ -15,7 +15,7 @@ interface UseLoansResult {
   isRefreshing: boolean;
   error: string | null;
   refresh: () => Promise<void>;
-  createLoan: (collateralAssetId: string, amountIrr: number, termMonths: 3 | 6) => Promise<Loan | null>;
+  createLoan: (collateralAssetId: string, amountIrr: number, durationMonths: 3 | 6) => Promise<Loan | null>;
   repayLoan: (loanId: string, amountIrr: number) => Promise<boolean>;
 }
 
@@ -55,20 +55,18 @@ export function useLoans(): UseLoansResult {
     await fetchLoans(true);
   }, [fetchLoans]);
 
-  const createLoan = useCallback(async (collateralAssetId: string, amountIrr: number, termMonths: 3 | 6): Promise<Loan | null> => {
+  const createLoan = useCallback(async (collateralAssetId: string, amountIrr: number, durationMonths: 3 | 6): Promise<Loan | null> => {
     try {
       setError(null);
-      const newLoan = await loansApi.create(collateralAssetId, amountIrr, termMonths);
-      setLoans((prev) => [newLoan, ...prev]);
-      // Refresh capacity after creating loan
-      const newCapacity = await loansApi.getCapacity();
-      setCapacity(newCapacity);
+      const newLoan = await loansApi.create(collateralAssetId, amountIrr, durationMonths);
+      // Refresh full loans list to get complete data with installments
+      await fetchLoans(true);
       return newLoan;
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to create loan'));
       return null;
     }
-  }, []);
+  }, [fetchLoans]);
 
   const repayLoan = useCallback(async (loanId: string, amountIrr: number): Promise<boolean> => {
     try {

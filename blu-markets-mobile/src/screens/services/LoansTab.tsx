@@ -11,13 +11,18 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { COLORS } from '../../constants/colors';
 import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING, RADIUS } from '../../constants/spacing';
 import { useLoans } from '../../hooks/useLoans';
-import { Loan } from '../../types';
+import { useAppSelector } from '../../hooks/useStore';
+import { Loan, AssetId } from '../../types';
 import { EmptyState } from '../../components/EmptyState';
+
+// Assets eligible for loan collateral (crypto assets only)
+const COLLATERAL_ELIGIBLE_ASSETS: AssetId[] = ['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'ADA', 'AVAX', 'LINK', 'DOT', 'TON', 'PAXG', 'KAG'];
 
 interface LoansTabProps {
   loanId?: string;
@@ -34,6 +39,31 @@ export function LoansTab({ loanId }: LoansTabProps) {
     createLoan,
     repayLoan,
   } = useLoans();
+
+  // Get holdings from portfolio to find eligible collateral
+  const holdings = useAppSelector((state) => state.portfolio?.holdings || []);
+
+  // Find first eligible collateral asset from user's holdings
+  const eligibleCollateral = holdings.find(
+    (h) => COLLATERAL_ELIGIBLE_ASSETS.includes(h.assetId as AssetId) && h.quantity > 0
+  );
+
+  const handleExploreBorrowing = async () => {
+    if (!eligibleCollateral) {
+      Alert.alert(
+        'No Eligible Collateral',
+        'You need crypto holdings (BTC, ETH, etc.) to use as collateral for a loan.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Create a loan with default values: first eligible asset, 5M IRR, 3 months
+    const result = await createLoan(eligibleCollateral.assetId, 5_000_000, 3);
+    if (result) {
+      Alert.alert('Loan Created', 'Your loan has been successfully created.');
+    }
+  };
 
   const hasLoans = loans.length > 0;
 
@@ -77,7 +107,7 @@ export function LoansTab({ loanId }: LoansTabProps) {
             ? `Borrow against your crypto holdings. Up to ${availableCapacity.toLocaleString()} IRR available.`
             : "Borrow against your crypto holdings at competitive rates"}
           actionLabel="Explore Borrowing"
-          onAction={() => createLoan(5000000, 3)}
+          onAction={handleExploreBorrowing}
         />
 
         {/* How It Works Section */}
@@ -165,7 +195,7 @@ export function LoansTab({ loanId }: LoansTabProps) {
         </Text>
         <TouchableOpacity
           style={styles.borrowButton}
-          onPress={() => createLoan(5000000, 3)}
+          onPress={handleExploreBorrowing}
         >
           <Text style={styles.borrowButtonText}>Borrow</Text>
         </TouchableOpacity>
@@ -194,15 +224,19 @@ function LoanCard({
   highlighted: boolean;
   onRepay: (amount: number) => void;
 }) {
-  const nextInstallment = loan.installments.find((i) => i.status === 'PENDING');
+  // Safety check for installments array
+  const installments = loan.installments || [];
+  const nextInstallment = installments.find((i) => i.status === 'PENDING');
   const daysUntilDue = nextInstallment
     ? Math.ceil((new Date(nextInstallment.dueISO).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : null;
 
-  // Calculate remaining from installments
-  const remainingIRR = loan.installments
-    .filter((i) => i.status !== 'PAID')
-    .reduce((sum, i) => sum + i.totalIRR - i.paidIRR, 0);
+  // Calculate remaining from installments (fallback to totalDueIRR - paidIRR if no installments)
+  const remainingIRR = installments.length > 0
+    ? installments
+        .filter((i) => i.status !== 'PAID')
+        .reduce((sum, i) => sum + i.totalIRR - i.paidIRR, 0)
+    : (loan.totalDueIRR || loan.amountIRR) - (loan.paidIRR || 0);
 
   return (
     <View style={[styles.loanCard, highlighted && styles.loanCardHighlighted]}>

@@ -26,9 +26,23 @@ export const loans = {
     };
   },
 
-  // Create a loan with collateral asset (duration in days)
-  create: (collateralAssetId: string, amountIrr: number, durationDays: 30 | 60 | 90): Promise<Loan> =>
-    apiClient.post('/loans', { collateralAssetId, amountIrr, durationDays }) as unknown as Promise<Loan>,
+  // Create a loan with collateral asset (duration in months: 3 or 6)
+  create: async (collateralAssetId: string, amountIrr: number, durationMonths: 3 | 6): Promise<Loan> => {
+    const response = await apiClient.post('/loans', { collateralAssetId, amountIrr, durationMonths }) as unknown as ApiResponse<{
+      loan?: Loan;
+      cashAdded?: number;
+      holdingFrozen?: boolean;
+    } | Loan>;
+
+    // Handle wrapped response { loan: {...} } or direct Loan response
+    if (response && typeof response === 'object' && 'loan' in response && response.loan) {
+      // Ensure installments defaults to empty array
+      return { ...response.loan, installments: response.loan.installments || [] };
+    }
+    // Direct loan response
+    const loan = response as Loan;
+    return { ...loan, installments: loan.installments || [] };
+  },
 
   repay: (loanId: string, amountIrr: number): Promise<{
     success: boolean;

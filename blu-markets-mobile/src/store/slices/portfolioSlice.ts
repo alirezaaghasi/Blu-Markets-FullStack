@@ -34,6 +34,15 @@ const initialState: PortfolioState = {
   lastSyncTimestamp: 0,
   riskScore: 5,
   riskProfileName: 'Balanced',
+  // Backend-calculated values (frontend is presentation layer only)
+  totalValueIrr: 0,
+  holdingsValueIrr: 0,
+  currentAllocation: {
+    FOUNDATION: 0,
+    GROWTH: 0,
+    UPSIDE: 0,
+  },
+  driftPct: 0,
 };
 
 const portfolioSlice = createSlice({
@@ -188,6 +197,24 @@ const portfolioSlice = createSlice({
     // Portfolio status
     setStatus: (state, action: PayloadAction<PortfolioStatus>) => {
       state.status = action.payload;
+    },
+
+    // Update backend-calculated portfolio values (frontend is presentation layer only)
+    setPortfolioValues: (
+      state,
+      action: PayloadAction<{
+        totalValueIrr: number;
+        holdingsValueIrr: number;
+        currentAllocation: TargetLayerPct;
+        driftPct: number;
+        status: PortfolioStatus;
+      }>
+    ) => {
+      state.totalValueIrr = action.payload.totalValueIrr;
+      state.holdingsValueIrr = action.payload.holdingsValueIrr;
+      state.currentAllocation = action.payload.currentAllocation;
+      state.driftPct = action.payload.driftPct;
+      state.status = action.payload.status;
     },
 
     // Protections
@@ -553,6 +580,7 @@ export const {
   unfreezeHolding,
   setTargetLayerPct,
   setStatus,
+  setPortfolioValues,
   addProtection,
   removeProtection,
   addLoan,

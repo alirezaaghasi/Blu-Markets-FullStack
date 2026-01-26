@@ -281,6 +281,11 @@ export interface PortfolioState {
   // Risk profile from onboarding (stored for profile screen)
   riskScore: number;
   riskProfileName: string;
+  // Backend-calculated values (frontend is presentation layer only)
+  totalValueIrr: number;
+  holdingsValueIrr: number;
+  currentAllocation: TargetLayerPct;
+  driftPct: number;
 }
 
 export interface PriceState {

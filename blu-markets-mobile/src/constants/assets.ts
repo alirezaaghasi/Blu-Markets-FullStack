@@ -4,34 +4,34 @@
 import { AssetConfig, AssetId, Layer } from '../types';
 
 export const ASSETS: Record<AssetId, AssetConfig> = {
-  // Foundation Layer
+  // Foundation Layer - Capital Preservation
   USDT: {
     id: 'USDT',
-    name: 'Tether USD',
+    name: 'US Dollar',          // PRD: "US Dollar"
     symbol: 'USDT',
     layer: 'FOUNDATION',
     volatility: 0.01,
     layerWeight: 0.40,
     liquidity: 1.00,
-    protectionEligible: false, // Foundation assets not protection-eligible per PRD
+    protectionEligible: false,
     ltv: 0.90,
     coinGeckoId: 'tether',
   },
   PAXG: {
     id: 'PAXG',
-    name: 'PAX Gold',
+    name: 'Gold',               // PRD: "Gold"
     symbol: 'PAXG',
     layer: 'FOUNDATION',
     volatility: 0.12,
     layerWeight: 0.30,
     liquidity: 0.85,
-    protectionEligible: true, // Gold has liquid COMEX derivatives market
+    protectionEligible: true,
     ltv: 0.70,
     coinGeckoId: 'pax-gold',
   },
   IRR_FIXED_INCOME: {
     id: 'IRR_FIXED_INCOME',
-    name: 'Fixed Income',
+    name: 'Fixed Income',       // PRD: "Fixed Income"
     symbol: 'IRR',
     layer: 'FOUNDATION',
     volatility: 0.05,
@@ -41,10 +41,10 @@ export const ASSETS: Record<AssetId, AssetConfig> = {
     ltv: 0,
   },
 
-  // Growth Layer
+  // Growth Layer - Balanced Progress
   BTC: {
     id: 'BTC',
-    name: 'Bitcoin',
+    name: 'Bitcoin',            // PRD: "Bitcoin"
     symbol: 'BTC',
     layer: 'GROWTH',
     volatility: 0.45,
@@ -56,7 +56,7 @@ export const ASSETS: Record<AssetId, AssetConfig> = {
   },
   ETH: {
     id: 'ETH',
-    name: 'Ethereum',
+    name: 'Ethereum',           // PRD: "Ethereum"
     symbol: 'ETH',
     layer: 'GROWTH',
     volatility: 0.55,
@@ -68,43 +68,43 @@ export const ASSETS: Record<AssetId, AssetConfig> = {
   },
   BNB: {
     id: 'BNB',
-    name: 'BNB',
+    name: 'Binance Coin',       // PRD: "Binance Coin"
     symbol: 'BNB',
     layer: 'GROWTH',
     volatility: 0.50,
     layerWeight: 0.15,
     liquidity: 0.90,
-    protectionEligible: false, // Not protection-eligible per PRD
+    protectionEligible: true,
     ltv: 0.50,
     coinGeckoId: 'binancecoin',
   },
   XRP: {
     id: 'XRP',
-    name: 'XRP',
+    name: 'Ripple',             // PRD: "Ripple"
     symbol: 'XRP',
     layer: 'GROWTH',
     volatility: 0.60,
     layerWeight: 0.10,
     liquidity: 0.88,
-    protectionEligible: false, // Not protection-eligible per PRD
+    protectionEligible: true,
     ltv: 0.45,
     coinGeckoId: 'ripple',
   },
   KAG: {
     id: 'KAG',
-    name: 'Kinesis Silver',
+    name: 'Silver',             // PRD: "Silver"
     symbol: 'KAG',
     layer: 'GROWTH',
     volatility: 0.18,
     layerWeight: 0.15,
     liquidity: 0.75,
-    protectionEligible: true,
+    protectionEligible: false,
     ltv: 0.60,
     coinGeckoId: 'kinesis-silver',
   },
   QQQ: {
     id: 'QQQ',
-    name: 'Nasdaq ETF',
+    name: 'NASDAQ 100',         // PRD: "NASDAQ 100"
     symbol: 'QQQ',
     layer: 'GROWTH',
     volatility: 0.20,
@@ -115,10 +115,10 @@ export const ASSETS: Record<AssetId, AssetConfig> = {
     // Fetched from Finnhub, not CoinGecko
   },
 
-  // Upside Layer
+  // Upside Layer - Bounded Conviction
   SOL: {
     id: 'SOL',
-    name: 'Solana',
+    name: 'Solana',             // PRD: "Solana"
     symbol: 'SOL',
     layer: 'UPSIDE',
     volatility: 0.75,
@@ -130,7 +130,7 @@ export const ASSETS: Record<AssetId, AssetConfig> = {
   },
   TON: {
     id: 'TON',
-    name: 'Toncoin',
+    name: 'TON Coin',           // PRD: "TON Coin"
     symbol: 'TON',
     layer: 'UPSIDE',
     volatility: 0.65,
@@ -142,32 +142,32 @@ export const ASSETS: Record<AssetId, AssetConfig> = {
   },
   LINK: {
     id: 'LINK',
-    name: 'Chainlink',
+    name: 'Chainlink',          // PRD: "Chainlink"
     symbol: 'LINK',
     layer: 'UPSIDE',
     volatility: 0.60,
     layerWeight: 0.18,
     liquidity: 0.85,
-    protectionEligible: false, // Not protection-eligible per PRD
+    protectionEligible: false,
     ltv: 0.35,
     coinGeckoId: 'chainlink',
   },
   AVAX: {
     id: 'AVAX',
-    name: 'Avalanche',
+    name: 'Avalanche',          // PRD: "Avalanche"
     symbol: 'AVAX',
     layer: 'UPSIDE',
     volatility: 0.70,
     layerWeight: 0.16,
     liquidity: 0.82,
-    protectionEligible: false, // Not protection-eligible per PRD
+    protectionEligible: false,
     ltv: 0.30,
     coinGeckoId: 'avalanche-2',
   },
   MATIC: {
     id: 'MATIC',
-    name: 'Polygon',
-    symbol: 'MATIC',
+    name: 'Polygon',            // PRD: "Polygon"
+    symbol: 'POL',              // Updated ticker
     layer: 'UPSIDE',
     volatility: 0.65,
     layerWeight: 0.14,
@@ -178,7 +178,7 @@ export const ASSETS: Record<AssetId, AssetConfig> = {
   },
   ARB: {
     id: 'ARB',
-    name: 'Arbitrum',
+    name: 'Arbitrum',           // PRD: "Arbitrum"
     symbol: 'ARB',
     layer: 'UPSIDE',
     volatility: 0.70,

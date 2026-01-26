@@ -12,24 +12,29 @@ interface AssetIconProps {
   size?: number;
 }
 
-// Asset icon mappings - using emoji/text as fallback
-// In production, replace with actual image assets
+// Asset icon mappings - using symbol abbreviations for consistent display
+// Each asset shows its recognizable symbol/abbreviation
 const ASSET_ICONS: Partial<Record<AssetId, string>> = {
-  BTC: '₿',
-  ETH: 'Ξ',
-  USDT: '$',
-  PAXG: '🥇',
-  SOL: '◎',
-  TON: '💎',
-  LINK: '⬡',
-  AVAX: '🔺',
-  BNB: '◆',
-  XRP: '✕',
-  MATIC: '⬟',
-  ARB: '🔷',
-  KAG: '🥈',
-  QQQ: '📈',
-  IRR_FIXED_INCOME: '💵',
+  // Foundation Layer
+  USDT: '$',           // US Dollar - dollar sign
+  PAXG: 'Au',          // Gold - chemical symbol
+  IRR_FIXED_INCOME: 'FI', // Fixed Income
+
+  // Growth Layer
+  BTC: '₿',            // Bitcoin - official symbol
+  ETH: 'Ξ',            // Ethereum - official symbol
+  BNB: 'BN',           // Binance Coin
+  XRP: 'XR',           // Ripple
+  KAG: 'Ag',           // Silver - chemical symbol
+  QQQ: 'Q',            // NASDAQ 100
+
+  // Upside Layer
+  SOL: '◎',            // Solana - official symbol
+  TON: 'T',            // TON Coin
+  LINK: '⬡',           // Chainlink - hexagon
+  AVAX: 'A',           // Avalanche
+  MATIC: 'M',          // Polygon
+  ARB: 'AR',           // Arbitrum
 };
 
 export const AssetIcon: React.FC<AssetIconProps> = ({ assetId, size = 44 }) => {

@@ -47,8 +47,9 @@ const LAYER_ASSETS: Record<Layer, Array<{ assetId: AssetId; weight: number }>> =
   ],
 };
 
-// Minimum trade amount in IRR (1 million IRR)
-const MIN_TRADE_AMOUNT_IRR = 1_000_000;
+// Minimum trade amount in IRR (100K IRR - allows diversification for small investments)
+// PRD specifies all 15 assets should be allocated, so minimum must be low enough
+const MIN_TRADE_AMOUNT_IRR = 100_000;
 
 // FUNDING RULES:
 // - Initial Funding: 100% goes to assets, 0% to cash (remaining from rounding is redistributed)

@@ -90,6 +90,7 @@ const formatUsd = (irrValue: number, fxRate: number): string => {
 };
 
 // Generate holdings based on allocation (for display when API doesn't return holdings)
+// Shows ALL 15 assets distributed by layer weights per PRD
 const generateDisplayHoldings = (
   totalInvestment: number,
   allocation: { FOUNDATION: number; GROWTH: number; UPSIDE: number }
@@ -102,55 +103,34 @@ const generateDisplayHoldings = (
     layer: LayerKey;
   }> = [];
 
-  // Foundation assets distribution (PAXG, USDT split)
-  const foundationAmount = totalInvestment * allocation.FOUNDATION;
-  const foundationAssets = getAssetsByLayer('FOUNDATION').filter(a => a.id !== 'IRR_FIXED_INCOME');
-  if (foundationAssets.length > 0) {
-    const perAsset = foundationAmount / foundationAssets.length;
-    foundationAssets.forEach(asset => {
-      holdings.push({
-        assetId: asset.id,
-        name: asset.name,
-        symbol: asset.symbol,
-        valueIrr: perAsset,
-        layer: 'FOUNDATION',
-      });
-    });
-  }
+  // Helper to add assets from a layer using their weights
+  const addLayerAssets = (layer: LayerKey, layerAmount: number) => {
+    const assets = getAssetsByLayer(layer);
+    if (assets.length === 0) return;
 
-  // Growth assets distribution (BTC, ETH, BNB based on weights)
-  const growthAmount = totalInvestment * allocation.GROWTH;
-  const growthAssets = getAssetsByLayer('GROWTH');
-  const mainGrowth = growthAssets.filter(a => ['BTC', 'ETH', 'BNB'].includes(a.id));
-  if (mainGrowth.length > 0) {
-    const totalWeight = mainGrowth.reduce((sum, a) => sum + a.layerWeight, 0);
-    mainGrowth.forEach(asset => {
-      holdings.push({
-        assetId: asset.id,
-        name: asset.name,
-        symbol: asset.symbol,
-        valueIrr: growthAmount * (asset.layerWeight / totalWeight),
-        layer: 'GROWTH',
-      });
-    });
-  }
+    // Normalize weights to sum to 1
+    const totalWeight = assets.reduce((sum, a) => sum + a.layerWeight, 0);
 
-  // Upside assets distribution (SOL, TON, LINK based on weights)
-  const upsideAmount = totalInvestment * allocation.UPSIDE;
-  const upsideAssets = getAssetsByLayer('UPSIDE');
-  const mainUpside = upsideAssets.filter(a => ['SOL', 'TON', 'LINK'].includes(a.id));
-  if (mainUpside.length > 0) {
-    const totalWeight = mainUpside.reduce((sum, a) => sum + a.layerWeight, 0);
-    mainUpside.forEach(asset => {
+    assets.forEach(asset => {
+      const assetValue = layerAmount * (asset.layerWeight / totalWeight);
       holdings.push({
         assetId: asset.id,
         name: asset.name,
         symbol: asset.symbol,
-        valueIrr: upsideAmount * (asset.layerWeight / totalWeight),
-        layer: 'UPSIDE',
+        valueIrr: assetValue,
+        layer,
       });
     });
-  }
+  };
+
+  // Foundation: USDT (40%), PAXG (30%), IRR_FIXED_INCOME (30%)
+  addLayerAssets('FOUNDATION', totalInvestment * allocation.FOUNDATION);
+
+  // Growth: BTC (25%), ETH (20%), BNB (15%), XRP (10%), KAG (15%), QQQ (15%)
+  addLayerAssets('GROWTH', totalInvestment * allocation.GROWTH);
+
+  // Upside: SOL (20%), TON (18%), LINK (18%), AVAX (16%), MATIC (14%), ARB (14%)
+  addLayerAssets('UPSIDE', totalInvestment * allocation.UPSIDE);
 
   return holdings;
 };

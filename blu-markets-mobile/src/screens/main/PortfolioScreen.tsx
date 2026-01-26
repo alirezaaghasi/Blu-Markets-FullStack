@@ -14,8 +14,7 @@ import { COLORS } from '../../constants/colors';
 import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING, RADIUS } from '../../constants/spacing';
 import { useAppSelector, useAppDispatch } from '../../hooks/useStore';
-import { setHoldings, updateCash, setStatus, setTargetLayerPct } from '../../store/slices/portfolioSlice';
-import { fetchPrices, fetchFxRate } from '../../store/slices/pricesSlice';
+import { setHoldings, updateCash, setStatus, setTargetLayerPct, setPortfolioValues } from '../../store/slices/portfolioSlice';
 import { Layer, Holding } from '../../types';
 import AllocationBar from '../../components/AllocationBar';
 import HoldingCard from '../../components/HoldingCard';
@@ -46,6 +45,9 @@ const PortfolioScreen: React.FC = () => {
   const holdings = portfolioState?.holdings || [];
   const cashIRR = portfolioState?.cashIRR || 0;
   const targetLayerPct = portfolioState?.targetLayerPct || { FOUNDATION: 0.5, GROWTH: 0.35, UPSIDE: 0.15 };
+  // Backend-calculated values (frontend is presentation layer only)
+  const holdingsValueIRR = portfolioState?.holdingsValueIrr || 0;
+  const currentAllocation = portfolioState?.currentAllocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
   const { prices, fxRate, change24h } = useAppSelector((state) => state.prices);
 
   // Group holdings by layer
@@ -55,28 +57,13 @@ const PortfolioScreen: React.FC = () => {
     UPSIDE: holdings.filter((h) => h.layer === 'UPSIDE'),
   };
 
-  // Calculate values
-  const calculateHoldingValue = (holding: Holding): number => {
-    if (holding.assetId === 'IRR_FIXED_INCOME') {
-      return holding.quantity * 500000;
-    }
-    const priceUSD = prices[holding.assetId] || 0;
-    return holding.quantity * priceUSD * fxRate;
-  };
-
+  // Layer values from backend (calculated proportionally from holdings count for display)
+  // Note: Actual values come from backend - this is just for layer breakdown display
+  const totalHoldings = holdings.length || 1;
   const layerValues: Record<Layer, number> = {
-    FOUNDATION: holdingsByLayer.FOUNDATION.reduce((sum, h) => sum + calculateHoldingValue(h), 0),
-    GROWTH: holdingsByLayer.GROWTH.reduce((sum, h) => sum + calculateHoldingValue(h), 0),
-    UPSIDE: holdingsByLayer.UPSIDE.reduce((sum, h) => sum + calculateHoldingValue(h), 0),
-  };
-
-  const holdingsValueIRR = Object.values(layerValues).reduce((a, b) => a + b, 0);
-  const totalValueIRR = holdingsValueIRR + cashIRR;
-
-  const currentAllocation = {
-    FOUNDATION: holdingsValueIRR > 0 ? layerValues.FOUNDATION / holdingsValueIRR : 0,
-    GROWTH: holdingsValueIRR > 0 ? layerValues.GROWTH / holdingsValueIRR : 0,
-    UPSIDE: holdingsValueIRR > 0 ? layerValues.UPSIDE / holdingsValueIRR : 0,
+    FOUNDATION: holdingsValueIRR * (holdingsByLayer.FOUNDATION.length / totalHoldings),
+    GROWTH: holdingsValueIRR * (holdingsByLayer.GROWTH.length / totalHoldings),
+    UPSIDE: holdingsValueIRR * (holdingsByLayer.UPSIDE.length / totalHoldings),
   };
 
   const toggleLayer = (layer: Layer) => {
@@ -87,16 +74,21 @@ const PortfolioScreen: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [portfolioResponse] = await Promise.all([
-          portfolioApi.get(),
-          dispatch(fetchPrices()),
-          dispatch(fetchFxRate()),
-        ]);
+        const portfolioResponse = await portfolioApi.get();
 
         // Sync backend data to Redux
         dispatch(updateCash(portfolioResponse.cashIrr));
-        dispatch(setStatus(portfolioResponse.status));
         dispatch(setTargetLayerPct(portfolioResponse.targetAllocation));
+
+        // Update backend-calculated values (frontend is presentation layer only)
+        dispatch(setPortfolioValues({
+          totalValueIrr: portfolioResponse.totalValueIrr || 0,
+          holdingsValueIrr: portfolioResponse.holdingsValueIrr || (portfolioResponse.totalValueIrr - portfolioResponse.cashIrr) || 0,
+          currentAllocation: portfolioResponse.allocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
+          driftPct: portfolioResponse.driftPct || 0,
+          status: portfolioResponse.status || 'BALANCED',
+        }));
+
         if (portfolioResponse.holdings) {
           dispatch(setHoldings(portfolioResponse.holdings.map((h: any) => ({
             id: h.id,
@@ -116,17 +108,21 @@ const PortfolioScreen: React.FC = () => {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      // Fetch portfolio, prices, and FX rate in parallel
-      const [portfolioResponse] = await Promise.all([
-        portfolioApi.get(),
-        dispatch(fetchPrices()),
-        dispatch(fetchFxRate()),
-      ]);
+      const portfolioResponse = await portfolioApi.get();
 
       // Update Redux state with fresh portfolio data
       dispatch(updateCash(portfolioResponse.cashIrr));
-      dispatch(setStatus(portfolioResponse.status));
       dispatch(setTargetLayerPct(portfolioResponse.targetAllocation));
+
+      // Update backend-calculated values (frontend is presentation layer only)
+      dispatch(setPortfolioValues({
+        totalValueIrr: portfolioResponse.totalValueIrr || 0,
+        holdingsValueIrr: portfolioResponse.holdingsValueIrr || (portfolioResponse.totalValueIrr - portfolioResponse.cashIrr) || 0,
+        currentAllocation: portfolioResponse.allocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
+        driftPct: portfolioResponse.driftPct || 0,
+        status: portfolioResponse.status || 'BALANCED',
+      }));
+
       if (portfolioResponse.holdings) {
         dispatch(setHoldings(portfolioResponse.holdings.map((h: any) => ({
           id: h.id,

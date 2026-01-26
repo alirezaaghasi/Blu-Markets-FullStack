@@ -53,12 +53,22 @@ function normalizePortfolioResponse(data: Record<string, unknown>, holdings?: Ho
   const validStatuses = ['BALANCED', 'SLIGHTLY_OFF', 'ATTENTION_REQUIRED'];
   const status = (rawStatus && validStatuses.includes(rawStatus) ? rawStatus : 'BALANCED') as PortfolioStatus;
 
+  // Parse cash and total value
+  const cashIrr = Number(data.cashIrr ?? data.cash_irr ?? data.cashIRR ?? 0);
+  const totalValueIrr = Number(data.totalValueIrr ?? data.total_value_irr ?? data.totalValue ?? 0);
+  // Backend may return holdingsValueIrr, or we can calculate from total - cash
+  const holdingsValueIrr = Number(data.holdingsValueIrr ?? data.holdings_value_irr ?? (totalValueIrr - cashIrr));
+
   return {
-    cashIrr: Number(data.cashIrr ?? data.cash_irr ?? data.cashIRR ?? 0),
+    cashIrr,
     holdings: dataHoldings,
     targetAllocation: normalizeAllocation(data.targetAllocation as Record<string, number> | undefined ?? data.target_allocation as Record<string, number> | undefined),
     status,
-    totalValueIrr: Number(data.totalValueIrr ?? data.total_value_irr ?? data.totalValue ?? 0),
+    // Backend-calculated values (frontend is presentation layer only)
+    totalValueIrr,
+    holdingsValueIrr,
+    allocation: normalizeAllocation(data.allocation as Record<string, number> | undefined),
+    driftPct: Number(data.driftPct ?? data.drift_pct ?? 0),
     dailyChangePercent: Number(data.dailyChangePercent ?? data.daily_change_percent ?? 0),
     // Include risk score if available for profile screen
     riskScore: data.riskScore as number | undefined,

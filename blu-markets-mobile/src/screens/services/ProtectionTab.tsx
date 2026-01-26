@@ -32,7 +32,7 @@ export function ProtectionTab({ protectionId }: ProtectionTabProps) {
     isRefreshing,
     error,
     refresh,
-    purchaseProtection,
+    quickPurchaseProtection,
     cancelProtection,
   } = useProtections();
 
@@ -91,7 +91,7 @@ export function ProtectionTab({ protectionId }: ProtectionTabProps) {
       {eligibleAssets.filter(a => (a.quantity ?? 0) > 0).length > 0 ? (
         <EligibleAssetsGrid
           assets={eligibleAssets.filter(a => (a.quantity ?? 0) > 0)}
-          onProtect={(assetId) => purchaseProtection(assetId, 3)}
+          onProtect={(holdingId) => quickPurchaseProtection(holdingId, 30)}
         />
       ) : (
         <EmptyState
@@ -139,8 +139,10 @@ function ProtectionCard({
         <View style={styles.protectionAsset}>
           <Text style={styles.protectionAssetIcon}>{asset?.symbol || protection.assetId}</Text>
           <View>
-            <Text style={styles.protectionAssetName}>{asset?.name || protection.assetId}</Text>
-            <Text style={styles.protectionAssetSymbol}>{protection.assetId}</Text>
+            <Text style={styles.protectionAssetName}>
+              {asset?.name || protection.assetId}
+              <Text style={styles.protectionAssetSymbolInline}> | {asset?.symbol || ''}</Text>
+            </Text>
           </View>
         </View>
         <View style={[
@@ -195,6 +197,7 @@ function EligibleAssetsGrid({
   onProtect,
 }: {
   assets: Array<{
+    holdingId?: string;
     assetId: AssetId;
     quantity?: number;
     valueIrr?: number;
@@ -203,7 +206,7 @@ function EligibleAssetsGrid({
       thirtyDayIrr: number;
     };
   }>;
-  onProtect: (assetId: AssetId) => void;
+  onProtect: (holdingId: string) => void;
 }) {
   return (
     <View style={styles.eligibleGrid}>
@@ -211,10 +214,16 @@ function EligibleAssetsGrid({
         const asset = ASSETS[item.assetId];
         const quantity = item.quantity ?? 0;
         const premiumIrr = item.indicativePremium?.thirtyDayIrr ?? 0;
+        // Use holdingId if available, otherwise skip items without it
+        const holdingId = item.holdingId;
+        if (!holdingId) return null;
         return (
-          <View key={item.assetId} style={styles.eligibleCard}>
+          <View key={holdingId} style={styles.eligibleCard}>
             <Text style={styles.eligibleIcon}>{asset?.symbol || item.assetId}</Text>
-            <Text style={styles.eligibleName}>{asset?.name || item.assetId}</Text>
+            <Text style={styles.eligibleName}>
+              {asset?.name || item.assetId}
+              <Text style={styles.eligibleSymbol}> | {asset?.symbol || ''}</Text>
+            </Text>
             <Text style={styles.eligibleQuantity}>
               {quantity.toFixed(4)} {asset?.symbol}
             </Text>
@@ -223,7 +232,7 @@ function EligibleAssetsGrid({
             </Text>
             <TouchableOpacity
               style={styles.protectButton}
-              onPress={() => onProtect(item.assetId)}
+              onPress={() => onProtect(holdingId)}
             >
               <Text style={styles.protectButtonText}>Protect</Text>
             </TouchableOpacity>
@@ -315,6 +324,10 @@ const styles = StyleSheet.create({
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
     color: COLORS.text.primary,
   },
+  protectionAssetSymbolInline: {
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
+    color: COLORS.text.secondary,
+  },
   protectionAssetSymbol: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.text.secondary,
@@ -390,6 +403,10 @@ const styles = StyleSheet.create({
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
     color: COLORS.text.primary,
     marginBottom: SPACING[1],
+  },
+  eligibleSymbol: {
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
+    color: COLORS.text.secondary,
   },
   eligibleQuantity: {
     fontSize: TYPOGRAPHY.fontSize.xs,
