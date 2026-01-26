@@ -841,15 +841,20 @@ export const protection = {
     const state = getState();
     const protections = state.portfolio.protections || [];
 
-    // Filter active and calculate days remaining
+    // Filter active and calculate days remaining with label
     return protections
       .filter((p: any) => p.status === 'ACTIVE')
       .map((p: any) => {
         const expiryDate = new Date(p.expiryDate || p.endISO);
         const daysRemaining = Math.max(0, Math.ceil((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+        // Human-readable label for days remaining
+        const daysRemainingLabel = daysRemaining === 0 ? 'Expires today' :
+          daysRemaining === 1 ? '1 day remaining' :
+          `${daysRemaining} days remaining`;
         return {
           ...p,
           daysRemaining,
+          daysRemainingLabel,
         };
       });
   },
@@ -933,8 +938,38 @@ export const loans = {
     await delay(MOCK_DELAY);
 
     const state = getState();
+    const { holdings } = state.portfolio;
+    const { prices, fxRate } = state.prices;
+
+    // Enhance loans with computed fields: remainingIrr, ltv
+    const enhancedLoans = state.portfolio.loans.map((loan: Loan) => {
+      // Calculate remaining amount from unpaid installments
+      const remainingIrr = loan.installments
+        .filter((i) => i.status !== 'PAID')
+        .reduce((sum, i) => sum + i.totalIRR - i.paidIRR, 0);
+
+      // Calculate LTV based on current collateral value
+      const collateralHolding = holdings.find((h: Holding) => h.assetId === loan.collateralAssetId);
+      let collateralValueIrr = 0;
+      if (collateralHolding) {
+        if (loan.collateralAssetId === 'IRR_FIXED_INCOME') {
+          collateralValueIrr = loan.collateralQuantity * FIXED_INCOME_UNIT_PRICE;
+        } else {
+          const priceUsd = prices[loan.collateralAssetId] || 0;
+          collateralValueIrr = loan.collateralQuantity * priceUsd * fxRate;
+        }
+      }
+      const ltv = collateralValueIrr > 0 ? loan.amountIRR / collateralValueIrr : 0;
+
+      return {
+        ...loan,
+        remainingIrr,
+        ltv,
+      };
+    });
+
     return {
-      loans: state.portfolio.loans,
+      loans: enhancedLoans,
     };
   },
 

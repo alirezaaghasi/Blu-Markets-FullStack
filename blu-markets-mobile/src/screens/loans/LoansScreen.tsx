@@ -1,6 +1,6 @@
 // Loans Screen
 // Based on PRD Section 9.4 - Loans Tab
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -19,68 +19,61 @@ import { portfolio as portfolioApi } from '../../services/api';
 import { Loan, Holding } from '../../types';
 import { ASSETS, LAYER_COLORS } from '../../constants/assets';
 import {
-  MAX_PORTFOLIO_LOAN_PCT,
   LOAN_HEALTH_THRESHOLDS,
-  FIXED_INCOME_UNIT_PRICE,
 } from '../../constants/business';
+import { useLoans } from '../../hooks/useLoans';
 import LoanSheet from '../../components/LoanSheet';
 import RepaySheet from '../../components/RepaySheet';
 import { EmptyState } from '../../components/EmptyState';
 
 const LoansScreen: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { loans, holdings, cashIRR } = useAppSelector((state) => state.portfolio);
+  const { loans: reduxLoans, holdings } = useAppSelector((state) => state.portfolio);
   const { prices, fxRate } = useAppSelector((state) => state.prices);
+
+  // Use backend-derived loan capacity values
+  const { capacity, refresh: refreshLoans } = useLoans();
 
   const [showLoanSheet, setShowLoanSheet] = useState(false);
   const [showRepaySheet, setShowRepaySheet] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Pull-to-refresh handler - refreshes prices to update collateral values
+  // Pull-to-refresh handler - refreshes prices and loan capacity from backend
   const onRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const [portfolioResponse] = await Promise.all([
-        portfolioApi.get(),
+      await Promise.all([
+        portfolioApi.get().then((portfolioResponse) => {
+          dispatch(updateCash(portfolioResponse.cashIrr));
+          dispatch(setStatus(portfolioResponse.status));
+          if (portfolioResponse.holdings) {
+            dispatch(setHoldings(portfolioResponse.holdings.map((h: Holding) => ({
+              assetId: h.assetId,
+              quantity: h.quantity,
+              frozen: h.frozen,
+              layer: h.layer,
+            }))));
+          }
+        }),
         dispatch(fetchPrices()),
         dispatch(fetchFxRate()),
+        refreshLoans(), // Refresh loan capacity from backend
       ]);
-
-      // Update Redux with fresh portfolio data (holdings, cash)
-      dispatch(updateCash(portfolioResponse.cashIrr));
-      dispatch(setStatus(portfolioResponse.status));
-      if (portfolioResponse.holdings) {
-        dispatch(setHoldings(portfolioResponse.holdings.map((h: Holding) => ({
-          assetId: h.assetId,
-          quantity: h.quantity,
-          frozen: h.frozen,
-          layer: h.layer,
-        }))));
-      }
     } catch (error) {
       console.error('Failed to refresh loans data:', error);
     } finally {
       setIsRefreshing(false);
     }
-  }, [dispatch]);
+  }, [dispatch, refreshLoans]);
 
-  // Calculate total portfolio value
-  const portfolioValueIRR = useMemo(() => {
-    const holdingsValue = holdings.reduce((sum, h) => {
-      if (h.assetId === 'IRR_FIXED_INCOME') {
-        return sum + h.quantity * FIXED_INCOME_UNIT_PRICE;
-      }
-      const priceUSD = prices[h.assetId] || 0;
-      return sum + h.quantity * priceUSD * fxRate;
-    }, 0);
-    return holdingsValue + cashIRR;
-  }, [holdings, prices, fxRate, cashIRR]);
+  // Use loans from Redux (kept in sync by useLoans hook)
+  const loans = reduxLoans;
 
-  // Calculate loan capacity
-  const maxLoanCapacity = portfolioValueIRR * MAX_PORTFOLIO_LOAN_PCT;
-  const usedLoanCapacity = loans.reduce((sum, l) => sum + l.amountIRR, 0);
-  const remainingCapacity = Math.max(0, maxLoanCapacity - usedLoanCapacity);
+  // Use backend-derived loan capacity values (with fallbacks for loading state)
+  const maxLoanCapacity = capacity?.maxCapacityIrr ?? 0;
+  const usedLoanCapacity = capacity?.usedIrr ?? loans.reduce((sum, l) => sum + l.amountIRR, 0);
+  const remainingCapacity = capacity?.availableIrr ?? Math.max(0, maxLoanCapacity - usedLoanCapacity);
   const capacityPercentage = maxLoanCapacity > 0 ? (usedLoanCapacity / maxLoanCapacity) * 100 : 0;
 
   // Get eligible holdings for collateral (not frozen, has value)

@@ -124,15 +124,15 @@ function ProtectionCard({
 }) {
   const asset = ASSETS[protection.assetId];
 
-  // Calculate days remaining from endISO or expiryDate
+  // Use backend-provided daysRemaining, with fallback calculation
   const expiryDate = protection.endISO || protection.expiryDate;
-  const daysRemaining = expiryDate ? Math.max(
+  const daysRemaining = protection.daysRemaining ?? (expiryDate ? Math.max(
     0,
     Math.ceil((new Date(expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-  ) : 0;
+  ) : 0);
 
-  // Determine status based on dates
-  const isActive = expiryDate ? new Date(expiryDate).getTime() > Date.now() : protection.status === 'ACTIVE';
+  // Determine status based on dates or backend status
+  const isActive = protection.status === 'ACTIVE' || (expiryDate ? new Date(expiryDate).getTime() > Date.now() : false);
 
   return (
     <View style={[styles.protectionCard, highlighted && styles.protectionCardHighlighted]}>

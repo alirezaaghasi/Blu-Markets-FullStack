@@ -76,22 +76,27 @@ const ProtectionScreen: React.FC = () => {
     return asset?.protectionEligible && eligible && !protectedAssetIds.has(h.assetId) && h.quantity > 0;
   });
 
-  // Calculate days remaining for a protection
-  const getDaysRemaining = (endISO: string): number => {
+  // Use backend-provided daysRemaining, with fallback calculation
+  const getDaysRemaining = (protection: Protection): number => {
+    // Prefer backend-provided value
+    if (protection.daysRemaining !== undefined) {
+      return protection.daysRemaining;
+    }
+    // Fallback: calculate from dates
+    const endISO = protection.endISO || protection.expiryDate;
+    if (!endISO) return 0;
     const endDate = new Date(endISO);
     const now = new Date();
     const diff = endDate.getTime() - now.getTime();
     return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
   };
 
-  // Calculate progress percentage
-  const getProgressPercentage = (startISO: string, endISO: string): number => {
-    const start = new Date(startISO).getTime();
-    const end = new Date(endISO).getTime();
-    const now = Date.now();
-    const total = end - start;
-    const elapsed = now - start;
-    return Math.min(100, Math.max(0, (elapsed / total) * 100));
+  // Calculate progress percentage from daysRemaining and durationDays
+  const getProgressPercentage = (protection: Protection): number => {
+    const daysRemaining = getDaysRemaining(protection);
+    const totalDays = protection.durationDays || 30;
+    const elapsed = totalDays - daysRemaining;
+    return Math.min(100, Math.max(0, (elapsed / totalDays) * 100));
   };
 
   // Handle cancel protection
@@ -195,10 +200,9 @@ const ProtectionScreen: React.FC = () => {
             <Text style={styles.sectionTitle}>Active Protections</Text>
             {protections.map((protection) => {
               const asset = ASSETS[protection.assetId as keyof typeof ASSETS];
-              const startDate = protection.startISO || protection.startDate || new Date().toISOString();
-              const endDate = protection.endISO || protection.expiryDate || new Date().toISOString();
-              const daysRemaining = getDaysRemaining(endDate);
-              const progress = getProgressPercentage(startDate, endDate);
+              // Use backend-derived values
+              const daysRemaining = getDaysRemaining(protection);
+              const progress = getProgressPercentage(protection);
 
               return (
                 <View key={protection.id} style={styles.protectionCard}>

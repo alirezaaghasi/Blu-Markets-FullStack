@@ -8,7 +8,7 @@
  * Step 2: ConfirmTradeModal → Confirm/Cancel
  * Result: TradeSuccessModal or TradeErrorModal
  */
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -34,7 +34,6 @@ import { updateHoldingFromTrade, updateCash, logAction } from '../store/slices/p
 import {
   validateBuyTrade,
   validateSellTrade,
-  generateTradePreview,
 } from '../utils/tradeValidation';
 import AllocationBar from './AllocationBar';
 import { trade } from '../services/api';
@@ -187,22 +186,33 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
     };
   }, [side, amountIRR, cashIRR, assetId, holding, holdingQuantity, tradeQuantity, asset.symbol, availableBalance]);
 
-  // Generate preview
-  const preview = useMemo(() => {
-    if (amountIRR < MIN_TRADE_AMOUNT) return null;
-    return generateTradePreview(
-      side,
-      assetId,
-      amountIRR,
-      priceUSD,
-      fxRate,
-      currentAllocation,
-      targetLayerPct,
-      holdings,
-      holdingValues,
-      cashIRR
-    );
-  }, [side, assetId, amountIRR, priceUSD, fxRate, currentAllocation, targetLayerPct, holdings, holdingValues, cashIRR]);
+  // Backend-derived trade preview
+  const [preview, setPreview] = useState<TradePreview | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+
+  // Fetch preview from backend when trade parameters change
+  useEffect(() => {
+    if (amountIRR < MIN_TRADE_AMOUNT) {
+      setPreview(null);
+      return;
+    }
+
+    // Debounce API call
+    const timeoutId = setTimeout(async () => {
+      setIsLoadingPreview(true);
+      try {
+        const previewData = await trade.preview(assetId, side, amountIRR);
+        setPreview(previewData);
+      } catch (error) {
+        console.error('Failed to fetch trade preview:', error);
+        setPreview(null);
+      } finally {
+        setIsLoadingPreview(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [side, assetId, amountIRR]);
 
   // Format number with commas
   const formatNumber = (num: number): string => {
@@ -229,7 +239,7 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
 
   // Step 1: Open confirmation modal (Review Trade)
   const handleReviewTrade = () => {
-    if (!validation.ok || !preview) return;
+    if (!validation.ok || !preview || isLoadingPreview) return;
     setShowConfirmModal(true);
   };
 
@@ -488,13 +498,13 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
               style={[
                 styles.confirmButton,
                 side === 'SELL' && styles.confirmButtonSell,
-                !validation.ok && styles.confirmButtonDisabled,
+                (!validation.ok || isLoadingPreview) && styles.confirmButtonDisabled,
               ]}
               onPress={handleReviewTrade}
-              disabled={!validation.ok}
+              disabled={!validation.ok || isLoadingPreview}
             >
               <Text style={styles.confirmButtonText}>
-                Review Trade
+                {isLoadingPreview ? 'Loading...' : 'Review Trade'}
               </Text>
             </TouchableOpacity>
           </View>

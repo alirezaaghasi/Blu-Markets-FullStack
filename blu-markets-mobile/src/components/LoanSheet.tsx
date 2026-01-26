@@ -1,6 +1,6 @@
 // Loan Bottom Sheet Component
 // Based on PRD Section 6.5 - Borrow Flow
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,19 +13,19 @@ import {
   Alert,
 } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../constants/theme';
-import { Holding, Loan, LoanInstallment, AssetId } from '../types';
+import { Holding, AssetId } from '../types';
 import { ASSETS, LAYER_COLORS } from '../constants/assets';
 import {
   LOAN_DAILY_INTEREST_RATE,
   LOAN_ANNUAL_INTEREST_RATE,
   LOAN_INSTALLMENT_COUNT,
   LOAN_DURATION_OPTIONS,
-  MAX_PORTFOLIO_LOAN_PCT,
 } from '../constants/business';
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
 import { addLoan, freezeHolding, addCash, logAction } from '../store/slices/portfolioSlice';
 import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
 import { loans as loansApi } from '../services/api';
+import type { LoanCapacityResponse } from '../services/api';
 
 interface LoanSheetProps {
   visible: boolean;
@@ -39,7 +39,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
   eligibleHoldings: propHoldings,
 }) => {
   const dispatch = useAppDispatch();
-  const { loans, cashIRR, holdings } = useAppSelector((state) => state.portfolio);
+  const { holdings } = useAppSelector((state) => state.portfolio);
   const { prices, fxRate } = useAppSelector((state) => state.prices);
 
   // Use provided holdings or derive eligible holdings from portfolio
@@ -58,6 +58,23 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successResult, setSuccessResult] = useState<TransactionSuccessResult | null>(null);
+  const [capacity, setCapacity] = useState<LoanCapacityResponse | null>(null);
+
+  // Fetch loan capacity from backend when sheet opens
+  const fetchCapacity = useCallback(async () => {
+    try {
+      const capacityResponse = await loansApi.getCapacity();
+      setCapacity(capacityResponse);
+    } catch (error) {
+      console.error('Failed to fetch loan capacity:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (visible) {
+      fetchCapacity();
+    }
+  }, [visible, fetchCapacity]);
 
   // Set initial selected asset when eligibleHoldings loads
   React.useEffect(() => {
@@ -82,22 +99,10 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
     return collateralValueIRR * selectedAsset.ltv;
   }, [collateralValueIRR, selectedAsset]);
 
-  // Calculate existing loans total
-  const existingLoansTotal = loans.reduce((sum, l) => sum + l.amountIRR, 0);
+  // Use backend-derived remaining portfolio capacity (with fallback)
+  const remainingPortfolioCapacity = capacity?.availableIrr ?? 0;
 
-  // Calculate portfolio loan capacity
-  const portfolioValueIRR = useMemo(() => {
-    const holdingsValue = holdings.reduce((sum, h) => {
-      const priceUSD = prices[h.assetId] || 0;
-      return sum + h.quantity * priceUSD * fxRate;
-    }, 0);
-    return holdingsValue + cashIRR;
-  }, [holdings, prices, fxRate, cashIRR]);
-
-  const maxPortfolioLoanCapacity = portfolioValueIRR * MAX_PORTFOLIO_LOAN_PCT;
-  const remainingPortfolioCapacity = Math.max(0, maxPortfolioLoanCapacity - existingLoansTotal);
-
-  // Effective max borrow (minimum of LTV limit and portfolio capacity)
+  // Effective max borrow (minimum of LTV limit and portfolio capacity from backend)
   const effectiveMaxBorrow = Math.min(maxBorrowIRR, remainingPortfolioCapacity);
 
   // Parse amount
