@@ -101,6 +101,101 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     },
   });
 
+  // POST /api/v1/loans/preview
+  // Returns loan calculation preview without creating the loan
+  app.post<{
+    Body: { collateralAssetId: string; amountIrr: number; durationMonths: number };
+  }>('/preview', {
+    schema: {
+      description: 'Get loan calculation preview',
+      tags: ['Loans'],
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object',
+        required: ['collateralAssetId', 'amountIrr', 'durationMonths'],
+        properties: {
+          collateralAssetId: { type: 'string' },
+          amountIrr: { type: 'number', minimum: 1000000 },
+          durationMonths: { type: 'number', enum: [3, 6] },
+        },
+      },
+    },
+    handler: async (request, reply) => {
+      const { collateralAssetId, amountIrr, durationMonths } = request.body;
+
+      const portfolio = await prisma.portfolio.findUnique({
+        where: { userId: request.userId },
+        include: { holdings: true },
+      });
+
+      if (!portfolio) {
+        throw new AppError('NOT_FOUND', 'Portfolio not found', 404);
+      }
+
+      // Find holding
+      const holding = portfolio.holdings.find((h) => h.assetId === collateralAssetId);
+      if (!holding) {
+        throw new AppError('NOT_FOUND', 'Holding not found', 404);
+      }
+
+      // Get price
+      const prices = await getCurrentPrices();
+      const price = prices.get(collateralAssetId as AssetId);
+      if (!price) {
+        throw new AppError('VALIDATION_ERROR', 'Price not available', 400);
+      }
+
+      // Calculate collateral value
+      const collateralValueDecimal = roundIrr(multiply(holding.quantity, price.priceIrr));
+      const layer = getAssetLayer(collateralAssetId as AssetId);
+      const maxLtv = LTV_BY_LAYER[layer];
+      const maxLoanDecimal = roundIrr(calculateMaxLoan(collateralValueDecimal, maxLtv));
+      const amountDecimal = toDecimal(amountIrr);
+
+      // Calculate interest (simple interest per PRD: 30% APR)
+      const totalInterestDecimal = roundIrr(calculateSimpleInterestMonthly(amountDecimal, INTEREST_RATE, durationMonths));
+      const totalRepaymentDecimal = roundIrr(add(amountDecimal, totalInterestDecimal));
+
+      // Calculate per-installment amounts (equal monthly payments)
+      const numInstallments = durationMonths;
+      const installmentPrincipalDecimal = roundIrr(divide(amountDecimal, numInstallments));
+      const installmentInterestDecimal = roundIrr(divide(totalInterestDecimal, numInstallments));
+      const installmentTotalDecimal = roundIrr(add(installmentPrincipalDecimal, installmentInterestDecimal));
+
+      // Generate installment schedule
+      const startDate = new Date();
+      const installments = [];
+      for (let i = 1; i <= numInstallments; i++) {
+        const dueDate = new Date(startDate);
+        dueDate.setMonth(dueDate.getMonth() + i);
+        installments.push({
+          number: i,
+          dueDate: dueDate.toISOString(),
+          principalIrr: toNumber(installmentPrincipalDecimal),
+          interestIrr: toNumber(installmentInterestDecimal),
+          totalIrr: toNumber(installmentTotalDecimal),
+        });
+      }
+
+      return {
+        valid: !isGreaterThan(amountDecimal, maxLoanDecimal),
+        collateralAssetId,
+        collateralValueIrr: toNumber(collateralValueDecimal),
+        maxLtv,
+        maxLoanIrr: toNumber(maxLoanDecimal),
+        principalIrr: amountIrr,
+        interestRate: INTEREST_RATE,
+        effectiveAPR: INTEREST_RATE * 100,
+        durationMonths,
+        totalInterestIrr: toNumber(totalInterestDecimal),
+        totalRepaymentIrr: toNumber(totalRepaymentDecimal),
+        numInstallments,
+        installmentAmountIrr: toNumber(installmentTotalDecimal),
+        installments,
+      };
+    },
+  });
+
   // GET /api/v1/loans/capacity
   app.get('/capacity', {
     schema: {

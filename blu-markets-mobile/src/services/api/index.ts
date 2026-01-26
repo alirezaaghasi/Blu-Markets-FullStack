@@ -48,6 +48,7 @@ export type {
   PortfolioResponse,
   ActivityResponse,
   LoanCapacityResponse,
+  LoanPreviewResponse,
   LoansResponse,
   ProtectionsResponse,
   EligibleAssetsResponse,

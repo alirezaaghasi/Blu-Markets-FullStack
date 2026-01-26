@@ -27,7 +27,7 @@ import { useAppSelector, useAppDispatch } from '../hooks/useStore';
 import { addLoan, freezeHolding, addCash, logAction } from '../store/slices/portfolioSlice';
 import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
 import { loans as loansApi } from '../services/api';
-import type { LoanCapacityResponse } from '../services/api';
+import type { LoanCapacityResponse, LoanPreviewResponse } from '../services/api';
 
 interface LoanSheetProps {
   visible: boolean;
@@ -61,6 +61,8 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
   const [showSuccess, setShowSuccess] = useState(false);
   const [successResult, setSuccessResult] = useState<TransactionSuccessResult | null>(null);
   const [capacity, setCapacity] = useState<LoanCapacityResponse | null>(null);
+  const [loanPreview, setLoanPreview] = useState<LoanPreviewResponse | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
   // Fetch loan capacity from backend when sheet opens
   const fetchCapacity = useCallback(async () => {
@@ -77,6 +79,31 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
       fetchCapacity();
     }
   }, [visible, fetchCapacity]);
+
+  // Fetch loan preview from backend when amount changes (debounced)
+  const amountIRR = parseInt(amountInput.replace(/,/g, ''), 10) || 0;
+
+  useEffect(() => {
+    if (!selectedAssetId || amountIRR < LOAN_MIN_AMOUNT) {
+      setLoanPreview(null);
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      setIsLoadingPreview(true);
+      try {
+        const preview = await loansApi.preview(selectedAssetId, amountIRR, durationDays);
+        setLoanPreview(preview);
+      } catch (error) {
+        console.error('Failed to fetch loan preview:', error);
+        setLoanPreview(null);
+      } finally {
+        setIsLoadingPreview(false);
+      }
+    }, 300); // Debounce 300ms
+
+    return () => clearTimeout(timeoutId);
+  }, [selectedAssetId, amountIRR, durationDays]);
 
   // Set initial selected asset when eligibleHoldings loads
   React.useEffect(() => {
@@ -107,19 +134,12 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
   // Effective max borrow (minimum of LTV limit and portfolio capacity from backend)
   const effectiveMaxBorrow = Math.min(maxBorrowIRR, remainingPortfolioCapacity);
 
-  // Parse amount
-  const amountIRR = parseInt(amountInput.replace(/,/g, ''), 10) || 0;
+  // NOTE: amountIRR is now parsed in the useEffect above for preview fetching
 
-  // Calculate interest using daily rate
-  const totalInterest = useMemo(() => {
-    return amountIRR * LOAN_DAILY_INTEREST_RATE * durationDays;
-  }, [amountIRR, durationDays]);
-
-  // Calculate installments
-  const installmentAmount = useMemo(() => {
-    const total = amountIRR + totalInterest;
-    return Math.ceil(total / LOAN_INSTALLMENT_COUNT);
-  }, [amountIRR, totalInterest]);
+  // Use backend-derived interest and installment amounts (from loan preview)
+  // Falls back to frontend calculation only if backend preview is not available
+  const totalInterest = loanPreview?.totalInterestIrr ?? (amountIRR * LOAN_DAILY_INTEREST_RATE * durationDays);
+  const installmentAmount = loanPreview?.installmentAmountIrr ?? Math.ceil((amountIRR + totalInterest) / LOAN_INSTALLMENT_COUNT);
 
   // Validation
   const validationErrors: string[] = [];

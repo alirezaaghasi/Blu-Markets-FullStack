@@ -999,6 +999,75 @@ export const loans = {
     };
   },
 
+  // Preview endpoint - returns backend-calculated loan details
+  preview: async (collateralAssetId: string, amountIrr: number, durationDays: 90 | 180) => {
+    await delay(MOCK_DELAY / 2); // Faster for preview
+
+    const state = getState();
+    const { holdings } = state.portfolio;
+    const { prices, fxRate } = state.prices;
+
+    // Find holding
+    const holding = holdings.find((h) => h.assetId === collateralAssetId);
+    if (!holding) {
+      throw new Error('Holding not found');
+    }
+
+    // Calculate collateral value
+    const priceUsd = prices[collateralAssetId as AssetId] || 0;
+    const collateralValueIrr = collateralAssetId === 'IRR_FIXED_INCOME'
+      ? holding.quantity * FIXED_INCOME_UNIT_PRICE
+      : holding.quantity * priceUsd * fxRate;
+
+    const asset = ASSETS[collateralAssetId as AssetId];
+    const maxLtv = asset?.ltv || 0.5;
+    const maxLoanIrr = collateralValueIrr * maxLtv;
+
+    // PRD: 30% APR
+    const interestRate = 0.30;
+    const durationMonths = durationDays / 30;
+    const totalInterestIrr = Math.round(amountIrr * interestRate * (durationMonths / 12));
+    const totalRepaymentIrr = amountIrr + totalInterestIrr;
+
+    // PRD: 6 installments
+    const numInstallments = 6;
+    const installmentAmountIrr = Math.ceil(totalRepaymentIrr / numInstallments);
+
+    // Generate installment schedule
+    const startDate = new Date();
+    const installments = [];
+    const daysPerInstallment = durationDays / numInstallments;
+
+    for (let i = 1; i <= numInstallments; i++) {
+      const dueDate = new Date(startDate);
+      dueDate.setDate(dueDate.getDate() + Math.round(daysPerInstallment * i));
+      installments.push({
+        number: i,
+        dueDate: dueDate.toISOString(),
+        principalIrr: Math.round(amountIrr / numInstallments),
+        interestIrr: Math.round(totalInterestIrr / numInstallments),
+        totalIrr: installmentAmountIrr,
+      });
+    }
+
+    return {
+      valid: amountIrr <= maxLoanIrr,
+      collateralAssetId,
+      collateralValueIrr,
+      maxLtv,
+      maxLoanIrr,
+      principalIrr: amountIrr,
+      interestRate,
+      effectiveAPR: interestRate * 100,
+      durationMonths,
+      totalInterestIrr,
+      totalRepaymentIrr,
+      numInstallments,
+      installmentAmountIrr,
+      installments,
+    };
+  },
+
   // Signature matches real API: (collateralAssetId, amountIrr, durationDays)
   // Per PRD: 30% APR, 3/6 month terms (90/180 days), 6 installments
   create: async (collateralAssetId: string, amountIrr: number, durationDays: 90 | 180): Promise<Loan> => {

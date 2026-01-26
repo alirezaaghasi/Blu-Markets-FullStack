@@ -2,7 +2,7 @@
 // src/services/api/loans.ts
 
 import { apiClient } from './client';
-import type { LoansResponse, LoanCapacityResponse, Loan } from './types';
+import type { LoansResponse, LoanCapacityResponse, LoanPreviewResponse, Loan } from './types';
 
 // Type for raw API responses (interceptor unwraps .data)
 type ApiResponse<T> = T;
@@ -24,6 +24,17 @@ export const loans = {
       // Portfolio value is maxCapacity / 0.25 (since limit is 25% of portfolio)
       portfolioValueIrr: data?.portfolioValueIrr ?? (maxCapacity > 0 ? maxCapacity / 0.25 : 0),
     };
+  },
+
+  // Get loan calculation preview from backend (all business logic on server)
+  preview: async (collateralAssetId: string, amountIrr: number, durationDays: 90 | 180): Promise<LoanPreviewResponse> => {
+    const durationMonths = (durationDays / 30) as 3 | 6;
+    const data = await apiClient.post('/loans/preview', {
+      collateralAssetId,
+      amountIrr,
+      durationMonths,
+    }) as unknown as ApiResponse<LoanPreviewResponse>;
+    return data;
   },
 
   // Create a loan with collateral asset (duration in days: 90 or 180 = 3 or 6 months)

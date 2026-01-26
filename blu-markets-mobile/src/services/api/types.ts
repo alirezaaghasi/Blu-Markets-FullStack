@@ -70,6 +70,30 @@ export interface LoansResponse {
   loans: Loan[];
 }
 
+// Loan preview response - all calculations from backend
+export interface LoanPreviewResponse {
+  valid: boolean;
+  collateralAssetId: string;
+  collateralValueIrr: number;
+  maxLtv: number;
+  maxLoanIrr: number;
+  principalIrr: number;
+  interestRate: number;
+  effectiveAPR: number;
+  durationMonths: number;
+  totalInterestIrr: number;
+  totalRepaymentIrr: number;
+  numInstallments: number;
+  installmentAmountIrr: number;
+  installments: Array<{
+    number: number;
+    dueDate: string;
+    principalIrr: number;
+    interestIrr: number;
+    totalIrr: number;
+  }>;
+}
+
 export interface ProtectionsResponse {
   protections: Protection[];
 }

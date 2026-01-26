@@ -18,6 +18,7 @@ import { ASSETS, LAYER_COLORS } from '../constants/assets';
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
 import { updateLoan, removeLoan, unfreezeHolding, subtractCash, logAction } from '../store/slices/portfolioSlice';
 import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
+import { loans as loansApi } from '../services/api';
 
 interface RepaySheetProps {
   visible: boolean;
@@ -83,16 +84,19 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
     setCustomAmount(formatNumber(num));
   };
 
-  // Handle confirmation
+  // Handle confirmation - calls backend API for all repayment logic
   const handleConfirm = async () => {
     if (!isValid) return;
 
     setIsSubmitting(true);
     try {
-      const isFullSettlement = repayAmount >= totalOutstanding;
+      // Call backend API to process repayment (all business logic on server)
+      const result = await loansApi.repay(loan.id, repayAmount);
+
+      const isFullSettlement = result.remainingBalance <= 0;
 
       if (isFullSettlement) {
-        // Full settlement - remove loan and unfreeze collateral
+        // Full settlement - update local state from API response
         dispatch(removeLoan(loan.id));
         dispatch(unfreezeHolding(loan.collateralAssetId));
         dispatch(subtractCash(repayAmount));
@@ -118,31 +122,12 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
         });
         setShowSuccess(true);
       } else {
-        // Partial payment - update installments
-        let remaining = repayAmount;
-        const updatedInstallments = loan.installments.map((inst) => {
-          if (remaining <= 0 || inst.status === 'PAID') return inst;
+        // Partial payment - use backend-calculated values
+        const paidCount = result.installmentsPaid;
+        const remainingBalance = result.remainingBalance;
+        const remainingInstallments = loan.installments.length - paidCount;
 
-          const amountDue = inst.totalIRR - inst.paidIRR;
-          if (remaining >= amountDue) {
-            remaining -= amountDue;
-            return { ...inst, paidIRR: inst.totalIRR, status: 'PAID' as const };
-          } else {
-            const newPaid = inst.paidIRR + remaining;
-            remaining = 0;
-            return { ...inst, paidIRR: newPaid, status: 'PARTIAL' as const };
-          }
-        });
-
-        const paidCount = updatedInstallments.filter((i) => i.status === 'PAID').length;
-
-        const updatedLoan: Loan = {
-          ...loan,
-          installments: updatedInstallments,
-          installmentsPaid: paidCount,
-        };
-
-        dispatch(updateLoan(updatedLoan));
+        // Update local state to reflect payment
         dispatch(subtractCash(repayAmount));
         dispatch(
           logAction({
@@ -154,11 +139,7 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
           })
         );
 
-        // Calculate remaining balance
-        const remainingBalance = totalOutstanding - repayAmount;
-        const remainingInstallments = loan.installments.length - paidCount;
-
-        // Show success modal for partial payment
+        // Show success modal for partial payment (using backend-calculated values)
         setSuccessResult({
           title: 'Payment Received!',
           subtitle: `${remainingInstallments} installments remaining`,
@@ -170,8 +151,8 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
         });
         setShowSuccess(true);
       }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to process repayment. Please try again.');
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to process repayment. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
