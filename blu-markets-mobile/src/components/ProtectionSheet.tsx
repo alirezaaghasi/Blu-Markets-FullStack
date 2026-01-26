@@ -15,7 +15,7 @@ import {
 import { colors, typography, spacing, borderRadius } from '../constants/theme';
 import { ProtectableHolding, ProtectionQuote, Holding } from '../types';
 import { ASSETS, LAYER_COLORS } from '../constants/assets';
-import { PROTECTION_DURATION_PRESETS } from '../constants/business';
+import { PROTECTION_DURATION_PRESETS, PROTECTION_ELIGIBLE_ASSETS } from '../constants/business';
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
 import { addProtection, subtractCash, logAction } from '../store/slices/portfolioSlice';
 import { protection as protectionApi, formatPremiumPct, formatDuration, getRegimeColor } from '../services/api/protection';
@@ -73,8 +73,8 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
     return holdings
       .filter((h) => {
         const asset = ASSETS[h.assetId];
-        // Protectable: crypto assets that aren't frozen and have quantity
-        return asset && asset.layer !== 'FOUNDATION' && !h.frozen && h.quantity > 0;
+        // Protectable: only assets in PROTECTION_ELIGIBLE_ASSETS list, not frozen, with quantity
+        return asset && PROTECTION_ELIGIBLE_ASSETS.includes(h.assetId as any) && !h.frozen && h.quantity > 0;
       })
       .map((h): ProtectableHolding => {
         const asset = ASSETS[h.assetId];

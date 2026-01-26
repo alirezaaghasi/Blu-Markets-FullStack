@@ -274,7 +274,7 @@ const HomeScreen: React.FC = () => {
   }, [navigation]);
 
   const handleViewActivity = useCallback(() => {
-    navigation.navigate('Activity');
+    navigation.navigate('Portfolio'); // Activity is shown in Portfolio screen
   }, [navigation]);
 
   const handleNotificationPress = useCallback(() => {
@@ -292,7 +292,7 @@ const HomeScreen: React.FC = () => {
   }, [navigation]);
 
   const handleDeepLinkServices = useCallback((initialTab?: 'loans' | 'protection', loanId?: string) => {
-    navigation.navigate('Services', { initialTab, loanId });
+    navigation.navigate('Market', { initialTab, loanId });
   }, [navigation]);
 
   // Comprehensive refresh

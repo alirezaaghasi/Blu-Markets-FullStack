@@ -19,7 +19,7 @@ export const SPREAD_BY_LAYER: Record<Layer, number> = {
   UPSIDE: 0.0060,     // 0.60%
 };
 
-// Layer Constraints
+// Layer Constraints (per PRD Rebalancing Rules)
 export const LAYER_CONSTRAINTS: Record<Layer, {
   minTarget: number;
   maxTarget: number;
@@ -28,19 +28,19 @@ export const LAYER_CONSTRAINTS: Record<Layer, {
   driftTolerance: number;
 }> = {
   FOUNDATION: {
-    minTarget: 0.40,
-    maxTarget: 0.70,
+    minTarget: 0.30,
+    maxTarget: 0.85,
     hardMin: 0.30,
     driftTolerance: 0.05,
   },
   GROWTH: {
-    minTarget: 0.20,
+    minTarget: 0.12,
     maxTarget: 0.45,
     driftTolerance: 0.05,
   },
   UPSIDE: {
-    minTarget: 0,
-    maxTarget: 0.20,
+    minTarget: 0.03,
+    maxTarget: 0.30,
     hardMax: 0.25,
     driftTolerance: 0.05,
   },
@@ -93,8 +93,12 @@ export const PROTECTION_MIN_COVERAGE_PCT = 0.1;  // 10%
 export const PROTECTION_MAX_COVERAGE_PCT = 1.0;  // 100%
 export const PROTECTION_DEFAULT_COVERAGE_PCT = 1.0; // 100%
 
-// Protection - Eligible assets (high-value assets with reliable pricing)
-export const PROTECTION_ELIGIBLE_ASSETS = ['BTC', 'ETH', 'PAXG', 'KAG', 'QQQ', 'SOL'] as const;
+// Protection - Eligible assets (per PRD + KAG confirmed eligible)
+export const PROTECTION_ELIGIBLE_ASSETS = [
+  'PAXG',                          // FOUNDATION
+  'BTC', 'ETH', 'BNB', 'XRP', 'KAG', 'QQQ',  // GROWTH
+  'SOL', 'LINK', 'AVAX',           // UPSIDE
+] as const;
 
 // Protection - Quote validity
 export const PROTECTION_QUOTE_VALIDITY_SECONDS = 300; // 5 minutes

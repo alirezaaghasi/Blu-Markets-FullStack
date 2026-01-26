@@ -31,7 +31,7 @@ interface UseProtectionsResult {
 export function useProtections(): UseProtectionsResult {
   const [protections, setProtections] = useState<Protection[]>([]);
   const [protectableHoldings, setProtectableHoldings] = useState<ProtectableHolding[]>([]);
-  const [durationPresets, setDurationPresets] = useState<number[]>([7, 14, 30, 60, 90, 180]);
+  const [durationPresets, setDurationPresets] = useState<number[]>([30, 90, 180]); // 1, 3, 6 months only per PRD
   const [coverageRange, setCoverageRange] = useState({ min: 0.1, max: 1.0, step: 0.1 });
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);

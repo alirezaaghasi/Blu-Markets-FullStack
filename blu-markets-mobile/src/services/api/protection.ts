@@ -21,8 +21,8 @@ import type {
 // Type for raw API responses (interceptor unwraps .data)
 type ApiResponse<T> = T;
 
-// Protection duration presets in days
-export const DURATION_PRESETS = [7, 14, 30, 60, 90, 180] as const;
+// Protection duration presets in days (1, 3, 6 months only per PRD)
+export const DURATION_PRESETS = [30, 90, 180] as const;
 export type DurationPreset = (typeof DURATION_PRESETS)[number];
 
 // Coverage percentage bounds

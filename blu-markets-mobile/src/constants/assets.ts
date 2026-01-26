@@ -148,7 +148,7 @@ export const ASSETS: Record<AssetId, AssetConfig> = {
     volatility: 0.60,
     layerWeight: 0.18,
     liquidity: 0.85,
-    protectionEligible: false,
+    protectionEligible: true, // Per PRD - UPSIDE eligible assets
     ltv: 0.30, // UPSIDE layer cap per PRD
     coinGeckoId: 'chainlink',
   },
@@ -160,7 +160,7 @@ export const ASSETS: Record<AssetId, AssetConfig> = {
     volatility: 0.70,
     layerWeight: 0.16,
     liquidity: 0.82,
-    protectionEligible: false,
+    protectionEligible: true, // Per PRD - UPSIDE eligible assets
     ltv: 0.30,
     coinGeckoId: 'avalanche-2',
   },
