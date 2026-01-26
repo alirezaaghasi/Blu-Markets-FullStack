@@ -209,7 +209,7 @@ export interface Loan {
   collateralAssetId: AssetId;
   collateralQuantity: number;
   amountIRR: number;
-  dailyInterestRate: number; // Daily interest rate (0.0005 = 0.05%)
+  dailyInterestRate: number; // Daily interest rate (0.30/365 ≈ 0.000822 for 30% APR)
   interestRate?: number; // Annual interest rate for display (0.30 = 30%)
   durationDays: 90 | 180; // 3 or 6 months per PRD
   startISO: string;

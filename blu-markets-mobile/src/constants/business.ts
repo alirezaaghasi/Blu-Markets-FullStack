@@ -72,7 +72,7 @@ export const LOAN_MIN_AMOUNT = 1_000_000; // 1M IRR per PRD
 export const LTV_BY_LAYER: Record<Layer, number> = {
   FOUNDATION: 0.70,
   GROWTH: 0.50,
-  UPSIDE: 0.25,
+  UPSIDE: 0.30, // Matches asset-level LTVs in assets.ts
 };
 
 // Protection - Duration options (in days, displayed as months)
