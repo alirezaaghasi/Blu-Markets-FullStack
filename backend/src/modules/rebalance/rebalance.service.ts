@@ -495,8 +495,15 @@ function generateRebalanceTrades(
   let totalSellIrr = 0;
 
   // Find overweight and underweight layers
-  const overweight = gapAnalysis.filter((g) => g.gap < -1); // Need to sell
-  const underweight = gapAnalysis.filter((g) => g.gap > 1); // Need to buy
+  // BUG FIX: For HOLDINGS_PLUS_CASH mode, use gapIrr (absolute value) instead of gap (percentage)
+  // because layers can be "overweight by %" but "underweight by IRR" when cash is included
+  const useIrrGaps = mode === 'HOLDINGS_PLUS_CASH' || mode === 'SMART';
+  const overweight = gapAnalysis.filter((g) =>
+    useIrrGaps ? g.gapIrr < -MIN_TRADE_AMOUNT : g.gap < -1
+  ); // Need to sell
+  const underweight = gapAnalysis.filter((g) =>
+    useIrrGaps ? g.gapIrr > MIN_TRADE_AMOUNT : g.gap > 1
+  ); // Need to buy
 
   // Calculate total sellable amount from overweight layers
   let totalSellableAmount = 0;
