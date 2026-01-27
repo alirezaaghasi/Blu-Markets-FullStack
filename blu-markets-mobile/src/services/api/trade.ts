@@ -29,7 +29,17 @@ function normalizeAllocation(allocation: Record<string, number> | undefined): Ta
 /**
  * Normalize trade preview response
  * BUG-013 FIX: Added runtime validation with flexible field handling
- * Supports both backend response formats and provides sensible defaults
+ * Supports both backend response formats (nested and flat) and provides sensible defaults
+ *
+ * Backend response structure:
+ * {
+ *   valid: boolean,
+ *   preview: { action, assetId, quantity, amountIrr, priceIrr, spread, spreadAmountIrr },
+ *   allocation: { before, target, after },
+ *   boundary: 'SAFE',
+ *   movesToward: boolean,
+ *   error?: string,
+ * }
  */
 function normalizeTradePreview(data: unknown): TradePreview {
   // Runtime validation - check we have an object
@@ -39,18 +49,27 @@ function normalizeTradePreview(data: unknown): TradePreview {
 
   const d = data as Record<string, unknown>;
 
-  // Extract numeric fields with fallbacks for different field name conventions
-  // Backend may use amountIrr, amountIRR, or amount
-  const quantity = typeof d.quantity === 'number' ? d.quantity : 0;
-  const amountIRR = typeof d.amountIRR === 'number' ? d.amountIRR
-    : typeof d.amountIrr === 'number' ? d.amountIrr
-    : typeof d.amount === 'number' ? d.amount
+  // Handle nested backend response format (preview object contains trade details)
+  const preview = (d.preview as Record<string, unknown>) || d;
+  const allocation = (d.allocation as Record<string, unknown>) || {};
+
+  // Extract trade details from preview object
+  const quantity = typeof preview.quantity === 'number' ? preview.quantity : 0;
+  const amountIRR = typeof preview.amountIrr === 'number' ? preview.amountIrr
+    : typeof preview.amountIRR === 'number' ? preview.amountIRR
+    : typeof d.amountIRR === 'number' ? d.amountIRR
     : 0;
 
-  // Validate we have at least an assetId (minimum required field)
-  if (!d.assetId && !d.asset_id) {
+  // Get assetId from preview or top level
+  const assetId = preview.assetId ?? preview.asset_id ?? d.assetId ?? d.asset_id;
+  if (!assetId) {
     throw new Error('[Trade API] Invalid preview response: assetId required');
   }
+
+  // Get allocation data (from allocation object or top level)
+  const before = (allocation.before ?? d.before) as Record<string, number> | undefined;
+  const after = (allocation.after ?? d.after) as Record<string, number> | undefined;
+  const target = (allocation.target ?? d.target ?? allocation.targetAllocation) as Record<string, number> | undefined;
 
   // Validate boundary enum (allow missing for backwards compatibility)
   const validBoundaries = ['SAFE', 'DRIFT', 'STRUCTURAL', 'STRESS'];
@@ -59,18 +78,18 @@ function normalizeTradePreview(data: unknown): TradePreview {
 
   // Build normalized response with safe defaults
   return {
-    side: (d.side ?? d.action ?? 'BUY') as 'BUY' | 'SELL',
-    assetId: (d.assetId ?? d.asset_id) as AssetId,
+    side: (preview.action ?? preview.side ?? d.side ?? 'BUY') as 'BUY' | 'SELL',
+    assetId: assetId as AssetId,
     amountIRR: amountIRR,
     quantity: quantity,
-    priceUSD: (d.priceUSD ?? d.priceUsd ?? d.price_usd ?? 0) as number,
-    spread: (d.spread ?? 0) as number,
-    before: normalizeAllocation(d.before as Record<string, number> | undefined),
-    after: normalizeAllocation(d.after as Record<string, number> | undefined),
-    target: normalizeAllocation(d.target as Record<string, number> | undefined),
+    priceUSD: (preview.priceUsd ?? preview.priceUSD ?? preview.priceIrr ?? d.priceUSD ?? 0) as number,
+    spread: (preview.spread ?? d.spread ?? 0) as number,
+    before: normalizeAllocation(before),
+    after: normalizeAllocation(after),
+    target: normalizeAllocation(target),
     boundary: boundary as 'SAFE' | 'DRIFT' | 'STRUCTURAL' | 'STRESS',
     frictionCopy: (d.frictionCopy ?? d.friction_copy ?? []) as string[],
-    movesTowardTarget: (d.movesTowardTarget ?? d.moves_toward_target ?? true) as boolean,
+    movesTowardTarget: (d.movesToward ?? d.movesTowardTarget ?? true) as boolean,
   };
 }
 
