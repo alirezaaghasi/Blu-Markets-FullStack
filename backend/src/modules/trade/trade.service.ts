@@ -101,7 +101,7 @@ export async function previewTrade(
     ? subtract(amountDecimal, spreadAmountDecimal)
     : amountDecimal;
   const quantityDecimal = roundCrypto(divide(effectiveAmountDecimal, price.priceIrr));
-  const quantity = toNumber(quantityDecimal);
+  let quantity = toNumber(quantityDecimal);
 
   // Validate sufficient funds/holdings
   if (action === 'BUY' && amountIrr > snapshot.cashIrr) {
@@ -129,7 +129,7 @@ export async function previewTrade(
 
   if (action === 'SELL') {
     const holding = snapshot.holdings.find((h) => h.assetId === assetId);
-    if (!holding || holding.quantity < quantity) {
+    if (!holding || holding.quantity <= 0) {
       return {
         valid: false,
         preview: {
@@ -150,6 +150,38 @@ export async function previewTrade(
         movesToward: false,
         error: 'Insufficient holdings',
       };
+    }
+
+    // BUG FIX: Handle "sell all" scenarios where floating-point precision causes
+    // calculated quantity to slightly exceed holding quantity.
+    // If quantity exceeds holding by less than 0.1%, cap it to the holding amount.
+    if (quantity > holding.quantity) {
+      const tolerance = holding.quantity * 0.001; // 0.1% tolerance
+      if (quantity - holding.quantity <= tolerance) {
+        // Cap quantity to available holding (sell all)
+        quantity = holding.quantity;
+      } else {
+        return {
+          valid: false,
+          preview: {
+            action,
+            assetId,
+            quantity,
+            amountIrr,
+            priceIrr: price.priceIrr,
+            spread: getSpreadForAsset(assetId),
+            spreadAmountIrr,
+          },
+          allocation: {
+            before: snapshot.allocation,
+            target: snapshot.targetAllocation,
+            after: snapshot.allocation,
+          },
+          boundary: 'SAFE',
+          movesToward: false,
+          error: 'Insufficient holdings',
+        };
+      }
     }
 
     // Check if asset is frozen (collateral)

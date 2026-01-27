@@ -127,10 +127,12 @@ export async function previewRebalance(
   });
 
   // Calculate gap analysis
-  const gapAnalysis = calculateGapAnalysis(snapshot, holdingsByLayer);
+  // BUG FIX: When mode is HOLDINGS_PLUS_CASH, calculate gaps based on total portfolio value
+  // (holdings + cash) so that all layers appear underweight and cash gets deployed
+  const gapAnalysis = calculateGapAnalysis(snapshot, holdingsByLayer, mode);
 
   // DEBUG: Log gap analysis
-  logger.info('REBALANCE DEBUG - Gap Analysis:', { gaps: gapAnalysis });
+  logger.info('REBALANCE DEBUG - Gap Analysis:', { gaps: gapAnalysis, mode });
 
   // Generate rebalance trades
   const result = generateRebalanceTrades(snapshot, holdingsByLayer, gapAnalysis, mode, prices);
@@ -415,11 +417,49 @@ function partitionHoldingsByLayer(
 // DRIFT FIX: Use holdings value for gap calculation, not total value (which includes cash)
 function calculateGapAnalysis(
   snapshot: PortfolioSnapshot,
-  holdingsByLayer: Record<Layer, LayerHoldings>
+  holdingsByLayer: Record<Layer, LayerHoldings>,
+  mode: RebalanceMode = 'HOLDINGS_ONLY'
 ): GapAnalysis[] {
-  // DRIFT FIX: Use holdings value, not total value
-  const holdingsValueDecimal = toDecimal(snapshot.holdingsValueIrr);
   const layers: Layer[] = ['FOUNDATION', 'GROWTH', 'UPSIDE'];
+
+  // BUG FIX: When mode is HOLDINGS_PLUS_CASH, calculate what each layer SHOULD be
+  // if all funds (holdings + cash) were deployed to target allocation.
+  // This creates buy gaps for each layer to deploy the cash.
+  if (mode === 'HOLDINGS_PLUS_CASH' || mode === 'SMART') {
+    const totalValueDecimal = toDecimal(snapshot.totalValueIrr);
+    const holdingsValueDecimal = toDecimal(snapshot.holdingsValueIrr);
+
+    return layers.map((layer) => {
+      const targetPct = snapshot.targetAllocation[layer.toLowerCase() as keyof typeof snapshot.targetAllocation];
+      // Target value if all funds were deployed
+      const targetValueDecimal = roundIrr(multiply(divide(targetPct, 100), totalValueDecimal));
+      const targetValue = toNumber(targetValueDecimal);
+      // Current layer value
+      const currentValue = holdingsByLayer[layer].totalValue;
+      // Current percentage based on holdings only
+      const currentPct = holdingsValueDecimal.greaterThan(0)
+        ? toNumber(multiply(divide(currentValue, holdingsValueDecimal), 100))
+        : 0;
+      // Gap is how much to BUY to reach target (positive = need to buy)
+      const gapIrr = targetValue - currentValue;
+      const gap = targetPct - currentPct;
+      const sellableIrr = holdingsByLayer[layer].unfrozenValue;
+      const frozenIrr = holdingsByLayer[layer].frozenValue;
+
+      return {
+        layer,
+        current: currentPct,
+        target: targetPct,
+        gap,
+        gapIrr,
+        sellableIrr,
+        frozenIrr,
+      };
+    });
+  }
+
+  // HOLDINGS_ONLY: Use holdings value for gap calculation (original behavior)
+  const holdingsValueDecimal = toDecimal(snapshot.holdingsValueIrr);
 
   return layers.map((layer) => {
     const currentPct = snapshot.allocation[layer.toLowerCase() as keyof typeof snapshot.allocation];
