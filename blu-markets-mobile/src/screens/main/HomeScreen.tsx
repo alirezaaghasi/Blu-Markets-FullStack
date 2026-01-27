@@ -114,8 +114,9 @@ function formatActivityMessage(entry: ActionLogEntry): string {
 
 /**
  * Portfolio Health Status Badge
+ * BUG-F FIX: Made tappable to open rebalance sheet when attention is required
  */
-const StatusBadge: React.FC<{ status: PortfolioStatus }> = ({ status }) => {
+const StatusBadge: React.FC<{ status: PortfolioStatus; onPress?: () => void }> = ({ status, onPress }) => {
   const config = {
     BALANCED: { label: 'Balanced', color: '#4ade80', dotColor: '#22c55e' },
     SLIGHTLY_OFF: { label: 'Slightly Off', color: '#fde047', dotColor: '#eab308' },
@@ -123,13 +124,25 @@ const StatusBadge: React.FC<{ status: PortfolioStatus }> = ({ status }) => {
   };
 
   const { label, color, dotColor } = config[status];
+  const isTappable = status !== 'BALANCED' && onPress;
 
-  return (
+  const content = (
     <View style={[styles.statusBadge, { backgroundColor: `${color}20`, borderColor: `${color}40` }]}>
       <View style={[styles.statusDot, { backgroundColor: dotColor }]} />
       <Text style={[styles.statusLabel, { color: dotColor }]}>{label}</Text>
     </View>
   );
+
+  // BUG-F FIX: Make badge tappable when not balanced
+  if (isTappable) {
+    return (
+      <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+        {content}
+      </TouchableOpacity>
+    );
+  }
+
+  return content;
 };
 
 /**
@@ -399,7 +412,11 @@ const HomeScreen: React.FC = () => {
         {/* HEADER: Status Badge + Notification + Avatar */}
         {/* ================================================================ */}
         <View style={styles.header}>
-          <StatusBadge status={portfolioStatusResult.status} />
+          {/* BUG-F FIX: Tapping status badge opens rebalance sheet when attention is required */}
+          <StatusBadge
+            status={portfolioStatusResult.status}
+            onPress={() => setRebalanceSheetVisible(true)}
+          />
           <View style={styles.headerRight}>
             <TouchableOpacity
               style={styles.notificationButton}

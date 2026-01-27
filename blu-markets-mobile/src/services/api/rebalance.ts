@@ -38,6 +38,9 @@ function normalizeRebalancePreview(data: any): RebalancePreview {
   };
 }
 
+// Import RebalanceMode type
+type RebalanceMode = 'HOLDINGS_ONLY' | 'HOLDINGS_PLUS_CASH' | 'SMART';
+
 export const rebalance = {
   getStatus: (): Promise<{
     needsRebalance: boolean;
@@ -47,15 +50,16 @@ export const rebalance = {
   }> =>
     apiClient.get('/rebalance/status'),
 
-  preview: async (): Promise<RebalancePreview> => {
-    const data = await apiClient.get('/rebalance/preview');
+  // BUG-E FIX: Accept mode parameter to support Deploy Cash mode
+  preview: async (mode: RebalanceMode = 'HOLDINGS_ONLY'): Promise<RebalancePreview> => {
+    const data = await apiClient.get(`/rebalance/preview?mode=${mode}`);
     return normalizeRebalancePreview(data);
   },
 
-  execute: (): Promise<{
+  execute: (mode: RebalanceMode = 'HOLDINGS_ONLY'): Promise<{
     success: boolean;
     tradesExecuted: number;
     newStatus: PortfolioStatus;
   }> =>
-    apiClient.post('/rebalance/execute'),
+    apiClient.post('/rebalance/execute', { mode }),
 };

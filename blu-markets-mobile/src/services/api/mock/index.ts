@@ -41,6 +41,9 @@ import type {
   PortfolioStatus,
   TradePreview,
   RebalancePreview,
+  RebalanceTrade,
+  RebalanceMode,
+  Layer,
   Boundary,
   LoanInstallment,
 } from '../../../types';
@@ -292,7 +295,35 @@ export const portfolio = {
     const state = getState();
     const { holdings, targetLayerPct, status, cashIRR } = state.portfolio;
     const { prices, fxRate } = state.prices;
-    const totalValue = calculatePortfolioValue(holdings, prices, fxRate) + cashIRR;
+
+    // BUG-B FIX: Calculate holdings value separately from total
+    const holdingsValue = calculatePortfolioValue(holdings, prices, fxRate);
+    const totalValue = holdingsValue + cashIRR;
+
+    // BUG-B FIX: Calculate allocation based on HOLDINGS VALUE ONLY
+    // Allocation percentages should sum to 100% (representing distribution of holdings)
+    const layerValues: Record<string, number> = { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
+    holdings.forEach((h) => {
+      const a = ASSETS[h.assetId];
+      if (a) {
+        const val = h.assetId === 'IRR_FIXED_INCOME'
+          ? h.quantity * FIXED_INCOME_UNIT_PRICE
+          : h.quantity * (prices[h.assetId] || 0) * fxRate;
+        layerValues[a.layer] += val;
+      }
+    });
+
+    const allocation: TargetLayerPct = {
+      FOUNDATION: holdingsValue > 0 ? layerValues.FOUNDATION / holdingsValue : 0,
+      GROWTH: holdingsValue > 0 ? layerValues.GROWTH / holdingsValue : 0,
+      UPSIDE: holdingsValue > 0 ? layerValues.UPSIDE / holdingsValue : 0,
+    };
+
+    // Calculate drift from target allocation
+    const driftFoundation = Math.abs(allocation.FOUNDATION - targetLayerPct.FOUNDATION);
+    const driftGrowth = Math.abs(allocation.GROWTH - targetLayerPct.GROWTH);
+    const driftUpside = Math.abs(allocation.UPSIDE - targetLayerPct.UPSIDE);
+    const driftPct = ((driftFoundation + driftGrowth + driftUpside) / 2) * 100;
 
     return {
       cashIrr: cashIRR,
@@ -300,6 +331,9 @@ export const portfolio = {
       targetAllocation: targetLayerPct,
       status,
       totalValueIrr: totalValue,
+      holdingsValueIrr: holdingsValue,
+      allocation, // BUG-B FIX: Now returning correct allocation
+      driftPct,   // Include drift for status displays
       dailyChangePercent: Math.random() * 4 - 2, // Random -2% to +2%
     };
   },
@@ -362,8 +396,8 @@ export const trade = {
     const spread = asset.layer === 'FOUNDATION' ? 0.0015 : asset.layer === 'GROWTH' ? 0.003 : 0.006;
     const quantity = amountIrr / priceIRR;
 
-    // Calculate current allocation
-    const totalValue = calculatePortfolioValue(holdings, prices, fxRate) + cashIRR;
+    // BUG-B FIX: Calculate allocation based on HOLDINGS VALUE ONLY
+    const holdingsValue = calculatePortfolioValue(holdings, prices, fxRate);
     const layerValues: Record<string, number> = { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
 
     holdings.forEach((h) => {
@@ -376,10 +410,11 @@ export const trade = {
       }
     });
 
+    // BUG-B FIX: Use holdingsValue as denominator so percentages sum to 100%
     const before: TargetLayerPct = {
-      FOUNDATION: totalValue > 0 ? layerValues.FOUNDATION / totalValue : 0,
-      GROWTH: totalValue > 0 ? layerValues.GROWTH / totalValue : 0,
-      UPSIDE: totalValue > 0 ? layerValues.UPSIDE / totalValue : 0,
+      FOUNDATION: holdingsValue > 0 ? layerValues.FOUNDATION / holdingsValue : 0,
+      GROWTH: holdingsValue > 0 ? layerValues.GROWTH / holdingsValue : 0,
+      UPSIDE: holdingsValue > 0 ? layerValues.UPSIDE / holdingsValue : 0,
     };
 
     // Calculate after allocation
@@ -392,11 +427,12 @@ export const trade = {
       newLayerValues[asset.layer] -= tradeValue;
     }
 
-    const newTotalValue = totalValue + (side === 'BUY' ? 0 : -amountIrr);
+    // BUG-B FIX: Use new holdings value as denominator
+    const newHoldingsValue = holdingsValue + (side === 'BUY' ? tradeValue : -tradeValue);
     const after: TargetLayerPct = {
-      FOUNDATION: newTotalValue > 0 ? newLayerValues.FOUNDATION / newTotalValue : 0,
-      GROWTH: newTotalValue > 0 ? newLayerValues.GROWTH / newTotalValue : 0,
-      UPSIDE: newTotalValue > 0 ? newLayerValues.UPSIDE / newTotalValue : 0,
+      FOUNDATION: newHoldingsValue > 0 ? newLayerValues.FOUNDATION / newHoldingsValue : 0,
+      GROWTH: newHoldingsValue > 0 ? newLayerValues.GROWTH / newHoldingsValue : 0,
+      UPSIDE: newHoldingsValue > 0 ? newLayerValues.UPSIDE / newHoldingsValue : 0,
     };
 
     // Calculate drift from target
@@ -559,16 +595,23 @@ export const rebalance = {
     };
   },
 
-  preview: async (): Promise<RebalancePreview> => {
+  // BUG-E FIX: Accept mode parameter to support Deploy Cash mode
+  // BUG-E FIX: Accept mode parameter to support Deploy Cash mode
+  preview: async (mode: RebalanceMode = 'HOLDINGS_ONLY'): Promise<RebalancePreview> => {
     await delay(MOCK_DELAY);
 
     const state = getState();
-    const { holdings, targetLayerPct, cashIRR } = state.portfolio;
+    const { holdings, targetLayerPct, cashIRR, loans } = state.portfolio;
     const { prices, fxRate } = state.prices;
 
-    // Calculate current allocation
-    const totalValue = calculatePortfolioValue(holdings, prices, fxRate) + cashIRR;
+    // BUG-B FIX: Calculate allocation based on HOLDINGS VALUE ONLY, not total portfolio
+    // Allocation percentages represent how holdings are distributed across layers
+    const holdingsValue = calculatePortfolioValue(holdings, prices, fxRate);
     const layerValues: Record<string, number> = { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
+
+    // Track which assets are locked as loan collateral
+    const lockedAssetIds = new Set(loans?.filter(l => l.status === 'ACTIVE').map(l => l.collateralAssetId) || []);
+    let hasLockedCollateral = false;
 
     holdings.forEach((h) => {
       const a = ASSETS[h.assetId];
@@ -577,25 +620,137 @@ export const rebalance = {
           ? h.quantity * FIXED_INCOME_UNIT_PRICE
           : h.quantity * (prices[h.assetId] || 0) * fxRate;
         layerValues[a.layer] += val;
+        if (lockedAssetIds.has(h.assetId)) {
+          hasLockedCollateral = true;
+        }
       }
     });
 
+    // BUG-B FIX: Divide by holdingsValue, not totalValue (which includes cash)
+    // This ensures allocation percentages sum to 100%
     const before: TargetLayerPct = {
-      FOUNDATION: totalValue > 0 ? layerValues.FOUNDATION / totalValue : 0,
-      GROWTH: totalValue > 0 ? layerValues.GROWTH / totalValue : 0,
-      UPSIDE: totalValue > 0 ? layerValues.UPSIDE / totalValue : 0,
+      FOUNDATION: holdingsValue > 0 ? layerValues.FOUNDATION / holdingsValue : 0,
+      GROWTH: holdingsValue > 0 ? layerValues.GROWTH / holdingsValue : 0,
+      UPSIDE: holdingsValue > 0 ? layerValues.UPSIDE / holdingsValue : 0,
     };
 
+    // BUG-D FIX: Calculate actual drift and generate trades if needed
+    const driftFoundation = Math.abs(before.FOUNDATION - targetLayerPct.FOUNDATION);
+    const driftGrowth = Math.abs(before.GROWTH - targetLayerPct.GROWTH);
+    const driftUpside = Math.abs(before.UPSIDE - targetLayerPct.UPSIDE);
+    const totalDrift = (driftFoundation + driftGrowth + driftUpside) / 2 * 100; // Average drift as percentage
+
+    const DRIFT_THRESHOLD = 5; // 5% threshold for rebalancing
+    const trades: RebalanceTrade[] = [];
+    let cashDeployed = 0;
+
+    // BUG-E FIX: Handle Deploy Cash mode - use cash to buy underweight layers
+    if (mode === 'HOLDINGS_PLUS_CASH' && cashIRR > 0) {
+      // Calculate how to deploy cash to reduce drift
+      const underweightLayers = [
+        { layer: 'FOUNDATION', diff: targetLayerPct.FOUNDATION - before.FOUNDATION },
+        { layer: 'GROWTH', diff: targetLayerPct.GROWTH - before.GROWTH },
+        { layer: 'UPSIDE', diff: targetLayerPct.UPSIDE - before.UPSIDE },
+      ].filter(l => l.diff > 0.02); // Only layers that are underweight by >2%
+
+      if (underweightLayers.length > 0) {
+        // Calculate total deficit
+        const totalDeficit = underweightLayers.reduce((sum, l) => sum + l.diff, 0);
+
+        // Distribute cash proportionally to underweight layers
+        for (const layer of underweightLayers) {
+          const proportion = layer.diff / totalDeficit;
+          const buyAmount = Math.min(cashIRR * proportion, cashIRR);
+          cashDeployed += buyAmount;
+
+          // Pick a representative asset for each layer
+          const assetForLayer = layer.layer === 'FOUNDATION' ? 'USDT' :
+                                layer.layer === 'GROWTH' ? 'BTC' : 'SOL';
+          trades.push({
+            assetId: assetForLayer as AssetId,
+            side: 'BUY',
+            amountIRR: Math.round(buyAmount),
+            layer: layer.layer as Layer,
+          });
+        }
+      }
+    }
+    // BUG-D FIX: Generate trades when drift exceeds threshold (Holdings Only mode)
+    else if (totalDrift > DRIFT_THRESHOLD && holdingsValue > 0) {
+      // Calculate how much to move between layers
+      const layers: Array<{ layer: string; current: number; target: number; diff: number }> = [
+        { layer: 'FOUNDATION', current: before.FOUNDATION, target: targetLayerPct.FOUNDATION, diff: targetLayerPct.FOUNDATION - before.FOUNDATION },
+        { layer: 'GROWTH', current: before.GROWTH, target: targetLayerPct.GROWTH, diff: targetLayerPct.GROWTH - before.GROWTH },
+        { layer: 'UPSIDE', current: before.UPSIDE, target: targetLayerPct.UPSIDE, diff: targetLayerPct.UPSIDE - before.UPSIDE },
+      ];
+
+      // Find overweight layers (need to sell) and underweight layers (need to buy)
+      const overweight = layers.filter(l => l.diff < -0.02); // More than 2% over
+      const underweight = layers.filter(l => l.diff > 0.02);  // More than 2% under
+
+      // Generate sell trades for overweight layers (exclude locked assets)
+      for (const layer of overweight) {
+        const layerHoldings = holdings.filter(h => {
+          const a = ASSETS[h.assetId];
+          return a?.layer === layer.layer && !lockedAssetIds.has(h.assetId);
+        });
+        if (layerHoldings.length > 0) {
+          const sellAmount = Math.abs(layer.diff) * holdingsValue;
+          // Pick first available asset in layer to sell
+          const holdingToSell = layerHoldings[0];
+          trades.push({
+            assetId: holdingToSell.assetId,
+            side: 'SELL',
+            amountIRR: Math.round(sellAmount),
+            layer: layer.layer as Layer,
+          });
+        }
+      }
+
+      // Generate buy trades for underweight layers
+      for (const layer of underweight) {
+        const buyAmount = layer.diff * holdingsValue;
+        // Pick a representative asset for each layer
+        const assetForLayer = layer.layer === 'FOUNDATION' ? 'USDT' :
+                              layer.layer === 'GROWTH' ? 'BTC' : 'SOL';
+        trades.push({
+          assetId: assetForLayer as AssetId,
+          side: 'BUY',
+          amountIRR: Math.round(buyAmount),
+          layer: layer.layer as Layer,
+        });
+      }
+    }
+
+    // Calculate residual drift after proposed trades
+    const residualDrift = trades.length > 0 ? Math.max(0, totalDrift - 10) : totalDrift;
+
+    // Calculate after allocation based on trades
+    const newHoldingsValue = holdingsValue + cashDeployed;
+    const newLayerValues = { ...layerValues };
+    for (const trade of trades) {
+      if (trade.side === 'BUY') {
+        newLayerValues[trade.layer] += trade.amountIRR;
+      } else {
+        newLayerValues[trade.layer] -= trade.amountIRR;
+      }
+    }
+    const after: TargetLayerPct = trades.length > 0 ? {
+      FOUNDATION: newHoldingsValue > 0 ? newLayerValues.FOUNDATION / newHoldingsValue : 0,
+      GROWTH: newHoldingsValue > 0 ? newLayerValues.GROWTH / newHoldingsValue : 0,
+      UPSIDE: newHoldingsValue > 0 ? newLayerValues.UPSIDE / newHoldingsValue : 0,
+    } : before;
+
     return {
-      mode: 'HOLDINGS_ONLY',
+      mode,
       before,
-      after: targetLayerPct,
+      after,
       target: targetLayerPct,
-      trades: [],
-      cashDeployed: 0,
-      residualDrift: 0,
-      hasLockedCollateral: false,
-      insufficientCash: false,
+      trades,
+      cashDeployed,
+      residualDrift,
+      hasLockedCollateral,
+      insufficientCash: mode === 'HOLDINGS_PLUS_CASH' && cashIRR <= 0,
     };
   },
 

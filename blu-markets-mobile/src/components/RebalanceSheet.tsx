@@ -44,11 +44,12 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
   const { cashIRR, targetLayerPct } = useAppSelector((state) => state.portfolio);
 
   // Fetch preview from backend when mode changes or sheet opens
+  // BUG-E FIX: Pass mode to preview API
   const fetchPreview = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await rebalance.preview();
+      const result = await rebalance.preview(mode);
       setPreview(result);
     } catch (err: any) {
       setError(err?.message || 'Failed to load rebalance preview');
@@ -258,12 +259,13 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
               </View>
 
               {/* Legend */}
+              {/* BUG-A FIX: afterAllocation values are already percentages (0-100), don't multiply again */}
               <View style={styles.legend}>
                 {(['FOUNDATION', 'GROWTH', 'UPSIDE'] as const).map((layer) => (
                   <View key={layer} style={styles.legendItem}>
                     <View style={[styles.legendDot, { backgroundColor: LAYER_COLORS[layer] }]} />
                     <Text style={styles.legendText}>
-                      {LAYER_NAMES[layer]} {Math.round(afterAllocation[layer.toLowerCase() as keyof typeof afterAllocation] * 100)}%
+                      {LAYER_NAMES[layer]} {Math.round(afterAllocation[layer.toLowerCase() as keyof typeof afterAllocation])}%
                     </Text>
                   </View>
                 ))}
@@ -358,19 +360,33 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
               </View>
             )}
 
-            {!isLoading && !error && residualDrift > 2 && (
+            {/* BUG-C FIX: Make drift warning and balanced message mutually exclusive */}
+            {!isLoading && !error && residualDrift > 2 && canExecute && (
               <View style={[styles.warningBox, { borderColor: colors.warning }]}>
                 <Text style={styles.warningIcon}>⚠️</Text>
                 <Text style={styles.warningText}>
-                  {`Remaining drift: ${residualDrift.toFixed(1)}% from target.`}
+                  {`Remaining drift: ${residualDrift.toFixed(1)}% from target after rebalancing.`}
                 </Text>
               </View>
             )}
 
-            {!isLoading && !error && !canExecute && (
+            {/* BUG-C FIX: Show appropriate message based on drift and trade availability */}
+            {!isLoading && !error && !canExecute && residualDrift <= 5 && (
               <View style={styles.infoBox}>
                 <Text style={styles.infoText}>
-                  Your portfolio is already balanced or no trades are needed.
+                  Your portfolio is balanced. No rebalancing needed.
+                </Text>
+              </View>
+            )}
+
+            {/* BUG-C FIX: Show drift exists but can't rebalance (e.g., all assets locked) */}
+            {!isLoading && !error && !canExecute && residualDrift > 5 && (
+              <View style={[styles.warningBox, { borderColor: colors.warning }]}>
+                <Text style={styles.warningIcon}>⚠️</Text>
+                <Text style={styles.warningText}>
+                  {hasLockedCollateral
+                    ? `${residualDrift.toFixed(1)}% drift from target. Cannot rebalance because assets are locked as collateral.`
+                    : `${residualDrift.toFixed(1)}% drift from target. Unable to generate trades.`}
                 </Text>
               </View>
             )}
