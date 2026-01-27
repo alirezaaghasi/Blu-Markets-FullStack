@@ -91,6 +91,10 @@ export const TradeSuccessModal: React.FC<TradeSuccessModalProps> = ({
   if (!result) return null;
 
   const asset = ASSETS[result.assetId];
+
+  // Guard clause: return null if asset not found
+  if (!asset) return null;
+
   const isBuy = result.side === 'BUY';
 
   return (
@@ -139,7 +143,7 @@ export const TradeSuccessModal: React.FC<TradeSuccessModalProps> = ({
                     {isBuy ? 'Purchased' : 'Sold'}
                   </Text>
                   <Text style={styles.summaryValue}>
-                    {result.quantity.toFixed(6)} {asset.symbol}
+                    {(result.quantity ?? 0).toFixed(6)} {asset.symbol ?? ''}
                   </Text>
                 </View>
 
@@ -150,7 +154,7 @@ export const TradeSuccessModal: React.FC<TradeSuccessModalProps> = ({
                     {isBuy ? 'Amount Paid' : 'Amount Received'}
                   </Text>
                   <Text style={styles.summaryValue}>
-                    {formatNumber(result.amountIRR)} IRR
+                    {formatNumber(result.amountIRR ?? 0)} IRR
                   </Text>
                 </View>
 
@@ -161,13 +165,13 @@ export const TradeSuccessModal: React.FC<TradeSuccessModalProps> = ({
                   <View style={styles.balanceRow}>
                     <Text style={styles.balanceLabel}>Cash</Text>
                     <Text style={styles.balanceValue}>
-                      {formatNumber(result.newCashBalance)} IRR
+                      {formatNumber(result.newCashBalance ?? 0)} IRR
                     </Text>
                   </View>
                   <View style={styles.balanceRow}>
-                    <Text style={styles.balanceLabel}>{asset.symbol}</Text>
+                    <Text style={styles.balanceLabel}>{asset.symbol ?? ''}</Text>
                     <Text style={styles.balanceValue}>
-                      {result.newHoldingQuantity.toFixed(6)}
+                      {(result.newHoldingQuantity ?? 0).toFixed(6)}
                     </Text>
                   </View>
                 </View>

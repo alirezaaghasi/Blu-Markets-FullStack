@@ -81,8 +81,12 @@ export const ConfirmTradeModal: React.FC<ConfirmTradeModalProps> = ({
   if (!preview) return null;
 
   const asset = ASSETS[preview.assetId];
+
+  // Guard clause: return null if asset not found
+  if (!asset) return null;
+
   const isBuy = preview.side === 'BUY';
-  const boundaryConfig = BOUNDARY_CONFIG[preview.boundary];
+  const boundaryConfig = BOUNDARY_CONFIG[preview.boundary ?? 'SAFE'];
   const isHighRisk = preview.boundary === 'STRESS' || preview.boundary === 'STRUCTURAL';
 
   return (
@@ -124,12 +128,12 @@ export const ConfirmTradeModal: React.FC<ConfirmTradeModalProps> = ({
 
                   {/* Asset Info */}
                   <View style={styles.assetRow}>
-                    <View style={[styles.assetIcon, { backgroundColor: `${COLORS.layers[asset.layer.toLowerCase() as 'foundation' | 'growth' | 'upside']}20` }]}>
-                      <Text style={styles.assetIconText}>{asset.symbol}</Text>
+                    <View style={[styles.assetIcon, { backgroundColor: `${COLORS.layers[(asset.layer ?? 'GROWTH').toLowerCase() as 'foundation' | 'growth' | 'upside']}20` }]}>
+                      <Text style={styles.assetIconText}>{asset.symbol ?? ''}</Text>
                     </View>
                     <View style={styles.assetInfo}>
-                      <Text style={styles.assetName}>{asset.name}</Text>
-                      <Text style={styles.assetSymbol}>{asset.symbol}</Text>
+                      <Text style={styles.assetName}>{asset.name ?? 'Unknown'}</Text>
+                      <Text style={styles.assetSymbol}>{asset.symbol ?? ''}</Text>
                     </View>
                   </View>
 
@@ -137,25 +141,26 @@ export const ConfirmTradeModal: React.FC<ConfirmTradeModalProps> = ({
                   <View style={styles.detailsGrid}>
                     <DetailRow
                       label="Amount"
-                      value={`${formatNumber(preview.amountIRR)} IRR`}
+                      value={`${formatNumber(preview.amountIRR ?? 0)} IRR`}
                     />
                     <DetailRow
                       label={isBuy ? 'You receive' : 'You sell'}
-                      value={`${(preview.quantity ?? 0).toFixed(6)} ${asset.symbol}`}
+                      value={`${(preview.quantity ?? 0).toFixed(6)} ${asset.symbol ?? ''}`}
                     />
                     <DetailRow
                       label="Price"
-                      value={`$${preview.priceUSD.toLocaleString()}`}
+                      value={`$${(preview.priceUSD ?? 0).toLocaleString()}`}
                     />
                     <DetailRow
-                      label={`Spread (${formatPercent(preview.spread)})`}
-                      value={`${formatNumber(Math.round(preview.amountIRR * preview.spread))} IRR`}
+                      label={`Spread (${formatPercent(preview.spread ?? 0)})`}
+                      value={`${formatNumber(Math.round((preview.amountIRR ?? 0) * (preview.spread ?? 0)))} IRR`}
                       muted
                     />
                   </View>
                 </View>
 
                 {/* Allocation Impact */}
+                {preview.before && preview.after && preview.target && (
                 <View style={styles.allocationSection}>
                   <Text style={styles.sectionTitle}>Allocation Impact</Text>
 
@@ -184,29 +189,31 @@ export const ConfirmTradeModal: React.FC<ConfirmTradeModalProps> = ({
                   <View style={styles.layerPercentages}>
                     <LayerPercent
                       label="Foundation"
-                      before={preview.before.FOUNDATION}
-                      after={preview.after.FOUNDATION}
-                      target={preview.target.FOUNDATION}
+                      before={preview.before?.FOUNDATION ?? 0}
+                      after={preview.after?.FOUNDATION ?? 0}
+                      target={preview.target?.FOUNDATION ?? 0}
                       color={COLORS.layers.foundation}
                     />
                     <LayerPercent
                       label="Growth"
-                      before={preview.before.GROWTH}
-                      after={preview.after.GROWTH}
-                      target={preview.target.GROWTH}
+                      before={preview.before?.GROWTH ?? 0}
+                      after={preview.after?.GROWTH ?? 0}
+                      target={preview.target?.GROWTH ?? 0}
                       color={COLORS.layers.growth}
                     />
                     <LayerPercent
                       label="Upside"
-                      before={preview.before.UPSIDE}
-                      after={preview.after.UPSIDE}
-                      target={preview.target.UPSIDE}
+                      before={preview.before?.UPSIDE ?? 0}
+                      after={preview.after?.UPSIDE ?? 0}
+                      target={preview.target?.UPSIDE ?? 0}
                       color={COLORS.layers.upside}
                     />
                   </View>
                 </View>
+                )}
 
                 {/* Boundary Indicator */}
+                {boundaryConfig && (
                 <View style={[styles.boundarySection, { backgroundColor: boundaryConfig.bgColor }]}>
                   <View style={styles.boundaryHeader}>
                     <View style={[styles.boundaryDot, { backgroundColor: boundaryConfig.color }]} />
@@ -229,6 +236,7 @@ export const ConfirmTradeModal: React.FC<ConfirmTradeModalProps> = ({
                     </View>
                   )}
                 </View>
+                )}
               </ScrollView>
 
               {/* Actions */}

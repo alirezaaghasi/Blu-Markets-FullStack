@@ -192,7 +192,7 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
         available: availableBalance,
       },
     };
-  }, [side, amountIRR, cashIRR, assetId, holding, holdingQuantity, tradeQuantity, asset.symbol, availableBalance]);
+  }, [side, amountIRR, cashIRR, assetId, holding, holdingQuantity, tradeQuantity, asset?.symbol, availableBalance]);
 
   // Backend-derived trade preview
   const [preview, setPreview] = useState<TradePreview | null>(null);
@@ -278,8 +278,8 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
       // Log action to activity feed
       dispatch(logAction({
         type: 'TRADE',
-        boundary: preview.boundary,
-        message: `${side === 'BUY' ? 'Bought' : 'Sold'} ${(preview.quantity ?? 0).toFixed(6)} ${asset.symbol}`,
+        boundary: preview?.boundary ?? 'SAFE',
+        message: `${side === 'BUY' ? 'Bought' : 'Sold'} ${(preview?.quantity ?? 0).toFixed(6)} ${asset?.symbol ?? ''}`,
         amountIRR: amountIRR,
       }));
 
@@ -459,6 +459,7 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
                 </View>
 
                 {/* Allocation Preview */}
+                {preview.before && preview.after && (
                 <View style={styles.allocationPreview}>
                   <Text style={styles.allocationLabel}>Allocation Impact</Text>
                   <View style={styles.allocationBars}>
@@ -476,14 +477,17 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
                     </View>
                   </View>
                 </View>
+                )}
 
                 {/* Boundary Indicator */}
+                {preview.boundary && BOUNDARY_COLORS[preview.boundary] && (
                 <View style={[styles.boundaryIndicator, { backgroundColor: `${BOUNDARY_COLORS[preview.boundary]}20` }]}>
                   <View style={[styles.boundaryDot, { backgroundColor: BOUNDARY_COLORS[preview.boundary] }]} />
                   <Text style={[styles.boundaryText, { color: BOUNDARY_COLORS[preview.boundary] }]}>
                     {preview.boundary} {preview.movesTowardTarget ? '(moves toward target)' : ''}
                   </Text>
                 </View>
+                )}
 
                 {/* Friction Copy */}
                 {(preview.frictionCopy?.length ?? 0) > 0 && (
@@ -611,7 +615,9 @@ const AssetPickerModal: React.FC<AssetPickerModalProps> = ({
       UPSIDE: [],
     };
     assetsToShow.forEach((asset) => {
-      grouped[asset.layer].push(asset);
+      if (asset && asset.layer && grouped[asset.layer]) {
+        grouped[asset.layer].push(asset);
+      }
     });
     return grouped;
   }, [assetsToShow]);
