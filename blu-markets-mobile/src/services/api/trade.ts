@@ -99,6 +99,6 @@ export const trade = {
     return normalizeTradePreview(data);
   },
 
-  execute: (assetId: AssetId, action: 'BUY' | 'SELL', amountIrr: number): Promise<TradeExecuteResponse> =>
-    apiClient.post('/trade/execute', { assetId, action, amountIrr }),
+  execute: (assetId: AssetId, action: 'BUY' | 'SELL', amountIrr: number, acknowledgedWarning = true): Promise<TradeExecuteResponse> =>
+    apiClient.post('/trade/execute', { assetId, action, amountIrr, acknowledgedWarning }),
 };

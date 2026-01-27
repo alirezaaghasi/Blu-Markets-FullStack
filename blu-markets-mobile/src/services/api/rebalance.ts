@@ -28,13 +28,16 @@ function normalizeAllocation(allocation: Record<string, number> | undefined): Ta
 
 /**
  * Normalize rebalance preview response
+ * Backend uses: currentAllocation, targetAllocation, afterAllocation
+ * Frontend expects: before, target, after (with UPPERCASE keys as fractions)
  */
 function normalizeRebalancePreview(data: any): RebalancePreview {
   return {
     ...data,
-    before: normalizeAllocation(data.before),
-    after: normalizeAllocation(data.after),
-    target: normalizeAllocation(data.target),
+    // Handle both naming conventions (before/currentAllocation, after/afterAllocation, target/targetAllocation)
+    before: normalizeAllocation(data.before ?? data.currentAllocation),
+    after: normalizeAllocation(data.after ?? data.afterAllocation),
+    target: normalizeAllocation(data.target ?? data.targetAllocation),
   };
 }
 

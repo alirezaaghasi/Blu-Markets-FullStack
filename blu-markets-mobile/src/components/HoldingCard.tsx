@@ -11,6 +11,7 @@ import { AssetIcon } from './AssetIcon';
 interface HoldingCardProps {
   holding: Holding;
   priceUSD: number;
+  priceIRR?: number;  // Direct IRR price from backend (preferred over priceUSD * fxRate)
   fxRate: number;
   change24h?: number;
   purchasedAt?: string | Date;  // For Fixed Income accrued interest calculation
@@ -50,6 +51,7 @@ const formatQuantity = (quantity: number, assetId: AssetId): string => {
 export const HoldingCard: React.FC<HoldingCardProps> = ({
   holding,
   priceUSD,
+  priceIRR,
   fxRate,
   change24h,
   purchasedAt,
@@ -63,10 +65,13 @@ export const HoldingCard: React.FC<HoldingCardProps> = ({
     ? calculateFixedIncomeValue(holding.quantity, purchasedAt)
     : null;
 
-  // Fixed Income uses calculated total (principal + accrued), others use USD conversion
+  // Fixed Income uses calculated total (principal + accrued)
+  // Other assets: prefer direct IRR price from backend, fallback to USD * fxRate
   const valueIRR = isFixedIncome
     ? (fixedIncomeBreakdown?.total || 0)
-    : holding.quantity * priceUSD * fxRate;
+    : priceIRR && priceIRR > 0
+      ? holding.quantity * priceIRR
+      : holding.quantity * priceUSD * fxRate;
 
   return (
     <TouchableOpacity

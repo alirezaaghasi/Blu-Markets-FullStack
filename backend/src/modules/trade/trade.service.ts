@@ -421,6 +421,7 @@ export async function executeTrade(
         holdingQuantity,
       },
       // Aliases for mobile client compatibility
+      newCashIrr: newCashIrr,
       newHoldingQuantity: holdingQuantity,
       boundary: preview.boundary,
       ledgerEntryId: ledgerEntry.id,

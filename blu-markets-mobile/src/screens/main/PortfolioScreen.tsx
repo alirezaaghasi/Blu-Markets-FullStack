@@ -1,6 +1,6 @@
 // Portfolio Screen
 // Based on CLAUDE_CODE_HANDOFF.md - Holdings by layer view
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -49,7 +49,7 @@ const PortfolioScreen: React.FC = () => {
   // Backend-calculated values (frontend is presentation layer only)
   const holdingsValueIRR = portfolioState?.holdingsValueIrr || 0;
   const currentAllocation = portfolioState?.currentAllocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
-  const { prices, fxRate, change24h } = useAppSelector((state) => state.prices);
+  const { prices, pricesIrr, fxRate, change24h } = useAppSelector((state) => state.prices);
 
   // Group holdings by layer
   const holdingsByLayer: Record<Layer, Holding[]> = {
@@ -58,14 +58,35 @@ const PortfolioScreen: React.FC = () => {
     UPSIDE: holdings.filter((h) => h.layer === 'UPSIDE'),
   };
 
-  // Layer values from backend (calculated proportionally from holdings count for display)
-  // Note: Actual values come from backend - this is just for layer breakdown display
-  const totalHoldings = holdings.length || 1;
-  const layerValues: Record<Layer, number> = {
-    FOUNDATION: holdingsValueIRR * (holdingsByLayer.FOUNDATION.length / totalHoldings),
-    GROWTH: holdingsValueIRR * (holdingsByLayer.GROWTH.length / totalHoldings),
-    UPSIDE: holdingsValueIRR * (holdingsByLayer.UPSIDE.length / totalHoldings),
-  };
+  // BUG FIX: Calculate layer values by summing actual holding values in each layer
+  // This matches the React web app's snapshot.ts approach
+  const layerValues = useMemo(() => {
+    const values: Record<Layer, number> = { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
+
+    for (const holding of holdings) {
+      const layer = holding.layer as Layer;
+      if (!values.hasOwnProperty(layer)) continue;
+
+      // Calculate holding value using direct IRR price (preferred) or USD * fxRate
+      let valueIrr = 0;
+      if (holding.assetId === 'IRR_FIXED_INCOME') {
+        // Fixed Income: quantity represents units at 500,000 IRR each
+        valueIrr = holding.quantity * 500_000;
+      } else {
+        const pIrr = pricesIrr?.[holding.assetId];
+        if (pIrr && pIrr > 0) {
+          valueIrr = holding.quantity * pIrr;
+        } else {
+          const priceUsd = prices[holding.assetId] || 0;
+          valueIrr = holding.quantity * priceUsd * fxRate;
+        }
+      }
+
+      values[layer] += valueIrr;
+    }
+
+    return values;
+  }, [holdings, prices, pricesIrr, fxRate]);
 
   const toggleLayer = (layer: Layer) => {
     setExpandedLayers((prev) => ({ ...prev, [layer]: !prev[layer] }));
@@ -211,8 +232,10 @@ const PortfolioScreen: React.FC = () => {
                         key={holding.assetId}
                         holding={holding}
                         priceUSD={prices[holding.assetId] || 0}
+                        priceIRR={pricesIrr?.[holding.assetId]}
                         fxRate={fxRate}
                         change24h={change24h?.[holding.assetId]}
+                        purchasedAt={holding.purchasedAt}
                       />
                     ))}
                   </View>

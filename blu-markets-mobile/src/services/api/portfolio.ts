@@ -20,10 +20,14 @@ function normalizeAllocation(allocation: Record<string, number> | undefined): Ta
     return val > 1 ? val / 100 : val;
   };
 
+  // BUG FIX: Handle all three case conventions from backend:
+  // - UPPERCASE: FOUNDATION, GROWTH, UPSIDE
+  // - lowercase: foundation, growth, upside
+  // - TitleCase: Foundation, Growth, Upside (from backend's Allocation field)
   return {
-    FOUNDATION: normalizeValue(allocation.FOUNDATION ?? allocation.foundation),
-    GROWTH: normalizeValue(allocation.GROWTH ?? allocation.growth),
-    UPSIDE: normalizeValue(allocation.UPSIDE ?? allocation.upside),
+    FOUNDATION: normalizeValue(allocation.FOUNDATION ?? allocation.foundation ?? allocation.Foundation),
+    GROWTH: normalizeValue(allocation.GROWTH ?? allocation.growth ?? allocation.Growth),
+    UPSIDE: normalizeValue(allocation.UPSIDE ?? allocation.upside ?? allocation.Upside),
   };
 }
 
@@ -36,6 +40,7 @@ function normalizeHolding(h: Record<string, unknown>): Holding {
     quantity: Number(h.quantity) || 0,
     frozen: Boolean(h.frozen),
     layer: (h.layer as Layer) || 'FOUNDATION',
+    purchasedAt: (h.purchasedAt ?? h.purchased_at) as string | undefined,  // For Fixed Income accrual
   };
 }
 
@@ -67,7 +72,12 @@ function normalizePortfolioResponse(data: Record<string, unknown>, holdings?: Ho
     // Backend-calculated values (frontend is presentation layer only)
     totalValueIrr,
     holdingsValueIrr,
-    allocation: normalizeAllocation(data.allocation as Record<string, number> | undefined),
+    // BUG FIX: Handle both lowercase and uppercase Allocation keys from backend
+    // Backend sends both, but some HTTP clients may transform keys
+    allocation: normalizeAllocation(
+      (data.allocation as Record<string, number> | undefined) ||
+      (data.Allocation as Record<string, number> | undefined)
+    ),
     driftPct: Number(data.driftPct ?? data.drift_pct ?? 0),
     dailyChangePercent: Number(data.dailyChangePercent ?? data.daily_change_percent ?? 0),
     // Include risk score if available for profile screen

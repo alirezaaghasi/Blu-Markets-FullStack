@@ -32,13 +32,13 @@ import { ASSETS, LAYER_COLORS, LAYER_NAMES } from '../constants/assets';
 import { MIN_TRADE_AMOUNT, SPREAD_BY_LAYER } from '../constants/business';
 import { calculateFixedIncomeValue } from '../utils/fixedIncome';
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
-import { updateHoldingFromTrade, updateCash, logAction } from '../store/slices/portfolioSlice';
+import { updateHoldingFromTrade, updateCash, logAction, setStatus, setPortfolioValues } from '../store/slices/portfolioSlice';
 import {
   validateBuyTrade,
   validateSellTrade,
 } from '../utils/tradeValidation';
 import AllocationBar from './AllocationBar';
-import { trade } from '../services/api';
+import { trade, portfolio as portfolioApi } from '../services/api';
 import { ConfirmTradeModal } from './ConfirmTradeModal';
 import { TradeSuccessModal } from './TradeSuccessModal';
 import { TradeErrorModal } from './TradeErrorModal';
@@ -89,17 +89,24 @@ const formatIRRCompact = (num: number): string => {
 };
 
 // BUG-1 FIX: Calculate holding value for display (matches HoldingCard logic)
+// Updated to prefer direct IRR prices from backend over USD * fxRate calculation
 const getHoldingValueIRR = (
   h: Holding,
   prices: Record<string, number>,
+  pricesIrr: Record<string, number>,
   fxRate: number
 ): number => {
   if (h.assetId === 'IRR_FIXED_INCOME') {
     const breakdown = calculateFixedIncomeValue(h.quantity, h.purchasedAt);
     return breakdown?.total || h.quantity;
   }
-  const price = prices[h.assetId] || 0;
-  return h.quantity * price * fxRate;
+  // Prefer direct IRR price from backend, fallback to USD * fxRate
+  const priceIrr = pricesIrr?.[h.assetId];
+  if (priceIrr && priceIrr > 0) {
+    return h.quantity * priceIrr;
+  }
+  const priceUsd = prices[h.assetId] || 0;
+  return h.quantity * priceUsd * fxRate;
 };
 
 export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
@@ -110,7 +117,7 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
 }) => {
   const dispatch = useAppDispatch();
   const { holdings, cashIRR, targetLayerPct } = useAppSelector((state) => state.portfolio);
-  const { prices, fxRate } = useAppSelector((state) => state.prices);
+  const { prices, pricesIrr, fxRate } = useAppSelector((state) => state.prices);
 
   // Trade input state
   const [side, setSide] = useState<'BUY' | 'SELL'>(initialSide);
@@ -132,7 +139,10 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
   const assetSymbol = asset?.symbol || '';
   const assetName = asset?.name || 'Unknown';
   const priceUSD = prices[assetId] || 0;
-  const priceIRR = priceUSD * fxRate;
+  // Prefer direct IRR price from backend, fallback to USD * fxRate
+  const priceIRR = (pricesIrr?.[assetId] && pricesIrr[assetId] > 0)
+    ? pricesIrr[assetId]
+    : priceUSD * fxRate;
 
   // Find holding for selected asset
   const holding = holdings.find((h) => h.assetId === assetId);
@@ -145,12 +155,15 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
   const holdingValues = useMemo(() => {
     const map = new Map<string, number>();
     holdings.forEach((h) => {
-      const p = prices[h.assetId] || 0;
-      // UI ESTIMATE ONLY - backend preview is authoritative
-      map.set(h.assetId, h.quantity * p * fxRate);
+      // Prefer direct IRR price from backend, fallback to USD * fxRate
+      const pIrr = pricesIrr?.[h.assetId];
+      const valueIrr = (pIrr && pIrr > 0)
+        ? h.quantity * pIrr
+        : h.quantity * (prices[h.assetId] || 0) * fxRate;
+      map.set(h.assetId, valueIrr);
     });
     return map;
-  }, [holdings, prices, fxRate]);
+  }, [holdings, prices, pricesIrr, fxRate]);
 
   // BUG-006 FIX: Client-side allocation is for UI display ONLY
   // Backend trade.preview provides authoritative before/after allocations
@@ -310,14 +323,38 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
       const response = await trade.execute(assetId, side, amountIRR);
 
       // BUG-017 FIX: Use backend-provided values only (no local calculations)
+      // BUG-CASH FIX: Extract values from either root level aliases or nested newBalance object
+      const newCash = response.newCashIrr ?? (response as any).newBalance?.cashIrr ?? cashIRR;
+      const newHoldingQty = response.newHoldingQuantity ?? (response as any).newBalance?.holdingQuantity ?? 0;
+
       // Update holding quantity from backend response
       dispatch(updateHoldingFromTrade({
         assetId,
-        quantity: response.newHoldingQuantity,
+        quantity: newHoldingQty,
         side,
       }));
       // Update cash from backend (includes spread/fees)
-      dispatch(updateCash(response.newCashIrr));
+      dispatch(updateCash(newCash));
+
+      // BUG-STATUS FIX: Refresh portfolio status after trade to update badge and rebalance button
+      try {
+        const portfolioData = await portfolioApi.get();
+        console.log('[TradeBottomSheet] Post-trade portfolio status:', portfolioData.status);
+        console.log('[TradeBottomSheet] Post-trade allocation:', portfolioData.allocation);
+        console.log('[TradeBottomSheet] Post-trade driftPct:', portfolioData.driftPct);
+        dispatch(setStatus(portfolioData.status));
+        dispatch(setPortfolioValues({
+          totalValueIrr: portfolioData.totalValueIrr || 0,
+          holdingsValueIrr: portfolioData.holdingsValueIrr || 0,
+          currentAllocation: portfolioData.allocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
+          driftPct: portfolioData.driftPct || 0,
+          status: portfolioData.status || 'BALANCED',
+        }));
+        console.log('[TradeBottomSheet] Dispatched status update:', portfolioData.status);
+      } catch (e) {
+        // Non-fatal - status will update on next refresh
+        console.warn('Failed to refresh portfolio status after trade:', e);
+      }
 
       // Log action to activity feed
       dispatch(logAction({
@@ -333,8 +370,8 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
         assetId,
         amountIRR,
         quantity: preview.quantity ?? 0,
-        newCashBalance: response.newCashIrr,
-        newHoldingQuantity: response.newHoldingQuantity,
+        newCashBalance: newCash,
+        newHoldingQuantity: newHoldingQty,
       });
 
       // Close confirm modal, show success modal
@@ -424,7 +461,10 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
                 <View>
                   <Text style={styles.assetName}>{assetName}</Text>
                   <Text style={styles.assetPrice}>
-                    {formatNumber(priceIRR)} IRR (${(priceUSD || 0).toLocaleString()})
+                    {/* BUG-DISPLAY FIX: Show holding value for SELL, price per unit for BUY */}
+                    {side === 'SELL' && holdingValue > 0
+                      ? `You own: ${formatIRRCompact(holdingValue)} IRR`
+                      : `${formatNumber(priceIRR)} IRR (${(priceUSD || 0).toLocaleString()})`}
                   </Text>
                 </View>
               </View>
@@ -585,6 +625,7 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
           side={side}
           holdings={holdings}
           prices={prices}
+          pricesIrr={pricesIrr}
           fxRate={fxRate}
         />
 
@@ -625,6 +666,7 @@ interface AssetPickerModalProps {
   side: 'BUY' | 'SELL';
   holdings: Holding[];
   prices: Record<string, number>;
+  pricesIrr: Record<string, number>;
   fxRate: number;
 }
 
@@ -636,6 +678,7 @@ const AssetPickerModal: React.FC<AssetPickerModalProps> = ({
   side,
   holdings,
   prices,
+  pricesIrr,
   fxRate,
 }) => {
   // Get assets to show based on side
@@ -695,14 +738,16 @@ const AssetPickerModal: React.FC<AssetPickerModalProps> = ({
 
                 {layerAssets.map((asset) => {
                   const priceUSD = prices[asset.id] || 0;
-                  const priceIRR = priceUSD * fxRate;
+                  // Prefer direct IRR price from backend, fallback to USD * fxRate
+                  const pIrr = pricesIrr?.[asset.id];
+                  const priceIRR = (pIrr && pIrr > 0) ? pIrr : priceUSD * fxRate;
                   const holding = holdings.find((h) => h.assetId === asset.id);
                   const isSelected = asset.id === currentAssetId;
 
                   // BUG-1 FIX: In SELL mode, show holding VALUE (matches Portfolio)
                   // In BUY mode, show price per unit
                   const isFixedIncome = asset.id === 'IRR_FIXED_INCOME';
-                  const holdingValueIRR = holding ? getHoldingValueIRR(holding, prices, fxRate) : 0;
+                  const holdingValueIRR = holding ? getHoldingValueIRR(holding, prices, pricesIrr, fxRate) : 0;
 
                   // Display text based on mode
                   const displayValue = side === 'SELL' && holding

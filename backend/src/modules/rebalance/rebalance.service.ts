@@ -27,6 +27,7 @@ import {
   Decimal,
 } from '../../utils/money.js';
 import { logger } from '../../utils/logger.js';
+import { getLayerWeights, getLayerAssets, ASSETS_CONFIG } from '../../config/assets.js';
 
 // Rebalance modes per PRD Section 18.3
 export type RebalanceMode = 'HOLDINGS_ONLY' | 'HOLDINGS_PLUS_CASH' | 'SMART';
@@ -44,8 +45,8 @@ const SPREAD_BY_LAYER: Record<Layer, number> = {
 // Minimum trade amount
 const MIN_TRADE_AMOUNT = 1_000_000;
 
-// Cooldown period in hours
-const REBALANCE_COOLDOWN_HOURS = 24;
+// Cooldown period in hours (set to 0 for testing)
+const REBALANCE_COOLDOWN_HOURS = 0;
 
 interface LayerHoldings {
   frozen: { assetId: AssetId; quantity: number; valueIrr: number }[];
@@ -105,14 +106,42 @@ export async function previewRebalance(
   const snapshot = await getPortfolioSnapshot(userId);
   const prices = await getCurrentPrices();
 
+  // DEBUG: Log snapshot allocation info
+  logger.info('REBALANCE DEBUG - Snapshot:', {
+    currentAllocation: snapshot.allocation,
+    targetAllocation: snapshot.targetAllocation,
+    cashIrr: snapshot.cashIrr,
+    holdingsValueIrr: snapshot.holdingsValueIrr,
+    totalValueIrr: snapshot.totalValueIrr,
+    driftPct: snapshot.driftPct,
+  });
+
   // Partition holdings by layer and frozen status
   const holdingsByLayer = partitionHoldingsByLayer(snapshot, prices);
+
+  // DEBUG: Log layer values
+  logger.info('REBALANCE DEBUG - Holdings by Layer:', {
+    FOUNDATION: { total: holdingsByLayer.FOUNDATION.totalValue, unfrozen: holdingsByLayer.FOUNDATION.unfrozenValue },
+    GROWTH: { total: holdingsByLayer.GROWTH.totalValue, unfrozen: holdingsByLayer.GROWTH.unfrozenValue },
+    UPSIDE: { total: holdingsByLayer.UPSIDE.totalValue, unfrozen: holdingsByLayer.UPSIDE.unfrozenValue },
+  });
 
   // Calculate gap analysis
   const gapAnalysis = calculateGapAnalysis(snapshot, holdingsByLayer);
 
+  // DEBUG: Log gap analysis
+  logger.info('REBALANCE DEBUG - Gap Analysis:', { gaps: gapAnalysis });
+
   // Generate rebalance trades
   const result = generateRebalanceTrades(snapshot, holdingsByLayer, gapAnalysis, mode, prices);
+
+  // DEBUG: Log generated trades
+  logger.info('REBALANCE DEBUG - Generated Trades:', {
+    trades: result.trades,
+    totalBuyIrr: result.totalBuyIrr,
+    totalSellIrr: result.totalSellIrr,
+    afterAllocation: result.afterAllocation,
+  });
 
   // Check if there are any locked collateral
   const hasLockedCollateral = snapshot.holdings.some((h) => h.frozen);
@@ -440,38 +469,43 @@ function generateRebalanceTrades(
   // Include cash if mode allows
   let availableCash = mode === 'HOLDINGS_ONLY' ? 0 : snapshot.cashIrr;
 
-  // Generate SELL trades from overweight layers (unfrozen only)
+  // Generate SELL trades from overweight layers using pro-rata allocation
+  // Per PRD Section 7.3: Sell proportionally from each asset in the layer
+  // Track NET proceeds after spread deduction
+  let totalNetSellProceeds = 0;
+
   for (const gap of overweight) {
     const layerKey = gap.layer as Layer;
     const layerHoldings = holdingsByLayer[layerKey];
-    const targetSellAmount = Math.abs(gap.gapIrr);
-    let remainingToSell = targetSellAmount;
+    const targetSellAmount = Math.min(Math.abs(gap.gapIrr), layerHoldings.unfrozenValue);
 
-    // Sort unfrozen holdings by value (sell largest first)
-    const sortedHoldings = [...layerHoldings.unfrozen].sort((a, b) => b.valueIrr - a.valueIrr);
+    if (targetSellAmount >= MIN_TRADE_AMOUNT) {
+      // Generate pro-rata sell trades
+      const layerSellTrades = generateLayerSellTrades(
+        layerKey,
+        targetSellAmount,
+        layerHoldings,
+        prices
+      );
 
-    for (const holding of sortedHoldings) {
-      if (remainingToSell <= MIN_TRADE_AMOUNT) break;
+      for (const trade of layerSellTrades) {
+        // Calculate net proceeds after spread
+        const assetLayer = getAssetLayer(trade.assetId as AssetId);
+        const spread = SPREAD_BY_LAYER[assetLayer];
+        const netProceeds = trade.amountIrr * (1 - spread);
 
-      const sellAmount = Math.min(holding.valueIrr, remainingToSell);
-      if (sellAmount >= MIN_TRADE_AMOUNT) {
-        trades.push({
-          side: 'SELL',
-          assetId: holding.assetId,
-          amountIrr: Math.round(sellAmount),
-          layer: gap.layer,
-        });
-        totalSellIrr += sellAmount;
-        remainingToSell -= sellAmount;
+        trades.push(trade);
+        totalSellIrr += trade.amountIrr;
+        totalNetSellProceeds += netProceeds;
       }
     }
   }
 
-  // Calculate total available for buys
-  const totalAvailableForBuys = totalSellIrr + availableCash;
+  // Calculate total available for buys (using NET proceeds after spread)
+  const totalAvailableForBuys = totalNetSellProceeds + availableCash;
 
-  // Generate BUY trades for underweight layers
-  // Distribute proportionally to the gap
+  // Generate BUY trades for underweight layers using HRAM intra-layer weights
+  // Per PRD Section 7.3: Distribute buys according to layer weights
   const totalGapIrr = underweight.reduce((sum, l) => sum + l.gapIrr, 0);
 
   for (const gap of underweight) {
@@ -479,19 +513,21 @@ function generateRebalanceTrades(
 
     const layerKey = gap.layer as Layer;
     const proportion = gap.gapIrr / totalGapIrr;
-    const buyAmount = Math.min(gap.gapIrr, totalAvailableForBuys * proportion);
+    const layerBuyAmount = Math.min(gap.gapIrr, totalAvailableForBuys * proportion);
 
-    if (buyAmount >= MIN_TRADE_AMOUNT) {
-      // Choose asset to buy in this layer (prefer largest existing holding or default)
-      const assetToBuy = selectAssetToBuy(layerKey, holdingsByLayer[layerKey], prices);
+    if (layerBuyAmount >= MIN_TRADE_AMOUNT) {
+      // Generate intra-layer buy trades according to HRAM weights
+      const layerBuyTrades = generateLayerBuyTrades(
+        layerKey,
+        layerBuyAmount,
+        holdingsByLayer[layerKey],
+        prices
+      );
 
-      trades.push({
-        side: 'BUY',
-        assetId: assetToBuy,
-        amountIrr: Math.round(buyAmount),
-        layer: gap.layer,
-      });
-      totalBuyIrr += buyAmount;
+      for (const trade of layerBuyTrades) {
+        trades.push(trade);
+        totalBuyIrr += trade.amountIrr;
+      }
     }
   }
 
@@ -519,26 +555,116 @@ function generateRebalanceTrades(
   };
 }
 
-function selectAssetToBuy(
+/**
+ * Generate BUY trades for a layer using intra-layer HRAM weights (PRD Section 7.3)
+ * Distributes buy amount across assets proportionally to their target layer weights
+ */
+function generateLayerBuyTrades(
   layer: Layer,
+  layerBuyAmount: number,
   layerHoldings: LayerHoldings,
   prices: Map<AssetId, { priceIrr: number }>
-): AssetId {
-  // Default assets per layer
-  const defaultAssets: Record<Layer, AssetId> = {
-    FOUNDATION: 'USDT',
-    GROWTH: 'BTC',
-    UPSIDE: 'SOL',
-  };
+): RebalanceTrade[] {
+  const trades: RebalanceTrade[] = [];
+  const layerWeights = getLayerWeights(layer);
+  const layerAssets = getLayerAssets(layer);
 
-  // If user has existing holdings in this layer, prefer adding to largest
-  const existingAssets = [...layerHoldings.frozen, ...layerHoldings.unfrozen];
-  if (existingAssets.length > 0) {
-    const sorted = existingAssets.sort((a, b) => b.valueIrr - a.valueIrr);
-    return sorted[0].assetId;
+  // Calculate current weights within layer
+  const currentValues: Record<string, number> = {};
+  let currentLayerTotal = 0;
+
+  for (const h of [...layerHoldings.frozen, ...layerHoldings.unfrozen]) {
+    currentValues[h.assetId] = h.valueIrr;
+    currentLayerTotal += h.valueIrr;
   }
 
-  return defaultAssets[layer];
+  // After buying, layer will be worth: currentLayerTotal + layerBuyAmount
+  const afterLayerValue = currentLayerTotal + layerBuyAmount;
+
+  // Calculate how much each asset should be worth after rebalancing
+  // and how much we need to buy to get there
+  for (const assetId of layerAssets) {
+    const targetWeight = layerWeights[assetId] || 0;
+    const targetValue = afterLayerValue * targetWeight;
+    const currentValue = currentValues[assetId] || 0;
+    const buyNeeded = targetValue - currentValue;
+
+    // Only buy if we need more than minimum trade amount
+    if (buyNeeded >= MIN_TRADE_AMOUNT) {
+      const price = prices.get(assetId);
+      if (!price) continue;
+
+      trades.push({
+        side: 'BUY',
+        assetId,
+        amountIrr: Math.round(buyNeeded),
+        layer,
+      });
+    }
+  }
+
+  // If no individual trades meet minimum, buy the highest-weight asset
+  if (trades.length === 0 && layerBuyAmount >= MIN_TRADE_AMOUNT) {
+    // Find asset with highest target weight that has a price
+    const sortedAssets = layerAssets
+      .filter(a => prices.has(a))
+      .sort((a, b) => (layerWeights[b] || 0) - (layerWeights[a] || 0));
+
+    if (sortedAssets.length > 0) {
+      trades.push({
+        side: 'BUY',
+        assetId: sortedAssets[0],
+        amountIrr: Math.round(layerBuyAmount),
+        layer,
+      });
+    }
+  }
+
+  return trades;
+}
+
+/**
+ * Generate SELL trades for a layer using pro-rata allocation (PRD Section 7.3)
+ * Sells from each asset proportionally to its current value within the layer
+ */
+function generateLayerSellTrades(
+  layer: Layer,
+  layerSellAmount: number,
+  layerHoldings: LayerHoldings,
+  prices: Map<AssetId, { priceIrr: number }>
+): RebalanceTrade[] {
+  const trades: RebalanceTrade[] = [];
+  let remainingToSell = layerSellAmount;
+
+  // Sort unfrozen holdings by value (sell proportionally from each)
+  const sortedHoldings = [...layerHoldings.unfrozen].sort((a, b) => b.valueIrr - a.valueIrr);
+  const layerTotal = sortedHoldings.reduce((sum, h) => sum + h.valueIrr, 0);
+
+  if (layerTotal <= 0) return trades;
+
+  for (const holding of sortedHoldings) {
+    if (remainingToSell < MIN_TRADE_AMOUNT) break;
+
+    // Pro-rata: sell proportion based on this asset's share of layer
+    const proportion = holding.valueIrr / layerTotal;
+    const sellAmount = Math.min(
+      layerSellAmount * proportion,  // Pro-rata amount
+      holding.valueIrr,               // Can't sell more than we have
+      remainingToSell                 // Don't exceed remaining need
+    );
+
+    if (sellAmount >= MIN_TRADE_AMOUNT) {
+      trades.push({
+        side: 'SELL',
+        assetId: holding.assetId,
+        amountIrr: Math.round(sellAmount),
+        layer,
+      });
+      remainingToSell -= sellAmount;
+    }
+  }
+
+  return trades;
 }
 
 // MONEY FIX M-02: Use Decimal arithmetic for after allocation calculation

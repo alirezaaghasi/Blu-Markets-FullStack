@@ -285,6 +285,7 @@ const HomeScreen: React.FC = () => {
   const totalValueIrr = cashIRR + holdingsValueIrr;
   const currentAllocation = portfolioState?.currentAllocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
   const portfolioStatus = portfolioState?.status || 'BALANCED';
+  console.log('[HomeScreen] Current portfolioStatus from Redux:', portfolioStatus);
   const { phone, authToken } = useAppSelector((state) => state.auth);
 
   // Check if we're in demo mode (runtime check)
@@ -362,6 +363,9 @@ const HomeScreen: React.FC = () => {
         refreshActivities(),
       ]);
 
+      // DEBUG: Log portfolio response on refresh
+      console.log('[HomeScreen] Refresh - Portfolio status:', portfolioResponse.status);
+
       // Update cash and target allocation
       dispatch(updateCash(portfolioResponse.cashIrr));
       dispatch(setTargetLayerPct(portfolioResponse.targetAllocation));
@@ -398,6 +402,13 @@ const HomeScreen: React.FC = () => {
     const fetchData = async () => {
       try {
         const portfolioResponse = await portfolioApi.get();
+
+        // DEBUG: Log portfolio response to verify status
+        console.log('[HomeScreen] Portfolio API response:', {
+          status: portfolioResponse.status,
+          driftPct: portfolioResponse.driftPct,
+          allocation: portfolioResponse.allocation,
+        });
 
         // Update cash and target allocation
         dispatch(updateCash(portfolioResponse.cashIrr));

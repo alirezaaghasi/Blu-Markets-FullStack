@@ -108,6 +108,7 @@ export interface HoldingResponse {
   priceIrr: number;
   change24hPct?: number;
   pctOfPortfolio: number;
+  purchasedAt?: string;  // ISO string for Fixed Income accrual calculation
 }
 
 export interface AddFundsRequest {

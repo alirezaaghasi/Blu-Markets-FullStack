@@ -137,6 +137,7 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
         priceUsd: price?.priceUsd || 0,
         change24hPct: price?.change24hPct || 0,
         pctOfPortfolio: totalValueIrr > 0 ? toNumber(multiply(divide(valueIrrDecimal, totalValueIrr), 100)) : 0,
+        purchasedAt: h.purchaseDate?.toISOString(),  // For Fixed Income accrual
       };
     });
 
@@ -214,6 +215,7 @@ export async function getPortfolioHoldings(userId: string): Promise<HoldingRespo
         priceIrr: price?.priceIrr || 0,
         change24hPct: price?.change24hPct,
         pctOfPortfolio: isGreaterThan(totalValueDecimal, 0) ? toNumber(multiply(divide(valueIrrDecimal, totalValueDecimal), 100)) : 0,
+        purchasedAt: h.purchaseDate?.toISOString(),  // For Fixed Income accrual
       };
     });
 
