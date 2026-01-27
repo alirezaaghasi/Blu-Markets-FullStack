@@ -35,6 +35,7 @@ import { setHoldings, updateCash, setStatus, setTargetLayerPct, setPortfolioValu
 import { portfolio as portfolioApi } from '../../services/api';
 import type { Holding, ActionLogEntry } from '../../types';
 import { ASSETS } from '../../constants/assets';
+import { DEMO_TOKEN } from '../../constants/business';
 import { ActivityCard } from '../../components/ActivityCard';
 import { TradeBottomSheet } from '../../components/TradeBottomSheet';
 import { AddFundsSheet } from '../../components/AddFundsSheet';
@@ -82,6 +83,7 @@ function formatIRRShort(value: number | undefined): string {
 
 /**
  * Format activity log message
+ * Returns user-friendly description based on action type and data
  */
 function formatActivityMessage(entry: ActionLogEntry): string {
   const assetName = entry.assetId ? (ASSETS[entry.assetId]?.name || entry.assetId) : '';
@@ -92,19 +94,28 @@ function formatActivityMessage(entry: ActionLogEntry): string {
     case 'ADD_FUNDS':
       return `Added ${formatIRRShort(entry.amountIRR)} cash`;
     case 'TRADE':
-      return entry.message || `Traded ${assetName}`;
+      // Use entry.message if provided (includes direction and amount)
+      // Otherwise construct from available data
+      if (entry.message && entry.message.length > 0) {
+        return entry.message;
+      }
+      return assetName ? `Traded ${assetName}` : 'Executed trade';
     case 'BORROW':
-      return `Borrowed ${formatIRRShort(entry.amountIRR)} against ${assetName}`;
+      return `Borrowed ${formatIRRShort(entry.amountIRR)}${assetName ? ` against ${assetName}` : ''}`;
     case 'REPAY':
       return `Repaid ${formatIRRShort(entry.amountIRR)}`;
     case 'PROTECT':
-      return `Protected ${assetName}`;
+      return assetName ? `Protected ${assetName}` : 'Added protection';
     case 'REBALANCE':
-      return 'Rebalanced portfolio';
+      return entry.message && entry.message.length > 0 ? entry.message : 'Rebalanced portfolio';
     case 'CANCEL_PROTECTION':
-      return `Cancelled ${assetName} protection`;
+      return assetName ? `Cancelled ${assetName} protection` : 'Cancelled protection';
     default:
-      return entry.message || entry.type;
+      // Robust fallback: prefer message, then type, then generic text
+      if (entry.message && entry.message.length > 0) {
+        return entry.message;
+      }
+      return entry.type ? String(entry.type).replace(/_/g, ' ').toLowerCase() : 'Activity';
   }
 }
 
@@ -249,7 +260,7 @@ const HomeScreen: React.FC = () => {
   const { phone, authToken } = useAppSelector((state) => state.auth);
 
   // Check if we're in demo mode (runtime check)
-  const isDemoMode = authToken === 'demo-token';
+  const isDemoMode = authToken === DEMO_TOKEN;
 
   // ==========================================================================
   // COMPUTED VALUES (using backend-calculated values from Redux)
@@ -286,9 +297,8 @@ const HomeScreen: React.FC = () => {
     navigation.navigate('Portfolio');
   }, [navigation]);
 
-  const handleViewActivity = useCallback(() => {
-    navigation.navigate('Portfolio'); // Activity is shown in Portfolio screen
-  }, [navigation]);
+  // Note: No dedicated activity history screen exists
+  // Full activity log is available in the Activity section on Home screen
 
   const handleNotificationPress = useCallback(() => {
     Alert.alert(
@@ -482,11 +492,6 @@ const HomeScreen: React.FC = () => {
         <View style={styles.activitySection}>
           <View style={styles.activityHeader}>
             <Text style={styles.sectionTitle}>Activity Log</Text>
-            {activities.length > 0 && (
-              <TouchableOpacity onPress={handleViewActivity}>
-                <Text style={styles.viewAllLink}>View all →</Text>
-              </TouchableOpacity>
-            )}
           </View>
 
           {isLoadingActivities ? (
@@ -499,25 +504,29 @@ const HomeScreen: React.FC = () => {
             </View>
           ) : (
             <View style={styles.chatContainer}>
-              {activities.slice(0, 5).map((entry: ActionLogEntry) => (
-                <View key={entry.id} style={styles.chatBubble}>
-                  <View style={styles.chatBubbleContent}>
-                    <View style={[
-                      styles.activityDot,
-                      { backgroundColor: entry.boundary === 'SAFE' ? '#4ade80' :
-                        entry.boundary === 'DRIFT' ? '#fde047' : '#f87171' }
-                    ]} />
-                    <View style={styles.chatTextContainer}>
-                      <Text style={styles.chatMessage}>
-                        {formatActivityMessage(entry)}
-                      </Text>
-                      <Text style={styles.chatTime}>
-                        {formatRelativeTime(entry.timestamp)}
-                      </Text>
+              {activities.slice(0, 5).map((entry: ActionLogEntry) => {
+                const message = formatActivityMessage(entry);
+                const time = formatRelativeTime(entry.timestamp);
+                const dotColor = entry.boundary === 'SAFE' ? '#4ade80' :
+                  entry.boundary === 'DRIFT' ? '#fde047' :
+                  entry.boundary === 'STRUCTURAL' ? '#fb923c' : '#f87171';
+
+                return (
+                  <View key={entry.id} style={styles.chatBubble}>
+                    <View style={styles.chatBubbleContent}>
+                      <View style={[styles.activityDot, { backgroundColor: dotColor }]} />
+                      <View style={styles.chatTextContainer}>
+                        <Text style={styles.chatMessage} numberOfLines={2}>
+                          {message}
+                        </Text>
+                        <Text style={styles.chatTime}>
+                          {time}
+                        </Text>
+                      </View>
                     </View>
                   </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
           )}
 
@@ -781,11 +790,6 @@ const styles = StyleSheet.create({
     color: COLORS.text.secondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-  },
-  viewAllLink: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: '500',
-    color: COLORS.brand.primary,
   },
   loadingContainer: {
     padding: SPACING[6],

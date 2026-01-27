@@ -7,6 +7,7 @@ import { activity } from '../services/api/index';
 import { useAppSelector } from './useStore';
 import type { ActionLogEntry } from '../types';
 import { getErrorMessage } from '../utils/errorUtils';
+import { DEMO_TOKEN } from '../constants/business';
 
 interface UseActivityFeedResult {
   activities: ActionLogEntry[];
@@ -29,7 +30,7 @@ export function useActivityFeed(initialLimit = 10): UseActivityFeedResult {
   // Check if we're in demo mode (runtime check via Redux)
   const authToken = useAppSelector((state) => state.auth.authToken);
   const reduxActionLog = useAppSelector((state) => state.portfolio.actionLog);
-  const isDemoMode = authToken === 'demo-token';
+  const isDemoMode = authToken === DEMO_TOKEN;
 
   // Demo mode activities from Redux state
   const demoActivities = useMemo(() => {
