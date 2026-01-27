@@ -392,6 +392,8 @@ export const trade = {
       quantity: holding?.quantity || 0,
       boundary: 'SAFE',
       newHoldingQuantity: holding?.quantity || 0,
+      // BUG-017 FIX: Return the new cash balance from backend
+      newCashIrr: newCashIRR,
     };
   },
 };

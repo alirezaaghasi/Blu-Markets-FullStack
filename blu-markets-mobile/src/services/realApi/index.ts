@@ -87,6 +87,8 @@ export interface TradeExecuteResponse {
   quantity: number;
   boundary: Boundary;
   newHoldingQuantity: number;
+  // BUG-017 FIX: Backend must return the new cash balance (includes spread/fees)
+  newCashIrr: number;
 }
 
 export interface UserProfile {

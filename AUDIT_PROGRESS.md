@@ -23,6 +23,18 @@
 - **16:00** - BUG-4: handleConfirm shows specific error messages instead of silent return
 - **16:00** - Committed and pushed (commit 5c03cb2)
 
+### Fix Log - Session 4 (Audit P0 Issues)
+
+- **Session Start** - Fixed P0 Critical audit issues (BUG-017, BUG-018)
+- **BUG-017 FIX**: Trade execution now uses backend-provided `newCashIrr`
+  - Added `newCashIrr` field to `TradeExecuteResponse` interface
+  - Updated mock APIs to return `newCashIrr` from backend calculation
+  - Fixed TradeBottomSheet to use `response.newCashIrr` instead of local `cashIRR + cashChange`
+- **BUG-018 FIX**: Rebalance already correct - refreshes from portfolio.get() API
+  - RebalanceSheet calls `rebalance.execute()` then `portfolio.get()` for new state
+  - No local calculations - all values from backend
+- TypeScript compiles with 0 errors
+
 ### Findings So Far
 
 **BUG-1 (Activity Log):**
@@ -56,13 +68,13 @@
 
 | Priority | Total | Fixed | In Progress | Remaining |
 |----------|-------|-------|-------------|-----------|
-| P0 Critical | 2 | 0 | 0 | 2 |
+| P0 Critical | 2 | 2 | 0 | 0 |
 | P1 High | 3 | 0 | 0 | 3 |
 | P2 Medium | 4 | 0 | 0 | 4 |
 | P3 Low | 3 | 0 | 0 | 3 |
-| **Total** | **12** | **0** | **0** | **12** |
+| **Total** | **12** | **2** | **0** | **10** |
 
-### Status: **12 NEW ISSUES IDENTIFIED**
+### Status: **P0 CRITICAL ISSUES FIXED**
 
 ---
 
@@ -72,8 +84,8 @@
 
 | Bug ID | Issue | File | Status |
 |--------|-------|------|--------|
-| BUG-017 | executeTrade client-side calculations | portfolioSlice.ts:304-386 | 🔴 Not Started |
-| BUG-018 | executeRebalance client-side calculations | portfolioSlice.ts:389-478 | 🔴 Not Started |
+| BUG-017 | executeTrade client-side calculations | portfolioSlice.ts, TradeBottomSheet.tsx, api/types.ts | ✅ Fixed - uses backend newCashIrr |
+| BUG-018 | executeRebalance client-side calculations | portfolioSlice.ts, RebalanceSheet.tsx | ✅ Fixed - refetches from portfolio API |
 
 ### P1 High (Fix Soon)
 

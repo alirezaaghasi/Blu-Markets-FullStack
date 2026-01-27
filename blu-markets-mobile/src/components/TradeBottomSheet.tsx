@@ -309,15 +309,15 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
       // Execute trade via API
       const response = await trade.execute(assetId, side, amountIRR);
 
-      // Update local state with trade result
+      // BUG-017 FIX: Use backend-provided values only (no local calculations)
+      // Update holding quantity from backend response
       dispatch(updateHoldingFromTrade({
         assetId,
         quantity: response.newHoldingQuantity,
         side,
       }));
-      // Update cash - for BUY we subtract, for SELL we add
-      const cashChange = side === 'BUY' ? -amountIRR : amountIRR;
-      dispatch(updateCash(cashIRR + cashChange));
+      // Update cash from backend (includes spread/fees)
+      dispatch(updateCash(response.newCashIrr));
 
       // Log action to activity feed
       dispatch(logAction({
@@ -327,13 +327,13 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
         amountIRR: amountIRR,
       }));
 
-      // Set trade result for success modal
+      // Set trade result for success modal (using backend values)
       setTradeResult({
         side,
         assetId,
         amountIRR,
         quantity: preview.quantity ?? 0,
-        newCashBalance: cashIRR + cashChange,
+        newCashBalance: response.newCashIrr,
         newHoldingQuantity: response.newHoldingQuantity,
       });
 
