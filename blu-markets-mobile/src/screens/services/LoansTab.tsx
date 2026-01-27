@@ -302,13 +302,13 @@ function LoanCard({
         <View style={styles.loanDetailRow}>
           <Text style={styles.loanDetailLabel}>Principal</Text>
           <Text style={styles.loanDetailValue}>
-            {loan.amountIRR.toLocaleString()} IRR
+            {(loan.amountIRR ?? 0).toLocaleString()} IRR
           </Text>
         </View>
         <View style={styles.loanDetailRow}>
           <Text style={styles.loanDetailLabel}>Remaining</Text>
           <Text style={styles.loanDetailValue}>
-            {remainingIRR.toLocaleString()} IRR
+            {(remainingIRR ?? 0).toLocaleString()} IRR
           </Text>
         </View>
         <View style={styles.loanDetailRow}>
@@ -324,7 +324,7 @@ function LoanCard({
             Next Payment {daysUntilDue !== null && `in ${daysUntilDue} days`}
           </Text>
           <Text style={styles.nextPaymentValue}>
-            {nextInstallment.totalIRR.toLocaleString()} IRR
+            {(nextInstallment.totalIRR ?? 0).toLocaleString()} IRR
           </Text>
           <TouchableOpacity
             style={styles.payButton}

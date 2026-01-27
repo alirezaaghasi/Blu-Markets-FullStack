@@ -254,7 +254,7 @@ const LoansScreen: React.FC = () => {
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Principal</Text>
                       <Text style={styles.detailValue}>
-                        {loan.amountIRR.toLocaleString()} IRR
+                        {(loan.amountIRR ?? 0).toLocaleString()} IRR
                       </Text>
                     </View>
                     <View style={styles.detailRow}>
@@ -338,7 +338,7 @@ const LoansScreen: React.FC = () => {
                       <Text style={styles.assetSymbol}> | {asset.symbol}</Text>
                     </Text>
                     <Text style={styles.collateralValue}>
-                      Up to {maxBorrowIRR.toLocaleString()} IRR ({(asset.ltv * 100).toFixed(0)}% LTV)
+                      Up to {(maxBorrowIRR || 0).toLocaleString()} IRR ({((asset.ltv || 0) * 100).toFixed(0)}% LTV)
                     </Text>
                   </View>
                   <Text style={styles.collateralArrow}>›</Text>
