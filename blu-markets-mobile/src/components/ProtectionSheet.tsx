@@ -199,7 +199,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
       return;
     }
     if (!canAfford) {
-      Alert.alert('Insufficient Funds', `You need ${quote.premiumIrr.toLocaleString()} IRR but only have ${cashIRR.toLocaleString()} IRR.`);
+      Alert.alert('Insufficient Funds', `You need ${(quote.premiumIrr ?? 0).toLocaleString()} IRR but only have ${(cashIRR ?? 0).toLocaleString()} IRR.`);
       return;
     }
 
@@ -238,7 +238,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
         items: [
           { label: 'Coverage', value: `${(coveragePct * 100).toFixed(0)}%` },
           { label: 'Duration', value: formatDuration(durationDays) },
-          { label: 'Premium Paid', value: `${quote.premiumIrr.toLocaleString()} IRR` },
+          { label: 'Premium Paid', value: `${(quote.premiumIrr ?? 0).toLocaleString()} IRR` },
           { label: 'Expires', value: expiryDate.toLocaleDateString(), highlight: true },
         ],
       });
@@ -335,7 +335,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
               </Text>
               {holding.valueUsd && (
                 <Text style={styles.assetValueUsd}>
-                  ${holding.valueUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })} USD
+                  ${(holding.valueUsd || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} USD
                 </Text>
               )}
             </View>
