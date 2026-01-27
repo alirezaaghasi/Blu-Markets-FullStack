@@ -446,15 +446,15 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
                 <View style={styles.previewRow}>
                   <Text style={styles.previewLabel}>You will {side === 'BUY' ? 'receive' : 'sell'}</Text>
                   <Text style={styles.previewValue}>
-                    {preview.quantity.toFixed(6)} {asset.symbol}
+                    {(preview.quantity ?? 0).toFixed(6)} {asset?.symbol ?? ''}
                   </Text>
                 </View>
 
                 {/* Spread */}
                 <View style={styles.previewRow}>
-                  <Text style={styles.previewLabel}>Spread ({(preview.spread * 100).toFixed(2)}%)</Text>
+                  <Text style={styles.previewLabel}>Spread ({((preview.spread ?? 0) * 100).toFixed(2)}%)</Text>
                   <Text style={styles.previewValue}>
-                    {formatNumber(Math.round(amountIRR * preview.spread))} IRR
+                    {formatNumber(Math.round(amountIRR * (preview.spread ?? 0)))} IRR
                   </Text>
                 </View>
 

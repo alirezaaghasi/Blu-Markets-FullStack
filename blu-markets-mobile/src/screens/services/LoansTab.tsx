@@ -1,8 +1,9 @@
 // Loans Tab - Part of Services Screen
 // Based on UI Restructure Specification Section 3
 // Updated to use API hooks for backend integration
+// BUG-3 FIX: Opens LoanSheet for confirmation instead of direct loan creation
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -18,8 +19,9 @@ import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING, RADIUS } from '../../constants/spacing';
 import { useLoans } from '../../hooks/useLoans';
 import { useAppSelector } from '../../hooks/useStore';
-import { Loan, AssetId } from '../../types';
+import { Loan, AssetId, Holding } from '../../types';
 import { EmptyState } from '../../components/EmptyState';
+import { LoanSheet } from '../../components/LoanSheet';
 
 // BUG-012 FIX: Collateral eligibility should come from backend
 // This list is a fallback for UI responsiveness; backend API is authoritative
@@ -42,16 +44,20 @@ export function LoansTab({ loanId }: LoansTabProps) {
     repayLoan,
   } = useLoans();
 
+  // BUG-3 FIX: State for LoanSheet instead of direct loan creation
+  const [loanSheetVisible, setLoanSheetVisible] = useState(false);
+
   // Get holdings from portfolio to find eligible collateral
   const holdings = useAppSelector((state) => state.portfolio?.holdings || []);
 
-  // Find first eligible collateral asset from user's holdings (not already frozen)
-  const eligibleCollateral = holdings.find(
+  // Filter eligible collateral assets from user's holdings (not already frozen)
+  const eligibleHoldings = holdings.filter(
     (h) => COLLATERAL_ELIGIBLE_ASSETS.includes(h.assetId as AssetId) && h.quantity > 0 && !h.frozen
-  );
+  ) as Holding[];
 
-  const handleExploreBorrowing = async () => {
-    if (!eligibleCollateral) {
+  // BUG-3 FIX: Open LoanSheet for user to configure loan parameters
+  const handleExploreBorrowing = () => {
+    if (eligibleHoldings.length === 0) {
       // Check if there are holdings but all are frozen
       const hasAnyEligible = holdings.some(
         (h) => COLLATERAL_ELIGIBLE_ASSETS.includes(h.assetId as AssetId) && h.quantity > 0
@@ -66,11 +72,13 @@ export function LoansTab({ loanId }: LoansTabProps) {
       return;
     }
 
-    // Create a loan with default values: first eligible asset, 5M IRR, 90 days (3 months)
-    const result = await createLoan(eligibleCollateral.assetId, 5_000_000, 90);
-    if (result) {
-      Alert.alert('Loan Created', 'Your loan has been successfully created.');
-    }
+    // Open LoanSheet for user to select collateral, amount, and duration
+    setLoanSheetVisible(true);
+  };
+
+  const handleLoanSheetClose = () => {
+    setLoanSheetVisible(false);
+    refresh(); // Refresh the list after any action
   };
 
   const hasLoans = loans.length > 0;
@@ -97,9 +105,107 @@ export function LoansTab({ loanId }: LoansTabProps) {
   if (!hasLoans) {
     const availableCapacity = capacity?.availableIrr || 0;
     return (
+      <>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.emptyContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={refresh}
+              tintColor={COLORS.brand.primary}
+            />
+          }
+        >
+          <EmptyState
+            icon="cash-outline"
+            title="No Active Loans"
+            description={availableCapacity > 0
+              ? `Borrow against your crypto holdings. Up to ${availableCapacity.toLocaleString()} IRR available.`
+              : "Borrow against your crypto holdings at competitive rates"}
+            actionLabel="Explore Borrowing"
+            onAction={handleExploreBorrowing}
+          />
+
+          {/* How It Works Section */}
+          <View style={styles.howItWorksSection}>
+            <Text style={styles.howItWorksTitle}>How Crypto-Backed Loans Work</Text>
+
+            <View style={styles.stepCard}>
+              <View style={styles.stepNumber}>
+                <Text style={styles.stepNumberText}>1</Text>
+              </View>
+              <View style={styles.stepContent}>
+                <Text style={styles.stepTitle}>Choose Collateral</Text>
+                <Text style={styles.stepDescription}>
+                  Select crypto assets from your portfolio to use as collateral
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.stepCard}>
+              <View style={styles.stepNumber}>
+                <Text style={styles.stepNumberText}>2</Text>
+              </View>
+              <View style={styles.stepContent}>
+                <Text style={styles.stepTitle}>Get Instant IRR</Text>
+                {/* BUG-012 FIX: LTV varies by asset layer (70%/50%/30%) */}
+                <Text style={styles.stepDescription}>
+                  Receive a loan based on your collateral's value (LTV varies by asset)
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.stepCard}>
+              <View style={styles.stepNumber}>
+                <Text style={styles.stepNumberText}>3</Text>
+              </View>
+              <View style={styles.stepContent}>
+                <Text style={styles.stepTitle}>Repay & Unlock</Text>
+                <Text style={styles.stepDescription}>
+                  Pay back in installments to unlock your crypto collateral
+                </Text>
+              </View>
+            </View>
+
+            {/* Benefits */}
+            <View style={styles.benefitsCard}>
+              <Text style={styles.benefitsTitle}>Benefits</Text>
+              <View style={styles.benefitRow}>
+                <Text style={styles.benefitIcon}>✓</Text>
+                <Text style={styles.benefitText}>Keep your crypto exposure</Text>
+              </View>
+              <View style={styles.benefitRow}>
+                <Text style={styles.benefitIcon}>✓</Text>
+                <Text style={styles.benefitText}>No credit check required</Text>
+              </View>
+              <View style={styles.benefitRow}>
+                <Text style={styles.benefitIcon}>✓</Text>
+                <Text style={styles.benefitText}>Competitive interest rates</Text>
+              </View>
+              <View style={styles.benefitRow}>
+                <Text style={styles.benefitIcon}>✓</Text>
+                <Text style={styles.benefitText}>Flexible repayment options</Text>
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+
+        {/* BUG-3 FIX: LoanSheet for configuration and confirmation */}
+        <LoanSheet
+          visible={loanSheetVisible}
+          onClose={handleLoanSheetClose}
+          eligibleHoldings={eligibleHoldings}
+        />
+      </>
+    );
+  }
+
+  return (
+    <>
       <ScrollView
         style={styles.container}
-        contentContainerStyle={styles.emptyContent}
+        contentContainerStyle={styles.content}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -108,119 +214,39 @@ export function LoansTab({ loanId }: LoansTabProps) {
           />
         }
       >
-        <EmptyState
-          icon="cash-outline"
-          title="No Active Loans"
-          description={availableCapacity > 0
-            ? `Borrow against your crypto holdings. Up to ${availableCapacity.toLocaleString()} IRR available.`
-            : "Borrow against your crypto holdings at competitive rates"}
-          actionLabel="Explore Borrowing"
-          onAction={handleExploreBorrowing}
-        />
-
-        {/* How It Works Section */}
-        <View style={styles.howItWorksSection}>
-          <Text style={styles.howItWorksTitle}>How Crypto-Backed Loans Work</Text>
-
-          <View style={styles.stepCard}>
-            <View style={styles.stepNumber}>
-              <Text style={styles.stepNumberText}>1</Text>
-            </View>
-            <View style={styles.stepContent}>
-              <Text style={styles.stepTitle}>Choose Collateral</Text>
-              <Text style={styles.stepDescription}>
-                Select crypto assets from your portfolio to use as collateral
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.stepCard}>
-            <View style={styles.stepNumber}>
-              <Text style={styles.stepNumberText}>2</Text>
-            </View>
-            <View style={styles.stepContent}>
-              <Text style={styles.stepTitle}>Get Instant IRR</Text>
-              {/* BUG-012 FIX: LTV varies by asset layer (70%/50%/30%) */}
-              <Text style={styles.stepDescription}>
-                Receive a loan based on your collateral's value (LTV varies by asset)
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.stepCard}>
-            <View style={styles.stepNumber}>
-              <Text style={styles.stepNumberText}>3</Text>
-            </View>
-            <View style={styles.stepContent}>
-              <Text style={styles.stepTitle}>Repay & Unlock</Text>
-              <Text style={styles.stepDescription}>
-                Pay back in installments to unlock your crypto collateral
-              </Text>
-            </View>
-          </View>
-
-          {/* Benefits */}
-          <View style={styles.benefitsCard}>
-            <Text style={styles.benefitsTitle}>Benefits</Text>
-            <View style={styles.benefitRow}>
-              <Text style={styles.benefitIcon}>✓</Text>
-              <Text style={styles.benefitText}>Keep your crypto exposure</Text>
-            </View>
-            <View style={styles.benefitRow}>
-              <Text style={styles.benefitIcon}>✓</Text>
-              <Text style={styles.benefitText}>No credit check required</Text>
-            </View>
-            <View style={styles.benefitRow}>
-              <Text style={styles.benefitIcon}>✓</Text>
-              <Text style={styles.benefitText}>Competitive interest rates</Text>
-            </View>
-            <View style={styles.benefitRow}>
-              <Text style={styles.benefitIcon}>✓</Text>
-              <Text style={styles.benefitText}>Flexible repayment options</Text>
-            </View>
-          </View>
+        {/* Borrow Capacity Card */}
+        <View style={styles.capacityCard}>
+          <Text style={styles.capacityLabel}>Available to Borrow</Text>
+          <Text style={styles.capacityValue}>
+            {(capacity?.availableIrr || 0).toLocaleString()} IRR
+          </Text>
+          <TouchableOpacity
+            style={styles.borrowButton}
+            onPress={handleExploreBorrowing}
+          >
+            <Text style={styles.borrowButtonText}>Borrow</Text>
+          </TouchableOpacity>
         </View>
+
+        {/* Active Loans */}
+        <Text style={styles.sectionTitle}>Active Loans</Text>
+        {loans.map((loan) => (
+          <LoanCard
+            key={loan.id}
+            loan={loan}
+            highlighted={loan.id === loanId}
+            onRepay={(amount) => repayLoan(loan.id, amount)}
+          />
+        ))}
       </ScrollView>
-    );
-  }
 
-  return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={isRefreshing}
-          onRefresh={refresh}
-          tintColor={COLORS.brand.primary}
-        />
-      }
-    >
-      {/* Borrow Capacity Card */}
-      <View style={styles.capacityCard}>
-        <Text style={styles.capacityLabel}>Available to Borrow</Text>
-        <Text style={styles.capacityValue}>
-          {(capacity?.availableIrr || 0).toLocaleString()} IRR
-        </Text>
-        <TouchableOpacity
-          style={styles.borrowButton}
-          onPress={handleExploreBorrowing}
-        >
-          <Text style={styles.borrowButtonText}>Borrow</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Active Loans */}
-      <Text style={styles.sectionTitle}>Active Loans</Text>
-      {loans.map((loan) => (
-        <LoanCard
-          key={loan.id}
-          loan={loan}
-          highlighted={loan.id === loanId}
-          onRepay={(amount) => repayLoan(loan.id, amount)}
-        />
-      ))}
-    </ScrollView>
+      {/* BUG-3 FIX: LoanSheet for configuration and confirmation */}
+      <LoanSheet
+        visible={loanSheetVisible}
+        onClose={handleLoanSheetClose}
+        eligibleHoldings={eligibleHoldings}
+      />
+    </>
   );
 }
 

@@ -191,13 +191,15 @@ function ProtectionCard({
         <View style={styles.protectionDetailRow}>
           <Text style={styles.protectionDetailLabel}>Protected Value</Text>
           <Text style={styles.protectionDetailValue}>
-            {protection.notionalIRR?.toLocaleString() || '0'} IRR
+            {/* BUG-2 FIX: Use canonical notionalIrr, fallback to alias notionalIRR */}
+            {(protection.notionalIrr ?? protection.notionalIRR ?? 0).toLocaleString()} IRR
           </Text>
         </View>
         <View style={styles.protectionDetailRow}>
           <Text style={styles.protectionDetailLabel}>Premium Paid</Text>
           <Text style={styles.protectionDetailValue}>
-            {protection.premiumIRR?.toLocaleString() || '0'} IRR
+            {/* BUG-2 FIX: Use canonical premiumIrr, fallback to alias premiumIRR */}
+            {(protection.premiumIrr ?? protection.premiumIRR ?? 0).toLocaleString()} IRR
           </Text>
         </View>
         <View style={styles.protectionDetailRow}>

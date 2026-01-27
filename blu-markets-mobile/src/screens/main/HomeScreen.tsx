@@ -84,38 +84,54 @@ function formatIRRShort(value: number | undefined): string {
 /**
  * Format activity log message
  * Returns user-friendly description based on action type and data
+ * BUG-1 FIX: Handle backend action types (TRADE_BUY, PROTECTION_PURCHASE, etc.)
  */
 function formatActivityMessage(entry: ActionLogEntry): string {
   const assetName = entry.assetId ? (ASSETS[entry.assetId]?.name || entry.assetId) : '';
+  // BUG-1 FIX: entry.type may be string from backend, normalize to handle all cases
+  const actionType = String(entry.type || '');
 
-  switch (entry.type) {
+  switch (actionType) {
     case 'PORTFOLIO_CREATED':
       return `Started with ${formatIRRShort(entry.amountIRR)}`;
     case 'ADD_FUNDS':
       return `Added ${formatIRRShort(entry.amountIRR)} cash`;
+    // BUG-1 FIX: Handle both frontend 'TRADE' and backend 'TRADE_BUY'/'TRADE_SELL'
     case 'TRADE':
-      // Use entry.message if provided (includes direction and amount)
-      // Otherwise construct from available data
-      if (entry.message && entry.message.length > 0) {
-        return entry.message;
-      }
-      return assetName ? `Traded ${assetName}` : 'Executed trade';
+    case 'TRADE_BUY':
+      if (entry.message && entry.message.length > 0) return entry.message;
+      return assetName ? `Bought ${assetName}` : 'Executed buy';
+    case 'TRADE_SELL':
+      if (entry.message && entry.message.length > 0) return entry.message;
+      return assetName ? `Sold ${assetName}` : 'Executed sell';
+    // BUG-1 FIX: Handle both frontend 'BORROW' and backend 'LOAN_CREATE'
     case 'BORROW':
+    case 'LOAN_CREATE':
       return `Borrowed ${formatIRRShort(entry.amountIRR)}${assetName ? ` against ${assetName}` : ''}`;
     case 'REPAY':
+    case 'LOAN_REPAY':
       return `Repaid ${formatIRRShort(entry.amountIRR)}`;
+    case 'LOAN_LIQUIDATE':
+      return `Loan liquidated${assetName ? ` (${assetName})` : ''}`;
+    // BUG-1 FIX: Handle both frontend 'PROTECT' and backend 'PROTECTION_PURCHASE'
     case 'PROTECT':
+    case 'PROTECTION_PURCHASE':
       return assetName ? `Protected ${assetName}` : 'Added protection';
     case 'REBALANCE':
       return entry.message && entry.message.length > 0 ? entry.message : 'Rebalanced portfolio';
     case 'CANCEL_PROTECTION':
+    case 'PROTECTION_CANCEL':
       return assetName ? `Cancelled ${assetName} protection` : 'Cancelled protection';
+    case 'PROTECTION_EXPIRE':
+      return assetName ? `${assetName} protection expired` : 'Protection expired';
+    case 'PROTECTION_SETTLEMENT':
+      return assetName ? `${assetName} protection settled` : 'Protection settled';
     default:
-      // Robust fallback: prefer message, then type, then generic text
+      // Robust fallback: prefer message, then type formatted, then generic text
       if (entry.message && entry.message.length > 0) {
         return entry.message;
       }
-      return entry.type ? String(entry.type).replace(/_/g, ' ').toLowerCase() : 'Activity';
+      return actionType ? actionType.replace(/_/g, ' ').toLowerCase() : 'Activity';
   }
 }
 
