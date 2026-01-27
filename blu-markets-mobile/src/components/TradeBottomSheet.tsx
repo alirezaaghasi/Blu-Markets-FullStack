@@ -279,7 +279,7 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
       dispatch(logAction({
         type: 'TRADE',
         boundary: preview.boundary,
-        message: `${side === 'BUY' ? 'Bought' : 'Sold'} ${preview.quantity.toFixed(6)} ${asset.symbol}`,
+        message: `${side === 'BUY' ? 'Bought' : 'Sold'} ${(preview.quantity ?? 0).toFixed(6)} ${asset.symbol}`,
         amountIRR: amountIRR,
       }));
 
@@ -288,7 +288,7 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
         side,
         assetId,
         amountIRR,
-        quantity: preview.quantity,
+        quantity: preview.quantity ?? 0,
         newCashBalance: cashIRR + cashChange,
         newHoldingQuantity: response.newHoldingQuantity,
       });

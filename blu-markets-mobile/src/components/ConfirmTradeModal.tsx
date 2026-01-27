@@ -141,7 +141,7 @@ export const ConfirmTradeModal: React.FC<ConfirmTradeModalProps> = ({
                     />
                     <DetailRow
                       label={isBuy ? 'You receive' : 'You sell'}
-                      value={`${preview.quantity.toFixed(6)} ${asset.symbol}`}
+                      value={`${(preview.quantity ?? 0).toFixed(6)} ${asset.symbol}`}
                     />
                     <DetailRow
                       label="Price"
