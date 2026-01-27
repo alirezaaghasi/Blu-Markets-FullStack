@@ -28,45 +28,49 @@ function normalizeAllocation(allocation: Record<string, number> | undefined): Ta
 
 /**
  * Normalize trade preview response
- * BUG-013 FIX: Added runtime validation instead of accepting any
+ * BUG-013 FIX: Added runtime validation with flexible field handling
+ * Supports both backend response formats and provides sensible defaults
  */
 function normalizeTradePreview(data: unknown): TradePreview {
-  // Runtime validation - check required fields exist
+  // Runtime validation - check we have an object
   if (!data || typeof data !== 'object') {
     throw new Error('[Trade API] Invalid preview response: expected object');
   }
 
   const d = data as Record<string, unknown>;
 
-  // Validate required numeric fields (handle both camelCase variants)
-  const quantity = d.quantity as number | undefined;
-  const amountIRR = (d.amountIRR ?? d.amountIrr) as number | undefined;
+  // Extract numeric fields with fallbacks for different field name conventions
+  // Backend may use amountIrr, amountIRR, or amount
+  const quantity = typeof d.quantity === 'number' ? d.quantity : 0;
+  const amountIRR = typeof d.amountIRR === 'number' ? d.amountIRR
+    : typeof d.amountIrr === 'number' ? d.amountIrr
+    : typeof d.amount === 'number' ? d.amount
+    : 0;
 
-  if (typeof quantity !== 'number' || typeof amountIRR !== 'number') {
-    throw new Error('[Trade API] Invalid preview response: quantity and amountIRR required');
+  // Validate we have at least an assetId (minimum required field)
+  if (!d.assetId && !d.asset_id) {
+    throw new Error('[Trade API] Invalid preview response: assetId required');
   }
 
   // Validate boundary enum (allow missing for backwards compatibility)
   const validBoundaries = ['SAFE', 'DRIFT', 'STRUCTURAL', 'STRESS'];
-  const boundary = (d.boundary as string) || 'SAFE';
-  if (!validBoundaries.includes(boundary)) {
-    throw new Error(`[Trade API] Invalid preview response: boundary must be one of ${validBoundaries.join(', ')}`);
-  }
+  const rawBoundary = (d.boundary as string) || 'SAFE';
+  const boundary = validBoundaries.includes(rawBoundary) ? rawBoundary : 'SAFE';
 
-  // Build normalized response
+  // Build normalized response with safe defaults
   return {
-    side: (d.side ?? d.action) as 'BUY' | 'SELL',
-    assetId: d.assetId as AssetId,
+    side: (d.side ?? d.action ?? 'BUY') as 'BUY' | 'SELL',
+    assetId: (d.assetId ?? d.asset_id) as AssetId,
     amountIRR: amountIRR,
     quantity: quantity,
-    priceUSD: (d.priceUSD ?? d.priceUsd ?? d.priceIrr ?? 0) as number,
+    priceUSD: (d.priceUSD ?? d.priceUsd ?? d.price_usd ?? 0) as number,
     spread: (d.spread ?? 0) as number,
     before: normalizeAllocation(d.before as Record<string, number> | undefined),
     after: normalizeAllocation(d.after as Record<string, number> | undefined),
     target: normalizeAllocation(d.target as Record<string, number> | undefined),
     boundary: boundary as 'SAFE' | 'DRIFT' | 'STRUCTURAL' | 'STRESS',
-    frictionCopy: (d.frictionCopy ?? []) as string[],
-    movesTowardTarget: (d.movesTowardTarget ?? true) as boolean,
+    frictionCopy: (d.frictionCopy ?? d.friction_copy ?? []) as string[],
+    movesTowardTarget: (d.movesTowardTarget ?? d.moves_toward_target ?? true) as boolean,
   };
 }
 

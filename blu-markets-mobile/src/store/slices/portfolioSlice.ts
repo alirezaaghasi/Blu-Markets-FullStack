@@ -18,6 +18,12 @@ import {
 import { MAX_ACTION_LOG_SIZE, RISK_PROFILE_ALLOCATIONS } from '../../constants/business';
 import { ASSETS } from '../../constants/assets';
 
+// Counter for unique IDs - prevents duplicate keys when multiple entries are created in the same millisecond
+let idCounter = 0;
+function generateUniqueId(): number {
+  return Date.now() * 1000 + (idCounter++ % 1000);
+}
+
 // BUG-022 FIX: Use RISK_PROFILE_ALLOCATIONS[5] (Balanced) as default instead of hardcoded values
 // This ensures consistency with the risk profile system
 const DEFAULT_ALLOCATION = RISK_PROFILE_ALLOCATIONS[5]; // Balanced profile
@@ -160,7 +166,7 @@ const portfolioSlice = createSlice({
 
       // Log the action
       const entry: ActionLogEntry = {
-        id: Date.now(),
+        id: generateUniqueId(),
         timestamp: new Date().toISOString(),
         type: 'TRADE',
         boundary: 'SAFE',
@@ -267,7 +273,7 @@ const portfolioSlice = createSlice({
       }>
     ) => {
       const entry: ActionLogEntry = {
-        id: Date.now(),
+        id: generateUniqueId(),
         timestamp: new Date().toISOString(),
         type: action.payload.type,
         boundary: action.payload.boundary,
@@ -288,7 +294,7 @@ const portfolioSlice = createSlice({
 
       // Log the action
       const entry: ActionLogEntry = {
-        id: Date.now(),
+        id: generateUniqueId(),
         timestamp: new Date().toISOString(),
         type: 'ADD_FUNDS',
         boundary: 'SAFE',
@@ -325,7 +331,7 @@ const portfolioSlice = createSlice({
 
       // Log the action
       const entry: ActionLogEntry = {
-        id: Date.now(),
+        id: generateUniqueId(),
         timestamp: new Date().toISOString(),
         type: 'TRADE',
         boundary,
@@ -363,7 +369,7 @@ const portfolioSlice = createSlice({
 
       // Log the rebalance action
       const entry: ActionLogEntry = {
-        id: Date.now(),
+        id: generateUniqueId(),
         timestamp: new Date().toISOString(),
         type: 'REBALANCE',
         boundary,
