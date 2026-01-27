@@ -9,8 +9,8 @@ export const FIXED_INCOME_UNIT_PRICE = 500_000; // IRR per unit (500K IRR per PR
 export const FIXED_INCOME_ANNUAL_RATE = 0.30; // 30% annual
 
 // Trading
-export const MIN_TRADE_AMOUNT = 100_000; // IRR per PRD Section 25
-export const MIN_REBALANCE_TRADE = 100_000; // IRR
+export const MIN_TRADE_AMOUNT = 1_000_000; // IRR - must match backend minimum (1M)
+export const MIN_REBALANCE_TRADE = 1_000_000; // IRR - must match backend minimum
 
 // Spread by Layer
 export const SPREAD_BY_LAYER: Record<Layer, number> = {
