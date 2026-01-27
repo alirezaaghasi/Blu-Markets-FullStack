@@ -958,7 +958,8 @@ export const protection = {
 
     const iv = MOCK_VOLATILITY[assetId] || 0.5;
 
-    const durations = [7, 14, 30, 60, 90, 180];
+    // BUG-011 FIX: Only valid protection durations per PRD (1, 3, 6 months)
+    const durations = [30, 90, 180];
 
     return durations.map((durationDays) => {
       const premiumUsd = calculateMockPremium(notionalUsd, durationDays, iv);
@@ -1235,7 +1236,8 @@ export const loans = {
 
     // PRD: 30% APR
     const interestRate = 0.30;
-    const durationMonths = durationDays / 30;
+    // BUG-010 FIX: Explicit mapping instead of division (90 days = 3 months, 180 days = 6 months)
+    const durationMonths = durationDays === 90 ? 3 : durationDays === 180 ? 6 : Math.round(durationDays / 30);
     const totalInterestIrr = Math.round(amountIrr * interestRate * (durationMonths / 12));
     const totalRepaymentIrr = amountIrr + totalInterestIrr;
 

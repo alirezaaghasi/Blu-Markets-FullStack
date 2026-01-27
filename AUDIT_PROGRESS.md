@@ -106,6 +106,41 @@
 
 ---
 
+# Session 5: Comprehensive Architectural Fixes
+
+## New Issues Found (from comprehensive audit)
+
+### P1 High (Already Fixed from Session 4)
+
+| Bug ID | Issue | Status |
+|--------|-------|--------|
+| BUG-001 | WebSocket auth token in URL | ✅ Documented - WS API limitation |
+| BUG-002 | Client calculates collateral | ✅ Fixed - uses backend preview |
+| BUG-003 | Client calculates loan health | ✅ Fixed - prefers backend values |
+| BUG-004 | Trade uses client valuations | ✅ Fixed - uses backend preview |
+| BUG-005 | Protection computes locally | ✅ Fixed - uses backend quote |
+| BUG-006 | Trade validation financial math | ✅ Documented - legacy/demo only |
+| BUG-007 | Risk profile client-side | ✅ Fixed - runtime guard throws |
+| BUG-008 | Fixed income client calc | ✅ Fixed - runtime guard throws |
+
+### P2 Medium (Fixed in Session 5)
+
+| Bug ID | Issue | File | Status |
+|--------|-------|------|--------|
+| BUG-009 | Mock loan installments = termMonths | mockApi/index.ts | ✅ Fixed - always 6 installments |
+| BUG-010 | durationDays / 30 pattern | api/mock/index.ts | ✅ Fixed - explicit mapping |
+| BUG-011 | Invalid protection durations | api/mock/index.ts | ✅ Fixed - [30, 90, 180] only |
+| BUG-012 | Storage XOR obfuscation | utils/storage.ts | ✅ Documented - needs encryption |
+| BUG-013 | Trade preview no validation | api/trade.ts | ✅ Fixed - runtime validation |
+
+### P3 Low (Fixed in Session 5)
+
+| Bug ID | Issue | File | Status |
+|--------|-------|------|--------|
+| BUG-014 | Duration Math.round(days/30) | api/protection.ts | ✅ Fixed - explicit mapping |
+
+---
+
 ## New Issues Found
 
 ### P0 Critical (Must Fix)

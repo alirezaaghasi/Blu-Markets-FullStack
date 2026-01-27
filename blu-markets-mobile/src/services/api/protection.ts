@@ -300,24 +300,30 @@ export function formatPremiumPct(pct: number): string {
 
 /**
  * Format duration in days to human readable
+ * BUG-014 FIX: Use explicit mapping instead of division
  */
 export function formatDuration(days: number): string {
-  if (days < 30) {
-    return `${days} days`;
-  }
-  const months = Math.round(days / 30);
-  return months === 1 ? '1 month' : `${months} months`;
+  // Explicit mapping for supported durations
+  const durationMap: Record<number, string> = {
+    30: '1 month',
+    90: '3 months',
+    180: '6 months',
+  };
+  return durationMap[days] || `${days} days`;
 }
 
 /**
  * Format duration in Farsi
+ * BUG-014 FIX: Use explicit mapping instead of division
  */
 export function formatDurationFa(days: number): string {
-  if (days < 30) {
-    return `${days} روز`;
-  }
-  const months = Math.round(days / 30);
-  return months === 1 ? '۱ ماه' : `${months} ماه`;
+  // Explicit mapping for supported durations
+  const durationMapFa: Record<number, string> = {
+    30: '۱ ماه',
+    90: '۳ ماه',
+    180: '۶ ماه',
+  };
+  return durationMapFa[days] || `${days} روز`;
 }
 
 /**

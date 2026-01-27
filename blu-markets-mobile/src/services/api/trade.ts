@@ -28,13 +28,45 @@ function normalizeAllocation(allocation: Record<string, number> | undefined): Ta
 
 /**
  * Normalize trade preview response
+ * BUG-013 FIX: Added runtime validation instead of accepting any
  */
-function normalizeTradePreview(data: any): TradePreview {
+function normalizeTradePreview(data: unknown): TradePreview {
+  // Runtime validation - check required fields exist
+  if (!data || typeof data !== 'object') {
+    throw new Error('[Trade API] Invalid preview response: expected object');
+  }
+
+  const d = data as Record<string, unknown>;
+
+  // Validate required numeric fields (handle both camelCase variants)
+  const quantity = d.quantity as number | undefined;
+  const amountIRR = (d.amountIRR ?? d.amountIrr) as number | undefined;
+
+  if (typeof quantity !== 'number' || typeof amountIRR !== 'number') {
+    throw new Error('[Trade API] Invalid preview response: quantity and amountIRR required');
+  }
+
+  // Validate boundary enum (allow missing for backwards compatibility)
+  const validBoundaries = ['SAFE', 'DRIFT', 'STRUCTURAL', 'STRESS'];
+  const boundary = (d.boundary as string) || 'SAFE';
+  if (!validBoundaries.includes(boundary)) {
+    throw new Error(`[Trade API] Invalid preview response: boundary must be one of ${validBoundaries.join(', ')}`);
+  }
+
+  // Build normalized response
   return {
-    ...data,
-    before: normalizeAllocation(data.before),
-    after: normalizeAllocation(data.after),
-    target: normalizeAllocation(data.target),
+    side: (d.side ?? d.action) as 'BUY' | 'SELL',
+    assetId: d.assetId as AssetId,
+    amountIRR: amountIRR,
+    quantity: quantity,
+    priceUSD: (d.priceUSD ?? d.priceUsd ?? d.priceIrr ?? 0) as number,
+    spread: (d.spread ?? 0) as number,
+    before: normalizeAllocation(d.before as Record<string, number> | undefined),
+    after: normalizeAllocation(d.after as Record<string, number> | undefined),
+    target: normalizeAllocation(d.target as Record<string, number> | undefined),
+    boundary: boundary as 'SAFE' | 'DRIFT' | 'STRUCTURAL' | 'STRESS',
+    frictionCopy: (d.frictionCopy ?? []) as string[],
+    movesTowardTarget: (d.movesTowardTarget ?? true) as boolean,
   };
 }
 

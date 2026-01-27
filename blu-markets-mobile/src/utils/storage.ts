@@ -2,7 +2,19 @@
 // Handles persisting and loading app state using AsyncStorage
 //
 // BUG-004 FIX: Portfolio state is now obfuscated before storage
-// NOTE: For production, replace with proper encryption using expo-crypto or react-native-keychain
+//
+// ⚠️⚠️⚠️ BUG-012 SECURITY WARNING ⚠️⚠️⚠️
+// Current implementation uses XOR obfuscation which is NOT cryptographically secure!
+// XOR with a hardcoded key can be trivially reversed by anyone with source code access.
+//
+// PRODUCTION REQUIREMENTS:
+// 1. Replace XOR obfuscation with AES-256 encryption (expo-crypto)
+// 2. Derive encryption key from device-specific data (not hardcoded)
+// 3. Use expo-secure-store for sensitive tokens (already in package.json)
+// 4. Consider adding HMAC for integrity verification
+//
+// ACCEPTABLE FOR: Demo/development mode where security is secondary
+// NOT ACCEPTABLE FOR: Production deployment with real user data
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PortfolioState, AuthState, OnboardingState, PriceState } from '../types';
 

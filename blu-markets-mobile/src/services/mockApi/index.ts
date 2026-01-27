@@ -689,28 +689,32 @@ export const loans = {
     }
 
     const interestRate = 0.30; // 30% annual
-    const monthlyRate = interestRate / 12;
     const now = new Date();
     const dueDate = new Date(now);
     dueDate.setMonth(dueDate.getMonth() + termMonths);
 
-    // Create installments
+    // BUG-009 FIX: Always 6 installments regardless of term (per PRD)
+    const NUM_INSTALLMENTS = 6;
+    const durationMonths = termMonths === 3 ? 3 : 6; // Explicit mapping, no division
+    const totalInterestIrr = Math.round(amountIrr * interestRate * (durationMonths / 12));
+    const totalRepaymentIrr = amountIrr + totalInterestIrr;
+
+    // Create installments - always 6
     const installments: LoanInstallment[] = [];
-    const principalPerInstallment = amountIrr / termMonths;
+    const principalPerInstallment = Math.round(amountIrr / NUM_INSTALLMENTS);
+    const interestPerInstallment = Math.round(totalInterestIrr / NUM_INSTALLMENTS);
+    const daysPerInstallment = (termMonths * 30) / NUM_INSTALLMENTS;
 
-    for (let i = 1; i <= termMonths; i++) {
+    for (let i = 1; i <= NUM_INSTALLMENTS; i++) {
       const installmentDate = new Date(now);
-      installmentDate.setMonth(installmentDate.getMonth() + i);
-
-      const remainingPrincipal = amountIrr - (principalPerInstallment * (i - 1));
-      const interestIrr = remainingPrincipal * monthlyRate;
+      installmentDate.setDate(installmentDate.getDate() + Math.round(daysPerInstallment * i));
 
       installments.push({
         number: i,
         dueISO: installmentDate.toISOString(),
         principalIRR: principalPerInstallment,
-        interestIRR: interestIrr,
-        totalIRR: principalPerInstallment + interestIrr,
+        interestIRR: interestPerInstallment,
+        totalIRR: principalPerInstallment + interestPerInstallment,
         paidIRR: 0,
         status: 'PENDING',
       });
