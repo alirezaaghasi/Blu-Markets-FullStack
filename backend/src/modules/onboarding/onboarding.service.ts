@@ -357,7 +357,9 @@ export async function createInitialPortfolio(
       },
     });
 
-    // Create individual trade entries for each asset allocation
+    // Create individual trade entries in ledger only (for audit trail)
+    // NOTE: We do NOT create action log entries for each allocation -
+    // only the single PORTFOLIO_CREATED entry shows in activity feed
     for (const holding of holdingsToCreate) {
       await tx.ledgerEntry.create({
         data: {
@@ -370,17 +372,6 @@ export async function createInitialPortfolio(
           message: `Initial allocation: Bought ${holding.quantity.toFixed(6)} ${holding.assetId} (${formatIrr(holding.valueIrr)})`,
           beforeSnapshot: {},
           afterSnapshot: {},
-        },
-      });
-
-      await tx.actionLog.create({
-        data: {
-          portfolioId: newPortfolio.id,
-          actionType: 'TRADE_BUY',
-          assetId: holding.assetId,
-          boundary: 'SAFE',
-          message: `Initial allocation: ${holding.assetId}`,
-          amountIrr: holding.valueIrr,
         },
       });
     }

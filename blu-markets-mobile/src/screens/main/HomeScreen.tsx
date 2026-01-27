@@ -445,6 +445,77 @@ const HomeScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* ================================================================ */}
+      {/* FIXED HEADER: Status Badge + Notification + Avatar */}
+      {/* ================================================================ */}
+      <View style={styles.header}>
+        {/* BUG-F FIX: Tapping status badge opens rebalance sheet when attention is required */}
+        <StatusBadge
+          status={portfolioStatusResult.status}
+          onPress={() => setRebalanceSheetVisible(true)}
+        />
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.notificationButton}
+            onPress={handleNotificationPress}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text style={styles.notificationIcon}>🔔</Text>
+            {nextLoanPayment && nextLoanPayment.daysUntil <= 7 && (
+              <View style={styles.notificationBadge} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.avatarContainer}
+            onPress={handleProfilePress}
+          >
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {phone ? phone.slice(-2) : 'U'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* ================================================================ */}
+      {/* FIXED PORTFOLIO VALUE: One Big Number + Asset/Cash Breakdown */}
+      {/* ================================================================ */}
+      <View style={styles.valueSection}>
+        {/* Total Holdings - ONE number (backend-calculated) */}
+        <Text style={styles.totalValueAmount}>
+          {formatIRR(totalValueIrr)} <Text style={styles.totalValueCurrency}>IRR</Text>
+        </Text>
+        <Text style={styles.totalValueLabel}>Total Holdings</Text>
+
+        {/* Asset Value vs Cash breakdown (backend-calculated) */}
+        <View style={styles.valueBreakdown}>
+          <View style={styles.valueBreakdownItem}>
+            <Text style={styles.breakdownValue}>{formatIRR(holdingsValueIrr)}</Text>
+            <Text style={styles.breakdownLabel}>Asset Value</Text>
+          </View>
+          <View style={styles.valueBreakdownDivider} />
+          <View style={styles.valueBreakdownItem}>
+            <Text style={styles.breakdownValue}>{formatIRR(cashIRR)}</Text>
+            <Text style={styles.breakdownLabel}>Cash</Text>
+          </View>
+        </View>
+
+        {/* View Portfolio Link */}
+        <TouchableOpacity
+          style={styles.viewPortfolioLink}
+          onPress={handleViewPortfolio}
+        >
+          <Text style={styles.viewPortfolioText}>View Portfolio →</Text>
+        </TouchableOpacity>
+
+        {/* Price Feed Status */}
+        <PriceFeedStatus lastUpdate={priceLastUpdate} />
+      </View>
+
+      {/* ================================================================ */}
+      {/* SCROLLABLE ACTIVITY LOG: Last 3-5 entries */}
+      {/* ================================================================ */}
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -457,77 +528,6 @@ const HomeScreen: React.FC = () => {
           />
         }
       >
-        {/* ================================================================ */}
-        {/* HEADER: Status Badge + Notification + Avatar */}
-        {/* ================================================================ */}
-        <View style={styles.header}>
-          {/* BUG-F FIX: Tapping status badge opens rebalance sheet when attention is required */}
-          <StatusBadge
-            status={portfolioStatusResult.status}
-            onPress={() => setRebalanceSheetVisible(true)}
-          />
-          <View style={styles.headerRight}>
-            <TouchableOpacity
-              style={styles.notificationButton}
-              onPress={handleNotificationPress}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Text style={styles.notificationIcon}>🔔</Text>
-              {nextLoanPayment && nextLoanPayment.daysUntil <= 7 && (
-                <View style={styles.notificationBadge} />
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.avatarContainer}
-              onPress={handleProfilePress}
-            >
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {phone ? phone.slice(-2) : 'U'}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* ================================================================ */}
-        {/* PORTFOLIO VALUE: One Big Number + Asset/Cash Breakdown */}
-        {/* ================================================================ */}
-        <View style={styles.valueSection}>
-          {/* Total Holdings - ONE number (backend-calculated) */}
-          <Text style={styles.totalValueAmount}>
-            {formatIRR(totalValueIrr)} <Text style={styles.totalValueCurrency}>IRR</Text>
-          </Text>
-          <Text style={styles.totalValueLabel}>Total Holdings</Text>
-
-          {/* Asset Value vs Cash breakdown (backend-calculated) */}
-          <View style={styles.valueBreakdown}>
-            <View style={styles.valueBreakdownItem}>
-              <Text style={styles.breakdownValue}>{formatIRR(holdingsValueIrr)}</Text>
-              <Text style={styles.breakdownLabel}>Asset Value</Text>
-            </View>
-            <View style={styles.valueBreakdownDivider} />
-            <View style={styles.valueBreakdownItem}>
-              <Text style={styles.breakdownValue}>{formatIRR(cashIRR)}</Text>
-              <Text style={styles.breakdownLabel}>Cash</Text>
-            </View>
-          </View>
-
-          {/* View Portfolio Link */}
-          <TouchableOpacity
-            style={styles.viewPortfolioLink}
-            onPress={handleViewPortfolio}
-          >
-            <Text style={styles.viewPortfolioText}>View Portfolio →</Text>
-          </TouchableOpacity>
-
-          {/* Price Feed Status */}
-          <PriceFeedStatus lastUpdate={priceLastUpdate} />
-        </View>
-
-        {/* ================================================================ */}
-        {/* ACTIVITY LOG: Last 3-5 entries */}
-        {/* ================================================================ */}
         <View style={styles.activitySection}>
           <View style={styles.activityHeader}>
             <Text style={styles.sectionTitle}>Activity Log</Text>
