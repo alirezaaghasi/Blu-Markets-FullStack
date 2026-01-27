@@ -486,9 +486,9 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
                 </View>
 
                 {/* Friction Copy */}
-                {preview.frictionCopy.length > 0 && (
+                {(preview.frictionCopy?.length ?? 0) > 0 && (
                   <View style={styles.frictionCopy}>
-                    {preview.frictionCopy.map((copy, index) => (
+                    {(preview.frictionCopy ?? []).map((copy, index) => (
                       <Text key={index} style={styles.frictionText}>
                         {copy}
                       </Text>
