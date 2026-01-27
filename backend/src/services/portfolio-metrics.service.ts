@@ -127,10 +127,13 @@ async function updatePortfolioMetrics(
 
   const totalValueIrr = cashIrr + holdingsValueIrr;
 
-  // Calculate allocation percentages
-  const foundationPct = totalValueIrr > 0 ? (layerValues.FOUNDATION / totalValueIrr) * 100 : 0;
-  const growthPct = totalValueIrr > 0 ? (layerValues.GROWTH / totalValueIrr) * 100 : 0;
-  const upsidePct = totalValueIrr > 0 ? (layerValues.UPSIDE / totalValueIrr) * 100 : 0;
+  // DRIFT FIX: Calculate allocation percentages based on HOLDINGS VALUE ONLY
+  // Cash is "unallocated dry powder" - not part of any layer
+  // This ensures adding cash doesn't create artificial drift
+  // Allocation represents how invested holdings are distributed across layers
+  const foundationPct = holdingsValueIrr > 0 ? (layerValues.FOUNDATION / holdingsValueIrr) * 100 : 0;
+  const growthPct = holdingsValueIrr > 0 ? (layerValues.GROWTH / holdingsValueIrr) * 100 : 0;
+  const upsidePct = holdingsValueIrr > 0 ? (layerValues.UPSIDE / holdingsValueIrr) * 100 : 0;
 
   // Get target allocation
   const target: TargetAllocation = {
@@ -147,8 +150,11 @@ async function updatePortfolioMetrics(
   );
 
   // Determine status
+  // DRIFT FIX: If no holdings, portfolio is "balanced" (nothing to be misallocated)
   let newStatus: PortfolioStatus;
-  if (driftPct <= 5) {
+  if (holdingsValueIrr === 0) {
+    newStatus = 'BALANCED';
+  } else if (driftPct <= 5) {
     newStatus = 'BALANCED';
   } else if (driftPct <= 10) {
     newStatus = 'SLIGHTLY_OFF';

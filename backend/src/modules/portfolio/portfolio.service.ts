@@ -93,8 +93,10 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
   const holdingsValueIrr = toNumber(roundIrr(holdingsValueDecimal));
   const totalValueIrr = toNumber(roundIrr(add(cashIrr, holdingsValueDecimal)));
 
-  // Calculate allocation
-  const allocation = calculateAllocation(portfolio.holdings, prices, totalValueIrr);
+  // DRIFT FIX: Calculate allocation based on HOLDINGS VALUE ONLY
+  // Cash is "unallocated dry powder" - not part of any layer
+  // This ensures adding cash doesn't create artificial drift
+  const allocation = calculateAllocation(portfolio.holdings, prices, holdingsValueIrr);
 
   // Get target allocation
   const targetAllocation: TargetAllocation = {
@@ -106,8 +108,8 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
   // Calculate drift
   const driftPct = calculateDrift(allocation, targetAllocation);
 
-  // Determine status
-  const status = determineStatus(driftPct, allocation);
+  // Determine status (pass holdingsValueIrr to handle edge case of no holdings)
+  const status = determineStatus(driftPct, allocation, holdingsValueIrr);
 
   // MONEY FIX M-02: Build holdings response with values using Decimal
   // HIGH-2 FIX: Filter out zero-balance holdings from response
@@ -300,12 +302,15 @@ export async function addFunds(
 }
 
 // MONEY FIX M-02: Use Decimal for allocation calculations
+// DRIFT FIX: Allocation is calculated based on holdings value only (excluding cash)
+// Cash is "unallocated dry powder" - not part of any layer
+// Allocation percentages represent how invested holdings are distributed, summing to 100%
 function calculateAllocation(
   holdings: { assetId: string; quantity: PrismaDecimal; layer: string }[],
   prices: Map<AssetId, { priceIrr: number }>,
-  totalValueIrr: number
+  holdingsValueIrr: number
 ): TargetAllocation {
-  if (totalValueIrr === 0) {
+  if (holdingsValueIrr === 0) {
     return { foundation: 0, growth: 0, upside: 0 };
   }
 
@@ -323,11 +328,12 @@ function calculateAllocation(
     }
   }
 
-  const totalDecimal = toDecimal(totalValueIrr);
+  // DRIFT FIX: Use holdings value as denominator, not total value (which includes cash)
+  const holdingsDecimal = toDecimal(holdingsValueIrr);
   return {
-    foundation: toNumber(multiply(divide(layerValues.FOUNDATION, totalDecimal), 100)),
-    growth: toNumber(multiply(divide(layerValues.GROWTH, totalDecimal), 100)),
-    upside: toNumber(multiply(divide(layerValues.UPSIDE, totalDecimal), 100)),
+    foundation: toNumber(multiply(divide(layerValues.FOUNDATION, holdingsDecimal), 100)),
+    growth: toNumber(multiply(divide(layerValues.GROWTH, holdingsDecimal), 100)),
+    upside: toNumber(multiply(divide(layerValues.UPSIDE, holdingsDecimal), 100)),
   };
 }
 
@@ -341,8 +347,15 @@ function calculateDrift(current: TargetAllocation, target: TargetAllocation): nu
 
 function determineStatus(
   driftPct: number,
-  allocation?: TargetAllocation
+  allocation?: TargetAllocation,
+  holdingsValueIrr?: number
 ): PortfolioStatus {
+  // DRIFT FIX: If no holdings, portfolio is "balanced" (nothing to be misallocated)
+  // User just has cash waiting to be invested
+  if (holdingsValueIrr !== undefined && holdingsValueIrr === 0) {
+    return 'BALANCED';
+  }
+
   // Per PRD Section 20.1:
   // ATTENTION_REQUIRED: Foundation < 30% OR Upside > 25%
   if (allocation) {

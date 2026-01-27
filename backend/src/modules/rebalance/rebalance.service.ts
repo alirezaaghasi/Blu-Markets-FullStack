@@ -345,9 +345,10 @@ function partitionHoldingsByLayer(
     UPSIDE: { frozen: [], unfrozen: [], totalValue: 0, frozenValue: 0, unfrozenValue: 0 },
   };
 
-  // Track values as Decimals for accumulation
+  // DRIFT FIX: Don't include cash in layer totals
+  // Cash is tracked separately and available for buying, not part of allocation
   const layerTotals: Record<Layer, { frozen: Decimal; unfrozen: Decimal; total: Decimal }> = {
-    FOUNDATION: { frozen: toDecimal(0), unfrozen: toDecimal(snapshot.cashIrr), total: toDecimal(snapshot.cashIrr) },
+    FOUNDATION: { frozen: toDecimal(0), unfrozen: toDecimal(0), total: toDecimal(0) },
     GROWTH: { frozen: toDecimal(0), unfrozen: toDecimal(0), total: toDecimal(0) },
     UPSIDE: { frozen: toDecimal(0), unfrozen: toDecimal(0), total: toDecimal(0) },
   };
@@ -382,18 +383,21 @@ function partitionHoldingsByLayer(
 }
 
 // MONEY FIX M-02: Use Decimal arithmetic for gap analysis
+// DRIFT FIX: Use holdings value for gap calculation, not total value (which includes cash)
 function calculateGapAnalysis(
   snapshot: PortfolioSnapshot,
   holdingsByLayer: Record<Layer, LayerHoldings>
 ): GapAnalysis[] {
-  const totalValueDecimal = toDecimal(snapshot.totalValueIrr);
+  // DRIFT FIX: Use holdings value, not total value
+  const holdingsValueDecimal = toDecimal(snapshot.holdingsValueIrr);
   const layers: Layer[] = ['FOUNDATION', 'GROWTH', 'UPSIDE'];
 
   return layers.map((layer) => {
     const currentPct = snapshot.allocation[layer.toLowerCase() as keyof typeof snapshot.allocation];
     const targetPct = snapshot.targetAllocation[layer.toLowerCase() as keyof typeof snapshot.targetAllocation];
     const gap = targetPct - currentPct;
-    const gapIrrDecimal = roundIrr(multiply(divide(gap, 100), totalValueDecimal));
+    // Gap in IRR is based on holdings value, not total portfolio
+    const gapIrrDecimal = roundIrr(multiply(divide(gap, 100), holdingsValueDecimal));
     const gapIrr = toNumber(gapIrrDecimal);
     const sellableIrr = holdingsByLayer[layer].unfrozenValue;
     const frozenIrr = holdingsByLayer[layer].frozenValue;
@@ -538,19 +542,24 @@ function selectAssetToBuy(
 }
 
 // MONEY FIX M-02: Use Decimal arithmetic for after allocation calculation
+// DRIFT FIX: Calculate allocation based on HOLDINGS VALUE ONLY
+// Cash is tracked separately and doesn't affect layer allocation percentages
 function calculateAfterAllocation(
   snapshot: PortfolioSnapshot,
   trades: RebalanceTrade[],
   prices: Map<AssetId, { priceIrr: number }>
 ): { foundation: number; growth: number; upside: number } {
-  // Start with current values as Decimals
+  // Track holdings values by layer (NOT including cash)
   const layerValues = {
-    FOUNDATION: toDecimal(snapshot.cashIrr),
+    FOUNDATION: toDecimal(0),
     GROWTH: toDecimal(0),
     UPSIDE: toDecimal(0),
   };
 
-  // Add holdings values
+  // Track cash separately
+  let cashDecimal = toDecimal(snapshot.cashIrr);
+
+  // Add holdings values (not including cash)
   for (const holding of snapshot.holdings) {
     const price = prices.get(holding.assetId as AssetId);
     if (price) {
@@ -559,28 +568,29 @@ function calculateAfterAllocation(
     }
   }
 
-  // Apply trades
+  // Apply trades - cash changes but doesn't affect layer allocation
   for (const trade of trades) {
     const spread = SPREAD_BY_LAYER[trade.layer as Layer];
     if (trade.side === 'SELL') {
       const netProceedsDecimal = roundIrr(multiply(trade.amountIrr, subtract(1, spread)));
       layerValues[trade.layer as Layer] = subtract(layerValues[trade.layer as Layer], trade.amountIrr);
-      // Proceeds go to Foundation (cash)
-      layerValues.FOUNDATION = add(layerValues.FOUNDATION, netProceedsDecimal);
+      // Proceeds go to cash (not Foundation layer holdings)
+      cashDecimal = add(cashDecimal, netProceedsDecimal);
     } else {
       const netAmountDecimal = roundIrr(multiply(trade.amountIrr, subtract(1, spread)));
       layerValues[trade.layer as Layer] = add(layerValues[trade.layer as Layer], netAmountDecimal);
-      // Cash used from Foundation
-      layerValues.FOUNDATION = subtract(layerValues.FOUNDATION, trade.amountIrr);
+      // Cash used for purchase
+      cashDecimal = subtract(cashDecimal, trade.amountIrr);
     }
   }
 
-  const totalDecimal = add(layerValues.FOUNDATION, layerValues.GROWTH, layerValues.UPSIDE);
+  // DRIFT FIX: Total is HOLDINGS only, not including cash
+  const holdingsTotalDecimal = add(layerValues.FOUNDATION, layerValues.GROWTH, layerValues.UPSIDE);
 
   return {
-    foundation: isGreaterThan(totalDecimal, 0) ? toNumber(multiply(divide(layerValues.FOUNDATION, totalDecimal), 100)) : 0,
-    growth: isGreaterThan(totalDecimal, 0) ? toNumber(multiply(divide(layerValues.GROWTH, totalDecimal), 100)) : 0,
-    upside: isGreaterThan(totalDecimal, 0) ? toNumber(multiply(divide(layerValues.UPSIDE, totalDecimal), 100)) : 0,
+    foundation: isGreaterThan(holdingsTotalDecimal, 0) ? toNumber(multiply(divide(layerValues.FOUNDATION, holdingsTotalDecimal), 100)) : 0,
+    growth: isGreaterThan(holdingsTotalDecimal, 0) ? toNumber(multiply(divide(layerValues.GROWTH, holdingsTotalDecimal), 100)) : 0,
+    upside: isGreaterThan(holdingsTotalDecimal, 0) ? toNumber(multiply(divide(layerValues.UPSIDE, holdingsTotalDecimal), 100)) : 0,
   };
 }
 
