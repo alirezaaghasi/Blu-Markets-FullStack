@@ -64,6 +64,7 @@ interface PortfolioStatusResult {
  * Format IRR with appropriate suffix
  */
 function formatIRR(value: number): string {
+  if (value === undefined || value === null || isNaN(value)) return '0';
   if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`;
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
   return value.toLocaleString('en-US');

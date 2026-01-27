@@ -66,6 +66,7 @@ type LayerKey = keyof typeof LAYER_CONFIG;
 
 // Format number with appropriate suffix
 const formatValue = (value: number): string => {
+  if (value === undefined || value === null || isNaN(value)) return '0';
   if (value >= 1_000_000_000) {
     return `${(value / 1_000_000_000).toFixed(1)}B`;
   }
@@ -412,7 +413,7 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
         <Animated.View style={[styles.totalCard, { opacity: fadeAnim }]}>
           <Text style={styles.totalLabel}>TOTAL INVESTED</Text>
           <Text style={styles.totalAmount}>
-            {initialInvestment.toLocaleString()} IRR
+            {(initialInvestment || 0).toLocaleString()} IRR
           </Text>
           <Text style={styles.totalUsd}>
             ≈ {formatUsd(initialInvestment, fxRate)} USD
