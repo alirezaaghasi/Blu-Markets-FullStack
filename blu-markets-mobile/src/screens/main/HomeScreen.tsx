@@ -521,6 +521,18 @@ const HomeScreen: React.FC = () => {
             <Text style={styles.sectionTitle}>Activity Log</Text>
           </View>
 
+          {/* DEBUG - Shows on screen to diagnose activity log issue */}
+          <View style={{ backgroundColor: '#ff4444', padding: 8, marginBottom: 8, borderRadius: 4 }}>
+            <Text style={{ color: '#ffffff', fontSize: 11 }}>
+              DEBUG: {activities?.length || 0} entries | isLoading: {String(isLoadingActivities)}
+            </Text>
+            {activities?.[0] && (
+              <Text style={{ color: '#ffff00', fontSize: 10 }}>
+                First: type={activities[0]?.type} msg={activities[0]?.message?.substring(0, 30)}
+              </Text>
+            )}
+          </View>
+
           {isLoadingActivities ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={COLORS.brand.primary} />
@@ -545,11 +557,12 @@ const HomeScreen: React.FC = () => {
                     <View style={styles.chatBubbleContent}>
                       <View style={[styles.activityDot, { backgroundColor: dotColor }]} />
                       <View style={styles.chatTextContainer}>
+                        {/* DEBUG: Force render message with visible fallback */}
                         <Text style={styles.chatMessage} numberOfLines={2}>
-                          {message || 'Activity recorded'}
+                          {message && message.length > 0 ? message : `[EMPTY: type=${entry?.type}]`}
                         </Text>
                         <Text style={styles.chatTime}>
-                          {time || 'Just now'}
+                          {time && time.length > 0 ? time : '[NO TIME]'}
                         </Text>
                       </View>
                     </View>
