@@ -424,7 +424,7 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
                 <View>
                   <Text style={styles.assetName}>{assetName}</Text>
                   <Text style={styles.assetPrice}>
-                    {formatNumber(priceIRR)} IRR (${priceUSD.toLocaleString()})
+                    {formatNumber(priceIRR)} IRR (${(priceUSD || 0).toLocaleString()})
                   </Text>
                 </View>
               </View>
