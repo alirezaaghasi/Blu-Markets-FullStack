@@ -29,6 +29,7 @@ import { Button } from './common';
 import { AssetId, Boundary, Holding, TradePreview } from '../types';
 import { ASSETS, LAYER_COLORS, LAYER_NAMES } from '../constants/assets';
 import { MIN_TRADE_AMOUNT, SPREAD_BY_LAYER } from '../constants/business';
+import { calculateFixedIncomeValue } from '../utils/fixedIncome';
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
 import { updateHoldingFromTrade, updateCash, logAction } from '../store/slices/portfolioSlice';
 import {
@@ -78,6 +79,28 @@ interface TradeResult {
   newHoldingQuantity: number;
 }
 
+// BUG-1 FIX: Format IRR with compact notation (matching HoldingCard format)
+const formatIRRCompact = (num: number): string => {
+  if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(1)}B`;
+  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
+  if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
+  return num.toLocaleString('en-US');
+};
+
+// BUG-1 FIX: Calculate holding value for display (matches HoldingCard logic)
+const getHoldingValueIRR = (
+  h: Holding,
+  prices: Record<string, number>,
+  fxRate: number
+): number => {
+  if (h.assetId === 'IRR_FIXED_INCOME') {
+    const breakdown = calculateFixedIncomeValue(h.quantity, h.purchasedAt);
+    return breakdown?.total || h.quantity;
+  }
+  const price = prices[h.assetId] || 0;
+  return h.quantity * price * fxRate;
+};
+
 export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
   visible,
   onClose,
@@ -103,6 +126,10 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
   const [errorMessage, setErrorMessage] = useState('');
 
   const asset = ASSETS[assetId];
+  // Guard: If asset not found, use defaults to prevent crashes
+  const assetLayer = asset?.layer || 'GROWTH';
+  const assetSymbol = asset?.symbol || '';
+  const assetName = asset?.name || 'Unknown';
   const priceUSD = prices[assetId] || 0;
   const priceIRR = priceUSD * fxRate;
 
@@ -374,11 +401,11 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
               onPress={() => setShowAssetPicker(true)}
             >
               <View style={styles.assetInfo}>
-                <View style={[styles.assetIcon, { backgroundColor: `${LAYER_COLORS[asset.layer]}20` }]}>
-                  <Text style={styles.assetIconText}>{asset.symbol}</Text>
+                <View style={[styles.assetIcon, { backgroundColor: `${LAYER_COLORS[assetLayer]}20` }]}>
+                  <Text style={styles.assetIconText}>{assetSymbol}</Text>
                 </View>
                 <View>
-                  <Text style={styles.assetName}>{asset.name}</Text>
+                  <Text style={styles.assetName}>{assetName}</Text>
                   <Text style={styles.assetPrice}>
                     {formatNumber(priceIRR)} IRR (${priceUSD.toLocaleString()})
                   </Text>
@@ -655,6 +682,18 @@ const AssetPickerModal: React.FC<AssetPickerModalProps> = ({
                   const holding = holdings.find((h) => h.assetId === asset.id);
                   const isSelected = asset.id === currentAssetId;
 
+                  // BUG-1 FIX: In SELL mode, show holding VALUE (matches Portfolio)
+                  // In BUY mode, show price per unit
+                  const isFixedIncome = asset.id === 'IRR_FIXED_INCOME';
+                  const holdingValueIRR = holding ? getHoldingValueIRR(holding, prices, fxRate) : 0;
+
+                  // Display text based on mode
+                  const displayValue = side === 'SELL' && holding
+                    ? `${formatIRRCompact(holdingValueIRR)} IRR`  // Show VALUE for SELL
+                    : isFixedIncome
+                      ? 'Fixed 30% APR'  // Fixed Income has no price per unit
+                      : `${formatIRRCompact(priceIRR)} IRR/unit`;  // Show price for BUY
+
                   return (
                     <TouchableOpacity
                       key={asset.id}
@@ -662,14 +701,16 @@ const AssetPickerModal: React.FC<AssetPickerModalProps> = ({
                       onPress={() => onSelect(asset.id)}
                     >
                       <View style={styles.pickerAssetInfo}>
-                        <Text style={styles.pickerAssetName}>{asset.name}</Text>
+                        <Text style={styles.pickerAssetName}>{asset?.name || 'Unknown'}</Text>
                         <Text style={styles.pickerAssetPrice}>
-                          {priceIRR.toLocaleString()} IRR
+                          {displayValue}
                         </Text>
                       </View>
                       {holding && holding.quantity > 0 && (
                         <Text style={styles.pickerHolding}>
-                          {holding.quantity.toFixed(4)} {asset.symbol}
+                          {side === 'SELL'
+                            ? `${holding.quantity.toFixed(isFixedIncome ? 0 : 4)} ${asset?.symbol || ''}`
+                            : `You own: ${holding.quantity.toFixed(isFixedIncome ? 0 : 4)}`}
                         </Text>
                       )}
                       {isSelected && <Text style={styles.pickerCheckmark}>✓</Text>}

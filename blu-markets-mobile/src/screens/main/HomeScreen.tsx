@@ -87,9 +87,12 @@ function formatIRRShort(value: number | undefined): string {
  * BUG-1 FIX: Handle backend action types (TRADE_BUY, PROTECTION_PURCHASE, etc.)
  */
 function formatActivityMessage(entry: ActionLogEntry): string {
+  // BUG-3 FIX: Robust null checks for all entry fields
+  if (!entry) return 'Activity';
+
   const assetName = entry.assetId ? (ASSETS[entry.assetId]?.name || entry.assetId) : '';
   // BUG-1 FIX: entry.type may be string from backend, normalize to handle all cases
-  const actionType = String(entry.type || '');
+  const actionType = String(entry.type || 'UNKNOWN').toUpperCase();
 
   switch (actionType) {
     case 'PORTFOLIO_CREATED':
@@ -126,12 +129,20 @@ function formatActivityMessage(entry: ActionLogEntry): string {
       return assetName ? `${assetName} protection expired` : 'Protection expired';
     case 'PROTECTION_SETTLEMENT':
       return assetName ? `${assetName} protection settled` : 'Protection settled';
+    case 'UNKNOWN':
+      // BUG-3 FIX: Handle unknown type gracefully
+      if (entry.message && entry.message.length > 0) {
+        return entry.message;
+      }
+      return 'Activity recorded';
     default:
       // Robust fallback: prefer message, then type formatted, then generic text
       if (entry.message && entry.message.length > 0) {
         return entry.message;
       }
-      return actionType ? actionType.replace(/_/g, ' ').toLowerCase() : 'Activity';
+      // BUG-3 FIX: Ensure we never return empty string
+      const formattedType = actionType.replace(/_/g, ' ').toLowerCase();
+      return formattedType && formattedType.trim() ? formattedType : 'Activity';
   }
 }
 
@@ -520,23 +531,25 @@ const HomeScreen: React.FC = () => {
             </View>
           ) : (
             <View style={styles.chatContainer}>
-              {activities.slice(0, 5).map((entry: ActionLogEntry) => {
-                const message = formatActivityMessage(entry);
-                const time = formatRelativeTime(entry.timestamp);
-                const dotColor = entry.boundary === 'SAFE' ? '#4ade80' :
-                  entry.boundary === 'DRIFT' ? '#fde047' :
-                  entry.boundary === 'STRUCTURAL' ? '#fb923c' : '#f87171';
+              {activities.slice(0, 5).map((entry: ActionLogEntry, index: number) => {
+                // BUG-3 FIX: Robust message and time generation with fallbacks
+                const message = formatActivityMessage(entry) || 'Activity';
+                const time = formatRelativeTime(entry?.timestamp) || 'Just now';
+                const boundary = entry?.boundary || 'SAFE';
+                const dotColor = boundary === 'SAFE' ? '#4ade80' :
+                  boundary === 'DRIFT' ? '#fde047' :
+                  boundary === 'STRUCTURAL' ? '#fb923c' : '#f87171';
 
                 return (
-                  <View key={entry.id} style={styles.chatBubble}>
+                  <View key={entry?.id || `activity-${index}`} style={styles.chatBubble}>
                     <View style={styles.chatBubbleContent}>
                       <View style={[styles.activityDot, { backgroundColor: dotColor }]} />
                       <View style={styles.chatTextContainer}>
                         <Text style={styles.chatMessage} numberOfLines={2}>
-                          {message}
+                          {message || 'Activity recorded'}
                         </Text>
                         <Text style={styles.chatTime}>
-                          {time}
+                          {time || 'Just now'}
                         </Text>
                       </View>
                     </View>
