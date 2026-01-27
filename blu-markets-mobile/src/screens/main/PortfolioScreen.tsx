@@ -99,7 +99,7 @@ const PortfolioScreen: React.FC = () => {
           }))));
         }
       } catch (error) {
-        console.error('Failed to fetch portfolio:', error);
+        if (__DEV__) console.error('Failed to fetch portfolio:', error);
       }
     };
     fetchData();
@@ -133,7 +133,7 @@ const PortfolioScreen: React.FC = () => {
         }))));
       }
     } catch (error) {
-      console.error('Failed to refresh portfolio:', error);
+      if (__DEV__) console.error('Failed to refresh portfolio:', error);
     } finally {
       setRefreshing(false);
     }

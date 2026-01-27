@@ -89,7 +89,7 @@ export const usePersistence = () => {
 
       isInitializedRef.current = true;
     } catch (error) {
-      console.error('Failed to load persisted state:', error);
+      if (__DEV__) console.error('Failed to load persisted state:', error);
       isInitializedRef.current = true;
     }
   }, [dispatch]);
@@ -109,7 +109,7 @@ export const usePersistence = () => {
           savePricesCache(prices),
         ]);
       } catch (error) {
-        console.error('Failed to persist state:', error);
+        if (__DEV__) console.error('Failed to persist state:', error);
       }
     }, DEBOUNCE_MS);
   }, [auth, portfolio, onboarding, prices]);

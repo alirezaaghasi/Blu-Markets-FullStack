@@ -44,17 +44,19 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
     if ('holdingId' in h && h.holdingId) {
       return h as ProtectableHolding;
     }
-    const asset = ASSETS[h.assetId];
-    const priceUSD = prices[h.assetId] || 0;
+    // At this point, h is Holding (has optional id)
+    const holding = h as Holding;
+    const asset = ASSETS[holding.assetId];
+    const priceUSD = prices[holding.assetId] || 0;
     const priceIRR = priceUSD * fxRate;
-    const valueIRR = h.quantity * priceIRR;
-    const valueUSD = h.quantity * priceUSD;
+    const valueIRR = holding.quantity * priceIRR;
+    const valueUSD = holding.quantity * priceUSD;
     return {
-      holdingId: (h as any).id || `demo-${h.assetId}`,
-      assetId: h.assetId,
-      name: asset?.name || h.assetId,
-      layer: h.layer,
-      quantity: h.quantity,
+      holdingId: holding.id || `demo-${holding.assetId}`,
+      assetId: holding.assetId,
+      name: asset?.name || holding.assetId,
+      layer: holding.layer,
+      quantity: holding.quantity,
       valueIrr: valueIRR,
       valueUsd: valueUSD,
       priceUsd: priceUSD,
@@ -74,7 +76,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
       .filter((h) => {
         const asset = ASSETS[h.assetId];
         // Protectable: only assets in PROTECTION_ELIGIBLE_ASSETS list, not frozen, with quantity
-        return asset && PROTECTION_ELIGIBLE_ASSETS.includes(h.assetId as any) && !h.frozen && h.quantity > 0;
+        return asset && (PROTECTION_ELIGIBLE_ASSETS as readonly string[]).includes(h.assetId) && !h.frozen && h.quantity > 0;
       })
       .map((h): ProtectableHolding => {
         const asset = ASSETS[h.assetId];
@@ -123,10 +125,9 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
     : eligibleHoldings.find((h) => h.holdingId === selectedHoldingId);
   const asset = holding ? ASSETS[holding.assetId] : null;
 
-  // Fetch quote when parameters change
+  // Callback for manual quote refresh (button handler)
   const fetchQuote = useCallback(async () => {
     if (!holding?.holdingId) return;
-
     setIsLoadingQuote(true);
     setQuoteError(null);
 
@@ -145,12 +146,36 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
     }
   }, [holding?.holdingId, coveragePct, durationDays]);
 
-  // Fetch quote on mount and when params change
+  // Fetch quote on mount and when params change (with cleanup)
   useEffect(() => {
-    if (visible) {
-      fetchQuote();
-    }
-  }, [visible, fetchQuote]);
+    if (!visible || !holding?.holdingId) return;
+
+    let isMounted = true;
+
+    const doFetch = async () => {
+      setIsLoadingQuote(true);
+      setQuoteError(null);
+
+      try {
+        const newQuote = await protectionApi.getQuote(
+          holding.holdingId,
+          coveragePct,
+          durationDays
+        );
+        if (isMounted) setQuote(newQuote);
+      } catch (err: any) {
+        if (isMounted) {
+          setQuoteError(err?.message || 'Failed to get quote');
+          setQuote(null);
+        }
+      } finally {
+        if (isMounted) setIsLoadingQuote(false);
+      }
+    };
+
+    doFetch();
+    return () => { isMounted = false; };
+  }, [visible, holding?.holdingId, coveragePct, durationDays]);
 
   // Validation
   const canAfford = quote ? cashIRR >= quote.premiumIrr : false;

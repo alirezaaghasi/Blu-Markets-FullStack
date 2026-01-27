@@ -4,7 +4,17 @@ import { useState, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { protection as protectionApi } from '../services/api/index';
 import type { Protection, ProtectableHolding, AssetId } from '../types';
+import type { ProtectableHoldingsResponse } from '../services/api/types';
 import { getErrorMessage } from '../utils/errorUtils';
+
+// Type guard to extract holdings from API response
+// API may return ProtectableHolding[] (mock) or ProtectableHoldingsResponse (real backend)
+function extractHoldings(response: ProtectableHolding[] | ProtectableHoldingsResponse): ProtectableHolding[] {
+  if (Array.isArray(response)) {
+    return response;
+  }
+  return response.holdings || [];
+}
 
 interface UseProtectionsResult {
   protections: Protection[];
@@ -53,8 +63,8 @@ export function useProtections(): UseProtectionsResult {
       ]);
 
       setProtections(activeProtections || []);
-      // Handle union type - check if response has 'holdings' property
-      const holdings = Array.isArray(holdingsResponse) ? holdingsResponse : (holdingsResponse as any)?.holdings || [];
+      // Handle union type - API may return array (mock) or object with holdings (real backend)
+      const holdings = extractHoldings(holdingsResponse);
       setProtectableHoldings(holdings);
 
       // Type narrow for optional properties
@@ -92,7 +102,7 @@ export function useProtections(): UseProtectionsResult {
       setProtections((prev) => [newProtection, ...prev]);
       // Refresh protectable holdings after purchase
       const holdingsResponse = await protectionApi.getHoldings();
-      const holdings = Array.isArray(holdingsResponse) ? holdingsResponse : (holdingsResponse as any)?.holdings || [];
+      const holdings = extractHoldings(holdingsResponse);
       setProtectableHoldings(holdings);
       return newProtection;
     } catch (err) {
@@ -108,7 +118,7 @@ export function useProtections(): UseProtectionsResult {
       setProtections((prev) => prev.filter((p) => p.id !== protectionId));
       // Refresh protectable holdings after cancellation
       const holdingsResponse = await protectionApi.getHoldings();
-      const holdings = Array.isArray(holdingsResponse) ? holdingsResponse : (holdingsResponse as any)?.holdings || [];
+      const holdings = extractHoldings(holdingsResponse);
       setProtectableHoldings(holdings);
       return true;
     } catch (err) {
@@ -145,7 +155,7 @@ export function useProtections(): UseProtectionsResult {
       setProtections((prev) => [newProtection, ...prev]);
       // Refresh protectable holdings after purchase
       const holdingsResponse = await protectionApi.getHoldings();
-      const holdings = Array.isArray(holdingsResponse) ? holdingsResponse : (holdingsResponse as any)?.holdings || [];
+      const holdings = extractHoldings(holdingsResponse);
       setProtectableHoldings(holdings);
       return newProtection;
     } catch (err) {

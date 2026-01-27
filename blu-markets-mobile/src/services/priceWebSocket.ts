@@ -120,7 +120,7 @@ class PriceWebSocketService {
       // ST-2: Set connection timeout to prevent hanging on slow/broken connections
       this.connectionTimeout = setTimeout(() => {
         if (this.status === 'connecting') {
-          console.log('WebSocket connection timeout');
+          if (__DEV__) console.log('WebSocket connection timeout');
           this.ws?.close();
           this.setStatus('error');
           this.scheduleReconnect();
@@ -134,7 +134,7 @@ class PriceWebSocketService {
           this.connectionTimeout = null;
         }
 
-        console.log('WebSocket connected');
+        if (__DEV__) console.log('WebSocket connected');
         this.setStatus('connected');
         this.reconnectAttempts = 0;
         this.isReconnecting = false;
@@ -148,12 +148,12 @@ class PriceWebSocketService {
           const message: WebSocketMessage = JSON.parse(event.data);
           this.notifyMessageHandlers(message);
         } catch (error) {
-          console.error('Failed to parse WebSocket message:', error);
+          if (__DEV__) console.error('Failed to parse WebSocket message:', error);
         }
       };
 
       this.ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        if (__DEV__) console.error('WebSocket error:', error);
         this.setStatus('error');
       };
 
@@ -164,7 +164,7 @@ class PriceWebSocketService {
           this.connectionTimeout = null;
         }
 
-        console.log('WebSocket disconnected');
+        if (__DEV__) console.log('WebSocket disconnected');
         this.setStatus('disconnected');
         this.ws = null;
 
@@ -173,7 +173,7 @@ class PriceWebSocketService {
         }
       };
     } catch (error) {
-      console.error('Failed to create WebSocket:', error);
+      if (__DEV__) console.error('Failed to create WebSocket:', error);
       this.setStatus('error');
       this.scheduleReconnect();
     }
@@ -230,7 +230,7 @@ class PriceWebSocketService {
   private scheduleReconnect(): void {
     // Guard against concurrent reconnection attempts
     if (this.isReconnecting) {
-      console.log('Reconnect already scheduled, skipping');
+      if (__DEV__) console.log('Reconnect already scheduled, skipping');
       return;
     }
     this.isReconnecting = true;
@@ -242,7 +242,7 @@ class PriceWebSocketService {
     }
 
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.log('Max reconnect attempts reached');
+      if (__DEV__) console.log('Max reconnect attempts reached');
       this.isReconnecting = false;
       return;
     }
@@ -253,7 +253,7 @@ class PriceWebSocketService {
       30000
     );
 
-    console.log(`Scheduling reconnect in ${delay}ms (attempt ${this.reconnectAttempts + 1})`);
+    if (__DEV__) console.log(`Scheduling reconnect in ${delay}ms (attempt ${this.reconnectAttempts + 1})`);
 
     this.reconnectTimeout = setTimeout(() => {
       this.reconnectAttempts++;

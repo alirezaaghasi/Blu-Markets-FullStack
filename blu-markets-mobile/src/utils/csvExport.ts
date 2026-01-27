@@ -91,7 +91,7 @@ export const exportToCSV = async (entries: ActionLogEntry[]): Promise<{ success:
 
     return { success: true };
   } catch (error) {
-    console.error('CSV export error:', error);
+    if (__DEV__) console.error('CSV export error:', error);
     return { success: false, error: (error as Error).message };
   }
 };

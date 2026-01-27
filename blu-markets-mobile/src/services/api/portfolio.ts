@@ -118,7 +118,7 @@ export const portfolio = {
         ...fullPortfolio,
         previousCashIrr,
         amountAdded,
-      } as PortfolioResponse;
+      };
     }
     return normalizePortfolioResponse(data);
   },

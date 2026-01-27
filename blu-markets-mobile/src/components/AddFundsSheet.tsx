@@ -87,8 +87,8 @@ export const AddFundsSheet: React.FC<AddFundsSheetProps> = ({
       const result = await portfolio.addFunds(amountIRR);
       // Use values from API response for accurate display
       const newBalance = result.cashIrr;
-      const previousBalance = (result as any).previousCashIrr ?? cashIRR;
-      const actualAmountAdded = (result as any).amountAdded ?? amountIRR;
+      const previousBalance = result.previousCashIrr ?? cashIRR;
+      const actualAmountAdded = result.amountAdded ?? amountIRR;
 
       // Update Redux with new cash balance
       dispatch(updateCash(newBalance));

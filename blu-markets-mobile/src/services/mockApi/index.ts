@@ -338,13 +338,46 @@ export const trade = {
 
     const state = getState();
     const { prices, fxRate } = state.prices;
+    const { holdings: currentHoldings, cashIRR: currentCash } = state.portfolio;
+
+    // Mock backend calculation (in production, backend computes these values)
+    const priceUSD = prices[assetId] || 0;
+    const priceIRR = priceUSD * fxRate;
+    const quantity = priceIRR > 0 ? amountIrr / priceIRR : 0;
+
+    let newCashIRR: number;
+    let newHoldings: typeof currentHoldings;
+
+    if (side === 'BUY') {
+      newCashIRR = currentCash - amountIrr;
+      const existingIdx = currentHoldings.findIndex((h) => h.assetId === assetId);
+      if (existingIdx >= 0) {
+        newHoldings = currentHoldings.map((h, i) =>
+          i === existingIdx ? { ...h, quantity: h.quantity + quantity } : h
+        );
+      } else {
+        newHoldings = [...currentHoldings, {
+          id: `holding_${Date.now()}`,
+          assetId,
+          quantity,
+          frozen: false,
+          layer: 'GROWTH' as const,
+        }];
+      }
+    } else {
+      newCashIRR = currentCash + amountIrr;
+      newHoldings = currentHoldings.map((h) =>
+        h.assetId === assetId ? { ...h, quantity: Math.max(0, h.quantity - quantity) } : h
+      ).filter((h) => h.quantity > 0);
+    }
 
     store.dispatch(executeTradeAction({
       side,
       assetId,
       amountIRR: amountIrr,
-      priceUSD: prices[assetId] || 0,
-      fxRate,
+      newCashIRR,
+      holdings: newHoldings,
+      boundary: 'SAFE',
     }));
 
     const newState = getState();

@@ -133,25 +133,13 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation, r
 
         const response = await onboarding.submitQuestionnaire(formattedAnswers);
 
-        const allocation = (response as any).targetAllocation || {};
-        const normalizeValue = (val: number | undefined): number => {
-          if (val === undefined) return 0;
-          return val > 1 ? val / 100 : val;
-        };
-
-        const normalizedAllocation = {
-          FOUNDATION: normalizeValue(allocation.FOUNDATION ?? allocation.foundation),
-          GROWTH: normalizeValue(allocation.GROWTH ?? allocation.growth),
-          UPSIDE: normalizeValue(allocation.UPSIDE ?? allocation.upside),
-        };
-
-        const riskScore = (response as any).riskScore ?? (response as any).score ?? 5;
-        const profileName = (response as any).profileName ?? 'Balanced';
+        // API returns properly typed QuestionnaireResponse with normalized allocation
+        const { riskScore, profileName, targetAllocation } = response;
 
         const profileData: RiskProfileData = {
           score: riskScore,
           profileName: profileName,
-          targetAllocation: normalizedAllocation,
+          targetAllocation: targetAllocation,
         };
 
         store.dispatch(setRiskProfile({
@@ -162,7 +150,7 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation, r
         setProfile(profileData);
         setIsLoading(false);
       } catch (err) {
-        console.error('[ProfileResult] API error:', err);
+        if (__DEV__) console.error('[ProfileResult] API error:', err);
         setError('Failed to calculate profile. Please try again.');
         setIsLoading(false);
       }

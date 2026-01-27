@@ -42,7 +42,7 @@ export const usePricePolling = (options: UsePricePollingOptions = {}) => {
         backoffRef.current * PRICE_BACKOFF_MULTIPLIER,
         PRICE_MAX_BACKOFF_MS
       );
-      console.warn(
+      if (__DEV__) console.warn(
         `Price fetch failed (attempt ${consecutiveErrorsRef.current}), next retry in ${backoffRef.current / 1000}s`
       );
     }

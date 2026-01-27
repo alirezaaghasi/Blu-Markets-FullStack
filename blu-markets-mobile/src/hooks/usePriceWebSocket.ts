@@ -51,7 +51,7 @@ export const usePriceWebSocket = (options: UsePriceWebSocketOptions = {}) => {
     (message: WebSocketMessage) => {
       switch (message.type) {
         case 'connected':
-          console.log('Price stream connected:', message.message);
+          if (__DEV__) console.log('Price stream connected:', message.message);
           break;
 
         case 'prices':
@@ -95,7 +95,7 @@ export const usePriceWebSocket = (options: UsePriceWebSocketOptions = {}) => {
           break;
 
         case 'error':
-          console.error('WebSocket error:', message.message);
+          if (__DEV__) console.error('WebSocket error:', message.message);
           break;
 
         default:
@@ -127,7 +127,7 @@ export const usePriceWebSocket = (options: UsePriceWebSocketOptions = {}) => {
   const startPollingFallback = useCallback(() => {
     if (pollingIntervalRef.current) return;
 
-    console.log('Starting REST polling fallback');
+    if (__DEV__) console.log('Starting REST polling fallback');
 
     // Fetch immediately
     dispatch(fetchPrices());
@@ -144,7 +144,7 @@ export const usePriceWebSocket = (options: UsePriceWebSocketOptions = {}) => {
 
   const stopPollingFallback = useCallback(() => {
     if (pollingIntervalRef.current) {
-      console.log('Stopping REST polling fallback');
+      if (__DEV__) console.log('Stopping REST polling fallback');
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
@@ -170,14 +170,14 @@ export const usePriceWebSocket = (options: UsePriceWebSocketOptions = {}) => {
 
       if (wasActive && !isActive) {
         // App going to background - pause polling and disconnect WebSocket
-        console.log('App going to background, pausing price updates');
+        if (__DEV__) console.log('App going to background, pausing price updates');
         stopPollingFallbackRef.current();
         if (WEBSOCKET_ENABLED) {
           priceWebSocket.disconnect();
         }
       } else if (!wasActive && isActive && enabled && isAuthenticated) {
         // App coming to foreground - resume
-        console.log('App coming to foreground, resuming price updates');
+        if (__DEV__) console.log('App coming to foreground, resuming price updates');
         if (WEBSOCKET_ENABLED) {
           priceWebSocket.connect();
         } else if (fallbackToPolling) {

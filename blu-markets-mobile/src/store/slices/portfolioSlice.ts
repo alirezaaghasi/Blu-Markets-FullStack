@@ -15,17 +15,17 @@ import {
   RebalanceTrade,
   RebalanceMode,
 } from '../../types';
-import { MAX_ACTION_LOG_SIZE, SPREAD_BY_LAYER, FIXED_INCOME_UNIT_PRICE } from '../../constants/business';
+import { MAX_ACTION_LOG_SIZE, RISK_PROFILE_ALLOCATIONS } from '../../constants/business';
 import { ASSETS } from '../../constants/assets';
+
+// BUG-022 FIX: Use RISK_PROFILE_ALLOCATIONS[5] (Balanced) as default instead of hardcoded values
+// This ensures consistency with the risk profile system
+const DEFAULT_ALLOCATION = RISK_PROFILE_ALLOCATIONS[5]; // Balanced profile
 
 const initialState: PortfolioState = {
   cashIRR: 0,
   holdings: [],
-  targetLayerPct: {
-    FOUNDATION: 0.50,
-    GROWTH: 0.35,
-    UPSIDE: 0.15,
-  },
+  targetLayerPct: DEFAULT_ALLOCATION,
   protections: [],
   loans: [],
   actionLog: [],
@@ -301,174 +301,73 @@ const portfolioSlice = createSlice({
       }
     },
 
-    // Execute trade (buy/sell)
+    // BUG-017 FIX: Execute trade with BACKEND-PROVIDED values only
+    // Frontend must NOT calculate spread, quantity, or new balances
+    // All financial calculations come from the backend API response
     executeTrade: (
       state,
       action: PayloadAction<{
+        // Backend-provided values ONLY
+        newCashIRR: number;
+        holdings: Holding[];  // Complete holdings array from backend
         side: 'BUY' | 'SELL';
         assetId: AssetId;
         amountIRR: number;
-        priceUSD: number;
-        fxRate: number;
+        boundary?: Boundary;
       }>
     ) => {
-      const { side, assetId, amountIRR, priceUSD, fxRate } = action.payload;
+      const { newCashIRR, holdings, side, assetId, amountIRR, boundary = 'SAFE' } = action.payload;
       const asset = ASSETS[assetId];
-      const spread = SPREAD_BY_LAYER[asset.layer];
-      const netAmount = amountIRR * (1 - spread);
-      const priceIRR = priceUSD * fxRate;
-      const quantity = netAmount / priceIRR;
 
-      if (side === 'BUY') {
-        // Deduct cash
-        state.cashIRR -= amountIRR;
+      // Update state with backend-provided values (NO local calculations)
+      state.cashIRR = newCashIRR;
+      state.holdings = holdings;
 
-        // Add or update holding
-        const existingIndex = state.holdings.findIndex(
-          (h) => h.assetId === assetId
-        );
-        if (existingIndex >= 0) {
-          state.holdings[existingIndex].quantity += quantity;
-        } else {
-          state.holdings.push({
-            assetId,
-            quantity,
-            frozen: false,
-            layer: asset.layer,
-          });
-        }
-
-        // Log the action
-        const entry: ActionLogEntry = {
-          id: Date.now(),
-          timestamp: new Date().toISOString(),
-          type: 'TRADE',
-          boundary: 'SAFE', // Should be calculated based on allocation impact
-          message: `Bought ${asset.symbol} (${amountIRR.toLocaleString()} IRR)`,
-          amountIRR,
-          assetId,
-        };
-        state.actionLog.unshift(entry);
-      } else {
-        // SELL
-        const holdingIndex = state.holdings.findIndex(
-          (h) => h.assetId === assetId
-        );
-        if (holdingIndex >= 0) {
-          const quantityToSell = amountIRR / priceIRR;
-          state.holdings[holdingIndex].quantity -= quantityToSell;
-
-          // Remove holding if quantity is zero or very small
-          if (state.holdings[holdingIndex].quantity < 0.00000001) {
-            state.holdings.splice(holdingIndex, 1);
-          }
-
-          // Add cash (net of spread)
-          state.cashIRR += netAmount;
-
-          // Log the action
-          const entry: ActionLogEntry = {
-            id: Date.now(),
-            timestamp: new Date().toISOString(),
-            type: 'TRADE',
-            boundary: 'SAFE',
-            message: `Sold ${asset.symbol} (${amountIRR.toLocaleString()} IRR)`,
-            amountIRR,
-            assetId,
-          };
-          state.actionLog.unshift(entry);
-        }
-      }
+      // Log the action
+      const entry: ActionLogEntry = {
+        id: Date.now(),
+        timestamp: new Date().toISOString(),
+        type: 'TRADE',
+        boundary,
+        message: `${side === 'BUY' ? 'Bought' : 'Sold'} ${asset.symbol} (${amountIRR.toLocaleString()} IRR)`,
+        amountIRR,
+        assetId,
+      };
+      state.actionLog.unshift(entry);
 
       if (state.actionLog.length > MAX_ACTION_LOG_SIZE) {
         state.actionLog = state.actionLog.slice(0, MAX_ACTION_LOG_SIZE);
       }
     },
 
-    // Execute rebalance (multiple trades)
+    // BUG-018 FIX: Execute rebalance with BACKEND-PROVIDED state only
+    // Frontend must NOT calculate spread, quantities, or execute trades locally
+    // Backend returns the complete new portfolio state after rebalancing
     executeRebalance: (
       state,
       action: PayloadAction<{
-        trades: RebalanceTrade[];
-        mode: RebalanceMode;
-        cashDeployed: number;
+        // Backend-provided values ONLY
+        newCashIRR: number;
+        holdings: Holding[];  // Complete holdings array from backend
+        newStatus: PortfolioStatus;
         boundary: Boundary;
-        prices: Record<string, number>;
-        fxRate: number;
+        tradesSummary: { sellCount: number; buyCount: number };
       }>
     ) => {
-      const { trades, mode, cashDeployed, boundary, prices, fxRate } = action.payload;
+      const { newCashIRR, holdings, newStatus, boundary, tradesSummary } = action.payload;
 
-      // Execute each trade
-      trades.forEach((trade) => {
-        const asset = ASSETS[trade.assetId];
-        if (!asset) return;
-
-        const spread = SPREAD_BY_LAYER[asset.layer];
-        const priceIRR = trade.assetId === 'IRR_FIXED_INCOME'
-          ? FIXED_INCOME_UNIT_PRICE
-          : (prices[trade.assetId] || 0) * fxRate;
-
-        if (priceIRR === 0) return;
-
-        if (trade.side === 'SELL') {
-          // Find and reduce holding
-          const holdingIndex = state.holdings.findIndex(
-            (h) => h.assetId === trade.assetId && !h.frozen
-          );
-          if (holdingIndex >= 0) {
-            const quantityToSell = trade.amountIRR / priceIRR;
-            state.holdings[holdingIndex].quantity -= quantityToSell;
-
-            // Remove if quantity too small
-            if (state.holdings[holdingIndex].quantity < 0.00000001) {
-              state.holdings.splice(holdingIndex, 1);
-            }
-
-            // Add proceeds to cash (for intermediate tracking)
-            const netProceeds = trade.amountIRR * (1 - spread);
-            state.cashIRR += netProceeds;
-          }
-        } else {
-          // BUY
-          const netAmount = trade.amountIRR * (1 - spread);
-          const quantityToBuy = netAmount / priceIRR;
-
-          // Deduct cash
-          state.cashIRR -= trade.amountIRR;
-
-          // Add or update holding
-          const existingIndex = state.holdings.findIndex(
-            (h) => h.assetId === trade.assetId
-          );
-          if (existingIndex >= 0) {
-            state.holdings[existingIndex].quantity += quantityToBuy;
-          } else {
-            state.holdings.push({
-              assetId: trade.assetId,
-              quantity: quantityToBuy,
-              frozen: false,
-              layer: asset.layer,
-            });
-          }
-        }
-      });
-
-      // If cash was deployed in HOLDINGS_PLUS_CASH mode, it's already handled via buy trades
-      // Update portfolio status to BALANCED after successful rebalance
-      if (boundary === 'SAFE') {
-        state.status = 'BALANCED';
-      }
+      // Update state with backend-provided values (NO local calculations)
+      state.cashIRR = newCashIRR;
+      state.holdings = holdings;
+      state.status = newStatus;
 
       // Log the rebalance action
-      const sellCount = trades.filter(t => t.side === 'SELL').length;
-      const buyCount = trades.filter(t => t.side === 'BUY').length;
       const entry: ActionLogEntry = {
         id: Date.now(),
         timestamp: new Date().toISOString(),
         type: 'REBALANCE',
         boundary,
-        message: `Rebalanced portfolio (${sellCount} sells, ${buyCount} buys)`,
+        message: `Rebalanced portfolio (${tradesSummary.sellCount} sells, ${tradesSummary.buyCount} buys)`,
       };
       state.actionLog.unshift(entry);
 
@@ -508,11 +407,8 @@ const portfolioSlice = createSlice({
         // SOL: 2.5 × $185 × 1,456,000 = 674M IRR
         { assetId: 'SOL', quantity: 2.5, frozen: false, layer: 'UPSIDE' },
       ];
-      state.targetLayerPct = {
-        FOUNDATION: 0.50,
-        GROWTH: 0.35,
-        UPSIDE: 0.15,
-      };
+      // BUG-022 FIX: Use consistent allocation from risk profile system
+      state.targetLayerPct = DEFAULT_ALLOCATION;
       state.status = 'BALANCED';
       state.lastSyncTimestamp = Date.now();
 

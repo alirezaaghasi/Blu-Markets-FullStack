@@ -48,7 +48,10 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
   const nextInstallment = loan.installments.find((i) => i.status !== 'PAID');
   const minPayment = nextInstallment?.totalIRR || 0;
 
-  // Calculate total outstanding
+  // BUG-025 FIX: Calculate total outstanding from backend-provided installment data
+  // The loan.installments array comes from the backend API (loans.getAll)
+  // This is a presentation-only calculation using authoritative backend data
+  // TODO: Consider adding loan.remainingBalanceIrr field to API response
   const totalOutstanding = loan.installments.reduce((sum, i) => {
     if (i.status === 'PAID') return sum;
     return sum + (i.totalIRR - i.paidIRR);

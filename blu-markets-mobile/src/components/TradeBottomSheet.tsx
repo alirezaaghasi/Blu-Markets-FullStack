@@ -197,21 +197,26 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
       return;
     }
 
+    let isMounted = true;
     // Debounce API call
     const timeoutId = setTimeout(async () => {
+      if (!isMounted) return;
       setIsLoadingPreview(true);
       try {
         const previewData = await trade.preview(assetId, side, amountIRR);
-        setPreview(previewData);
+        if (isMounted) setPreview(previewData);
       } catch (error) {
-        console.error('Failed to fetch trade preview:', error);
-        setPreview(null);
+        if (__DEV__) console.error('Failed to fetch trade preview:', error);
+        if (isMounted) setPreview(null);
       } finally {
-        setIsLoadingPreview(false);
+        if (isMounted) setIsLoadingPreview(false);
       }
     }, 300);
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
   }, [side, assetId, amountIRR]);
 
   // Format number with commas

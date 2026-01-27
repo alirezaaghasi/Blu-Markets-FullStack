@@ -50,8 +50,8 @@ const ProtectionScreen: React.FC = () => {
         protectionApi.getActive(),
         protectionApi.getEligible(),
       ]);
-      // Handle both array and wrapped response formats
-      setProtections(Array.isArray(protectionsRes) ? protectionsRes : (protectionsRes as any)?.protections || []);
+      // API already normalizes response to Protection[]
+      setProtections(protectionsRes);
       setEligibleAssets(eligibleRes?.assets || []);
     } catch (err: any) {
       setError(err?.message || 'Failed to load protection data');

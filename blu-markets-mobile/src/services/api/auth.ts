@@ -25,7 +25,7 @@ export const auth = {
       if (__DEV__) console.log('[Auth] OTP sent successfully');
       return result;
     } catch (error) {
-      console.error('[Auth] Send OTP error:', error);
+      if (__DEV__) console.error('[Auth] Send OTP error:', error);
       throw error;
     }
   },
@@ -47,7 +47,7 @@ export const auth = {
         onboardingComplete: response.onboardingComplete,
       };
     } catch (error) {
-      console.error('[Auth] Verify OTP error:', error);
+      if (__DEV__) console.error('[Auth] Verify OTP error:', error);
       throw error;
     }
   },

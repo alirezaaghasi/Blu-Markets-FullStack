@@ -50,7 +50,7 @@ export const useBiometricAuth = () => {
 
         setIsChecking(false);
       } catch (error) {
-        console.error('Failed to check biometric availability:', error);
+        if (__DEV__) console.error('Failed to check biometric availability:', error);
         setIsAvailable(false);
         setIsChecking(false);
       }
@@ -82,7 +82,7 @@ export const useBiometricAuth = () => {
         };
       }
     } catch (error) {
-      console.error('Biometric authentication error:', error);
+      if (__DEV__) console.error('Biometric authentication error:', error);
       return { success: false, error: 'Authentication error' };
     }
   }, [isAvailable]);
@@ -101,7 +101,7 @@ export const useBiometricAuth = () => {
       setIsEnabled(true);
       return true;
     } catch (error) {
-      console.error('Failed to enable biometric:', error);
+      if (__DEV__) console.error('Failed to enable biometric:', error);
       return false;
     }
   }, [authenticate]);
@@ -113,7 +113,7 @@ export const useBiometricAuth = () => {
       setIsEnabled(false);
       return true;
     } catch (error) {
-      console.error('Failed to disable biometric:', error);
+      if (__DEV__) console.error('Failed to disable biometric:', error);
       return false;
     }
   }, []);
@@ -124,7 +124,7 @@ export const useBiometricAuth = () => {
       await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
       return true;
     } catch (error) {
-      console.error('Failed to store auth token:', error);
+      if (__DEV__) console.error('Failed to store auth token:', error);
       return false;
     }
   }, []);
@@ -143,7 +143,7 @@ export const useBiometricAuth = () => {
       const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
       return token;
     } catch (error) {
-      console.error('Failed to get auth token:', error);
+      if (__DEV__) console.error('Failed to get auth token:', error);
       return null;
     }
   }, [isEnabled, authenticate]);
@@ -154,7 +154,7 @@ export const useBiometricAuth = () => {
       await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
       return true;
     } catch (error) {
-      console.error('Failed to clear auth token:', error);
+      if (__DEV__) console.error('Failed to clear auth token:', error);
       return false;
     }
   }, []);

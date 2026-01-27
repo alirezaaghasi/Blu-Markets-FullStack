@@ -85,7 +85,7 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
         dispatch(completeOnboarding());
       }
     } catch (err: unknown) {
-      console.error('[OTP] Verification error:', err);
+      if (__DEV__) console.error('[OTP] Verification error:', err);
       let errorMessage = 'Verification failed. Please try again.';
       if (err instanceof Error) {
         errorMessage = err.message;

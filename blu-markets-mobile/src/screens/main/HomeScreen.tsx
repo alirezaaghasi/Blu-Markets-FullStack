@@ -334,7 +334,7 @@ const HomeScreen: React.FC = () => {
         }))));
       }
     } catch (error) {
-      console.error('Failed to refresh home screen data:', error);
+      if (__DEV__) console.error('Failed to refresh home screen data:', error);
     } finally {
       setIsRefreshing(false);
     }
@@ -371,7 +371,7 @@ const HomeScreen: React.FC = () => {
           }))));
         }
       } catch (error) {
-        console.error('Failed to fetch portfolio on mount:', error);
+        if (__DEV__) console.error('Failed to fetch portfolio on mount:', error);
       }
     };
     fetchData();

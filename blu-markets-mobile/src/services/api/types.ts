@@ -51,6 +51,9 @@ export interface PortfolioResponse {
   // Risk profile info (for profile screen)
   riskScore?: number;
   riskProfileName?: string;
+  // Add-funds specific fields (returned by add-funds endpoint)
+  previousCashIrr?: number;
+  amountAdded?: number;
 }
 
 export interface ActivityResponse {

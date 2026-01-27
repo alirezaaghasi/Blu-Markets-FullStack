@@ -61,7 +61,7 @@ const LoansScreen: React.FC = () => {
         refreshLoans(), // Refresh loan capacity from backend
       ]);
     } catch (error) {
-      console.error('Failed to refresh loans data:', error);
+      if (__DEV__) console.error('Failed to refresh loans data:', error);
     } finally {
       setIsRefreshing(false);
     }

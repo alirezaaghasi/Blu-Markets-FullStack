@@ -70,7 +70,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
       const capacityResponse = await loansApi.getCapacity();
       setCapacity(capacityResponse);
     } catch (error) {
-      console.error('Failed to fetch loan capacity:', error);
+      if (__DEV__) console.error('Failed to fetch loan capacity:', error);
     }
   }, []);
 
@@ -89,20 +89,25 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
       return;
     }
 
+    let isMounted = true;
     const timeoutId = setTimeout(async () => {
+      if (!isMounted) return;
       setIsLoadingPreview(true);
       try {
         const preview = await loansApi.preview(selectedAssetId, amountIRR, durationDays);
-        setLoanPreview(preview);
+        if (isMounted) setLoanPreview(preview);
       } catch (error) {
-        console.error('Failed to fetch loan preview:', error);
-        setLoanPreview(null);
+        if (__DEV__) console.error('Failed to fetch loan preview:', error);
+        if (isMounted) setLoanPreview(null);
       } finally {
-        setIsLoadingPreview(false);
+        if (isMounted) setIsLoadingPreview(false);
       }
     }, 300); // Debounce 300ms
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
   }, [selectedAssetId, amountIRR, durationDays]);
 
   // Set initial selected asset when eligibleHoldings loads
@@ -123,6 +128,9 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
     return selectedHolding.quantity * priceUSD * fxRate;
   }, [selectedHolding, selectedAssetId, prices, fxRate]);
 
+  // BUG-023 NOTE: This is a UI estimate for slider max only. The actual
+  // max borrow amount is validated by the backend loan preview API.
+  // The backend's maxLoanIrr in LoanPreviewResponse is authoritative.
   const maxBorrowIRR = useMemo(() => {
     if (!selectedAsset) return 0;
     return collateralValueIRR * selectedAsset.ltv;

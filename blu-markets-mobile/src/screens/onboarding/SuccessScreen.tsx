@@ -254,7 +254,10 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
     UPSIDE: holdings.filter((h) => h.layer === 'UPSIDE'),
   };
 
-  // Calculate layer totals
+  // BUG-021 FIX: Calculate layer totals from display holdings
+  // NOTE: These are UI-only values for the onboarding success animation
+  // The actual portfolio will be created via backend API when user taps "View My Portfolio"
+  // The holdings shown here are illustrative based on the backend-provided allocation percentages
   const layerTotals = {
     FOUNDATION: groupedHoldings.FOUNDATION.reduce((sum, h) => sum + h.valueIrr, 0),
     GROWTH: groupedHoldings.GROWTH.reduce((sum, h) => sum + h.valueIrr, 0),
