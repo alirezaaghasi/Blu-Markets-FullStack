@@ -58,6 +58,7 @@ export const AddFundsSheet: React.FC<AddFundsSheetProps> = ({
 
   // Format number with commas
   const formatNumber = (num: number): string => {
+    if (num === undefined || num === null || isNaN(num)) return '0';
     return num.toLocaleString('en-US');
   };
 

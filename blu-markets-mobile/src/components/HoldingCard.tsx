@@ -19,6 +19,7 @@ interface HoldingCardProps {
 
 // Format number with commas
 const formatNumber = (num: number): string => {
+  if (num === undefined || num === null || isNaN(num)) return '0';
   if (num >= 1_000_000_000) {
     return `${(num / 1_000_000_000).toFixed(1)}B`;
   }
@@ -33,6 +34,7 @@ const formatNumber = (num: number): string => {
 
 // Format quantity based on asset
 const formatQuantity = (quantity: number, assetId: AssetId): string => {
+  if (quantity === undefined || quantity === null || isNaN(quantity)) return '0';
   if (assetId === 'BTC') {
     return quantity.toFixed(8);
   }

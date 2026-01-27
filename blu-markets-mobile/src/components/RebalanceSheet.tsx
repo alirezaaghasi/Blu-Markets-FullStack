@@ -27,6 +27,7 @@ interface RebalanceSheetProps {
 
 // Format number with commas
 const formatNumber = (num: number): string => {
+  if (num === undefined || num === null || isNaN(num)) return '0';
   return Math.round(num).toLocaleString('en-US');
 };
 

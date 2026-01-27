@@ -179,7 +179,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
   const isValid = validationErrors.length === 0 && amountIRR > 0;
 
   // Format number
-  const formatNumber = (num: number): string => num.toLocaleString('en-US');
+  const formatNumber = (num: number): string => (num === undefined || num === null || isNaN(num)) ? '0' : num.toLocaleString('en-US');
 
   // Handle amount input
   const handleAmountChange = (text: string) => {

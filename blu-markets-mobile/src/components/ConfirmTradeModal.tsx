@@ -63,11 +63,13 @@ const BOUNDARY_CONFIG: Record<Boundary, { color: string; bgColor: string; label:
 
 // Format number with commas
 const formatNumber = (num: number): string => {
+  if (num === undefined || num === null || isNaN(num)) return '0';
   return num.toLocaleString('en-US');
 };
 
 // Format percentage
 const formatPercent = (num: number): string => {
+  if (num === undefined || num === null || isNaN(num)) return '0%';
   return `${Math.round(num * 100)}%`;
 };
 

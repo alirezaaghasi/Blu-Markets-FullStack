@@ -74,7 +74,7 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
   const isValid = repayAmount > 0 && canAfford;
 
   // Format number
-  const formatNumber = (num: number): string => num.toLocaleString('en-US');
+  const formatNumber = (num: number): string => (num === undefined || num === null || isNaN(num)) ? '0' : num.toLocaleString('en-US');
 
   // Handle custom amount input
   const handleCustomAmountChange = (text: string) => {

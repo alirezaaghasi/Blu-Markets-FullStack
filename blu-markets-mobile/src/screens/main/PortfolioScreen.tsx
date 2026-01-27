@@ -29,6 +29,7 @@ const LAYER_CONFIG: Record<Layer, { name: string; color: string }> = {
 };
 
 const formatNumber = (num: number): string => {
+  if (num === undefined || num === null || isNaN(num)) return '0';
   return num.toLocaleString('en-US');
 };
 
