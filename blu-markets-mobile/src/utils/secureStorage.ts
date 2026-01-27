@@ -15,24 +15,33 @@ import { TOKEN_KEYS } from '../config/api';
 
 const isWeb = Platform.OS === 'web';
 
-// BUG-013 FIX: Strengthen warning for web platform security risk
-// Warn if running on web in production - this is a P1 security issue
-if (isWeb && process.env.NODE_ENV === 'production') {
+// BUG-003 FIX: Block web token storage in production to prevent XSS vulnerability
+// localStorage is vulnerable to XSS attacks - production web apps MUST use HttpOnly cookies
+const isProductionWeb = isWeb && process.env.NODE_ENV === 'production';
+
+if (isProductionWeb) {
   console.error(
-    '[SecureStorage] SECURITY WARNING: Running on web platform. ' +
-    'Tokens stored in localStorage are vulnerable to XSS attacks. ' +
-    'PRODUCTION WEB APPS MUST use HttpOnly cookies or disable web builds. ' +
+    '[SecureStorage] SECURITY ERROR: Web platform token storage is disabled in production. ' +
+    'localStorage is vulnerable to XSS attacks. ' +
+    'PRODUCTION WEB APPS MUST use HttpOnly cookies. ' +
     'See: https://owasp.org/www-community/HttpOnly'
   );
-  // TODO: Consider throwing an error or blocking token storage on web in production
-  // throw new Error('Web token storage not allowed in production');
 }
 
 /**
  * Securely store a value
+ * BUG-003 FIX: Throws error in production web builds to prevent XSS vulnerability
  */
 export async function setSecureItem(key: string, value: string): Promise<void> {
   if (isWeb) {
+    // BUG-003 FIX: Block token storage on production web - XSS vulnerability
+    if (isProductionWeb) {
+      throw new Error(
+        '[SecureStorage] Token storage is blocked on production web. ' +
+        'Use HttpOnly cookies instead. See: https://owasp.org/www-community/HttpOnly'
+      );
+    }
+    // Development-only: allow localStorage for testing
     localStorage.setItem(key, value);
   } else {
     await SecureStore.setItemAsync(key, value, {
@@ -45,9 +54,18 @@ export async function setSecureItem(key: string, value: string): Promise<void> {
 
 /**
  * Securely retrieve a value
+ * BUG-003 FIX: Throws error in production web builds to prevent XSS vulnerability
  */
 export async function getSecureItem(key: string): Promise<string | null> {
   if (isWeb) {
+    // BUG-003 FIX: Block token retrieval on production web - XSS vulnerability
+    if (isProductionWeb) {
+      throw new Error(
+        '[SecureStorage] Token retrieval is blocked on production web. ' +
+        'Use HttpOnly cookies instead. See: https://owasp.org/www-community/HttpOnly'
+      );
+    }
+    // Development-only: allow localStorage for testing
     return localStorage.getItem(key);
   } else {
     return await SecureStore.getItemAsync(key);
@@ -56,9 +74,18 @@ export async function getSecureItem(key: string): Promise<string | null> {
 
 /**
  * Securely delete a value
+ * BUG-003 FIX: Throws error in production web builds to prevent XSS vulnerability
  */
 export async function deleteSecureItem(key: string): Promise<void> {
   if (isWeb) {
+    // BUG-003 FIX: Block token deletion on production web
+    if (isProductionWeb) {
+      throw new Error(
+        '[SecureStorage] Token operations are blocked on production web. ' +
+        'Use HttpOnly cookies instead. See: https://owasp.org/www-community/HttpOnly'
+      );
+    }
+    // Development-only: allow localStorage for testing
     localStorage.removeItem(key);
   } else {
     await SecureStore.deleteItemAsync(key);

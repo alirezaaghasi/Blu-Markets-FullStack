@@ -1,7 +1,59 @@
 // Storage Utilities
 // Handles persisting and loading app state using AsyncStorage
+//
+// BUG-004 FIX: Portfolio state is now obfuscated before storage
+// NOTE: For production, replace with proper encryption using expo-crypto or react-native-keychain
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PortfolioState, AuthState, OnboardingState, PriceState } from '../types';
+
+// BUG-004 FIX: Simple obfuscation for sensitive data at rest
+// In production, replace with proper encryption using device-bound keys
+// This provides basic protection against casual inspection of backup files
+const OBFUSCATION_KEY = 'blu_markets_v1'; // Simple key for base64 + XOR obfuscation
+
+function obfuscateData(data: string): string {
+  // Convert to base64 first
+  const base64 = typeof btoa !== 'undefined'
+    ? btoa(unescape(encodeURIComponent(data)))
+    : Buffer.from(data).toString('base64');
+
+  // XOR with key for basic obfuscation
+  let result = '';
+  for (let i = 0; i < base64.length; i++) {
+    const charCode = base64.charCodeAt(i) ^ OBFUSCATION_KEY.charCodeAt(i % OBFUSCATION_KEY.length);
+    result += String.fromCharCode(charCode);
+  }
+
+  // Return as base64 to ensure safe storage
+  return typeof btoa !== 'undefined'
+    ? btoa(result)
+    : Buffer.from(result).toString('base64');
+}
+
+function deobfuscateData(obfuscated: string): string {
+  try {
+    // Decode outer base64
+    const xored = typeof atob !== 'undefined'
+      ? atob(obfuscated)
+      : Buffer.from(obfuscated, 'base64').toString();
+
+    // XOR with key to reverse obfuscation
+    let base64 = '';
+    for (let i = 0; i < xored.length; i++) {
+      const charCode = xored.charCodeAt(i) ^ OBFUSCATION_KEY.charCodeAt(i % OBFUSCATION_KEY.length);
+      base64 += String.fromCharCode(charCode);
+    }
+
+    // Decode inner base64
+    return typeof atob !== 'undefined'
+      ? decodeURIComponent(escape(atob(base64)))
+      : Buffer.from(base64, 'base64').toString();
+  } catch (error) {
+    // If deobfuscation fails, try parsing as plain JSON (migration from old format)
+    if (__DEV__) console.warn('[Storage] Failed to deobfuscate, trying plain JSON');
+    return obfuscated;
+  }
+}
 
 // Storage keys
 const STORAGE_KEYS = {
@@ -47,9 +99,13 @@ export const loadAuthState = async (): Promise<Partial<AuthState> | null> => {
 };
 
 // Save portfolio state
+// BUG-004 FIX: Portfolio state is now obfuscated before storage
 export const savePortfolioState = async (state: PortfolioState): Promise<void> => {
   try {
-    await AsyncStorage.setItem(STORAGE_KEYS.PORTFOLIO, JSON.stringify(state));
+    const jsonData = JSON.stringify(state);
+    // BUG-004 FIX: Obfuscate sensitive portfolio data before storing
+    const obfuscatedData = obfuscateData(jsonData);
+    await AsyncStorage.setItem(STORAGE_KEYS.PORTFOLIO, obfuscatedData);
     await AsyncStorage.setItem(STORAGE_KEYS.LAST_SYNC, Date.now().toString());
   } catch (error) {
     if (__DEV__) console.error('Failed to save portfolio state:', error);
@@ -57,10 +113,15 @@ export const savePortfolioState = async (state: PortfolioState): Promise<void> =
 };
 
 // Load portfolio state
+// BUG-004 FIX: Portfolio state is deobfuscated when loading
 export const loadPortfolioState = async (): Promise<Partial<PortfolioState> | null> => {
   try {
     const data = await AsyncStorage.getItem(STORAGE_KEYS.PORTFOLIO);
-    return data ? JSON.parse(data) : null;
+    if (!data) return null;
+
+    // BUG-004 FIX: Deobfuscate portfolio data (handles migration from plain JSON)
+    const jsonData = deobfuscateData(data);
+    return JSON.parse(jsonData);
   } catch (error) {
     if (__DEV__) console.error('Failed to load portfolio state:', error);
     return null;

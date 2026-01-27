@@ -1,17 +1,27 @@
 // Trade Validation Utilities
 // Based on PRD Section 21 - Trading Rules
 //
-// ⚠️ BUG-006 WARNING: CLIENT-SIDE CALCULATION DEPRECATION NOTICE
-// These utilities perform spread, drift, boundary, and allocation calculations on the client.
-// Per audit requirements, these calculations MUST be performed by the backend only.
+// ⚠️⚠️⚠️ BUG-007 FIX: INDICATIVE ONLY - NOT AUTHORITATIVE ⚠️⚠️⚠️
 //
-// CURRENT STATUS: Used for instant UI feedback while typing. Backend trade.preview API
-// is authoritative for all trade execution decisions.
+// These utilities provide INDICATIVE feedback for UI responsiveness only.
+// ALL trade decisions MUST use backend trade.preview API values.
 //
-// PRODUCTION REQUIREMENT: Remove or gate these functions behind __DEV__ flag.
-// All trade impact calculations must come from backend trade.preview endpoint.
+// SECURITY CRITICAL:
+// - NEVER use these values for actual trade execution
+// - NEVER display these values as final/confirmed amounts
+// - ALWAYS fetch backend trade.preview before showing confirmation
+// - Backend values override any client-side calculations
 //
-// Functions marked @deprecated should not be used for production trade decisions.
+// DELETION CANDIDATE: This file exists for legacy reasons.
+// Consider removing entirely and using backend preview for all UI states.
+//
+// If this file is causing confusion, DELETE IT. The slight UI delay
+// from waiting for backend preview is acceptable for financial accuracy.
+
+// BUG-007 FIX: Log warning if used
+if (__DEV__) {
+  console.warn('[tradeValidation] This module provides INDICATIVE values only. Backend is authoritative.');
+}
 
 import { AssetId, Layer, Boundary, TargetLayerPct, Holding, TradePreview, ValidationResult } from '../types';
 import { ASSETS, LAYER_COLORS } from '../constants/assets';

@@ -21,7 +21,9 @@ import { useAppSelector } from '../../hooks/useStore';
 import { Loan, AssetId } from '../../types';
 import { EmptyState } from '../../components/EmptyState';
 
-// Assets eligible for loan collateral (crypto assets only - must match AssetId type)
+// BUG-012 FIX: Collateral eligibility should come from backend
+// This list is a fallback for UI responsiveness; backend API is authoritative
+// PRODUCTION: Backend should return eligible assets with their LTV caps
 const COLLATERAL_ELIGIBLE_ASSETS: AssetId[] = ['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'AVAX', 'LINK', 'TON', 'PAXG', 'KAG', 'MATIC', 'ARB'];
 
 interface LoansTabProps {
@@ -138,8 +140,9 @@ export function LoansTab({ loanId }: LoansTabProps) {
             </View>
             <View style={styles.stepContent}>
               <Text style={styles.stepTitle}>Get Instant IRR</Text>
+              {/* BUG-012 FIX: LTV varies by asset layer (70%/50%/30%) */}
               <Text style={styles.stepDescription}>
-                Receive up to 70% of your collateral value as an IRR loan
+                Receive a loan based on your collateral's value (LTV varies by asset)
               </Text>
             </View>
           </View>
@@ -237,12 +240,15 @@ function LoanCard({
     ? Math.ceil((new Date(nextInstallment.dueISO).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : null;
 
-  // Calculate remaining from installments (fallback to totalDueIRR - paidIRR if no installments)
-  const remainingIRR = installments.length > 0
-    ? installments
-        .filter((i) => i.status !== 'PAID')
-        .reduce((sum, i) => sum + i.totalIRR - i.paidIRR, 0)
-    : (loan.totalDueIRR || loan.amountIRR) - (loan.paidIRR || 0);
+  // BUG-012 FIX: Prefer backend-provided remainingIrr; calculation is fallback only
+  // Backend loans.getAll API should return remainingIrr for each loan
+  const remainingIRR = (loan as any).remainingIrr ?? (
+    installments.length > 0
+      ? installments
+          .filter((i) => i.status !== 'PAID')
+          .reduce((sum, i) => sum + i.totalIRR - i.paidIRR, 0)
+      : (loan.totalDueIRR || loan.amountIRR) - (loan.paidIRR || 0)
+  );
 
   return (
     <View style={[styles.loanCard, highlighted && styles.loanCardHighlighted]}>
@@ -281,6 +287,7 @@ function LoanCard({
         </View>
         <View style={styles.loanDetailRow}>
           <Text style={styles.loanDetailLabel}>Interest Rate</Text>
+          {/* BUG-012 FIX: Prefer backend interestRate; dailyInterestRate*365 is fallback */}
           <Text style={styles.loanDetailValue}>{((loan.interestRate ?? loan.dailyInterestRate * 365) * 100).toFixed(0)}% APR</Text>
         </View>
       </View>

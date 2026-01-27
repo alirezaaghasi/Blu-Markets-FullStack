@@ -1,19 +1,11 @@
 // Price WebSocket Service
 // Connects to backend WebSocket for real-time price updates
 //
-// ⚠️ BUG-012 TODO: WEBSOCKET AUTHENTICATION REQUIRED
-// Current implementation creates unauthenticated WebSocket connections.
-// SECURITY REQUIREMENTS:
-// 1. Include auth token in WebSocket handshake (query param or header)
-// 2. Validate message schema before processing (prevent spoofed data)
-// 3. Backend must verify token and reject unauthorized connections
-//
-// IMPLEMENTATION:
-// - connect() should retrieve token from tokenStorage
-// - Pass token as: new WebSocket(`${WEBSOCKET_URL}?token=${token}`)
-// - Add message schema validation in onmessage handler
+// BUG-001 FIX: WebSocket connections now include auth token in handshake
+// BUG-002 FIX: All incoming messages are validated against schema before processing
 
 import { AppState, AppStateStatus } from 'react-native';
+import { tokenStorage } from '../utils/secureStorage';
 import { WEBSOCKET_URL, WEBSOCKET_RECONNECT_INTERVAL_MS } from '../constants/business';
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
@@ -53,6 +45,50 @@ type StatusHandler = (status: ConnectionStatus) => void;
 // Connection timeout to prevent hanging on slow/broken connections
 const CONNECTION_TIMEOUT_MS = 10000; // 10 seconds
 
+// BUG-002 FIX: Validate incoming WebSocket message schema
+const VALID_MESSAGE_TYPES = ['connected', 'prices', 'price', 'fx', 'subscribed', 'unsubscribed', 'error'] as const;
+
+function validateWebSocketMessage(data: unknown): WebSocketMessage | null {
+  if (!data || typeof data !== 'object') {
+    if (__DEV__) console.warn('[WebSocket] Invalid message: not an object');
+    return null;
+  }
+
+  const msg = data as Record<string, unknown>;
+
+  // Validate type field exists and is valid
+  if (typeof msg.type !== 'string' || !VALID_MESSAGE_TYPES.includes(msg.type as typeof VALID_MESSAGE_TYPES[number])) {
+    if (__DEV__) console.warn('[WebSocket] Invalid message type:', msg.type);
+    return null;
+  }
+
+  // Validate data array if present
+  if (msg.data !== undefined && !Array.isArray(msg.data)) {
+    if (__DEV__) console.warn('[WebSocket] Invalid data field: expected array');
+    return null;
+  }
+
+  // Validate numeric fields if present
+  const numericFields = ['priceUsd', 'priceIrr', 'change24hPct', 'usdIrr'];
+  for (const field of numericFields) {
+    if (msg[field] !== undefined && typeof msg[field] !== 'number') {
+      if (__DEV__) console.warn(`[WebSocket] Invalid ${field}: expected number`);
+      return null;
+    }
+  }
+
+  // Validate string fields if present
+  const stringFields = ['assetId', 'source', 'timestamp', 'message'];
+  for (const field of stringFields) {
+    if (msg[field] !== undefined && typeof msg[field] !== 'string') {
+      if (__DEV__) console.warn(`[WebSocket] Invalid ${field}: expected string`);
+      return null;
+    }
+  }
+
+  return msg as unknown as WebSocketMessage;
+}
+
 class PriceWebSocketService {
   private ws: WebSocket | null = null;
   private reconnectTimeout: NodeJS.Timeout | null = null;
@@ -91,7 +127,7 @@ class PriceWebSocketService {
     if (this.appState.match(/inactive|background/) && nextAppState === 'active') {
       // App came to foreground - reconnect if needed
       if (this.status === 'disconnected' && this.shouldReconnect) {
-        this.connect();
+        void this.connect(); // Fire and forget async connect
       }
     } else if (nextAppState.match(/inactive|background/)) {
       // App going to background - disconnect to save resources
@@ -100,7 +136,7 @@ class PriceWebSocketService {
     this.appState = nextAppState;
   };
 
-  connect(): void {
+  async connect(): Promise<void> {
     if (this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) {
       return;
     }
@@ -115,7 +151,15 @@ class PriceWebSocketService {
     this.setStatus('connecting');
 
     try {
-      this.ws = new WebSocket(WEBSOCKET_URL);
+      // BUG-001 FIX: Include auth token in WebSocket handshake
+      const token = await tokenStorage.getAccessToken();
+      const wsUrl = token ? `${WEBSOCKET_URL}?token=${encodeURIComponent(token)}` : WEBSOCKET_URL;
+
+      if (!token && __DEV__) {
+        console.warn('[WebSocket] Connecting without auth token - connection may be rejected by backend');
+      }
+
+      this.ws = new WebSocket(wsUrl);
 
       // ST-2: Set connection timeout to prevent hanging on slow/broken connections
       this.connectionTimeout = setTimeout(() => {
@@ -145,7 +189,13 @@ class PriceWebSocketService {
 
       this.ws.onmessage = (event) => {
         try {
-          const message: WebSocketMessage = JSON.parse(event.data);
+          const parsed = JSON.parse(event.data);
+          // BUG-002 FIX: Validate message schema before processing
+          const message = validateWebSocketMessage(parsed);
+          if (!message) {
+            if (__DEV__) console.warn('[WebSocket] Rejected invalid message:', parsed);
+            return;
+          }
           this.notifyMessageHandlers(message);
         } catch (error) {
           if (__DEV__) console.error('Failed to parse WebSocket message:', error);
@@ -258,7 +308,7 @@ class PriceWebSocketService {
     this.reconnectTimeout = setTimeout(() => {
       this.reconnectAttempts++;
       // isReconnecting will be reset in connect() on success or failure
-      this.connect();
+      void this.connect(); // Fire and forget async connect
     }, delay);
   }
 

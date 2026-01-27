@@ -38,7 +38,10 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
   const { cashIRR, holdings } = useAppSelector((state) => state.portfolio);
   const { prices, fxRate } = useAppSelector((state) => state.prices);
 
-  // Helper to convert Holding to ProtectableHolding
+  // BUG-010 FIX: Helper to convert Holding to ProtectableHolding
+  // NOTE: Client-side value calculations are for UI display ONLY
+  // Backend protection.getHoldings API provides authoritative values
+  // Indicative premiums are estimates - actual premiums come from backend quote
   const convertToProtectableHolding = (h: Holding | ProtectableHolding): ProtectableHolding => {
     // If already has holdingId, assume it's ProtectableHolding
     if ('holdingId' in h && h.holdingId) {
@@ -49,6 +52,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
     const asset = ASSETS[holding.assetId];
     const priceUSD = prices[holding.assetId] || 0;
     const priceIRR = priceUSD * fxRate;
+    // UI ESTIMATE ONLY - backend quote is authoritative for actual values
     const valueIRR = holding.quantity * priceIRR;
     const valueUSD = holding.quantity * priceUSD;
     return {
@@ -57,6 +61,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
       name: asset?.name || holding.assetId,
       layer: holding.layer,
       quantity: holding.quantity,
+      // UI ESTIMATES - backend getQuote provides authoritative premium pricing
       valueIrr: valueIRR,
       valueUsd: valueUSD,
       priceUsd: priceUSD,
@@ -64,6 +69,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
       isProtectable: true,
       hasExistingProtection: false,
       volatility: { iv: 0.5, regime: 'NORMAL', regimeColor: '#3B82F6' },
+      // Indicative only - actual premium from backend quote
       indicativePremium: { thirtyDayPct: 0.01, thirtyDayIrr: valueIRR * 0.01 },
     };
   };

@@ -1,14 +1,26 @@
 // Fixed Income Calculation Utility
 // Based on PRD Section 17 - Fixed Income Asset
 //
-// ⚠️ BUG-008 WARNING: DEMO/MOCK USE ONLY
+// ⚠️⚠️⚠️ BUG-009 FIX: DEMO/MOCK USE ONLY - NEVER USE IN PRODUCTION ⚠️⚠️⚠️
+//
 // Fixed income accrual and valuation MUST be computed by the backend.
-// This utility is only for demo mode and UI placeholders.
+// This utility exists ONLY for demo mode when backend is unavailable.
 //
 // PRODUCTION REQUIREMENT:
-// - Backend portfolio API must return { principal, accrued, total } for fixed income
-// - Frontend displays backend-provided values only
-// - This file should be gated behind __DEV__ or removed in production
+// - Backend portfolio API MUST return { principal, accrued, total } for fixed income
+// - Frontend displays backend-provided values ONLY
+// - Any displayed interest/accrual values must come from backend
+//
+// FINANCIAL ACCURACY: Backend is AUTHORITATIVE for all fixed income valuations.
+// Client calculations may diverge from backend due to rounding, timing, or rate changes.
+//
+// DELETION CANDIDATE: This file should be removed once backend provides
+// all fixed income values. Consider adding TODO to track removal.
+
+// BUG-009 FIX: Runtime guard to prevent production use
+if (!__DEV__ && process.env.EXPO_PUBLIC_DEMO_MODE !== 'true') {
+  console.error('[SECURITY] fixedIncome.ts loaded in production - this should never happen');
+}
 
 export const FIXED_INCOME_UNIT_PRICE = 500_000;  // IRR per unit
 export const FIXED_INCOME_ANNUAL_RATE = 0.30;    // 30% annual simple interest

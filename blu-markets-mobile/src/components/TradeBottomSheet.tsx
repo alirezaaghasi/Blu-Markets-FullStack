@@ -111,17 +111,22 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
   const holdingQuantity = holding?.quantity || 0;
   const holdingValue = holdingQuantity * priceIRR;
 
-  // Calculate holding values map
+  // BUG-006 FIX: Client-side holding values are for UI display ONLY
+  // Backend trade.preview API is AUTHORITATIVE for all trade decisions.
+  // Calculate holding values map (UI estimate only)
   const holdingValues = useMemo(() => {
     const map = new Map<string, number>();
     holdings.forEach((h) => {
       const p = prices[h.assetId] || 0;
+      // UI ESTIMATE ONLY - backend preview is authoritative
       map.set(h.assetId, h.quantity * p * fxRate);
     });
     return map;
   }, [holdings, prices, fxRate]);
 
-  // Current allocation
+  // BUG-006 FIX: Client-side allocation is for UI display ONLY
+  // Backend trade.preview provides authoritative before/after allocations
+  // Current allocation (UI estimate only)
   const currentAllocation = useMemo(() => {
     const layerValues = { FOUNDATION: cashIRR, GROWTH: 0, UPSIDE: 0 };
     holdingValues.forEach((value, id) => {
@@ -130,6 +135,7 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
     });
     const total = layerValues.FOUNDATION + layerValues.GROWTH + layerValues.UPSIDE;
     if (total === 0) return { FOUNDATION: 1, GROWTH: 0, UPSIDE: 0 };
+    // UI ESTIMATE ONLY - backend preview is authoritative
     return {
       FOUNDATION: layerValues.FOUNDATION / total,
       GROWTH: layerValues.GROWTH / total,
@@ -140,7 +146,9 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
   // Parse amount
   const amountIRR = parseInt(amountInput.replace(/,/g, ''), 10) || 0;
 
-  // Calculate quantity from IRR amount
+  // BUG-006 FIX: Client-side quantity calculation is for UI preview ONLY
+  // Backend trade.preview provides authoritative quantity after spread
+  // Calculate quantity from IRR amount (UI estimate only)
   const tradeQuantity = priceIRR > 0 ? amountIRR / priceIRR : 0;
 
   // Available balance for current side

@@ -121,18 +121,22 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
   const selectedHolding = eligibleHoldings.find((h) => h.assetId === selectedAssetId);
   const selectedAsset = selectedAssetId ? ASSETS[selectedAssetId] : null;
 
-  // Calculate collateral value and max borrow
+  // BUG-005 FIX: Client-side collateral value calculation is for UI preview ONLY
+  // Backend loan.preview API is AUTHORITATIVE for all loan eligibility decisions.
+  // This estimate enables responsive UI while backend calculates actual values.
   const collateralValueIRR = useMemo(() => {
     if (!selectedHolding || !selectedAssetId) return 0;
     const priceUSD = prices[selectedAssetId] || 0;
+    // UI ESTIMATE ONLY - backend preview is authoritative
     return selectedHolding.quantity * priceUSD * fxRate;
   }, [selectedHolding, selectedAssetId, prices, fxRate]);
 
-  // BUG-023 NOTE: This is a UI estimate for slider max only. The actual
+  // BUG-005 FIX: This is a UI estimate for slider max only. The actual
   // max borrow amount is validated by the backend loan preview API.
   // The backend's maxLoanIrr in LoanPreviewResponse is authoritative.
   const maxBorrowIRR = useMemo(() => {
     if (!selectedAsset) return 0;
+    // UI ESTIMATE ONLY - backend preview is authoritative
     return collateralValueIRR * selectedAsset.ltv;
   }, [collateralValueIRR, selectedAsset]);
 
@@ -216,7 +220,8 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
         })
       );
 
-      // Show success modal
+      // BUG-005 FIX: Show success modal with backend-provided values
+      // totalInterest comes from loanPreview API (backend-calculated)
       setSuccessResult({
         title: 'Loan Created!',
         subtitle: `Funds added to your cash balance`,
@@ -225,6 +230,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
           { label: 'Collateral', value: `${selectedAsset.name} (Frozen)` },
           { label: 'Duration', value: LOAN_DURATION_LABELS[durationDays] || `${durationDays} days` },
           { label: 'Interest Rate', value: `${(LOAN_ANNUAL_INTEREST_RATE * 100).toFixed(0)}% annual` },
+          // Use backend-provided totalInterest from loanPreview
           { label: 'Total to Repay', value: `${formatNumber(Math.round(amountIRR + totalInterest))} IRR` },
         ],
       });

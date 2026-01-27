@@ -1,5 +1,16 @@
 // Mock API for Demo Mode
 // Provides same interface as real API but uses Redux store data
+//
+// ⚠️ BUG-013 FIX: THIS FILE IS FOR DEMO/DEVELOPMENT ONLY
+// All financial calculations in this file (interest, LTV, premiums, etc.)
+// are DEMO SIMULATIONS that mimic backend behavior for offline testing.
+//
+// PRODUCTION REQUIREMENT:
+// - Demo mode must be explicitly enabled via build flags
+// - Production builds MUST use real API endpoints
+// - These mock calculations are NOT authoritative and may differ from backend
+//
+// SECURITY: Ensure demo mode cannot be enabled in production builds
 
 import { store } from '../../../store';
 import {
@@ -1033,12 +1044,16 @@ export const loans = {
   },
 
   // Preview endpoint - returns backend-calculated loan details
-  // ⚠️ BUG-016 WARNING: MOCK/DEMO USE ONLY
-  // This function performs client-side interest calculations (durationDays/30, interest math)
-  // which violates the "no frontend calculations" rule for production.
-  // This mock simulates backend behavior for offline demo mode only.
-  // PRODUCTION: Backend /loans/preview endpoint is authoritative for all loan calculations.
+  // ⚠️ BUG-013 FIX: MOCK/DEMO USE ONLY - NOT FOR PRODUCTION
+  // This function simulates backend loan preview calculations for offline demo mode.
+  // Uses durationDays/30 and interest math that MUST only run in demo mode.
+  // PRODUCTION: Backend /loans/preview endpoint is AUTHORITATIVE for all loan calculations.
+  // This mock should be unreachable in production builds (gated by demo mode flag).
   preview: async (collateralAssetId: string, amountIrr: number, durationDays: 90 | 180) => {
+    // BUG-013 FIX: Verify we're in demo mode
+    if (!__DEV__ && process.env.EXPO_PUBLIC_DEMO_MODE !== 'true') {
+      throw new Error('[Mock API] Loan preview is not available in production. Use real API.');
+    }
     await delay(MOCK_DELAY / 2); // Faster for preview
 
     const state = getState();
@@ -1108,7 +1123,12 @@ export const loans = {
 
   // Signature matches real API: (collateralAssetId, amountIrr, durationDays)
   // Per PRD: 30% APR, 3/6 month terms (90/180 days), 6 installments
+  // BUG-013 FIX: Mock loan creation simulates backend for demo mode only
   create: async (collateralAssetId: string, amountIrr: number, durationDays: 90 | 180): Promise<Loan> => {
+    // BUG-013 FIX: Verify we're in demo mode
+    if (!__DEV__ && process.env.EXPO_PUBLIC_DEMO_MODE !== 'true') {
+      throw new Error('[Mock API] Loan creation is not available in production. Use real API.');
+    }
     await delay(MOCK_DELAY);
 
     const state = getState();

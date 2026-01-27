@@ -70,9 +70,11 @@ const LoansScreen: React.FC = () => {
   // Use loans from Redux (kept in sync by useLoans hook)
   const loans = reduxLoans;
 
-  // Use backend-derived loan capacity values (with fallbacks for loading state)
+  // BUG-011 FIX: Use backend-derived loan capacity values
+  // Backend capacity API is AUTHORITATIVE - client fallbacks are for loading state only
   const maxLoanCapacity = capacity?.maxCapacityIrr ?? 0;
-  const usedLoanCapacity = capacity?.usedIrr ?? loans.reduce((sum, l) => sum + l.amountIRR, 0);
+  // Prefer backend usedIrr; fallback for loading state only (not for display)
+  const usedLoanCapacity = capacity?.usedIrr ?? (capacity === null ? 0 : loans.reduce((sum, l) => sum + l.amountIRR, 0));
   const remainingCapacity = capacity?.availableIrr ?? Math.max(0, maxLoanCapacity - usedLoanCapacity);
   const capacityPercentage = maxLoanCapacity > 0 ? (usedLoanCapacity / maxLoanCapacity) * 100 : 0;
 
@@ -84,12 +86,30 @@ const LoansScreen: React.FC = () => {
     return asset.ltv > 0 && h.quantity > 0;
   });
 
-  // Calculate loan health
+  // BUG-011 FIX: Client-side loan health calculation is for UI display ONLY
+  // Backend loans.getAll API should return health status and LTV for each loan
+  // This function provides a UI fallback when backend doesn't include health info
+  // PRODUCTION: Backend should include { ltv, healthStatus } in loan response
   const getLoanHealth = (loan: Loan): { level: string; color: string } => {
+    // Prefer backend-provided health status if available
+    if ((loan as any).healthStatus) {
+      const status = (loan as any).healthStatus;
+      const healthColors: Record<string, string> = {
+        HEALTHY: colors.success,
+        CAUTION: colors.warning,
+        WARNING: colors.boundaryStructural,
+        CRITICAL: colors.error,
+      };
+      return { level: status, color: healthColors[status] || colors.textSecondary };
+    }
+
+    // UI FALLBACK ONLY - calculate health from local prices
+    // Backend should provide authoritative LTV and health status
     const holding = holdings.find((h) => h.assetId === loan.collateralAssetId);
     if (!holding) return { level: 'Unknown', color: colors.textSecondary };
 
     const priceUSD = prices[loan.collateralAssetId] || 0;
+    // UI ESTIMATE ONLY - backend should provide authoritative LTV
     const collateralValueIRR = holding.quantity * priceUSD * fxRate;
     const currentLTV = loan.amountIRR / collateralValueIRR;
 
@@ -292,6 +312,8 @@ const LoansScreen: React.FC = () => {
         )}
 
         {/* Eligible Collateral */}
+        {/* BUG-011 FIX: Client-side max borrow estimates are for UI preview ONLY */}
+        {/* Backend loan.preview API provides authoritative max borrow amounts */}
         {eligibleHoldings.length > 0 && loans.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Available Collateral</Text>
@@ -301,6 +323,7 @@ const LoansScreen: React.FC = () => {
             {eligibleHoldings.slice(0, 3).map((holding) => {
               const asset = ASSETS[holding.assetId];
               const priceUSD = prices[holding.assetId] || 0;
+              // UI ESTIMATE ONLY - backend loan.preview is authoritative
               const valueIRR = holding.quantity * priceUSD * fxRate;
               const maxBorrowIRR = valueIRR * asset.ltv;
 
