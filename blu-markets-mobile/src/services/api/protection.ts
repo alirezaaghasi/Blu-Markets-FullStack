@@ -33,20 +33,86 @@ export const DEFAULT_COVERAGE_PCT = 1.0; // 100%
 // Default duration
 export const DEFAULT_DURATION_DAYS = 30;
 
+// Backend response shape for holdings (different from frontend ProtectableHolding)
+interface BackendHolding {
+  holdingId: string;
+  assetId: string;
+  quantity: number;
+  valueIrr: number;
+  valueUsd: number;
+  layer: string;
+  alreadyProtected: boolean;
+  estimatedPremiumPct?: number;
+  estimatedPremiumPctDisplay?: string;
+  // Optional fields that may be included
+  name?: string;
+  priceUsd?: number;
+  priceIrr?: number;
+  volatility?: { iv: number; regime: string; regimeColor: string };
+  indicativePremium?: { thirtyDayPct: number; thirtyDayIrr: number };
+}
+
+interface BackendHoldingsResponse {
+  holdings: BackendHolding[];
+  durationPresets?: number[];
+  coverageRange?: { min: number; max: number; step: number };
+  minNotionalIrr?: number;
+}
+
 export const protection = {
   /**
    * Get list of holdings eligible for protection
-   * Returns holdings with holdingId, valueIrr, estimatedPremiumPct, etc.
+   * BUG-2 FIX: Maps backend estimatedPremiumPct to frontend indicativePremium
    */
   getHoldings: async (): Promise<ProtectableHoldingsResponse> => {
     const data = (await apiClient.get('/protection/holdings')) as unknown as ApiResponse<
-      ProtectableHoldingsResponse | ProtectableHolding[]
+      BackendHoldingsResponse | ProtectableHolding[]
     >;
-    // Handle both array response and wrapped response
+
+    // Handle array response (from mock API)
     if (Array.isArray(data)) {
-      return { holdings: data, durationPresets: DURATION_PRESETS as unknown as number[], coverageRange: { min: MIN_COVERAGE_PCT, max: MAX_COVERAGE_PCT, step: 0.1 }, minNotionalIrr: 10_000_000 };
+      return {
+        holdings: data,
+        durationPresets: DURATION_PRESETS as unknown as number[],
+        coverageRange: { min: MIN_COVERAGE_PCT, max: MAX_COVERAGE_PCT, step: 0.1 },
+        minNotionalIrr: 10_000_000,
+      };
     }
-    return data as ProtectableHoldingsResponse;
+
+    // Transform backend response to frontend shape
+    const backendResponse = data as BackendHoldingsResponse;
+    const transformedHoldings: ProtectableHolding[] = (backendResponse.holdings || []).map((h) => {
+      // BUG-2 FIX: Calculate indicativePremium from estimatedPremiumPct if not provided
+      const estimatedPct = h.estimatedPremiumPct ?? 0.004; // ~0.4% monthly default
+      const thirtyDayIrr = (h.valueIrr || 0) * estimatedPct;
+
+      return {
+        holdingId: h.holdingId,
+        assetId: h.assetId as AssetId,
+        name: h.name || h.assetId,
+        layer: (h.layer || 'GROWTH') as 'FOUNDATION' | 'GROWTH' | 'UPSIDE',
+        quantity: h.quantity || 0,
+        valueIrr: h.valueIrr || 0,
+        valueUsd: h.valueUsd || 0,
+        priceUsd: h.priceUsd || 0,
+        priceIrr: h.priceIrr || 0,
+        isProtectable: !h.alreadyProtected,
+        hasExistingProtection: h.alreadyProtected || false,
+        volatility: h.volatility || { iv: 0.5, regime: 'NORMAL', regimeColor: '#3B82F6' },
+        // BUG-2 FIX: Map estimatedPremiumPct to indicativePremium format
+        indicativePremium: h.indicativePremium || {
+          thirtyDayPct: estimatedPct,
+          thirtyDayIrr: thirtyDayIrr,
+        },
+      };
+    });
+
+    return {
+      holdings: transformedHoldings,
+      durationPresets: backendResponse.durationPresets || (DURATION_PRESETS as unknown as number[]),
+      coverageRange: backendResponse.coverageRange || { min: MIN_COVERAGE_PCT, max: MAX_COVERAGE_PCT, step: 0.1 },
+      minNotionalIrr: backendResponse.minNotionalIrr || 10_000_000,
+    };
   },
 
   /**

@@ -1,8 +1,9 @@
 // Protection Tab - Part of Services Screen
 // Based on UI Restructure Specification Section 3
 // Updated to use API hooks for backend integration
+// BUG-3 FIX: Opens ProtectionSheet for confirmation instead of direct purchase
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -16,9 +17,10 @@ import { COLORS } from '../../constants/colors';
 import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING, RADIUS } from '../../constants/spacing';
 import { useProtections } from '../../hooks/useProtections';
-import { Protection, AssetId } from '../../types';
+import { Protection, AssetId, ProtectableHolding } from '../../types';
 import { ASSETS } from '../../constants/assets';
 import { EmptyState } from '../../components/EmptyState';
+import { ProtectionSheet } from '../../components/ProtectionSheet';
 
 interface ProtectionTabProps {
   protectionId?: string;
@@ -32,11 +34,26 @@ export function ProtectionTab({ protectionId }: ProtectionTabProps) {
     isRefreshing,
     error,
     refresh,
-    quickPurchaseProtection,
     cancelProtection,
   } = useProtections();
 
+  // BUG-3 FIX: State for ProtectionSheet instead of direct purchase
+  const [protectionSheetVisible, setProtectionSheetVisible] = useState(false);
+  const [selectedHolding, setSelectedHolding] = useState<ProtectableHolding | null>(null);
+
   const hasProtections = protections.length > 0;
+
+  // BUG-3 FIX: Open sheet for exploration and confirmation instead of direct purchase
+  const handleProtectAsset = (holding: ProtectableHolding) => {
+    setSelectedHolding(holding);
+    setProtectionSheetVisible(true);
+  };
+
+  const handleProtectionComplete = () => {
+    setProtectionSheetVisible(false);
+    setSelectedHolding(null);
+    refresh(); // Refresh the list after purchase
+  };
 
   if (isLoading && protections.length === 0) {
     return (
@@ -91,7 +108,7 @@ export function ProtectionTab({ protectionId }: ProtectionTabProps) {
       {eligibleAssets.filter(a => (a.quantity ?? 0) > 0).length > 0 ? (
         <EligibleAssetsGrid
           assets={eligibleAssets.filter(a => (a.quantity ?? 0) > 0)}
-          onProtect={(holdingId) => quickPurchaseProtection(holdingId, 30)}
+          onProtect={handleProtectAsset}
         />
       ) : (
         <EmptyState
@@ -109,6 +126,17 @@ export function ProtectionTab({ protectionId }: ProtectionTabProps) {
           description="Guard against downside risk while keeping your upside potential"
         />
       )}
+
+      {/* BUG-3 FIX: ProtectionSheet for preview and confirmation */}
+      <ProtectionSheet
+        visible={protectionSheetVisible}
+        onClose={() => {
+          setProtectionSheetVisible(false);
+          setSelectedHolding(null);
+        }}
+        holding={selectedHolding || undefined}
+        onPurchaseComplete={handleProtectionComplete}
+      />
     </ScrollView>
   );
 }
@@ -197,24 +225,19 @@ function EligibleAssetsGrid({
   assets,
   onProtect,
 }: {
-  assets: Array<{
-    holdingId?: string;
-    assetId: AssetId;
-    quantity?: number;
-    valueIrr?: number;
-    indicativePremium?: {
-      thirtyDayPct: number;
-      thirtyDayIrr: number;
-    };
-  }>;
-  onProtect: (holdingId: string) => void;
+  assets: ProtectableHolding[];
+  onProtect: (holding: ProtectableHolding) => void;
 }) {
   return (
     <View style={styles.eligibleGrid}>
       {assets.map((item) => {
         const asset = ASSETS[item.assetId];
         const quantity = item.quantity ?? 0;
-        const premiumIrr = item.indicativePremium?.thirtyDayIrr ?? 0;
+        // BUG-2 FIX: Calculate indicative premium if not provided by backend
+        // Use estimatedPremiumPct from backend or calculate from value
+        const valueIrr = item.valueIrr ?? 0;
+        const premiumIrr = item.indicativePremium?.thirtyDayIrr ??
+          (valueIrr * 0.004); // ~0.4% monthly premium fallback
         // Use holdingId if available, otherwise skip items without it
         const holdingId = item.holdingId;
         if (!holdingId) return null;
@@ -229,11 +252,11 @@ function EligibleAssetsGrid({
               {quantity.toFixed(4)} {asset?.symbol}
             </Text>
             <Text style={styles.eligiblePremium}>
-              ~{premiumIrr.toLocaleString()} IRR/mo
+              ~{formatIndicativePremium(premiumIrr)} IRR/mo
             </Text>
             <TouchableOpacity
               style={styles.protectButton}
-              onPress={() => onProtect(holdingId)}
+              onPress={() => onProtect(item)}
             >
               <Text style={styles.protectButtonText}>Protect</Text>
             </TouchableOpacity>
@@ -242,6 +265,14 @@ function EligibleAssetsGrid({
       })}
     </View>
   );
+}
+
+// BUG-2 FIX: Format indicative premium for display
+function formatIndicativePremium(amount: number): string {
+  if (amount >= 1_000_000_000) return `${(amount / 1_000_000_000).toFixed(1)}B`;
+  if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)}M`;
+  if (amount >= 1_000) return `${(amount / 1_000).toFixed(0)}K`;
+  return Math.round(amount).toLocaleString();
 }
 
 const styles = StyleSheet.create({

@@ -359,10 +359,12 @@ model HedgeLog {
   hedgeRatio  Decimal   @map("hedge_ratio") @db.Decimal(5, 4)
 
   // Greeks at time of action
-  delta Decimal? @db.Decimal(8, 6)
-  gamma Decimal? @db.Decimal(8, 6)
-  vega  Decimal? @db.Decimal(8, 6)
-  theta Decimal? @db.Decimal(8, 6)
+  // BUG-4 FIX: Increased precision from Decimal(8,6) to Decimal(12,6)
+  // Greeks like vega can exceed 99 for high-value assets (e.g., BTC at $97k)
+  delta Decimal? @db.Decimal(12, 6)
+  gamma Decimal? @db.Decimal(12, 6)
+  vega  Decimal? @db.Decimal(12, 6)
+  theta Decimal? @db.Decimal(12, 6)
 
   // Execution details (for future real hedging)
   instrument      String?  @db.VarChar(50)
