@@ -146,7 +146,7 @@ export const AmountDisplay: React.FC<AmountDisplayProps> = ({
 }) => {
   // Format number with thousand separators
   const formatAmount = (amount: number): string => {
-    if (amount === 0) return placeholder;
+    if (amount === undefined || amount === null || isNaN(amount) || amount === 0) return placeholder;
     return amount.toLocaleString('en-US');
   };
 

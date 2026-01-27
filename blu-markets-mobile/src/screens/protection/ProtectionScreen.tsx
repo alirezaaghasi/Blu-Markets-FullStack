@@ -304,7 +304,7 @@ const ProtectionScreen: React.FC = () => {
                         <Text style={styles.assetSymbol}> | {asset.symbol}</Text>
                       </Text>
                       <Text style={styles.assetValue}>
-                        {valueIRR.toLocaleString()} IRR
+                        {(valueIRR || 0).toLocaleString()} IRR
                       </Text>
                     </View>
                   </View>

@@ -171,9 +171,9 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
   }
   if (amountIRR > effectiveMaxBorrow) {
     if (amountIRR > maxBorrowIRR) {
-      validationErrors.push(`Maximum borrow with this collateral is ${maxBorrowIRR.toLocaleString()} IRR (${(selectedAsset?.ltv || 0) * 100}% LTV)`);
+      validationErrors.push(`Maximum borrow with this collateral is ${(maxBorrowIRR || 0).toLocaleString()} IRR (${(selectedAsset?.ltv || 0) * 100}% LTV)`);
     } else {
-      validationErrors.push(`Exceeds portfolio loan limit. Remaining capacity: ${remainingPortfolioCapacity.toLocaleString()} IRR`);
+      validationErrors.push(`Exceeds portfolio loan limit. Remaining capacity: ${(remainingPortfolioCapacity || 0).toLocaleString()} IRR`);
     }
   }
   const isValid = validationErrors.length === 0 && amountIRR > 0;

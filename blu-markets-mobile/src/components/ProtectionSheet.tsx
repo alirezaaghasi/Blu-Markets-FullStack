@@ -502,14 +502,14 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
                 quote && !canAfford && styles.cashValueInsufficient,
               ]}
             >
-              {cashIRR.toLocaleString()} IRR
+              {(cashIRR || 0).toLocaleString()} IRR
             </Text>
           </View>
 
           {quote && !canAfford && (
             <View style={styles.errorBanner}>
               <Text style={styles.errorText}>
-                Insufficient cash. Add {((quote.premiumIrr || 0) - cashIRR).toLocaleString()} IRR more.
+                Insufficient cash. Add {((quote.premiumIrr || 0) - (cashIRR || 0)).toLocaleString()} IRR more.
               </Text>
             </View>
           )}

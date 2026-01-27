@@ -74,7 +74,7 @@ function formatIRR(value: number): string {
  * Format IRR with short suffix for activity log
  */
 function formatIRRShort(value: number | undefined): string {
-  if (value === undefined) return '0';
+  if (value === undefined || value === null || isNaN(value)) return '0';
   if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B IRR`;
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(0)}M IRR`;
   return `${value.toLocaleString('en-US')} IRR`;
