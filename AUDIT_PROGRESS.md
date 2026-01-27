@@ -47,6 +47,20 @@
 - **BUG-021 FIX**: SuccessScreen now uses actual fxRate from prices slice
   - Falls back to DEFAULT_FX_RATE if not available
   - Added documentation clarifying display values are illustrative only
+
+**P2 Medium Issues:**
+- **BUG-022**: Already fixed - uses RISK_PROFILE_ALLOCATIONS[5] constant
+- **BUG-023 FIX**: LoanSheet now prefers backend `loanPreview.maxLoanIrr` over local estimate
+- **BUG-024 FIX**: Added isMounted cleanup patterns to async useEffects
+  - LoanSheet.tsx: fetchCapacity with cleanup
+  - RebalanceSheet.tsx: fetchPreview with cleanup
+  - ProtectionScreen.tsx: fetchData with cleanup
+- **BUG-025**: Already fixed - uses backend installment data for calculation
+
+**P3 Low Issues (Reviewed):**
+- **BUG-026**: Only 1 TODO found (API enhancement suggestion) - acceptable
+- **BUG-027**: HTTP URLs are localhost dev defaults - expected behavior
+- **BUG-028**: Map index keys are in static non-reorderable lists - acceptable
 - TypeScript compiles with 0 errors
 
 ### Findings So Far
@@ -84,11 +98,11 @@
 |----------|-------|-------|-------------|-----------|
 | P0 Critical | 2 | 2 | 0 | 0 |
 | P1 High | 3 | 3 | 0 | 0 |
-| P2 Medium | 4 | 0 | 0 | 4 |
-| P3 Low | 3 | 0 | 0 | 3 |
-| **Total** | **12** | **5** | **0** | **7** |
+| P2 Medium | 4 | 4 | 0 | 0 |
+| P3 Low | 3 | 3 | 0 | 0 |
+| **Total** | **12** | **12** | **0** | **0** |
 
-### Status: **P0 + P1 ISSUES FIXED**
+### Status: **ALL 12 AUDIT ISSUES RESOLVED**
 
 ---
 
@@ -113,18 +127,18 @@
 
 | Bug ID | Issue | File | Status |
 |--------|-------|------|--------|
-| BUG-022 | Hardcoded default allocation | portfolioSlice.ts | 🔴 Not Started |
-| BUG-023 | LoanSheet local max borrow | LoanSheet.tsx | 🔴 Not Started |
-| BUG-024 | useEffect without cleanup | Multiple | 🔴 Not Started |
-| BUG-025 | RepaySheet outstanding calculation | RepaySheet.tsx | 🔴 Not Started |
+| BUG-022 | Hardcoded default allocation | portfolioSlice.ts | ✅ Already fixed - uses RISK_PROFILE_ALLOCATIONS |
+| BUG-023 | LoanSheet local max borrow | LoanSheet.tsx | ✅ Fixed - prefers backend maxLoanIrr |
+| BUG-024 | useEffect without cleanup | Multiple | ✅ Fixed - added isMounted cleanup patterns |
+| BUG-025 | RepaySheet outstanding calculation | RepaySheet.tsx | ✅ Already fixed - uses backend installment data |
 
 ### P3 Low (Tech Debt)
 
 | Bug ID | Issue | File | Status |
 |--------|-------|------|--------|
-| BUG-026 | Unresolved TODOs | Multiple | 🔴 Not Started |
-| BUG-027 | HTTP URLs in config | business.ts, api.ts | 🔴 Document Only |
-| BUG-028 | Map index keys | Multiple | 🔴 Not Started |
+| BUG-026 | Unresolved TODOs | Multiple | ✅ Reviewed - only 1 valid TODO (enhancement) |
+| BUG-027 | HTTP URLs in config | business.ts, api.ts | ✅ Documented - localhost dev URLs expected |
+| BUG-028 | Map index keys | Multiple | ✅ Reviewed - static lists, acceptable per React |
 
 ---
 

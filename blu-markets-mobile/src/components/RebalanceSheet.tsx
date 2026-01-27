@@ -43,27 +43,39 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
 
   const { cashIRR, targetLayerPct } = useAppSelector((state) => state.portfolio);
 
-  // Fetch preview from backend when mode changes or sheet opens
-  // BUG-E FIX: Pass mode to preview API
-  const fetchPreview = useCallback(async () => {
+  // BUG-024 FIX: Fetch preview with cleanup to prevent state updates on unmounted component
+  const fetchPreviewInternal = useCallback(async (isMountedRef?: { current: boolean }) => {
     setIsLoading(true);
     setError(null);
     try {
       const result = await rebalance.preview(mode);
-      setPreview(result);
+      if (!isMountedRef || isMountedRef.current) {
+        setPreview(result);
+      }
     } catch (err: any) {
-      setError(err?.message || 'Failed to load rebalance preview');
-      setPreview(null);
+      if (!isMountedRef || isMountedRef.current) {
+        setError(err?.message || 'Failed to load rebalance preview');
+        setPreview(null);
+      }
     } finally {
-      setIsLoading(false);
+      if (!isMountedRef || isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [mode]);
 
   useEffect(() => {
-    if (visible) {
-      fetchPreview();
-    }
-  }, [visible, mode, fetchPreview]);
+    if (!visible) return;
+
+    const isMountedRef = { current: true };
+    fetchPreviewInternal(isMountedRef);
+    return () => { isMountedRef.current = false; };
+  }, [visible, mode, fetchPreviewInternal]);
+
+  // Manual retry handler (no cleanup needed for user-initiated action)
+  const handleRetry = useCallback(() => {
+    fetchPreviewInternal();
+  }, [fetchPreviewInternal]);
 
   const handleConfirm = async () => {
     if (!preview || preview.trades.length === 0) return;
@@ -183,7 +195,7 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
             {error && !isLoading && (
               <View style={styles.errorContainer}>
                 <Text style={styles.errorText}>{error}</Text>
-                <TouchableOpacity style={styles.retryButton} onPress={fetchPreview}>
+                <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
                   <Text style={styles.retryButtonText}>Retry</Text>
                 </TouchableOpacity>
               </View>

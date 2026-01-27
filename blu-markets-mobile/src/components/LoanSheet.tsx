@@ -64,21 +64,23 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
   const [loanPreview, setLoanPreview] = useState<LoanPreviewResponse | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
-  // Fetch loan capacity from backend when sheet opens
-  const fetchCapacity = useCallback(async () => {
-    try {
-      const capacityResponse = await loansApi.getCapacity();
-      setCapacity(capacityResponse);
-    } catch (error) {
-      if (__DEV__) console.error('Failed to fetch loan capacity:', error);
-    }
-  }, []);
-
+  // BUG-024 FIX: Fetch loan capacity with cleanup to prevent state updates on unmounted component
   useEffect(() => {
-    if (visible) {
-      fetchCapacity();
-    }
-  }, [visible, fetchCapacity]);
+    if (!visible) return;
+
+    let isMounted = true;
+    const fetchCapacity = async () => {
+      try {
+        const capacityResponse = await loansApi.getCapacity();
+        if (isMounted) setCapacity(capacityResponse);
+      } catch (error) {
+        if (__DEV__) console.error('Failed to fetch loan capacity:', error);
+      }
+    };
+
+    fetchCapacity();
+    return () => { isMounted = false; };
+  }, [visible]);
 
   // Fetch loan preview from backend when amount changes (debounced)
   const amountIRR = parseInt(amountInput.replace(/,/g, ''), 10) || 0;
@@ -131,14 +133,16 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
     return selectedHolding.quantity * priceUSD * fxRate;
   }, [selectedHolding, selectedAssetId, prices, fxRate]);
 
-  // BUG-005 FIX: This is a UI estimate for slider max only. The actual
-  // max borrow amount is validated by the backend loan preview API.
-  // The backend's maxLoanIrr in LoanPreviewResponse is authoritative.
-  const maxBorrowIRR = useMemo(() => {
+  // BUG-005/BUG-023 FIX: UI estimate for slider max, but prefer backend when available
+  // The backend's maxLoanIrr in LoanPreviewResponse is AUTHORITATIVE.
+  const localMaxBorrowEstimate = useMemo(() => {
     if (!selectedAsset) return 0;
-    // UI ESTIMATE ONLY - backend preview is authoritative
+    // UI ESTIMATE ONLY - used before backend preview loads
     return collateralValueIRR * selectedAsset.ltv;
   }, [collateralValueIRR, selectedAsset]);
+
+  // BUG-023 FIX: Prefer backend maxLoanIrr when available
+  const maxBorrowIRR = loanPreview?.maxLoanIrr ?? localMaxBorrowEstimate;
 
   // Use backend-derived remaining portfolio capacity
   // BUG-3 FIX: If capacity not loaded yet, use maxBorrowIRR as fallback (no portfolio limit)

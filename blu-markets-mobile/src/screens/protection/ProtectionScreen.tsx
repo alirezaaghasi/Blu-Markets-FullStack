@@ -39,8 +39,8 @@ const ProtectionScreen: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch data from backend
-  const fetchData = useCallback(async (showRefreshing = false) => {
+  // BUG-024 FIX: Fetch data with cleanup to prevent state updates on unmounted component
+  const fetchData = useCallback(async (showRefreshing = false, isMountedRef?: { current: boolean }) => {
     if (showRefreshing) setIsRefreshing(true);
     else setIsLoading(true);
     setError(null);
@@ -50,19 +50,27 @@ const ProtectionScreen: React.FC = () => {
         protectionApi.getActive(),
         protectionApi.getEligible(),
       ]);
-      // API already normalizes response to Protection[]
-      setProtections(protectionsRes);
-      setEligibleAssets(eligibleRes?.assets || []);
+      if (!isMountedRef || isMountedRef.current) {
+        // API already normalizes response to Protection[]
+        setProtections(protectionsRes);
+        setEligibleAssets(eligibleRes?.assets || []);
+      }
     } catch (err: any) {
-      setError(err?.message || 'Failed to load protection data');
+      if (!isMountedRef || isMountedRef.current) {
+        setError(err?.message || 'Failed to load protection data');
+      }
     } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      if (!isMountedRef || isMountedRef.current) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    fetchData();
+    const isMountedRef = { current: true };
+    fetchData(false, isMountedRef);
+    return () => { isMountedRef.current = false; };
   }, [fetchData]);
 
   const onRefresh = () => fetchData(true);
