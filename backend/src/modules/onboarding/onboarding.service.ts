@@ -215,6 +215,21 @@ export async function createInitialPortfolio(
   processLayer(growthAmount, 'GROWTH');
   processLayer(upsideAmount, 'UPSIDE');
 
+  // BUG-1 FIX: Validate that holdings were created
+  // If prices aren't available, no holdings can be created and the money would be lost
+  if (holdingsToCreate.length === 0) {
+    logger.error('Portfolio creation failed: no holdings could be created (prices not available)', undefined, {
+      userId,
+      amountIrr: input.amountIrr,
+      pricesAvailable: prices.size,
+    });
+    throw new AppError(
+      'SERVICE_UNAVAILABLE',
+      'Unable to create portfolio - asset prices are temporarily unavailable. Please try again in a few minutes.',
+      503
+    );
+  }
+
   // MONEY FIX M-02: Calculate total holdings value using Decimal
   let totalHoldingsValueDecimal = holdingsToCreate.reduce(
     (sum, h) => add(sum, h.valueIrr),
