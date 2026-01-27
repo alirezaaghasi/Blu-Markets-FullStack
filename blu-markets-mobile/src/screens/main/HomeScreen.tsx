@@ -521,18 +521,6 @@ const HomeScreen: React.FC = () => {
             <Text style={styles.sectionTitle}>Activity Log</Text>
           </View>
 
-          {/* DEBUG - Shows on screen to diagnose activity log issue */}
-          <View style={{ backgroundColor: '#ff4444', padding: 8, marginBottom: 8, borderRadius: 4 }}>
-            <Text style={{ color: '#ffffff', fontSize: 11 }}>
-              DEBUG: {activities?.length || 0} entries | isLoading: {String(isLoadingActivities)}
-            </Text>
-            {activities?.[0] && (
-              <Text style={{ color: '#ffff00', fontSize: 10 }}>
-                First: type={activities[0]?.type} msg={activities[0]?.message?.substring(0, 30)}
-              </Text>
-            )}
-          </View>
-
           {isLoadingActivities ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={COLORS.brand.primary} />
@@ -542,10 +530,10 @@ const HomeScreen: React.FC = () => {
               <Text style={styles.emptyActivityText}>No activity yet</Text>
             </View>
           ) : (
-            <View style={styles.chatContainer}>
+            /* BUG-1 FIX: Simplified activity log with guaranteed visible text */
+            <View>
               {activities.slice(0, 5).map((entry: ActionLogEntry, index: number) => {
-                // BUG-3 FIX: Robust message and time generation with fallbacks
-                const message = formatActivityMessage(entry) || 'Activity';
+                const message = formatActivityMessage(entry) || 'Activity recorded';
                 const time = formatRelativeTime(entry?.timestamp) || 'Just now';
                 const boundary = entry?.boundary || 'SAFE';
                 const dotColor = boundary === 'SAFE' ? '#4ade80' :
@@ -553,19 +541,47 @@ const HomeScreen: React.FC = () => {
                   boundary === 'STRUCTURAL' ? '#fb923c' : '#f87171';
 
                 return (
-                  <View key={entry?.id || `activity-${index}`} style={styles.chatBubble}>
-                    <View style={styles.chatBubbleContent}>
-                      <View style={[styles.activityDot, { backgroundColor: dotColor }]} />
-                      <View style={styles.chatTextContainer}>
-                        {/* DEBUG: Force render message with visible fallback */}
-                        <Text style={styles.chatMessage} numberOfLines={2}>
-                          {message && message.length > 0 ? message : `[EMPTY: type=${entry?.type}]`}
-                        </Text>
-                        <Text style={styles.chatTime}>
-                          {time && time.length > 0 ? time : '[NO TIME]'}
-                        </Text>
-                      </View>
-                    </View>
+                  <View
+                    key={entry?.id || `activity-${index}`}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: COLORS.background.surface,
+                      borderRadius: 12,
+                      padding: 14,
+                      marginBottom: 8,
+                      borderWidth: 1,
+                      borderColor: COLORS.border,
+                    }}
+                  >
+                    {/* Dot */}
+                    <View style={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: 5,
+                      backgroundColor: dotColor,
+                      marginRight: 12,
+                    }} />
+                    {/* Time */}
+                    <Text style={{
+                      color: COLORS.text.muted,
+                      fontSize: 12,
+                      marginRight: 12,
+                      minWidth: 55,
+                    }}>
+                      {time}
+                    </Text>
+                    {/* Message */}
+                    <Text
+                      style={{
+                        color: COLORS.text.primary,
+                        fontSize: 14,
+                        flex: 1,
+                      }}
+                      numberOfLines={1}
+                    >
+                      {message}
+                    </Text>
                   </View>
                 );
               })}

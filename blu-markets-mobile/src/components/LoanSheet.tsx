@@ -140,11 +140,15 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
     return collateralValueIRR * selectedAsset.ltv;
   }, [collateralValueIRR, selectedAsset]);
 
-  // Use backend-derived remaining portfolio capacity (with fallback)
-  const remainingPortfolioCapacity = capacity?.availableIrr ?? 0;
+  // Use backend-derived remaining portfolio capacity
+  // BUG-3 FIX: If capacity not loaded yet, use maxBorrowIRR as fallback (no portfolio limit)
+  const remainingPortfolioCapacity = capacity?.availableIrr ?? Infinity;
 
   // Effective max borrow (minimum of LTV limit and portfolio capacity from backend)
-  const effectiveMaxBorrow = Math.min(maxBorrowIRR, remainingPortfolioCapacity);
+  // If capacity not fetched yet, use maxBorrowIRR (optimistic, server will validate)
+  const effectiveMaxBorrow = capacity
+    ? Math.min(maxBorrowIRR, remainingPortfolioCapacity)
+    : maxBorrowIRR;
 
   // NOTE: amountIRR is now parsed in the useEffect above for preview fetching
 

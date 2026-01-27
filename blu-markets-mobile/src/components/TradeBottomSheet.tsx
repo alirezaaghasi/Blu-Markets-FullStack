@@ -20,6 +20,7 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { COLORS, BOUNDARY_BG } from '../constants/colors';
 import { TYPOGRAPHY } from '../constants/typography';
@@ -279,7 +280,23 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
 
   // Step 1: Open confirmation modal (Review Trade)
   const handleReviewTrade = () => {
-    if (!validation.ok || !preview || isLoadingPreview) return;
+    // BUG-2 FIX: Provide feedback instead of silently returning
+    if (isLoadingPreview) {
+      Alert.alert('Please Wait', 'Loading trade preview...');
+      return;
+    }
+    if (!validation.ok) {
+      Alert.alert('Invalid Trade', validation.errors.join('\n') || 'Please check your trade details.');
+      return;
+    }
+    if (!preview) {
+      Alert.alert('Preview Not Ready', 'Unable to get trade preview. Please try again.');
+      return;
+    }
+    if ((preview.quantity ?? 0) <= 0) {
+      Alert.alert('Invalid Amount', 'Trade quantity is too small. Please enter a larger amount.');
+      return;
+    }
     setShowConfirmModal(true);
   };
 

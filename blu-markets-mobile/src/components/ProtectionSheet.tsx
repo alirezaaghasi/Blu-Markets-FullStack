@@ -189,7 +189,19 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
 
   // Handle confirmation
   const handleConfirm = async () => {
-    if (!isValid || !quote || !holding || !asset) return;
+    // BUG-4 FIX: Provide feedback instead of silently returning
+    if (!holding || !asset) {
+      Alert.alert('Select Asset', 'Please select an asset to protect.');
+      return;
+    }
+    if (!quote) {
+      Alert.alert('Quote Required', quoteError || 'Unable to get protection quote. Please try again.');
+      return;
+    }
+    if (!canAfford) {
+      Alert.alert('Insufficient Funds', `You need ${quote.premiumIrr.toLocaleString()} IRR but only have ${cashIRR.toLocaleString()} IRR.`);
+      return;
+    }
 
     setIsSubmitting(true);
     try {
