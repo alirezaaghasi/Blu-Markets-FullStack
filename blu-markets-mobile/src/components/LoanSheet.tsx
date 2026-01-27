@@ -243,10 +243,15 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
     }
   };
 
+  // BUG FIX: Close inner modal first, then parent with delay
+  // React Native's Modal touch handling gets confused when nested modals close simultaneously
   const handleSuccessClose = () => {
     setShowSuccess(false);
     setSuccessResult(null);
-    onClose();
+    // Delay parent modal close to allow inner modal to properly unmount
+    setTimeout(() => {
+      onClose();
+    }, 150);
   };
 
   // Show empty state if no eligible holdings for collateral

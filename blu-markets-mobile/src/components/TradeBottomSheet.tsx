@@ -309,11 +309,16 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
   };
 
   // Handle success modal close
+  // BUG FIX: Close inner modal first, then parent with delay
+  // React Native's Modal touch handling gets confused when nested modals close simultaneously
   const handleSuccessClose = () => {
     setShowSuccessModal(false);
     setTradeResult(null);
     setAmountInput('');
-    onClose(); // Close the entire bottom sheet
+    // Delay parent modal close to allow inner modal to properly unmount
+    setTimeout(() => {
+      onClose();
+    }, 150);
   };
 
   // Handle error modal close

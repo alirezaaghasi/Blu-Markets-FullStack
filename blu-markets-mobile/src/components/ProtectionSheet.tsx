@@ -238,11 +238,16 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
     }
   };
 
+  // BUG FIX: Close inner modal first, then parent with delay
+  // React Native's Modal touch handling gets confused when nested modals close simultaneously
   const handleSuccessClose = () => {
     setShowSuccess(false);
     setSuccessResult(null);
-    onClose();
-    onPurchaseComplete?.();
+    // Delay parent modal close to allow inner modal to properly unmount
+    setTimeout(() => {
+      onClose();
+      onPurchaseComplete?.();
+    }, 150);
   };
 
   // Show empty state if no eligible holdings
