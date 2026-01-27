@@ -226,9 +226,9 @@ export const ConfirmTradeModal: React.FC<ConfirmTradeModalProps> = ({
                   </View>
 
                   {/* Friction Copy */}
-                  {(preview.frictionCopy?.length ?? 0) > 0 && (
+                  {Array.isArray(preview.frictionCopy) && preview.frictionCopy.length > 0 && (
                     <View style={styles.frictionCopy}>
-                      {(preview.frictionCopy ?? []).map((copy, index) => (
+                      {preview.frictionCopy.map((copy, index) => (
                         <Text key={index} style={[styles.frictionText, { color: boundaryConfig.color }]}>
                           • {copy}
                         </Text>
