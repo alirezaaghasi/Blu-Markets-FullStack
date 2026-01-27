@@ -19,8 +19,9 @@ const isWeb = Platform.OS === 'web';
 // localStorage is vulnerable to XSS attacks - production web apps MUST use HttpOnly cookies
 const isProductionWeb = isWeb && process.env.NODE_ENV === 'production';
 
+// BUG-019 FIX: Throw error instead of just logging in production
 if (isProductionWeb) {
-  console.error(
+  throw new Error(
     '[SecureStorage] SECURITY ERROR: Web platform token storage is disabled in production. ' +
     'localStorage is vulnerable to XSS attacks. ' +
     'PRODUCTION WEB APPS MUST use HttpOnly cookies. ' +

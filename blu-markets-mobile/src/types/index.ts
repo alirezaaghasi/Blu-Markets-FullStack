@@ -42,6 +42,9 @@ export type PortfolioStatus = 'BALANCED' | 'SLIGHTLY_OFF' | 'ATTENTION_REQUIRED'
 
 export type LoanStatus = 'ACTIVE' | 'REPAID' | 'LIQUIDATED';
 
+// BUG-020 FIX: Proper type for backend-provided loan health status
+export type LoanHealthStatus = 'HEALTHY' | 'CAUTION' | 'WARNING' | 'CRITICAL';
+
 export type InstallmentStatus = 'PENDING' | 'PARTIAL' | 'PAID';
 
 // Onboarding Types
@@ -221,6 +224,10 @@ export interface Loan {
   paidIRR?: number; // Amount already paid
   installments: LoanInstallment[];
   installmentsPaid: number;
+  // BUG-020 FIX: Optional backend-provided fields (replaces `as any` casts)
+  healthStatus?: LoanHealthStatus; // Backend-calculated health status
+  remainingIrr?: number; // Remaining balance to repay
+  currentLtv?: number; // Current loan-to-value ratio
 }
 
 // Activity Feed Types

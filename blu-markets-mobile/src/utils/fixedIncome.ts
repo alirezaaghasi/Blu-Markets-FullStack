@@ -17,9 +17,10 @@
 // DELETION CANDIDATE: This file should be removed once backend provides
 // all fixed income values. Consider adding TODO to track removal.
 
-// BUG-009 FIX: Runtime guard to prevent production use
+// BUG-009/BUG-019 FIX: Runtime guard to prevent production use
+// In production, throw error instead of just logging (which pollutes logs)
 if (!__DEV__ && process.env.EXPO_PUBLIC_DEMO_MODE !== 'true') {
-  console.error('[SECURITY] fixedIncome.ts loaded in production - this should never happen');
+  throw new Error('[SECURITY] fixedIncome.ts loaded in production - backend must compute fixed income values');
 }
 
 export const FIXED_INCOME_UNIT_PRICE = 500_000;  // IRR per unit

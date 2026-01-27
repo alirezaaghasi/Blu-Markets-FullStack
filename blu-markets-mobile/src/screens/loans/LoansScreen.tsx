@@ -91,16 +91,15 @@ const LoansScreen: React.FC = () => {
   // This function provides a UI fallback when backend doesn't include health info
   // PRODUCTION: Backend should include { ltv, healthStatus } in loan response
   const getLoanHealth = (loan: Loan): { level: string; color: string } => {
-    // Prefer backend-provided health status if available
-    if ((loan as any).healthStatus) {
-      const status = (loan as any).healthStatus;
+    // BUG-020 FIX: Prefer backend-provided health status if available (properly typed)
+    if (loan.healthStatus) {
       const healthColors: Record<string, string> = {
         HEALTHY: colors.success,
         CAUTION: colors.warning,
         WARNING: colors.boundaryStructural,
         CRITICAL: colors.error,
       };
-      return { level: status, color: healthColors[status] || colors.textSecondary };
+      return { level: loan.healthStatus, color: healthColors[loan.healthStatus] || colors.textSecondary };
     }
 
     // UI FALLBACK ONLY - calculate health from local prices

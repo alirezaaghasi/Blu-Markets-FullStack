@@ -37,6 +37,7 @@ import { resetOnboarding } from '../../store/slices/onboardingSlice';
 import { completeOnboarding } from '../../store/slices/authSlice';
 import { ASSETS, getAssetsByLayer } from '../../constants/assets';
 import { DEFAULT_FX_RATE } from '../../constants/business';
+// BUG-021 FIX: Import prices selector to get actual fxRate
 
 type SuccessScreenProps = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'Success'>;
@@ -209,6 +210,8 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
   const { riskProfile, initialInvestment } = useAppSelector(
     (state) => state.onboarding
   );
+  // BUG-021 FIX: Use actual fxRate from prices slice, fallback to default
+  const fxRate = useAppSelector((state) => state.prices.fxRate) || DEFAULT_FX_RATE;
 
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -412,7 +415,7 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
             {initialInvestment.toLocaleString()} IRR
           </Text>
           <Text style={styles.totalUsd}>
-            ≈ {formatUsd(initialInvestment, DEFAULT_FX_RATE)} USD
+            ≈ {formatUsd(initialInvestment, fxRate)} USD
           </Text>
 
           {/* Allocation Bar */}

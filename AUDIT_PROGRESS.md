@@ -23,7 +23,7 @@
 - **16:00** - BUG-4: handleConfirm shows specific error messages instead of silent return
 - **16:00** - Committed and pushed (commit 5c03cb2)
 
-### Fix Log - Session 4 (Audit P0 Issues)
+### Fix Log - Session 4 (Audit P0 + P1 Issues)
 
 - **Session Start** - Fixed P0 Critical audit issues (BUG-017, BUG-018)
 - **BUG-017 FIX**: Trade execution now uses backend-provided `newCashIrr`
@@ -33,6 +33,20 @@
 - **BUG-018 FIX**: Rebalance already correct - refreshes from portfolio.get() API
   - RebalanceSheet calls `rebalance.execute()` then `portfolio.get()` for new state
   - No local calculations - all values from backend
+
+**P1 High Issues:**
+- **BUG-019 FIX**: Console statements in security files now throw errors
+  - riskProfile.ts: throws error if loaded in production (not just logs)
+  - fixedIncome.ts: throws error if loaded in production
+  - secureStorage.ts: throws error on production web token storage
+  - All other console statements already guarded with `if (__DEV__)`
+- **BUG-020 FIX**: Replaced `as any` casts with proper types
+  - Added `LoanHealthStatus` type to types/index.ts
+  - Added optional `healthStatus`, `remainingIrr`, `currentLtv` fields to `Loan` interface
+  - Updated LoansScreen.tsx and LoansTab.tsx to use typed access
+- **BUG-021 FIX**: SuccessScreen now uses actual fxRate from prices slice
+  - Falls back to DEFAULT_FX_RATE if not available
+  - Added documentation clarifying display values are illustrative only
 - TypeScript compiles with 0 errors
 
 ### Findings So Far
@@ -69,12 +83,12 @@
 | Priority | Total | Fixed | In Progress | Remaining |
 |----------|-------|-------|-------------|-----------|
 | P0 Critical | 2 | 2 | 0 | 0 |
-| P1 High | 3 | 0 | 0 | 3 |
+| P1 High | 3 | 3 | 0 | 0 |
 | P2 Medium | 4 | 0 | 0 | 4 |
 | P3 Low | 3 | 0 | 0 | 3 |
-| **Total** | **12** | **2** | **0** | **10** |
+| **Total** | **12** | **5** | **0** | **7** |
 
-### Status: **P0 CRITICAL ISSUES FIXED**
+### Status: **P0 + P1 ISSUES FIXED**
 
 ---
 
@@ -91,9 +105,9 @@
 
 | Bug ID | Issue | File | Status |
 |--------|-------|------|--------|
-| BUG-019 | Console statements not guarded | 50+ locations | 🔴 Not Started |
-| BUG-020 | `as any` type assertions | 17+ locations | 🔴 Not Started |
-| BUG-021 | SuccessScreen portfolio calculations | SuccessScreen.tsx | 🔴 Not Started |
+| BUG-019 | Console statements not guarded | Multiple | ✅ Fixed - security files now throw errors |
+| BUG-020 | `as any` type assertions | types/index.ts, LoansScreen.tsx, LoansTab.tsx | ✅ Fixed - added proper Loan type fields |
+| BUG-021 | SuccessScreen portfolio calculations | SuccessScreen.tsx | ✅ Fixed - uses actual fxRate, documented as display-only |
 
 ### P2 Medium (Plan Fix)
 

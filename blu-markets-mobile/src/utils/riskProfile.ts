@@ -18,9 +18,10 @@
 // DELETION CANDIDATE: Consider deleting this file and having mock API
 // return hardcoded test profiles instead of computing them.
 
-// BUG-008 FIX: Runtime guard to prevent production use
+// BUG-008/BUG-019 FIX: Runtime guard to prevent production use
+// In production, throw error instead of just logging (which pollutes logs)
 if (!__DEV__ && process.env.EXPO_PUBLIC_DEMO_MODE !== 'true') {
-  console.error('[SECURITY] riskProfile.ts loaded in production - this should never happen');
+  throw new Error('[SECURITY] riskProfile.ts loaded in production - backend must compute risk profiles');
 }
 
 import { RiskProfile, TargetLayerPct } from '../types';

@@ -266,9 +266,9 @@ function LoanCard({
     ? Math.ceil((new Date(nextInstallment.dueISO).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : null;
 
-  // BUG-012 FIX: Prefer backend-provided remainingIrr; calculation is fallback only
+  // BUG-012/BUG-020 FIX: Prefer backend-provided remainingIrr; calculation is fallback only
   // Backend loans.getAll API should return remainingIrr for each loan
-  const remainingIRR = (loan as any).remainingIrr ?? (
+  const remainingIRR = loan.remainingIrr ?? (
     installments.length > 0
       ? installments
           .filter((i) => i.status !== 'PAID')
