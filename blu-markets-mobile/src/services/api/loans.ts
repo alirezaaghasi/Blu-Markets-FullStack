@@ -24,6 +24,10 @@ function validateLoan(data: unknown): Loan | null {
   if (typeof loan.status !== 'string') return null;
 
   // Optional fields with defaults
+  // Backend returns durationMonths, convert to durationDays for frontend
+  const durationMonths = typeof loan.durationMonths === 'number' ? loan.durationMonths : 3;
+  const durationDays = (durationMonths === 3 ? 90 : durationMonths === 6 ? 180 : durationMonths * 30) as 90 | 180;
+
   return {
     id: loan.id,
     collateralAssetId: loan.collateralAssetId,
@@ -31,7 +35,7 @@ function validateLoan(data: unknown): Loan | null {
     amountIRR: loan.amountIRR,
     dailyInterestRate: typeof loan.dailyInterestRate === 'number' ? loan.dailyInterestRate : 0,
     interestRate: typeof loan.interestRate === 'number' ? loan.interestRate : undefined,
-    durationDays: typeof loan.durationDays === 'number' ? loan.durationDays as 90 | 180 : 90,
+    durationDays: typeof loan.durationDays === 'number' ? loan.durationDays as 90 | 180 : durationDays,
     startISO: typeof loan.startISO === 'string' ? loan.startISO : new Date().toISOString(),
     dueISO: typeof loan.dueISO === 'string' ? loan.dueISO : new Date().toISOString(),
     status: loan.status as 'ACTIVE' | 'REPAID' | 'DEFAULTED',
@@ -97,22 +101,25 @@ export const loans = {
   },
 
   // Get loan calculation preview from backend (all business logic on server)
-  // BUG-002 FIX: Pass durationDays directly to backend; backend derives months internally
-  // Frontend must NOT convert days to months (durationDays / 30 is prohibited)
+  // Backend expects durationMonths (3 or 6), frontend uses durationDays (90 or 180)
   preview: async (collateralAssetId: string, amountIrr: number, durationDays: 90 | 180): Promise<LoanPreviewResponse> => {
+    // Convert days to months for backend API
+    const durationMonths = durationDays === 90 ? 3 : 6;
     const data = await apiClient.post('/loans/preview', {
       collateralAssetId,
       amountIrr,
-      durationDays, // Pass days directly, backend handles conversion
+      durationMonths,
     }) as unknown as ApiResponse<LoanPreviewResponse>;
     return data;
   },
 
   // Create a loan with collateral asset (duration in days: 90 or 180 = 3 or 6 months)
-  // BUG-002 FIX: Pass durationDays directly to backend; backend derives months internally
+  // Backend expects durationMonths (3 or 6), frontend uses durationDays (90 or 180)
   // BUG-014 FIX: Response is validated before returning
   create: async (collateralAssetId: string, amountIrr: number, durationDays: 90 | 180): Promise<Loan> => {
-    const response = await apiClient.post('/loans', { collateralAssetId, amountIrr, durationDays }) as unknown;
+    // Convert days to months for backend API
+    const durationMonths = durationDays === 90 ? 3 : 6;
+    const response = await apiClient.post('/loans', { collateralAssetId, amountIrr, durationMonths }) as unknown;
 
     // Handle wrapped response { loan: {...} } or direct Loan response
     let loanData: unknown;
