@@ -2,6 +2,51 @@
 
 ---
 
+# Session 3: 2026-01-27 — User-Reported Bug Fixes
+
+## Current Work: 4 Critical User-Reported Bugs
+
+| Bug | Severity | Issue | Status |
+|-----|----------|-------|--------|
+| **BUG-1** | P0 | Activity Log shows only dots, no text (6th report!) | 🟡 Debug output added |
+| **BUG-2** | P0 | "Review Trade" button does nothing | 🔴 Investigation needed |
+| **BUG-3** | P0 | Loan "Confirm" button always disabled | 🔴 Investigation needed |
+| **BUG-4** | P1 | Home "Insure Assets" button fails | 🔴 Investigation needed |
+
+### Fix Log - Session 3
+
+- **15:40** - Added visible debug output to Activity Log section
+- **15:40** - Debug shows: entry count, loading state, first entry type/message
+- **15:40** - Will help identify if data is missing or rendering issue
+- **PENDING** - Wait for user to test and report debug output
+
+### Findings So Far
+
+**BUG-1 (Activity Log):**
+- Code structure looks correct (dot + Text elements for message/time)
+- Styles specify correct colors (primary/white for text)
+- `formatActivityMessage` has comprehensive switch cases
+- Added debug output to see actual data on screen
+
+**BUG-2 (Trade Review button):**
+- Button has `onPress={handleReviewTrade}` handler
+- `handleReviewTrade` opens `ConfirmTradeModal` if `validation.ok && preview`
+- Possible cause: `validation.ok = false` disabling button
+- Possible cause: `preview = null` causing early return
+
+**BUG-3 (Loan Confirm):**
+- LoanSheet HAS all UI elements (amount input, duration selector, summary)
+- UI only shows when `selectedAssetId` is not null
+- `isValid = validationErrors.length === 0 && amountIRR > 0`
+- Confirm button disabled if `!isValid`
+
+**BUG-4 (Home Protection):**
+- Home button opens same `ProtectionSheet` component
+- Uses `protectionApi.purchase()` requiring `quoteId` from `getQuote`
+- Error may occur if quote fetching fails
+
+---
+
 # Session 2: 2026-01-27 — New Comprehensive Audit
 
 ## Current Status
