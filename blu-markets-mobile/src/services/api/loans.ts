@@ -20,7 +20,10 @@ function validateLoan(data: unknown): Loan | null {
   // Required fields
   if (typeof loan.id !== 'string') return null;
   if (typeof loan.collateralAssetId !== 'string') return null;
-  if (typeof loan.amountIRR !== 'number') return null;
+  // Backend returns principalIrr, frontend uses amountIRR - accept both
+  const amountIRR = typeof loan.amountIRR === 'number' ? loan.amountIRR :
+                    typeof loan.principalIrr === 'number' ? loan.principalIrr : null;
+  if (amountIRR === null) return null;
   if (typeof loan.status !== 'string') return null;
 
   // Optional fields with defaults
@@ -32,17 +35,25 @@ function validateLoan(data: unknown): Loan | null {
     id: loan.id,
     collateralAssetId: loan.collateralAssetId,
     collateralQuantity: typeof loan.collateralQuantity === 'number' ? loan.collateralQuantity : 0,
-    amountIRR: loan.amountIRR,
+    amountIRR,
     dailyInterestRate: typeof loan.dailyInterestRate === 'number' ? loan.dailyInterestRate : 0,
     interestRate: typeof loan.interestRate === 'number' ? loan.interestRate : undefined,
     durationDays: typeof loan.durationDays === 'number' ? loan.durationDays as 90 | 180 : durationDays,
-    startISO: typeof loan.startISO === 'string' ? loan.startISO : new Date().toISOString(),
-    dueISO: typeof loan.dueISO === 'string' ? loan.dueISO : new Date().toISOString(),
+    // Backend uses startDate/dueDate, frontend uses startISO/dueISO - accept both
+    startISO: typeof loan.startISO === 'string' ? loan.startISO :
+              typeof loan.startDate === 'string' ? loan.startDate : new Date().toISOString(),
+    dueISO: typeof loan.dueISO === 'string' ? loan.dueISO :
+            typeof loan.dueDate === 'string' ? loan.dueDate : new Date().toISOString(),
     status: loan.status as 'ACTIVE' | 'REPAID' | 'DEFAULTED',
-    totalInterestIRR: typeof loan.totalInterestIRR === 'number' ? loan.totalInterestIRR : 0,
-    totalRepaymentIRR: typeof loan.totalRepaymentIRR === 'number' ? loan.totalRepaymentIRR : loan.amountIRR,
-    totalDueIRR: typeof loan.totalDueIRR === 'number' ? loan.totalDueIRR : loan.amountIRR,
-    paidIRR: typeof loan.paidIRR === 'number' ? loan.paidIRR : 0,
+    // Backend uses lowercase Irr suffix, frontend uses uppercase IRR - accept both
+    totalInterestIRR: typeof loan.totalInterestIRR === 'number' ? loan.totalInterestIRR :
+                      typeof loan.totalInterestIrr === 'number' ? loan.totalInterestIrr : 0,
+    totalRepaymentIRR: typeof loan.totalRepaymentIRR === 'number' ? loan.totalRepaymentIRR :
+                       typeof loan.totalRepaymentIrr === 'number' ? loan.totalRepaymentIrr : amountIRR,
+    totalDueIRR: typeof loan.totalDueIRR === 'number' ? loan.totalDueIRR :
+                 typeof loan.totalDueIrr === 'number' ? loan.totalDueIrr : amountIRR,
+    paidIRR: typeof loan.paidIRR === 'number' ? loan.paidIRR :
+             typeof loan.paidIrr === 'number' ? loan.paidIrr : 0,
     installments: Array.isArray(loan.installments) ? loan.installments : [],
     installmentsPaid: typeof loan.installmentsPaid === 'number' ? loan.installmentsPaid : 0,
   } as Loan;
