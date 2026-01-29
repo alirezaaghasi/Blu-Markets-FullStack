@@ -641,8 +641,16 @@ Weight[i] = normalize(
 ### 6.2 Factor Calculations
 
 ```typescript
-// 1. Risk Parity Weight (inverse volatility)
-const riskParityWeight = (1 / volatility) / totalInverseVolatility;
+// 1. Risk Parity Weight (layerWeight base with volatility adjustment)
+// Uses configured layerWeight as base, NOT pure inverse volatility
+// This preserves intended asset allocations while still favoring lower volatility
+const baseWeight = assetConfig.layerWeight;  // From ASSETS_CONFIG (e.g., 0.20 for SOL in UPSIDE)
+const volatility = calculateVolatility(asset);  // From price history or baseVolatility config
+const avgVolatility = 0.30;  // Approximate average across all assets
+const volatilityRatio = avgVolatility / Math.max(volatility, 0.01);
+// Apply mild ±15% adjustment (not pure inverse volatility)
+const volatilityAdjustment = Math.max(0.85, Math.min(1.15, 0.85 + (volatilityRatio - 1) * 0.15));
+const riskParityWeight = baseWeight * volatilityAdjustment;
 
 // 2. Momentum Factor
 const momentum = (currentPrice - sma50) / sma50;  // Range: -1 to 1
@@ -655,9 +663,12 @@ const correlationFactor = 1 - (avgCorrelation * CORRELATION_PENALTY);
 // CORRELATION_PENALTY = 0.2 (default)
 
 // 4. Liquidity Factor
-const liquidityFactor = 1 + (liquidityScore * LIQUIDITY_BONUS);
+const liquidityFactor = 1 + ((liquidityScore - 0.80) * LIQUIDITY_BONUS);
 // LIQUIDITY_BONUS = 0.1 (default)
+// liquidityScore from ASSETS_CONFIG (0.0 - 1.0, baseline 0.80)
 ```
+
+**Note:** The HRAM algorithm uses configured `layerWeight` values as the primary allocation driver, with market factors (volatility, momentum, correlation, liquidity) applying small adjustments. This ensures assets maintain their intended allocation ratios while dynamically adapting to market conditions.
 
 ### 6.3 Strategy Presets
 

@@ -1,6 +1,7 @@
 import { prisma } from '../../config/database.js';
 import { AppError } from '../../middleware/error-handler.js';
 import { getAssetPrice, getCurrentFxRate } from '../../services/price-fetcher.service.js';
+import { logger } from '../../utils/logger.js';
 import {
   getPortfolioSnapshot,
   getAssetLayer,
@@ -122,9 +123,9 @@ export async function previewTrade(
   // MONEY FIX M-02: Use Decimal arithmetic for money calculations
   // Calculate trade details with layer-based spread
   const spread = getSpreadForAsset(assetId);
-  const amountDecimal = toDecimal(amountIrr);
-  const spreadAmountDecimal = roundIrr(multiply(amountDecimal, spread));
-  const spreadAmountIrr = toNumber(spreadAmountDecimal);
+  let amountDecimal = toDecimal(amountIrr);
+  let spreadAmountDecimal = roundIrr(multiply(amountDecimal, spread));
+  let spreadAmountIrr = toNumber(spreadAmountDecimal);
   const effectiveAmountDecimal = action === 'BUY'
     ? subtract(amountDecimal, spreadAmountDecimal)
     : amountDecimal;
@@ -157,6 +158,17 @@ export async function previewTrade(
 
   if (action === 'SELL') {
     const holding = snapshot.holdings.find((h) => h.assetId === assetId);
+
+    // DEBUG: Log sell validation details
+    logger.info('SELL trade validation', {
+      assetId,
+      requestedAmountIrr: amountIrr,
+      calculatedQuantity: quantity,
+      holdingQuantity: holding?.quantity,
+      holdingFrozen: holding?.frozen,
+      priceIrr: price.priceIrr,
+    });
+
     if (!holding || holding.quantity <= 0) {
       return {
         valid: false,
@@ -180,36 +192,33 @@ export async function previewTrade(
       };
     }
 
-    // BUG FIX: Handle "sell all" scenarios where floating-point precision causes
-    // calculated quantity to slightly exceed holding quantity.
-    // If quantity exceeds holding by less than 0.1%, cap it to the holding amount.
+    // BUG FIX: Handle "sell all" scenarios where frontend sends more than holding value
+    // This can happen due to:
+    // 1. Price differences between frontend and backend
+    // 2. Stale prices in frontend cache
+    // 3. Frontend calculation errors
+    // Solution: If user is trying to sell more than they have, cap it to sell all
     if (quantity > holding.quantity) {
-      const tolerance = holding.quantity * 0.001; // 0.1% tolerance
-      if (quantity - holding.quantity <= tolerance) {
-        // Cap quantity to available holding (sell all)
-        quantity = holding.quantity;
-      } else {
-        return {
-          valid: false,
-          preview: {
-            action,
-            assetId,
-            quantity,
-            amountIrr,
-            priceIrr: price.priceIrr,
-            spread: getSpreadForAsset(assetId),
-            spreadAmountIrr,
-          },
-          allocation: {
-            before: snapshot.allocation,
-            target: snapshot.targetAllocation,
-            after: snapshot.allocation,
-          },
-          boundary: 'SAFE',
-          movesToward: false,
-          error: 'Insufficient holdings',
-        };
-      }
+      // Calculate max sell value (what the user actually has)
+      const maxSellValueIrr = holding.quantity * price.priceIrr;
+
+      // Log the mismatch for debugging
+      logger.info('SELL amount exceeds holding - capping to sell all', {
+        assetId,
+        requestedQuantity: quantity,
+        holdingQuantity: holding.quantity,
+        requestedAmountIrr: amountIrr,
+        maxSellValueIrr,
+        ratio: quantity / holding.quantity,
+      });
+
+      // Cap to sell all - user clearly wants to sell everything
+      quantity = holding.quantity;
+      // Recalculate the IRR amount based on actual quantity
+      amountIrr = toNumber(roundIrr(multiply(quantity, price.priceIrr)));
+      // Recalculate spread
+      const newSpreadAmountDecimal = roundIrr(multiply(amountIrr, spread));
+      spreadAmountIrr = toNumber(newSpreadAmountDecimal);
     }
 
     // Check if asset is frozen (collateral)
@@ -341,7 +350,26 @@ export async function executeTrade(
 
     // MONEY FIX M-02: Recalculate trade values with current price using Decimal arithmetic
     const spread = getSpreadForAsset(assetId);
-    const amountDecimal = toDecimal(amountIrr);
+    let effectiveAmountIrr = amountIrr;
+
+    // For SELL: If requested amount exceeds holding value, cap to sell all
+    if (action === 'SELL') {
+      const existingHolding = currentPortfolio.holdings.find((h) => h.assetId === assetId);
+      if (existingHolding) {
+        const maxSellValueIrr = Number(existingHolding.quantity) * currentPrice.priceIrr;
+        if (amountIrr > maxSellValueIrr) {
+          logger.info('executeTrade: SELL amount exceeds holding - capping to sell all', {
+            assetId,
+            requestedAmountIrr: amountIrr,
+            maxSellValueIrr,
+            holdingQuantity: Number(existingHolding.quantity),
+          });
+          effectiveAmountIrr = maxSellValueIrr;
+        }
+      }
+    }
+
+    const amountDecimal = toDecimal(effectiveAmountIrr);
     const spreadAmountDecimal = roundIrr(multiply(amountDecimal, spread));
     const spreadAmountIrr = toNumber(spreadAmountDecimal);
     const effectiveAmountDecimal = action === 'BUY'
@@ -400,7 +428,16 @@ export async function executeTrade(
       }
 
       const currentQuantity = Number(existingHolding.quantity);
-      if (currentQuantity < quantity) {
+      // Allow 1% tolerance for sell-all scenarios (floating-point precision)
+      const tolerance = currentQuantity * 0.01;
+      if (currentQuantity + tolerance < quantity) {
+        logger.warn('SELL quantity exceeds holding after capping - possible precision issue', {
+          assetId,
+          quantity,
+          currentQuantity,
+          tolerance,
+          diff: quantity - currentQuantity,
+        });
         throw new AppError('INSUFFICIENT_HOLDINGS', 'Insufficient holdings (concurrent modification)', 400);
       }
 
@@ -408,9 +445,18 @@ export async function executeTrade(
         throw new AppError('ASSET_FROZEN', 'Asset is frozen as loan collateral', 400);
       }
 
+      // Determine if this is a "sell all" scenario
+      // If quantity is within 1% of the total holding, sell everything
+      const isSellAll = quantity >= currentQuantity * 0.99;
+      const actualQuantityToSell = isSellAll ? currentQuantity : quantity;
+
+      // Recalculate amount based on actual quantity we're selling
+      const actualAmountIrr = toNumber(roundIrr(multiply(actualQuantityToSell, priceIrr)));
+      const actualSpreadIrr = toNumber(roundIrr(multiply(actualAmountIrr, spread)));
+
       // RACE CONDITION FIX: Use atomic increment for cash addition
       // Combined with FOR UPDATE lock, this provides defense-in-depth
-      const cashReceivedDecimal = subtract(amountIrr, spreadAmountIrr);
+      const cashReceivedDecimal = subtract(actualAmountIrr, actualSpreadIrr);
       const cashReceived = toNumber(roundIrr(cashReceivedDecimal));
       const updatedPortfolio = await tx.portfolio.update({
         where: { id: portfolio.id },
@@ -418,17 +464,24 @@ export async function executeTrade(
       });
       newCashIrr = Number(updatedPortfolio.cashIrr);
 
-      // RACE CONDITION FIX: Use atomic decrement for holding reduction
-      const updatedHolding = await tx.holding.update({
-        where: { id: existingHolding.id },
-        data: { quantity: { decrement: quantity } },
-      });
-      holdingQuantity = Number(updatedHolding.quantity);
-
-      // Remove holding if negligible (cleanup after atomic operation)
-      if (holdingQuantity <= 0.00000001) {
+      if (isSellAll) {
+        // Delete the holding entirely for sell-all
         await tx.holding.delete({ where: { id: existingHolding.id } });
         holdingQuantity = 0;
+        logger.info('Sell-all completed - holding deleted', { assetId, soldQuantity: actualQuantityToSell });
+      } else {
+        // RACE CONDITION FIX: Use atomic decrement for holding reduction
+        const updatedHolding = await tx.holding.update({
+          where: { id: existingHolding.id },
+          data: { quantity: { decrement: actualQuantityToSell } },
+        });
+        holdingQuantity = Number(updatedHolding.quantity);
+
+        // Remove holding if negligible (cleanup after atomic operation)
+        if (holdingQuantity <= 0.00000001) {
+          await tx.holding.delete({ where: { id: existingHolding.id } });
+          holdingQuantity = 0;
+        }
       }
     }
 

@@ -144,6 +144,11 @@ const pricesSlice = createSlice({
     setPrices: (state, action: PayloadAction<Record<AssetId, number>>) => {
       state.prices = action.payload;
     },
+    // BUG FIX: Add setPricesIrr to restore IRR prices from cache
+    // Without this, the app falls back to USD*fxRate which can be wrong if DEFAULT_PRICES has stale values
+    setPricesIrr: (state, action: PayloadAction<Record<AssetId, number>>) => {
+      state.pricesIrr = action.payload;
+    },
     setFxRate: (
       state,
       action: PayloadAction<{ rate: number; source: 'bonbast' | 'fallback' }>
@@ -242,6 +247,7 @@ const pricesSlice = createSlice({
 export const {
   setPrice,
   setPrices,
+  setPricesIrr,
   setFxRate,
   setDefaultPrices,
   clearError,

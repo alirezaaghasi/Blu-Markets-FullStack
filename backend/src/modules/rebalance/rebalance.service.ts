@@ -27,7 +27,8 @@ import {
   Decimal,
 } from '../../utils/money.js';
 import { logger } from '../../utils/logger.js';
-import { getLayerWeights, getLayerAssets, ASSETS_CONFIG } from '../../config/assets.js';
+import { getLayerAssets, ASSETS_CONFIG } from '../../config/assets.js';
+import { getDynamicLayerWeights, type StrategyPreset } from '../../services/intra-layer-balancer.js';
 
 // Rebalance modes per PRD Section 18.3
 export type RebalanceMode = 'HOLDINGS_ONLY' | 'HOLDINGS_PLUS_CASH' | 'SMART';
@@ -643,10 +644,12 @@ function generateLayerBuyTrades(
   layer: Layer,
   layerBuyAmount: number,
   layerHoldings: LayerHoldings,
-  prices: Map<AssetId, { priceIrr: number }>
+  prices: Map<AssetId, { priceIrr: number }>,
+  strategy: StrategyPreset = 'BALANCED'
 ): RebalanceTrade[] {
   const trades: RebalanceTrade[] = [];
-  const layerWeights = getLayerWeights(layer);
+  // Use HRAM dynamic weights instead of static weights
+  const layerWeights = getDynamicLayerWeights(layer, strategy);
   const layerAssets = getLayerAssets(layer);
 
   // Calculate current weights within layer

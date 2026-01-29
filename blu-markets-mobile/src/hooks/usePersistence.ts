@@ -13,7 +13,7 @@ import {
 import { initializePortfolio, setTargetLayerPct } from '../store/slices/portfolioSlice';
 import { setAuthToken, setPhone } from '../store/slices/authSlice';
 import { setRiskProfile, setConsent, setInitialInvestment } from '../store/slices/onboardingSlice';
-import { setPrices, setFxRate } from '../store/slices/pricesSlice';
+import { setPrices, setPricesIrr, setFxRate } from '../store/slices/pricesSlice';
 
 // Debounce time for saving (prevent too frequent writes)
 const DEBOUNCE_MS = 1000;
@@ -84,6 +84,10 @@ export const usePersistence = () => {
             rate: data.pricesCache.fxRate,
             source: data.pricesCache.fxSource || 'fallback',
           }));
+        }
+        // BUG FIX: Also restore pricesIrr to prevent fallback to wrong USD*fxRate calculation
+        if (data.pricesCache.pricesIrr) {
+          dispatch(setPricesIrr(data.pricesCache.pricesIrr));
         }
       }
 
