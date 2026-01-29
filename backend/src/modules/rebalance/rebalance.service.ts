@@ -577,11 +577,12 @@ function generateRebalanceTrades(
   ); // Need to sell
   const underweight = gapAnalysis.filter((g) => {
     if (useIrrGaps) {
-      // Layer is underweight only if:
-      // - gapIrr > MIN_TRADE_AMOUNT (needs buying to reach target value)
-      // - AND gap > -5 (not already significantly overweight by percentage)
-      // This prevents buying Upside when it's 38% of holdings but target is 10%
-      return g.gapIrr > MIN_TRADE_AMOUNT && g.gap > -5;
+      // Layer is underweight only if gapIrr > MIN_TRADE_AMOUNT (needs buying to reach target value)
+      // In HOLDINGS_PLUS_CASH mode, if gapIrr is positive, the layer needs cash deployed
+      // to reach its target % of the TOTAL portfolio (holdings + cash).
+      // We should NOT filter by current holdings % - the whole point is to deploy cash
+      // to bring all layers to their target allocation of the larger total.
+      return g.gapIrr > MIN_TRADE_AMOUNT;
     }
     return g.gap > 1;
   }); // Need to buy
