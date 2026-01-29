@@ -5,11 +5,12 @@ import { prisma } from '../../config/database.js';
 import { AppError } from '../../middleware/error-handler.js';
 import { getPortfolioSnapshot, classifyBoundary, getAssetLayer } from '../portfolio/portfolio.service.js';
 import { getCurrentPrices } from '../../services/price-fetcher.service.js';
-import type {
-  AssetId,
-  Layer,
-  PortfolioSnapshot,
-  Boundary,
+import {
+  REBALANCE_COOLDOWN_HOURS,
+  type AssetId,
+  type Layer,
+  type PortfolioSnapshot,
+  type Boundary,
 } from '../../types/domain.js';
 import type { RebalancePreviewResponse, RebalanceTrade, GapAnalysis } from '../../types/api.js';
 import {
@@ -48,9 +49,7 @@ const SPREAD_BY_LAYER: Record<Layer, number> = {
 
 // Minimum trade amount (per PRD: 100,000 IRR)
 const MIN_TRADE_AMOUNT = 100_000;
-
-// Cooldown period in hours (set to 0 for testing)
-const REBALANCE_COOLDOWN_HOURS = 0;
+// REBALANCE_COOLDOWN_HOURS imported from domain.ts (24 hours)
 
 interface LayerHoldings {
   frozen: { assetId: AssetId; quantity: number; valueIrr: number }[];

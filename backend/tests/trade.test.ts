@@ -43,6 +43,11 @@ vi.mock('../src/modules/portfolio/portfolio.service.js', () => ({
 vi.mock('../src/services/price-fetcher.service.js', () => ({
   getAssetPrice: vi.fn(),
   getCurrentFxRate: vi.fn(),
+  getCurrentPrices: vi.fn().mockResolvedValue(new Map([
+    ['BTC', { priceUsd: 97500, priceIrr: 60450000000 }],
+    ['ETH', { priceUsd: 3500, priceIrr: 2170000000 }],
+    ['USDT', { priceUsd: 1, priceIrr: 620000 }],
+  ])),
 }));
 
 import { getPortfolioSnapshot, classifyBoundary } from '../src/modules/portfolio/portfolio.service.js';
@@ -94,7 +99,9 @@ describe('Trade Service', () => {
       expect(result.error).toContain('Insufficient cash');
     });
 
-    it('should reject SELL when insufficient holdings', async () => {
+    it('should cap SELL to available holdings (sell-all behavior)', async () => {
+      // BUG FIX: Trade service now caps sell amount to available holdings
+      // instead of rejecting the trade, enabling "sell all" functionality
       vi.mocked(getPortfolioSnapshot).mockResolvedValue({
         ...mockSnapshot,
         holdings: [
@@ -102,11 +109,13 @@ describe('Trade Service', () => {
         ],
       } as any);
       vi.mocked(getAssetPrice).mockResolvedValue(mockBtcPrice as any);
+      vi.mocked(classifyBoundary).mockReturnValue('SAFE');
 
       const result = await previewTrade('user-123', 'SELL', 'BTC', 50000000);
 
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain('Insufficient holdings');
+      // Trade is valid but capped to available quantity
+      expect(result.valid).toBe(true);
+      expect(result.preview.quantity).toBe(0.0001); // Capped to holding quantity
     });
 
     it('should reject SELL of frozen holdings', async () => {
@@ -230,10 +239,12 @@ describe('Trade Service', () => {
       vi.mocked(prisma.portfolio.findUnique).mockResolvedValue(mockPortfolio as any);
       vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) => {
         // Transaction client needs findUnique for re-validation inside transaction
+        // Also needs $executeRaw for row-level locking (FOR UPDATE)
         return callback({
+          $executeRaw: vi.fn().mockResolvedValue(1), // Row-level lock mock
           portfolio: {
             findUnique: vi.fn().mockResolvedValue(mockPortfolio),
-            update: vi.fn(),
+            update: vi.fn().mockResolvedValue({ ...mockPortfolio, cashIrr: 90000000n }),
           },
           holding: { update: vi.fn().mockResolvedValue({ quantity: 0.003 }), create: vi.fn() },
           ledgerEntry: { create: vi.fn().mockResolvedValue({ id: 'ledger-123' }) },
