@@ -42,8 +42,8 @@ import { trade } from '../services/api';
 import { ConfirmTradeModal } from './ConfirmTradeModal';
 import { TradeSuccessModal } from './TradeSuccessModal';
 import { TradeErrorModal } from './TradeErrorModal';
-// RTK Query - auto-invalidates portfolio cache after trade
-import { useExecuteTradeMutation } from '../store/api/apiSlice';
+// RTK Query for refetching portfolio after trade
+import { apiSlice } from '../store/api/apiSlice';
 
 interface TradeBottomSheetProps {
   visible: boolean;
@@ -137,8 +137,6 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
   const [tradeResult, setTradeResult] = useState<TradeResult | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // RTK Query mutation - auto-invalidates portfolio cache after trade
-  const [executeTrade] = useExecuteTradeMutation();
 
   const asset = ASSETS[assetId];
   // Guard: If asset not found, use defaults to prevent crashes
@@ -245,11 +243,13 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
   // Backend-derived trade preview
   const [preview, setPreview] = useState<TradePreview | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   // Fetch preview from backend when trade parameters change
   useEffect(() => {
     if (amountIRR < MIN_TRADE_AMOUNT) {
       setPreview(null);
+      setPreviewError(null);
       return;
     }
 
@@ -258,12 +258,22 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
     const timeoutId = setTimeout(async () => {
       if (!isMounted) return;
       setIsLoadingPreview(true);
+      setPreviewError(null);
       try {
         const previewData = await trade.preview(assetId, side, amountIRR);
         if (isMounted) setPreview(previewData);
-      } catch (error) {
+      } catch (error: any) {
         if (__DEV__) console.error('Failed to fetch trade preview:', error);
-        if (isMounted) setPreview(null);
+        if (isMounted) {
+          setPreview(null);
+          // Extract meaningful error message
+          const errorMsg = error?.message || error?.error?.message || 'Failed to load preview';
+          if (errorMsg.includes('token') || errorMsg.includes('unauthorized') || errorMsg.includes('401')) {
+            setPreviewError('Session expired. Please log in again.');
+          } else {
+            setPreviewError(errorMsg);
+          }
+        }
       } finally {
         if (isMounted) setIsLoadingPreview(false);
       }
@@ -311,7 +321,7 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
       return;
     }
     if (!preview) {
-      Alert.alert('Preview Not Ready', 'Unable to get trade preview. Please try again.');
+      Alert.alert('Preview Not Ready', previewError || 'Unable to get trade preview. Please try again.');
       return;
     }
     if ((preview.quantity ?? 0) <= 0) {
@@ -327,18 +337,21 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
 
     setIsSubmitting(true);
     try {
-      // Execute trade via RTK Query mutation
-      // This automatically invalidates 'Portfolio' and 'Holdings' tags
-      // The usePortfolioSync hook will refetch and sync to Redux
-      const response = await executeTrade({ assetId, side, amountIrr: amountIRR }).unwrap();
+      // Execute trade via services/api (respects DEMO_MODE like preview does)
+      // In demo mode, this uses mock API; in production, uses real backend
+      const response = await trade.execute(assetId, side, amountIRR);
 
       if (__DEV__) {
-        console.log('[TradeBottomSheet] Trade executed via RTK Query:', {
+        console.log('[TradeBottomSheet] Trade executed:', {
           tradeId: response.tradeId,
           newCashIrr: response.newCashIrr,
           newHoldingQuantity: response.newHoldingQuantity,
         });
       }
+
+      // Invalidate RTK Query cache to trigger portfolio refetch
+      // This ensures Redux state is updated with new balances from backend
+      dispatch(apiSlice.util.invalidateTags(['Portfolio', 'Holdings', 'Activity']));
 
       // Log action to local activity feed
       dispatch(logAction({
@@ -533,17 +546,27 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
                   <View style={styles.allocationBars}>
                     <View style={styles.allocationBarRow}>
                       <Text style={styles.allocationBarLabel}>Before</Text>
+                      <Text style={styles.allocationBarPct}>
+                        {Math.round((preview.before.FOUNDATION || 0) * 100)}/{Math.round((preview.before.GROWTH || 0) * 100)}/{Math.round((preview.before.UPSIDE || 0) * 100)}
+                      </Text>
                       <AllocationBar current={preview.before} target={targetLayerPct} compact />
                     </View>
                     <View style={styles.allocationBarRow}>
                       <Text style={styles.allocationBarLabel}>After</Text>
+                      <Text style={styles.allocationBarPct}>
+                        {Math.round((preview.after.FOUNDATION || 0) * 100)}/{Math.round((preview.after.GROWTH || 0) * 100)}/{Math.round((preview.after.UPSIDE || 0) * 100)}
+                      </Text>
                       <AllocationBar current={preview.after} target={targetLayerPct} compact />
                     </View>
                     <View style={styles.allocationBarRow}>
                       <Text style={styles.allocationBarLabel}>Target</Text>
+                      <Text style={styles.allocationBarPct}>
+                        {Math.round((targetLayerPct.FOUNDATION || 0) * 100)}/{Math.round((targetLayerPct.GROWTH || 0) * 100)}/{Math.round((targetLayerPct.UPSIDE || 0) * 100)}
+                      </Text>
                       <AllocationBar current={targetLayerPct} target={targetLayerPct} compact />
                     </View>
                   </View>
+                  <Text style={styles.allocationLegend}>F / G / U %</Text>
                 </View>
                 )}
 
@@ -975,9 +998,23 @@ const styles = StyleSheet.create({
     gap: SPACING[2],
   },
   allocationBarLabel: {
-    width: 50,
+    width: 45,
     fontSize: TYPOGRAPHY.fontSize.xs,
     color: COLORS.text.secondary,
+  },
+  allocationBarPct: {
+    width: 65,
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.text.primary,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  allocationLegend: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.text.secondary,
+    textAlign: 'right',
+    marginTop: SPACING[2],
+    fontStyle: 'italic',
   },
   boundaryIndicator: {
     flexDirection: 'row',
