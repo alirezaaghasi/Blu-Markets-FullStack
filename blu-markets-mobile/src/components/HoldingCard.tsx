@@ -100,8 +100,6 @@ export const HoldingCard: React.FC<HoldingCardProps> = ({
         <View style={styles.infoContainer}>
           <View style={styles.nameRow}>
             <Text style={styles.assetName}>{asset.name}</Text>
-            <Text style={styles.assetSymbol}> | {asset.symbol}</Text>
-
             {holding.frozen && (
               <View style={styles.frozenBadge}>
                 <Text style={styles.frozenText}>🔒</Text>

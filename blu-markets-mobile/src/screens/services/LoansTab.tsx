@@ -166,9 +166,9 @@ export function LoansTab({ loanId }: LoansTabProps) {
               </View>
               <View style={styles.stepContent}>
                 <Text style={styles.stepTitle}>Get Instant IRR</Text>
-                {/* BUG-012 FIX: LTV varies by asset layer (70%/50%/30%) */}
+                {/* BUG-012 FIX: Loan percentage varies by asset layer (70%/50%/30%) */}
                 <Text style={styles.stepDescription}>
-                  Receive a loan based on your collateral's value (LTV varies by asset)
+                  Receive a loan based on your asset's value (% varies by asset type)
                 </Text>
               </View>
             </View>
@@ -180,7 +180,7 @@ export function LoansTab({ loanId }: LoansTabProps) {
               <View style={styles.stepContent}>
                 <Text style={styles.stepTitle}>Repay & Unlock</Text>
                 <Text style={styles.stepDescription}>
-                  Pay back in installments to unlock your crypto collateral
+                  Pay back in installments to unlock your crypto
                 </Text>
               </View>
             </View>
@@ -309,7 +309,7 @@ function LoanCard({
           <Text style={styles.loanCollateralText}>
             {loan.collateralQuantity.toFixed(4)} {loan.collateralAssetId}
           </Text>
-          <Text style={styles.loanCollateralLabel}>Collateral</Text>
+          <Text style={styles.loanCollateralLabel}>Locked for this loan</Text>
         </View>
         <View style={[
           styles.loanStatus,
@@ -340,14 +340,14 @@ function LoanCard({
         <View style={styles.loanDetailRow}>
           <Text style={styles.loanDetailLabel}>Interest Rate</Text>
           {/* BUG-012 FIX: Prefer backend interestRate; dailyInterestRate*365 is fallback */}
-          <Text style={styles.loanDetailValue}>{((loan.interestRate ?? loan.dailyInterestRate * 365) * 100).toFixed(0)}% APR</Text>
+          <Text style={styles.loanDetailValue}>{((loan.interestRate ?? loan.dailyInterestRate * 365) * 100).toFixed(0)}% yearly</Text>
         </View>
       </View>
 
       {nextInstallment && loan.status === 'ACTIVE' && (
         <View style={styles.nextPayment}>
           <Text style={styles.nextPaymentLabel}>
-            Next Payment {daysUntilDue !== null && `in ${daysUntilDue} days`}
+            Next Payment: {new Date(nextInstallment.dueISO).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           </Text>
           <Text style={styles.nextPaymentValue}>
             {(nextInstallment.totalIRR ?? 0).toLocaleString()} IRR

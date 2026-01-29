@@ -6,6 +6,121 @@
 
 ---
 
+# PART A: UI Enhancement Implementation (15 Approved Changes)
+
+## Overview
+Systematic implementation plan for 15 UI enhancements focused on plain-language terminology, simplified displays, and improved user experience.
+
+---
+
+## Task 1: Create Global Formatting Utility
+**File**: `blu-markets-mobile/src/utils/formatNumber.ts`
+
+**Functions**:
+- `formatIRR(value: number)` - Iranian Rial with commas, no decimals
+- `formatUSD(value: number)` - USD with $ prefix, 2 decimals
+- `formatCrypto(value: number, symbol: string)` - Crypto with appropriate decimals
+- `formatPercent(value: number, decimals?: number)` - Percentage with % suffix
+
+---
+
+## Task 2: Remove Option Metrics Section
+**Files**: Protection screens
+**Change**: Remove "Option Metrics" (Delta, Gamma, Theta, Vega)
+
+---
+
+## Task 3: Remove Breakeven Analysis Section
+**Files**: Protection screens
+**Change**: Remove "Breakeven Analysis" section
+
+---
+
+## Task 4: Update "How Protection Works" Text
+**Files**: `BuyProtectionScreen.tsx`
+**Changes**: "option" → "protection", "strike price" → "protected value", "premium" → "protection cost"
+
+---
+
+## Task 5: Replace "Premium" with "Protection Cost"
+**Files**: All protection screens
+**Change**: Global rename
+
+---
+
+## Task 6: Replace "LTV" with "% of value"
+**Files**: Loan screens and components
+**Change**: "LTV" → "% of value"
+
+---
+
+## Task 7: Replace "APR" with "yearly"
+**Files**: Loan screens
+**Change**: "APR" → "yearly"
+
+---
+
+## Task 8: Replace "Collateral" with "Locked for this loan"
+**Files**: Loan screens
+**Change**: Terminology update
+
+---
+
+## Task 9: Use Concrete Dates for Next Payment
+**Files**: Loan screens
+**Change**: "in X days" → "Feb 15, 2026"
+
+---
+
+## Task 10: Simplify Home Screen Action Buttons
+**File**: `HomeScreen.tsx`
+**Changes**: "Buy/Sell" → "Trade", "Borrow IRR" → "Borrow", "Insure Assets" → "Protect"
+
+---
+
+## Task 11: Add Percentage to Portfolio Layer Values
+**File**: `PortfolioScreen.tsx`
+**Change**: Show "Foundation: ۱۲۵M IRR (50%)"
+
+---
+
+## Task 12: Remove Redundant "| SYMBOL" from Asset Names
+**Files**: Portfolio and asset components
+**Change**: "Bitcoin | BTC" → "Bitcoin"
+
+---
+
+## Task 13: Rename "Market" Tab to "Services"
+**File**: `MainTabNavigator.tsx`
+**Change**: Tab label update
+
+---
+
+## Task 14: Update Active Protections Display
+**Files**: Protection list components
+**Changes**: Remove "Premium Paid", show "Expires: Mar 15, 2026"
+
+---
+
+## Task 15: Simplify Activity Log Messages
+**Files**: Activity components
+**Changes**: "Purchased BTC" → "Bought Bitcoin"
+
+---
+
+## Implementation Order
+1. Task 1 (formatNumber.ts) - Foundation
+2. Task 13 (Market → Services) - Quick win
+3. Task 10 (Home buttons) - Quick win
+4. Tasks 11-12 (Portfolio) - Related changes
+5. Tasks 6-9 (Loans) - Related changes
+6. Tasks 2-5, 14 (Protection) - Related changes
+7. Task 15 (Activity log) - Final polish
+
+---
+
+# PART B: External Code Review Fixes (9 Issues)
+
 ## Overview
 
 This document outlines the implementation plan for fixing the 9 issues identified in the comprehensive code review.

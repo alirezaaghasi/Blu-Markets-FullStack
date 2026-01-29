@@ -100,6 +100,18 @@ export const formatDualCurrency = (
 };
 
 /**
+ * Format percentage with % suffix
+ * @param value - The percentage value (e.g., 50 for 50%)
+ * @param decimals - Number of decimal places (default: 1)
+ */
+export const formatPercent = (value: number, decimals: number = 1): string => {
+  if (value === null || value === undefined || isNaN(value)) {
+    return '--%';
+  }
+  return `${value.toFixed(decimals)}%`;
+};
+
+/**
  * Format crypto quantity with appropriate decimal places
  */
 export const formatCryptoQuantity = (quantity: number, symbol: string): string => {

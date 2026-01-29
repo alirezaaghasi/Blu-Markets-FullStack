@@ -185,7 +185,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
   }
   if (amountIRR > effectiveMaxBorrow) {
     if (amountIRR > maxBorrowIRR) {
-      validationErrors.push(`Maximum borrow with this collateral is ${(maxBorrowIRR || 0).toLocaleString()} IRR (${(selectedAsset?.ltv || 0) * 100}% LTV)`);
+      validationErrors.push(`Maximum borrow with this asset is ${(maxBorrowIRR || 0).toLocaleString()} IRR (${(selectedAsset?.ltv || 0) * 100}% of value)`);
     } else {
       validationErrors.push(`Exceeds portfolio loan limit. Remaining capacity: ${(remainingPortfolioCapacity || 0).toLocaleString()} IRR`);
     }
@@ -264,9 +264,9 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
         subtitle: `Funds added to your cash balance`,
         items: [
           { label: 'Amount Borrowed', value: `${formatNumber(amountIRR)} IRR`, highlight: true },
-          { label: 'Collateral', value: `${selectedAsset.name} (Frozen)` },
+          { label: 'Locked for this loan', value: `${selectedAsset.name}` },
           { label: 'Duration', value: LOAN_DURATION_LABELS[durationDays] || `${durationDays} days` },
-          { label: 'Interest Rate', value: `${(LOAN_ANNUAL_INTEREST_RATE * 100).toFixed(0)}% annual` },
+          { label: 'Interest Rate', value: `${(LOAN_ANNUAL_INTEREST_RATE * 100).toFixed(0)}% yearly` },
           // Use backend-provided totalInterest from loanPreview
           { label: 'Total to Repay', value: `${formatNumber(Math.round(amountIRR + totalInterest))} IRR` },
         ],
@@ -313,7 +313,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
               No assets available as collateral.
             </Text>
             <Text style={styles.emptyStateSubtext}>
-              You need assets with LTV value to borrow against.
+              You need assets to use as security for a loan.
             </Text>
           </View>
         </SafeAreaView>
@@ -343,11 +343,11 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
         >
-          {/* Collateral Selection */}
+          {/* Asset Selection - asset will be locked for this loan */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Step 1: Select Collateral</Text>
+            <Text style={styles.sectionTitle}>Step 1: Select Asset to Lock</Text>
             {!selectedAssetId && (
-              <Text style={styles.sectionHelper}>Tap an asset to use as collateral for your loan</Text>
+              <Text style={styles.sectionHelper}>Tap an asset to lock for your loan</Text>
             )}
             <View style={styles.collateralList}>
               {eligibleHoldings.map((holding) => {
@@ -389,7 +389,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
                       <View style={{ flex: 1 }}>
                         <Text style={styles.collateralName}>{asset.name}</Text>
                         <Text style={styles.collateralValue}>
-                          Max: {formatNumber(maxBorrow)} IRR ({(asset.ltv * 100).toFixed(0)}% LTV)
+                          Max: {formatNumber(maxBorrow)} IRR ({(asset.ltv * 100).toFixed(0)}% of value)
                         </Text>
                       </View>
                     </View>
@@ -473,7 +473,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
                     <Text style={styles.previewValue}>{formatNumber(amountIRR)} IRR</Text>
                   </View>
                   <View style={styles.previewRow}>
-                    <Text style={styles.previewLabel}>Interest ({(LOAN_ANNUAL_INTEREST_RATE * 100)}% annual)</Text>
+                    <Text style={styles.previewLabel}>Interest ({(LOAN_ANNUAL_INTEREST_RATE * 100)}% yearly)</Text>
                     <Text style={styles.previewValue}>{formatNumber(Math.round(totalInterest))} IRR</Text>
                   </View>
                   <View style={[styles.previewRow, styles.previewRowTotal]}>
@@ -493,10 +493,10 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
               <View style={styles.warningCard}>
                 <Text style={styles.warningTitle}>Important Information</Text>
                 <Text style={styles.warningText}>
-                  • Your {selectedAsset?.name} will be frozen as collateral and cannot be sold
+                  • Your {selectedAsset?.name} will be locked for this loan and cannot be sold
                 </Text>
                 <Text style={styles.warningText}>
-                  • If the collateral value drops below the loan amount, it may be liquidated
+                  • If the asset value drops below the loan amount, it may be sold to repay
                 </Text>
                 <Text style={styles.warningText}>
                   • Repay early with no penalties

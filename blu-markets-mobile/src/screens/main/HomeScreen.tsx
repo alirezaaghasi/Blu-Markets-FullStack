@@ -549,7 +549,7 @@ const HomeScreen: React.FC = () => {
       {/* FIXED MAIN ACTIONS AT BOTTOM */}
       {/* ================================================================ */}
       <View style={[styles.fixedActionsContainer, { paddingBottom: SPACING[6] + insets.bottom }]}>
-        {/* Row 1: Rebalance, Add Funds, Buy/Sell */}
+        {/* Row 1: Rebalance, Add Funds, Trade */}
         <View style={styles.actionsRow}>
           <MainActionButton
             label="Rebalance"
@@ -561,20 +561,20 @@ const HomeScreen: React.FC = () => {
             onPress={() => setAddFundsSheetVisible(true)}
           />
           <MainActionButton
-            label="Buy/Sell"
+            label="Trade"
             onPress={() => setTradeSheetVisible(true)}
           />
         </View>
 
-        {/* Row 2: Borrow IRR, Insure Assets */}
+        {/* Row 2: Borrow, Protect */}
         <View style={styles.actionsRowWide}>
           <WideActionButton
-            label="Borrow IRR"
+            label="Borrow"
             onPress={() => setLoanSheetVisible(true)}
             disabled={holdingsValueIrr === 0}
           />
           <WideActionButton
-            label="Insure Assets"
+            label="Protect"
             onPress={() => setProtectionSheetVisible(true)}
             disabled={holdingsValueIrr === 0}
           />

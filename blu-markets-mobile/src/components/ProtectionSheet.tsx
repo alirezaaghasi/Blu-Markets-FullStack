@@ -270,7 +270,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
         items: [
           { label: 'Coverage', value: `${(coveragePct * 100).toFixed(0)}%` },
           { label: 'Duration', value: formatDuration(durationDays) },
-          { label: 'Premium Paid', value: `${(quote.premiumIrr ?? 0).toLocaleString()} IRR` },
+          { label: 'Protection Cost', value: `${(quote.premiumIrr ?? 0).toLocaleString()} IRR` },
           { label: 'Expires', value: expiryDate.toLocaleDateString(), highlight: true },
         ],
       });
@@ -306,7 +306,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
         <SafeAreaView style={styles.container}>
           <View style={styles.header}>
             <View style={styles.dragIndicator} />
-            <Text style={styles.title}>Insure Assets</Text>
+            <Text style={styles.title}>Protect Assets</Text>
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
               <Text style={styles.closeButtonText}>Cancel</Text>
             </TouchableOpacity>
@@ -561,10 +561,10 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
           {/* Quote Details */}
           {quote && !isLoadingQuote && (
             <>
-              {/* Premium Calculation */}
+              {/* Protection Cost Calculation */}
               <View style={styles.premiumCard}>
                 <View style={styles.premiumRow}>
-                  <Text style={styles.premiumLabel}>Premium Rate</Text>
+                  <Text style={styles.premiumLabel}>Cost Rate</Text>
                   <Text style={styles.premiumValue}>
                     {formatPremiumPct(quote.premiumPct || 0)}
                   </Text>
@@ -576,67 +576,20 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
                   </Text>
                 </View>
                 <View style={styles.premiumRow}>
-                  <Text style={styles.premiumLabel}>Strike Price</Text>
+                  <Text style={styles.premiumLabel}>Protected Value</Text>
                   <Text style={styles.premiumValue}>
                     ${quote.strikeUsd?.toLocaleString() || 'N/A'}
                   </Text>
                 </View>
                 <View style={[styles.premiumRow, styles.premiumRowTotal]}>
-                  <Text style={styles.premiumTotalLabel}>Total Premium</Text>
+                  <Text style={styles.premiumTotalLabel}>Total Protection Cost</Text>
                   <Text style={styles.premiumTotalValue}>
                     {(quote.premiumIrr || 0).toLocaleString()} IRR
                   </Text>
                 </View>
               </View>
 
-              {/* Greeks & Volatility */}
-              {(quote.greeks || quote.volatility) && (
-                <View style={styles.greeksCard}>
-                  <Text style={styles.greeksTitle}>Option Metrics</Text>
-                  {quote.volatility && (
-                    <View style={styles.greeksRow}>
-                      <Text style={styles.greeksLabel}>Implied Volatility</Text>
-                      <View style={styles.greeksValueContainer}>
-                        <Text style={styles.greeksValue}>
-                          {((quote.volatility.iv || 0) * 100).toFixed(1)}%
-                        </Text>
-                        <View style={[styles.regimeBadge, { backgroundColor: getRegimeColor(quote.volatility.regime || 'NORMAL') }]}>
-                          <Text style={styles.regimeText}>{quote.volatility.regime}</Text>
-                        </View>
-                      </View>
-                    </View>
-                  )}
-                  {quote.greeks && (
-                    <>
-                      <View style={styles.greeksRow}>
-                        <Text style={styles.greeksLabel}>Delta</Text>
-                        <Text style={styles.greeksValue}>{quote.greeks.delta?.toFixed(4)}</Text>
-                      </View>
-                      <View style={styles.greeksRow}>
-                        <Text style={styles.greeksLabel}>Theta (daily)</Text>
-                        <Text style={styles.greeksValue}>{quote.greeks.theta?.toFixed(4)}</Text>
-                      </View>
-                    </>
-                  )}
-                </View>
-              )}
-
-              {/* Breakeven Info */}
-              {quote.breakeven && (
-                <View style={styles.breakevenCard}>
-                  <Text style={styles.breakevenTitle}>Breakeven Analysis</Text>
-                  <Text style={styles.breakevenText}>
-                    You profit if {holding.assetId} drops more than{' '}
-                    <Text style={styles.breakevenHighlight}>
-                      {((quote.breakeven.priceDrop || 0) * 100).toFixed(1)}%
-                    </Text>{' '}
-                    from ${quote.strikeUsd?.toLocaleString()}
-                  </Text>
-                  <Text style={styles.breakevenSubtext}>
-                    Breakeven price: ${quote.breakeven.priceUsd?.toLocaleString()}
-                  </Text>
-                </View>
-              )}
+              {/* Option Metrics and Breakeven Analysis removed for simpler UI */}
             </>
           )}
 
@@ -667,13 +620,13 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
             <View style={styles.infoItem}>
               <Text style={styles.infoBullet}>•</Text>
               <Text style={styles.infoText}>
-                Premium is calculated using Black-Scholes option pricing
+                Protection cost is based on current market conditions
               </Text>
             </View>
             <View style={styles.infoItem}>
               <Text style={styles.infoBullet}>•</Text>
               <Text style={styles.infoText}>
-                If {holding.assetId} drops below the strike price, you receive the difference
+                If {holding.assetId} drops below the protected value, you receive the difference
               </Text>
             </View>
             <View style={styles.infoItem}>
@@ -685,7 +638,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
             <View style={styles.infoItem}>
               <Text style={styles.infoBullet}>•</Text>
               <Text style={styles.infoText}>
-                Premium is non-refundable once purchased
+                Protection cost is non-refundable once purchased
               </Text>
             </View>
           </View>

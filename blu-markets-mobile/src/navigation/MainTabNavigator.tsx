@@ -65,6 +65,7 @@ function MainTabContent() {
         name="Market"
         component={MarketScreen}
         options={{
+          tabBarLabel: 'Services',
           tabBarIcon: ({ color }) => <TrendingUp color={color} size={24} />,
         }}
       />

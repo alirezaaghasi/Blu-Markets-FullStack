@@ -170,7 +170,6 @@ function ProtectionCard({
           <View>
             <Text style={styles.protectionAssetName}>
               {asset?.name || protection.assetId}
-              <Text style={styles.protectionAssetSymbolInline}> | {asset?.symbol || ''}</Text>
             </Text>
           </View>
         </View>
@@ -196,15 +195,10 @@ function ProtectionCard({
           </Text>
         </View>
         <View style={styles.protectionDetailRow}>
-          <Text style={styles.protectionDetailLabel}>Premium Paid</Text>
+          <Text style={styles.protectionDetailLabel}>Expires</Text>
           <Text style={styles.protectionDetailValue}>
-            {/* BUG-2 FIX: Use canonical premiumIrr, fallback to alias premiumIRR */}
-            {(protection.premiumIrr ?? protection.premiumIRR ?? 0).toLocaleString()} IRR
+            {expiryDate ? new Date(expiryDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
           </Text>
-        </View>
-        <View style={styles.protectionDetailRow}>
-          <Text style={styles.protectionDetailLabel}>Days Remaining</Text>
-          <Text style={styles.protectionDetailValue}>{daysRemaining} days</Text>
         </View>
       </View>
 
@@ -248,7 +242,6 @@ function EligibleAssetsGrid({
             <Text style={styles.eligibleIcon}>{asset?.symbol || item.assetId}</Text>
             <Text style={styles.eligibleName}>
               {asset?.name || item.assetId}
-              <Text style={styles.eligibleSymbol}> | {asset?.symbol || ''}</Text>
             </Text>
             <Text style={styles.eligibleQuantity}>
               {quantity.toFixed(4)} {asset?.symbol}

@@ -220,7 +220,10 @@ const PortfolioScreen: React.FC = () => {
                     <Text style={styles.layerCount}>({layerHoldings.length})</Text>
                   </View>
                   <View style={styles.layerHeaderRight}>
-                    <Text style={styles.layerValue}>{formatNumber(layerValues[layer])} IRR</Text>
+                    <Text style={styles.layerValue}>
+                      {formatNumber(layerValues[layer])} IRR
+                      <Text style={styles.layerPercent}> ({(currentAllocation[layer] * 100).toFixed(0)}%)</Text>
+                    </Text>
                     <Text style={styles.expandIcon}>{isExpanded ? '▼' : '▶'}</Text>
                   </View>
                 </TouchableOpacity>
@@ -346,6 +349,11 @@ const styles = StyleSheet.create({
     fontWeight: TYPOGRAPHY.fontWeight.medium,
     color: COLORS.text.primary,
     marginRight: SPACING[2],
+  },
+  layerPercent: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.normal,
+    color: COLORS.text.muted,
   },
   expandIcon: {
     fontSize: 12,
