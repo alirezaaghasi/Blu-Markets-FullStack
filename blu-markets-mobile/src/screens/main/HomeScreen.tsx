@@ -521,7 +521,7 @@ const HomeScreen: React.FC = () => {
               id="loan-payment-alert"
               type="LOAN_PAYMENT"
               title={`Loan payment due in ${nextLoanPayment.daysUntil} days`}
-              subtitle={`${nextLoanPayment.installment.totalIRR?.toLocaleString()} IRR`}
+              subtitle={formatIRR(nextLoanPayment.installment.totalIRR ?? 0)}
               timestamp=""
               primaryAction={{
                 label: 'Pay Now',

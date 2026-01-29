@@ -21,6 +21,7 @@ import { addProtection, subtractCash, logAction, setPortfolioValues } from '../s
 import { portfolio as portfolioApi } from '../services/api';
 import { protection as protectionApi, formatPremiumPct, formatDuration, getRegimeColor } from '../services/api/protection';
 import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
+import { formatIRR } from '../utils/currency';
 
 interface ProtectionSheetProps {
   visible: boolean;
@@ -128,6 +129,8 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successResult, setSuccessResult] = useState<TransactionSuccessResult | null>(null);
+  // Task 4 (Round 2): Collapsible protection info
+  const [showProtectionDetails, setShowProtectionDetails] = useState(false);
 
   // FIX: Show asset picker when opened without a specific holding
   const [showAssetPicker, setShowAssetPicker] = useState(!propHolding);
@@ -406,7 +409,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
                   </View>
                   <View style={styles.assetPickerValue}>
                     <Text style={styles.assetPickerValueText}>
-                      {(h.valueIrr || 0).toLocaleString()} IRR
+                      {formatIRR(h.valueIrr || 0)}
                     </Text>
                     <Text style={styles.assetPickerLayerBadge}>
                       {h.layer}
@@ -478,7 +481,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
             <View style={styles.assetValue}>
               <Text style={styles.assetValueLabel}>Value to Protect</Text>
               <Text style={styles.assetValueAmount}>
-                {(holding.valueIrr || 0).toLocaleString()} IRR
+                {formatIRR(holding.valueIrr || 0)}
               </Text>
               {holding.valueUsd && (
                 <Text style={styles.assetValueUsd}>
@@ -558,76 +561,77 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
             </View>
           )}
 
-          {/* Quote Details - Task 7: Simplified to 3 rows max */}
+          {/* Task 2 (Round 2): Simplified to 2 rows - Total Protection Cost + Available Cash */}
           {quote && !isLoadingQuote && (
-            <>
-              {/* Protection Cost Summary */}
-              <View style={styles.premiumCard}>
-                <View style={styles.premiumRow}>
-                  <Text style={styles.premiumLabel}>Protection level</Text>
-                  <Text style={styles.premiumValue}>
-                    ${quote.strikeUsd?.toLocaleString() || 'N/A'}
-                  </Text>
-                </View>
-                <View style={styles.premiumRow}>
-                  <Text style={styles.premiumLabel}>Coverage duration</Text>
-                  <Text style={styles.premiumValue}>
-                    {formatDuration(durationDays)}
-                  </Text>
-                </View>
-                <View style={[styles.premiumRow, styles.premiumRowTotal]}>
-                  <Text style={styles.premiumTotalLabel}>Protection cost</Text>
-                  <Text style={styles.premiumTotalValue}>
-                    {(quote.premiumIrr || 0).toLocaleString()} IRR
-                  </Text>
-                </View>
+            <View style={styles.costSummary}>
+              <View style={styles.costRow}>
+                <Text style={styles.costLabel}>Total Protection Cost</Text>
+                <Text style={styles.costValue}>{formatIRR(quote.premiumIrr || 0)}</Text>
               </View>
-            </>
+              <View style={styles.costRow}>
+                <Text style={styles.costLabel}>Available Cash</Text>
+                <Text style={[styles.costValue, !canAfford && styles.cashValueInsufficient]}>
+                  {formatIRR(cashIRR || 0)}
+                </Text>
+              </View>
+            </View>
           )}
 
-          {/* Available Cash */}
-          <View style={styles.cashInfo}>
-            <Text style={styles.cashLabel}>Available Cash</Text>
-            <Text
-              style={[
-                styles.cashValue,
-                quote && !canAfford && styles.cashValueInsufficient,
-              ]}
-            >
-              {(cashIRR || 0).toLocaleString()} IRR
-            </Text>
-          </View>
+          {/* Show Available Cash even when no quote yet */}
+          {!quote && !isLoadingQuote && (
+            <View style={styles.cashInfo}>
+              <Text style={styles.cashLabel}>Available Cash</Text>
+              <Text style={styles.cashValue}>{formatIRR(cashIRR || 0)}</Text>
+            </View>
+          )}
 
           {quote && !canAfford && (
             <View style={styles.errorBanner}>
               <Text style={styles.errorText}>
-                Insufficient cash. Add {((quote.premiumIrr || 0) - (cashIRR || 0)).toLocaleString()} IRR more.
+                Insufficient cash. Add {formatIRR((quote.premiumIrr || 0) - (cashIRR || 0))} more.
               </Text>
             </View>
           )}
 
-          {/* Task 8: Inline explanation for what protection does */}
-          <View style={styles.infoCard}>
-            <Text style={styles.infoTitle}>What This Means</Text>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoBullet}>•</Text>
-              <Text style={styles.infoText}>
-                If {holding.assetId} price drops below ${quote?.strikeUsd?.toLocaleString() || 'the protected level'}, you get paid the difference
+          {/* Task 4 (Round 2): Collapsible "How Protection Works" - one line by default */}
+          <TouchableOpacity
+            onPress={() => setShowProtectionDetails(!showProtectionDetails)}
+            style={styles.protectionInfoContainer}
+            activeOpacity={0.7}
+          >
+            <View style={styles.protectionInfoRow}>
+              <Text style={styles.infoIcon}>ℹ️</Text>
+              <Text style={styles.protectionInfoText}>
+                If {holding.assetId} drops, you're covered for the difference.
+              </Text>
+              <Text style={styles.learnMoreLink}>
+                {showProtectionDetails ? 'Show less' : 'Learn more ›'}
               </Text>
             </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoBullet}>•</Text>
-              <Text style={styles.infoText}>
-                If the price stays above, nothing happens - you keep your {holding.assetId}
-              </Text>
+          </TouchableOpacity>
+
+          {showProtectionDetails && (
+            <View style={styles.protectionDetailsExpanded}>
+              <View style={styles.infoItem}>
+                <Text style={styles.infoBullet}>•</Text>
+                <Text style={styles.infoText}>
+                  If {holding.assetId} drops below today's price, you receive the difference
+                </Text>
+              </View>
+              <View style={styles.infoItem}>
+                <Text style={styles.infoBullet}>•</Text>
+                <Text style={styles.infoText}>
+                  Coverage ends automatically at expiry
+                </Text>
+              </View>
+              <View style={styles.infoItem}>
+                <Text style={styles.infoBullet}>•</Text>
+                <Text style={styles.infoText}>
+                  Protection cost is non-refundable once purchased
+                </Text>
+              </View>
             </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoBullet}>•</Text>
-              <Text style={styles.infoText}>
-                Protection cost is paid upfront and is non-refundable
-              </Text>
-            </View>
-          </View>
+          )}
         </ScrollView>
 
         {/* Confirm Button */}
@@ -646,7 +650,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
                 : isLoadingQuote
                 ? 'Loading...'
                 : quote
-                ? `Buy Protection for ${(quote.premiumIrr || 0).toLocaleString()} IRR`
+                ? `Buy Protection for ${formatIRR(quote.premiumIrr || 0)}`
                 : 'Get Quote First'}
             </Text>
           </TouchableOpacity>
@@ -900,6 +904,29 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     color: colors.textSecondary,
   },
+  // Task 2 (Round 2): Cost summary styles - 2 rows only
+  costSummary: {
+    backgroundColor: colors.cardDark,
+    borderRadius: borderRadius.lg,
+    padding: spacing[4],
+    marginBottom: spacing[4],
+  },
+  costRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing[3],
+  },
+  costLabel: {
+    fontSize: typography.fontSize.base,
+    color: colors.textSecondary,
+  },
+  costValue: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.textPrimaryDark,
+  },
+  // Legacy premium styles (kept for compatibility)
   premiumCard: {
     backgroundColor: colors.cardDark,
     borderRadius: borderRadius.lg,
@@ -1051,6 +1078,39 @@ const styles = StyleSheet.create({
     color: colors.primary,
     marginLeft: spacing[2],
   },
+  // Task 4 (Round 2): Collapsible protection info styles
+  protectionInfoContainer: {
+    backgroundColor: colors.surfaceDark,
+    borderRadius: borderRadius.lg,
+    padding: spacing[4],
+    marginBottom: spacing[3],
+  },
+  protectionInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  infoIcon: {
+    fontSize: typography.fontSize.base,
+    marginRight: spacing[2],
+  },
+  protectionInfoText: {
+    flex: 1,
+    fontSize: typography.fontSize.sm,
+    color: colors.textPrimaryDark,
+  },
+  learnMoreLink: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.primary,
+  },
+  protectionDetailsExpanded: {
+    backgroundColor: colors.surfaceDark,
+    borderRadius: borderRadius.lg,
+    padding: spacing[4],
+    marginBottom: spacing[3],
+  },
+  // Legacy info styles (kept for compatibility)
   infoCard: {
     backgroundColor: colors.surfaceDark,
     borderRadius: borderRadius.lg,

@@ -23,6 +23,7 @@ import { Loan, AssetId, Holding } from '../../types';
 import { EmptyState } from '../../components/EmptyState';
 import { LoanSheet } from '../../components/LoanSheet';
 import { RepaySheet } from '../../components/RepaySheet';
+import { formatIRR, formatCrypto, getAssetName, formatDate } from '../../utils/currency';
 
 // BUG-012 FIX: Collateral eligibility should come from backend
 // This list is a fallback for UI responsiveness; backend API is authoritative
@@ -138,7 +139,7 @@ export function LoansTab({ loanId }: LoansTabProps) {
             icon="cash-outline"
             title="No Active Loans"
             description={availableCapacity > 0
-              ? `Borrow against your crypto holdings. Up to ${availableCapacity.toLocaleString()} IRR available.`
+              ? `Borrow against your crypto holdings. Up to ${formatIRR(availableCapacity)} available.`
               : "Borrow against your crypto holdings at competitive rates"}
             actionLabel="Explore Borrowing"
             onAction={handleExploreBorrowing}
@@ -235,7 +236,7 @@ export function LoansTab({ loanId }: LoansTabProps) {
         <View style={styles.capacityCard}>
           <Text style={styles.capacityLabel}>Available to Borrow</Text>
           <Text style={styles.capacityValue}>
-            {(capacity?.availableIrr || 0).toLocaleString()} IRR
+            {formatIRR(capacity?.availableIrr || 0)}
           </Text>
           <TouchableOpacity
             style={styles.borrowButton}
@@ -299,64 +300,54 @@ function LoanCard({
       : (loan.totalDueIRR || loan.amountIRR) - (loan.paidIRR || 0)
   );
 
-  // Task 16: Simplified REPAID loan display
+  // Task 7 (Round 2): Simplified REPAID loan display - 2 lines only
   if (loan.status === 'REPAID') {
-    const totalPaid = loan.totalDueIRR || (loan.amountIRR + (loan.totalInterestIRR || 0));
+    const originalPrincipal = loan.amountIRR;
+    // Use dueISO as the settled date (best available option since settledAt isn't in type)
+    const settledDate = loan.dueISO;
     return (
       <View style={[styles.loanCard, highlighted && styles.loanCardHighlighted]}>
         <View style={styles.repaidHeader}>
           <Text style={styles.repaidTitle}>
-            Loan for {loan.collateralQuantity.toFixed(4)} {loan.collateralAssetId}: Repaid
+            {getAssetName(loan.collateralAssetId)} Loan — {formatIRR(originalPrincipal)}
           </Text>
           <View style={[styles.loanStatus, styles.loanStatusRepaid]}>
-            <Text style={[styles.loanStatusText, styles.loanStatusTextRepaid]}>REPAID</Text>
+            <Text style={[styles.loanStatusText, styles.loanStatusTextRepaid]}>REPAID ✓</Text>
           </View>
         </View>
-        <Text style={styles.repaidTotal}>
-          Total paid: {(totalPaid ?? 0).toLocaleString()} IRR
+        <Text style={styles.repaidDate}>
+          Settled {settledDate ? formatDate(settledDate, true) : 'N/A'}
         </Text>
       </View>
     );
   }
 
-  // Task 14: Active loans show only 3 fields - Collateral, Remaining, Next Payment
+  // Task 6 (Round 2): Active loans show only 3 fields - Asset+qty, Remaining, Next Payment+Pay
   return (
     <View style={[styles.loanCard, highlighted && styles.loanCardHighlighted]}>
+      {/* Field 1: Asset name + quantity + status badge */}
       <View style={styles.loanHeader}>
-        <View style={styles.loanCollateral}>
-          <Text style={styles.loanCollateralText}>
-            {loan.collateralQuantity.toFixed(4)} {loan.collateralAssetId}
-          </Text>
-          <Text style={styles.loanCollateralLabel}>Locked for this loan</Text>
-        </View>
+        <Text style={styles.loanAssetName}>
+          {getAssetName(loan.collateralAssetId)} ({formatCrypto(loan.collateralQuantity, loan.collateralAssetId)})
+        </Text>
         <View style={styles.loanStatus}>
           <Text style={styles.loanStatusText}>{loan.status}</Text>
         </View>
       </View>
 
-      {/* Task 14: Simplified to Remaining only */}
-      <View style={styles.loanDetails}>
-        <View style={styles.loanDetailRow}>
-          <Text style={styles.loanDetailLabel}>Remaining to pay</Text>
-          <Text style={styles.loanDetailValue}>
-            {(remainingIRR ?? 0).toLocaleString()} IRR
-          </Text>
-        </View>
+      {/* Field 2: Remaining amount */}
+      <View style={styles.loanDetailRow}>
+        <Text style={styles.loanDetailLabel}>Remaining</Text>
+        <Text style={styles.loanDetailValue}>{formatIRR(remainingIRR ?? 0)}</Text>
       </View>
 
-      {/* Task 14/15: Next payment with concrete date */}
+      {/* Field 3: Next payment date + amount + Pay button */}
       {nextInstallment && loan.status === 'ACTIVE' && (
-        <View style={styles.nextPayment}>
-          <Text style={styles.nextPaymentLabel}>
-            Next: {new Date(nextInstallment.dueISO).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+        <View style={styles.loanPaymentRow}>
+          <Text style={styles.paymentInfo}>
+            Next Payment {formatDate(nextInstallment.dueISO)} — {formatIRR(nextInstallment.totalIRR ?? 0)}
           </Text>
-          <Text style={styles.nextPaymentValue}>
-            {(nextInstallment.totalIRR ?? 0).toLocaleString()} IRR
-          </Text>
-          <TouchableOpacity
-            style={styles.payButton}
-            onPress={onRepay}
-          >
+          <TouchableOpacity style={styles.payButton} onPress={onRepay}>
             <Text style={styles.payButtonText}>Pay Now</Text>
           </TouchableOpacity>
         </View>
@@ -453,9 +444,16 @@ const styles = StyleSheet.create({
   loanHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: SPACING[4],
+    alignItems: 'center',
+    marginBottom: SPACING[3],
   },
+  // Task 6 (Round 2): Simplified loan card styles
+  loanAssetName: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.primary,
+  },
+  // Legacy styles kept for compatibility
   loanCollateral: {},
   loanCollateralText: {
     fontSize: TYPOGRAPHY.fontSize.lg,
@@ -483,7 +481,7 @@ const styles = StyleSheet.create({
   loanStatusTextRepaid: {
     color: COLORS.text.muted,
   },
-  // Task 16: Repaid loan styles
+  // Task 7 (Round 2): Repaid loan styles - 2 lines only
   repaidHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -496,9 +494,24 @@ const styles = StyleSheet.create({
     color: COLORS.text.primary,
     flex: 1,
   },
-  repaidTotal: {
+  repaidDate: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.text.secondary,
+  },
+  // Task 6 (Round 2): Simplified loan payment row
+  loanPaymentRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: SPACING[3],
+    paddingTop: SPACING[3],
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  paymentInfo: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
+    flex: 1,
   },
   loanDetails: {
     borderTopWidth: 1,

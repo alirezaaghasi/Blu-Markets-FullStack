@@ -29,6 +29,7 @@ import { addLoan, freezeHolding, addCash, logAction, setPortfolioValues } from '
 import { portfolio as portfolioApi } from '../services/api';
 import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
 import { loans as loansApi } from '../services/api';
+import { formatIRR } from '../utils/currency';
 import type { LoanCapacityResponse, LoanPreviewResponse } from '../services/api';
 
 interface LoanSheetProps {
@@ -464,19 +465,17 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
                 </View>
               </View>
 
-              {/* Loan Preview - Task 13: Simplified to 2 rows */}
+              {/* Task 5 (Round 2): Simplified loan summary - 2 rows only */}
               {amountIRR > 0 && (
                 <View style={styles.previewCard}>
                   <Text style={styles.previewTitle}>Loan Summary</Text>
-                  <View style={[styles.previewRow, styles.previewRowTotal]}>
-                    <Text style={styles.previewTotalLabel}>Total to repay</Text>
-                    <Text style={styles.previewTotalValue}>
-                      {formatNumber(Math.round(amountIRR + totalInterest))} IRR
-                    </Text>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Total to Repay</Text>
+                    <Text style={styles.summaryValue}>{formatIRR(Math.round(amountIRR + totalInterest))}</Text>
                   </View>
-                  <View style={styles.previewRow}>
-                    <Text style={styles.previewLabel}>In {LOAN_INSTALLMENT_COUNT} payments of</Text>
-                    <Text style={styles.previewValue}>~{formatNumber(installmentAmount)} IRR</Text>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Monthly Payment</Text>
+                    <Text style={styles.summaryValue}>~{formatIRR(installmentAmount)}</Text>
                   </View>
                 </View>
               )}
@@ -755,6 +754,23 @@ const styles = StyleSheet.create({
     marginBottom: spacing[3],
     textTransform: 'uppercase',
   },
+  // Task 5 (Round 2): New summary row styles
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing[3],
+  },
+  summaryLabel: {
+    fontSize: typography.fontSize.base,
+    color: colors.textSecondary,
+  },
+  summaryValue: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.textPrimaryDark,
+  },
+  // Legacy preview styles (kept for compatibility)
   previewRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

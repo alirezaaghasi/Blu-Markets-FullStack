@@ -71,7 +71,9 @@ describe('Rebalance Service', () => {
       expect(result.hoursRemaining).toBeNull();
     });
 
-    it('should block rebalance during 24-hour cooldown', async () => {
+    it('should allow rebalance with cooldown disabled (REBALANCE_COOLDOWN_HOURS = 0)', async () => {
+      // Cooldown is disabled in domain.ts (REBALANCE_COOLDOWN_HOURS = 0)
+      // So rebalancing should always be allowed regardless of last rebalance time
       const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
       vi.mocked(prisma.portfolio.findUnique).mockResolvedValue({
         lastRebalanceAt: twoHoursAgo,
@@ -79,9 +81,9 @@ describe('Rebalance Service', () => {
 
       const result = await checkRebalanceCooldown('user-123');
 
-      expect(result.canRebalance).toBe(false);
+      expect(result.canRebalance).toBe(true);  // Always true when cooldown = 0
       expect(result.hoursSinceRebalance).toBe(2);
-      expect(result.hoursRemaining).toBe(22);
+      expect(result.hoursRemaining).toBeNull();  // No waiting when cooldown = 0
     });
 
     it('should allow rebalance after 24-hour cooldown', async () => {

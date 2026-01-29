@@ -19,6 +19,7 @@ import { logAction } from '../store/slices/portfolioSlice';
 import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
 // RTK Query - auto-invalidates portfolio cache after rebalance
 import { useGetRebalancePreviewQuery, useExecuteRebalanceMutation } from '../store/api/apiSlice';
+import { formatIRR, formatPercent } from '../utils/currency';
 
 interface RebalanceSheetProps {
   visible: boolean;
@@ -175,86 +176,44 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
               </View>
             )}
 
-            {/* Allocation Preview */}
+            {/* Task 8 (Round 2): Simplified allocation - single bar with layer arrows */}
             {!isLoading && !error && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Allocation</Text>
 
-              {/* Before / Target / After bars */}
-              <View style={styles.allocationRow}>
-                <Text style={styles.allocationLabel}>Before</Text>
-                <View style={styles.allocationBarContainer}>
-                  <View style={styles.allocationBar}>
-                    <View style={[styles.barSegment, {
-                      flex: beforeAllocation.foundation || 1,
-                      backgroundColor: LAYER_COLORS.FOUNDATION
-                    }]} />
-                    <View style={[styles.barSegment, {
-                      flex: beforeAllocation.growth || 1,
-                      backgroundColor: LAYER_COLORS.GROWTH
-                    }]} />
-                    <View style={[styles.barSegment, {
-                      flex: beforeAllocation.upside || 1,
-                      backgroundColor: LAYER_COLORS.UPSIDE
-                    }]} />
-                  </View>
+              {/* Single Current allocation bar */}
+              <View style={styles.currentBarContainer}>
+                <View style={styles.allocationBar}>
+                  <View style={[styles.barSegment, {
+                    flex: beforeAllocation.foundation || 1,
+                    backgroundColor: LAYER_COLORS.FOUNDATION
+                  }]} />
+                  <View style={[styles.barSegment, {
+                    flex: beforeAllocation.growth || 1,
+                    backgroundColor: LAYER_COLORS.GROWTH
+                  }]} />
+                  <View style={[styles.barSegment, {
+                    flex: beforeAllocation.upside || 1,
+                    backgroundColor: LAYER_COLORS.UPSIDE
+                  }]} />
                 </View>
               </View>
 
-              <View style={styles.allocationRow}>
-                <Text style={styles.allocationLabel}>Target</Text>
-                <View style={styles.allocationBarContainer}>
-                  <View style={styles.allocationBar}>
-                    <View style={[styles.barSegment, {
-                      flex: targetAllocationDisplay.foundation || 1,
-                      backgroundColor: LAYER_COLORS.FOUNDATION,
-                      opacity: 0.5
-                    }]} />
-                    <View style={[styles.barSegment, {
-                      flex: targetAllocationDisplay.growth || 1,
-                      backgroundColor: LAYER_COLORS.GROWTH,
-                      opacity: 0.5
-                    }]} />
-                    <View style={[styles.barSegment, {
-                      flex: targetAllocationDisplay.upside || 1,
-                      backgroundColor: LAYER_COLORS.UPSIDE,
-                      opacity: 0.5
-                    }]} />
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.allocationRow}>
-                <Text style={styles.allocationLabel}>After</Text>
-                <View style={styles.allocationBarContainer}>
-                  <View style={styles.allocationBar}>
-                    <View style={[styles.barSegment, {
-                      flex: afterAllocation.foundation || 1,
-                      backgroundColor: LAYER_COLORS.FOUNDATION
-                    }]} />
-                    <View style={[styles.barSegment, {
-                      flex: afterAllocation.growth || 1,
-                      backgroundColor: LAYER_COLORS.GROWTH
-                    }]} />
-                    <View style={[styles.barSegment, {
-                      flex: afterAllocation.upside || 1,
-                      backgroundColor: LAYER_COLORS.UPSIDE
-                    }]} />
-                  </View>
-                </View>
-              </View>
-
-              {/* Legend */}
-              {/* BUG-A FIX: afterAllocation values are already percentages (0-100), don't multiply again */}
-              <View style={styles.legend}>
-                {(['FOUNDATION', 'GROWTH', 'UPSIDE'] as const).map((layer) => (
-                  <View key={layer} style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: LAYER_COLORS[layer] }]} />
-                    <Text style={styles.legendText}>
-                      {LAYER_NAMES[layer]} {Math.round(afterAllocation[layer.toLowerCase() as keyof typeof afterAllocation])}%
-                    </Text>
-                  </View>
-                ))}
+              {/* Layer changes with arrows */}
+              <View style={styles.layerChanges}>
+                {(['FOUNDATION', 'GROWTH', 'UPSIDE'] as const).map((layer) => {
+                  const current = beforeAllocation[layer.toLowerCase() as keyof typeof beforeAllocation];
+                  const target = targetAllocationDisplay[layer.toLowerCase() as keyof typeof targetAllocationDisplay];
+                  return (
+                    <View key={layer} style={styles.layerChangeRow}>
+                      <View style={[styles.layerDot, { backgroundColor: LAYER_COLORS[layer] }]} />
+                      <Text style={styles.layerName}>{LAYER_NAMES[layer]}</Text>
+                      <Text style={styles.layerChangeText}>
+                        {formatPercent(current)} → {formatPercent(target)}
+                      </Text>
+                    </View>
+                  );
+                })}
               </View>
             </View>
             )}
@@ -284,79 +243,30 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
                       Deploy Cash
                     </Text>
                     <Text style={styles.modeOptionSubtext}>
-                      +{formatNumber(cashIRR)} IRR
+                      +{formatIRR(cashIRR)}
                     </Text>
                   </TouchableOpacity>
                 </View>
               </View>
             )}
 
-            {/* Trade Summary */}
-            {!isLoading && !error && (
-            <View style={styles.section}>
-              <TouchableOpacity
-                style={styles.summaryHeader}
-                onPress={() => setShowTrades(!showTrades)}
-              >
-                <Text style={styles.sectionTitle}>Summary</Text>
-                <Text style={styles.expandIcon}>{showTrades ? '▼' : '▶'}</Text>
-              </TouchableOpacity>
+            {/* Task 8 (Round 2): Removed Summary section - no Selling/Buying counts */}
 
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Selling</Text>
-                <Text style={styles.summaryValue}>{sellTrades.length} assets</Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Buying</Text>
-                <Text style={styles.summaryValue}>{buyTrades.length} assets</Text>
-              </View>
-
-              {showTrades && trades.length > 0 && (
-                <View style={styles.tradeList}>
-                  {trades.map((trade, index) => (
-                    <View key={index} style={styles.tradeItem}>
-                      <View style={styles.tradeLeft}>
-                        <Text style={[
-                          styles.tradeSide,
-                          { color: trade.side === 'SELL' ? colors.error : colors.success }
-                        ]}>
-                          {trade.side}
-                        </Text>
-                        <Text style={styles.tradeAsset}>
-                          {ASSETS[trade.assetId as keyof typeof ASSETS]?.symbol || trade.assetId}
-                        </Text>
-                      </View>
-                      <Text style={styles.tradeAmount}>
-                        {formatNumber(trade.amountIRR)} IRR
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </View>
-            )}
-
-            {/* Warnings */}
-            {!isLoading && !error && hasLockedCollateral && (
+            {/* Task 8 (Round 2): Combined warning box */}
+            {!isLoading && !error && (hasLockedCollateral || residualDrift > 2) && canExecute && (
               <View style={styles.warningBox}>
-                <Text style={styles.warningIcon}>🔒</Text>
-                <Text style={styles.warningText}>
-                  Some assets are locked as collateral for your loans and cannot be sold.
-                </Text>
-              </View>
-            )}
-
-            {/* BUG-C FIX: Make drift warning and balanced message mutually exclusive */}
-            {!isLoading && !error && residualDrift > 2 && canExecute && (
-              <View style={[styles.warningBox, { borderColor: colors.warning }]}>
                 <Text style={styles.warningIcon}>⚠️</Text>
                 <Text style={styles.warningText}>
-                  {`Remaining drift: ${residualDrift.toFixed(1)}% from target after rebalancing.`}
+                  {hasLockedCollateral && residualDrift > 2
+                    ? `Some assets locked — ${formatPercent(residualDrift)} drift will remain`
+                    : hasLockedCollateral
+                    ? 'Some assets locked as collateral'
+                    : `${formatPercent(residualDrift)} drift will remain`}
                 </Text>
               </View>
             )}
 
-            {/* BUG-C FIX: Show appropriate message based on drift and trade availability */}
+            {/* Show appropriate message when no rebalancing needed or possible */}
             {!isLoading && !error && !canExecute && residualDrift <= 5 && (
               <View style={styles.infoBox}>
                 <Text style={styles.infoText}>
@@ -365,14 +275,13 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
               </View>
             )}
 
-            {/* BUG-C FIX: Show drift exists but can't rebalance (e.g., all assets locked) */}
             {!isLoading && !error && !canExecute && residualDrift > 5 && (
-              <View style={[styles.warningBox, { borderColor: colors.warning }]}>
+              <View style={styles.warningBox}>
                 <Text style={styles.warningIcon}>⚠️</Text>
                 <Text style={styles.warningText}>
                   {hasLockedCollateral
-                    ? `${residualDrift.toFixed(1)}% drift from target. Cannot rebalance because assets are locked as collateral.`
-                    : `${residualDrift.toFixed(1)}% drift from target. Unable to generate trades.`}
+                    ? `${formatPercent(residualDrift)} drift — assets locked as collateral`
+                    : `${formatPercent(residualDrift)} drift from target`}
                 </Text>
               </View>
             )}
@@ -490,6 +399,45 @@ const styles = StyleSheet.create({
     color: colors.textPrimaryDark,
     marginBottom: spacing[3],
   },
+  // Task 8 (Round 2): Simplified allocation styles - single bar with arrows
+  currentBarContainer: {
+    height: 28,
+    backgroundColor: colors.surfaceDark,
+    borderRadius: borderRadius.sm,
+    overflow: 'hidden',
+    marginBottom: spacing[4],
+  },
+  allocationBar: {
+    flexDirection: 'row',
+    height: '100%',
+  },
+  barSegment: {
+    height: '100%',
+  },
+  layerChanges: {
+    gap: spacing[2],
+  },
+  layerChangeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  layerDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: spacing[2],
+  },
+  layerName: {
+    flex: 1,
+    fontSize: typography.fontSize.base,
+    color: colors.textPrimaryDark,
+  },
+  layerChangeText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.textSecondary,
+  },
+  // Legacy allocation styles (kept for compatibility)
   allocationRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -506,13 +454,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceDark,
     borderRadius: borderRadius.sm,
     overflow: 'hidden',
-  },
-  allocationBar: {
-    flexDirection: 'row',
-    height: '100%',
-  },
-  barSegment: {
-    height: '100%',
   },
   legend: {
     flexDirection: 'row',

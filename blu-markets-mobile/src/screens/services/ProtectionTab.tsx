@@ -21,6 +21,7 @@ import { Protection, AssetId, ProtectableHolding } from '../../types';
 import { ASSETS } from '../../constants/assets';
 import { EmptyState } from '../../components/EmptyState';
 import { ProtectionSheet } from '../../components/ProtectionSheet';
+import { formatIRR } from '../../utils/currency';
 
 interface ProtectionTabProps {
   protectionId?: string;
@@ -191,7 +192,7 @@ function ProtectionCard({
           <Text style={styles.protectionDetailLabel}>Protected Value</Text>
           <Text style={styles.protectionDetailValue}>
             {/* BUG-2 FIX: Use canonical notionalIrr, fallback to alias notionalIRR */}
-            {(protection.notionalIrr ?? protection.notionalIRR ?? 0).toLocaleString()} IRR
+            {formatIRR(protection.notionalIrr ?? protection.notionalIRR ?? 0)}
           </Text>
         </View>
         <View style={styles.protectionDetailRow}>
@@ -238,16 +239,14 @@ function EligibleAssetsGrid({
         const holdingId = item.holdingId;
         if (!holdingId) return null;
         return (
+          // Task 3 (Round 2): Simplified card - 4 elements only (no quantity)
           <View key={holdingId} style={styles.eligibleCard}>
             <Text style={styles.eligibleIcon}>{asset?.symbol || item.assetId}</Text>
             <Text style={styles.eligibleName}>
               {asset?.name || item.assetId}
             </Text>
-            <Text style={styles.eligibleQuantity}>
-              {quantity.toFixed(4)} {asset?.symbol}
-            </Text>
             <Text style={styles.eligiblePremium}>
-              ~{formatIndicativePremium(premiumIrr)} IRR/mo cost
+              ~{formatIRR(premiumIrr, { showUnit: false })}/mo
             </Text>
             <TouchableOpacity
               style={styles.protectButton}
@@ -262,14 +261,7 @@ function EligibleAssetsGrid({
   );
 }
 
-// BUG-2 FIX: Format indicative premium for display
-function formatIndicativePremium(amount: number): string {
-  if (amount === undefined || amount === null || isNaN(amount)) return '0';
-  if (amount >= 1_000_000_000) return `${(amount / 1_000_000_000).toFixed(1)}B`;
-  if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)}M`;
-  if (amount >= 1_000) return `${(amount / 1_000).toFixed(0)}K`;
-  return Math.round(amount).toLocaleString();
-}
+// Task 3 (Round 2): Using formatIRR from utils/currency.ts instead of local function
 
 const styles = StyleSheet.create({
   container: {
