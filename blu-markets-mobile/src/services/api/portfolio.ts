@@ -104,15 +104,37 @@ export const portfolio = {
       ]);
       summaryData = summary;
       holdingsData = Array.isArray(holdings) ? holdings : [];
-    } catch {
+
+      // DEBUG: Log API responses
+      if (__DEV__) {
+        console.log('[Portfolio API] /portfolio holdings count:', Array.isArray(summaryData.holdings) ? (summaryData.holdings as unknown[]).length : 'none');
+        console.log('[Portfolio API] /portfolio/holdings count:', holdingsData.length);
+        if (holdingsData.length > 0) {
+          console.log('[Portfolio API] First holding:', JSON.stringify(holdingsData[0]));
+        }
+      }
+    } catch (error) {
       // If holdings endpoint fails, just return summary
+      if (__DEV__) console.log('[Portfolio API] Holdings endpoint failed, using summary only:', error);
       summaryData = await apiClient.get('/portfolio') as unknown as Record<string, unknown>;
     }
 
     // Normalize holdings from separate endpoint
     const holdings = holdingsData.map((h) => normalizeHolding(h));
 
-    return normalizePortfolioResponse(summaryData, holdings);
+    const result = normalizePortfolioResponse(summaryData, holdings);
+
+    // DEBUG: Log final result
+    if (__DEV__) {
+      console.log('[Portfolio API] Final holdings count:', result.holdings.length);
+      console.log('[Portfolio API] Holdings by layer:', {
+        FOUNDATION: result.holdings.filter(h => h.layer === 'FOUNDATION').length,
+        GROWTH: result.holdings.filter(h => h.layer === 'GROWTH').length,
+        UPSIDE: result.holdings.filter(h => h.layer === 'UPSIDE').length,
+      });
+    }
+
+    return result;
   },
 
   addFunds: async (amountIrr: number): Promise<PortfolioResponse> => {
