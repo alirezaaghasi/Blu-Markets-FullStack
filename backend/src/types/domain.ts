@@ -268,6 +268,6 @@ export const INTEREST_RATE = 0.30; // 30% annual
 export const FIXED_INCOME_RATE = 0.30; // 30% annual simple interest
 export const FIXED_INCOME_UNIT_PRICE_IRR = 500000; // 500K IRR per unit
 export const PORTFOLIO_LOAN_LIMIT = 0.25; // 25% of portfolio max
-export const MIN_TRADE_IRR = 1000000; // 1M IRR minimum trade
+export const MIN_TRADE_IRR = 100_000; // 100K IRR minimum trade - PRD Section 7.3
 export const REBALANCE_COOLDOWN_HOURS = 0; // Cooldown disabled
 export const FALLBACK_FX_RATE = 1456000; // USD/IRR fallback
