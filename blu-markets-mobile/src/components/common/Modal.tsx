@@ -47,6 +47,8 @@ interface ModalProps {
   visible: boolean;
   /** Close handler (called on backdrop press if dismissable) */
   onClose: () => void;
+  /** Back handler for multi-step modals (UX-004) */
+  onBack?: () => void;
   /** Modal title */
   title?: string;
   /** Modal content */
@@ -68,6 +70,7 @@ interface ModalProps {
 export const Modal: React.FC<ModalProps> = ({
   visible,
   onClose,
+  onBack,
   title,
   children,
   actions = [],
@@ -96,6 +99,16 @@ export const Modal: React.FC<ModalProps> = ({
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
             <View style={[styles.container, style]}>
+              {/* UX-004: Back button for multi-step modals */}
+              {onBack && (
+                <TouchableOpacity
+                  onPress={onBack}
+                  style={styles.backButton}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                  <Text style={styles.backButtonText}>‹</Text>
+                </TouchableOpacity>
+              )}
               {/* Close button */}
               {showCloseButton && (
                 <TouchableOpacity
@@ -285,6 +298,18 @@ const styles = StyleSheet.create({
   closeButtonText: {
     fontSize: TYPOGRAPHY.fontSize.lg,
     color: COLORS.text.muted,
+  },
+  // UX-004: Back button styles
+  backButton: {
+    position: 'absolute',
+    top: SPACING[4],
+    left: SPACING[4],
+    zIndex: 1,
+  },
+  backButtonText: {
+    fontSize: 24,
+    color: COLORS.text.muted,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
   },
   iconContainer: {
     alignItems: 'center',

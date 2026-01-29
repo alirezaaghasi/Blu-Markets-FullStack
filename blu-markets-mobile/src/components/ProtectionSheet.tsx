@@ -627,7 +627,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
               <View style={styles.infoItem}>
                 <Text style={styles.infoBullet}>•</Text>
                 <Text style={styles.infoText}>
-                  Protection cost is non-refundable once purchased
+                  This purchase is final and cannot be refunded
                 </Text>
               </View>
             </View>

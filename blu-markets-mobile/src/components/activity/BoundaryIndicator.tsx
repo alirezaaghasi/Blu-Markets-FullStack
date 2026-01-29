@@ -41,11 +41,13 @@ interface BoundaryDotProps {
 export const BoundaryDot: React.FC<BoundaryDotProps> = ({
   boundary,
   size = 'md',
-  showRing = true,
+  showRing = false, // UX-005: Disabled ring by default
 }) => {
   const config = BOUNDARY_CONFIG[boundary];
   const dotSize = size === 'sm' ? 8 : 10;
 
+  // UX-005: Use white/muted color for activity dots instead of boundary colors
+  // This reduces visual noise in the activity log
   return (
     <View
       style={[
@@ -53,7 +55,7 @@ export const BoundaryDot: React.FC<BoundaryDotProps> = ({
         {
           width: dotSize,
           height: dotSize,
-          backgroundColor: config.color,
+          backgroundColor: COLORS.text.muted, // White/muted instead of colored
         },
         showRing && {
           shadowColor: config.color,

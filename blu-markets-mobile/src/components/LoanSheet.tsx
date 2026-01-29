@@ -346,9 +346,15 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
         >
           {/* Asset Selection - asset will be locked for this loan */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Step 1: Select Asset to Lock</Text>
+            <View style={styles.sectionTitleRow}>
+              <Text style={styles.sectionTitle}>Step 1: Choose Collateral</Text>
+              <Text style={styles.infoIcon} onPress={() => Alert.alert(
+                'Borrowing Limits',
+                'Riskier assets let you borrow a smaller percentage of their value. Stablecoins and gold allow up to 50%, while volatile assets may only allow 30-40%.'
+              )}>ⓘ</Text>
+            </View>
             {!selectedAssetId && (
-              <Text style={styles.sectionHelper}>Tap an asset to lock for your loan</Text>
+              <Text style={styles.sectionHelper}>Tap an asset to use as security for your loan</Text>
             )}
             <View style={styles.collateralList}>
               {eligibleHoldings.map((holding) => {
@@ -390,7 +396,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
                       <View style={{ flex: 1 }}>
                         <Text style={styles.collateralName}>{asset.name}</Text>
                         <Text style={styles.collateralValue}>
-                          Max: {formatNumber(maxBorrow)} IRR ({(asset.ltv * 100).toFixed(0)}% of value)
+                          You can borrow up to {formatIRR(maxBorrow)}
                         </Text>
                       </View>
                     </View>
@@ -606,12 +612,22 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: spacing[4],
   },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing[3],
+  },
   sectionTitle: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
     color: colors.textSecondary,
-    marginBottom: spacing[3],
     textTransform: 'uppercase',
+  },
+  infoIcon: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+    marginLeft: spacing[2],
+    paddingHorizontal: spacing[1],
   },
   sectionHelper: {
     fontSize: typography.fontSize.sm,

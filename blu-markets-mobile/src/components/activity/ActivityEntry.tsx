@@ -72,7 +72,7 @@ export const ActivityEntry: React.FC<ActivityEntryProps> = ({
       {/* Content column */}
       <View style={[styles.contentColumn, isLast && styles.contentColumnLast]}>
         <View style={styles.headerRow}>
-          <Text style={styles.message} numberOfLines={1}>
+          <Text style={styles.message}>
             {entry.message}
           </Text>
           <BoundaryBadge boundary={entry.boundary} />

@@ -26,7 +26,10 @@ export const AllocationBar: React.FC<AllocationBarProps> = ({
 
   return (
     <View style={[styles.container, compact && styles.containerCompact]}>
-      {/* Current allocation bar */}
+      {/* UX-008: Current allocation bar with label */}
+      {!compact && target && (
+        <Text style={styles.barLabel}>Current:</Text>
+      )}
       <View style={[styles.barContainer, { height: barHeight }]}>
         {layers.map((layer) => (
           <View
@@ -42,11 +45,11 @@ export const AllocationBar: React.FC<AllocationBarProps> = ({
         ))}
       </View>
 
-      {/* Target indicator (optional) - hidden in compact mode */}
+      {/* UX-008: Target indicator with label - hidden in compact mode */}
       {target && !compact && (
         <View style={styles.targetContainer}>
-          <Text style={styles.targetLabel}>Target:</Text>
-          <View style={[styles.barContainer, styles.targetBar, { height: 4 }]}>
+          <Text style={styles.barLabel}>Target:</Text>
+          <View style={[styles.barContainer, styles.targetBar, { height: barHeight }]}>
             {layers.map((layer) => (
               <View
                 key={layer}
@@ -55,7 +58,6 @@ export const AllocationBar: React.FC<AllocationBarProps> = ({
                   {
                     flex: target[layer] || 0.001,
                     backgroundColor: LAYER_COLORS[layer],
-                    opacity: 0.5,
                   },
                 ]}
               />
@@ -97,15 +99,12 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   targetContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     marginTop: spacing[2],
   },
-  targetLabel: {
+  barLabel: {
     fontSize: typography.fontSize.xs,
     color: colors.textSecondary,
-    marginRight: spacing[2],
-    width: 45,
+    marginBottom: spacing[1],
   },
   targetBar: {
     flex: 1,

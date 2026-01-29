@@ -252,7 +252,7 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
                       Holdings Only
                     </Text>
                     <Text style={styles.modeOptionSubtext}>
-                      Trade existing assets
+                      Rebalance by adjusting what you own
                     </Text>
                   </TouchableOpacity>
 
@@ -261,10 +261,10 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
                     onPress={() => setMode('HOLDINGS_PLUS_CASH')}
                   >
                     <Text style={[styles.modeOptionText, mode === 'HOLDINGS_PLUS_CASH' && styles.modeOptionTextSelected]}>
-                      Deploy Cash
+                      Invest Cash
                     </Text>
                     <Text style={styles.modeOptionSubtext}>
-                      +{formatIRR(cashIRR)}
+                      Invest your {formatIRR(cashIRR)} cash
                     </Text>
                   </TouchableOpacity>
                 </View>
