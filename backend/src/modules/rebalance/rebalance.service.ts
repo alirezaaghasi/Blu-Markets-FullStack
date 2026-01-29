@@ -511,6 +511,25 @@ function generateRebalanceTrades(
   let totalBuyIrr = 0;
   let totalSellIrr = 0;
 
+  // === REBALANCE LOGGING START ===
+  logger.info('=== REBALANCE CALCULATION START ===', {
+    mode,
+    cashIrr: snapshot.cashIrr,
+    totalValueIrr: snapshot.totalValueIrr,
+    currentAllocation: snapshot.allocation,
+    targetAllocation: snapshot.targetAllocation,
+  });
+
+  logger.info('Gap Analysis:', {
+    gaps: gapAnalysis.map(g => ({
+      layer: g.layer,
+      currentPct: g.current.toFixed(2),
+      targetPct: g.target.toFixed(2),
+      gapPct: g.gap.toFixed(2),
+      gapIrr: Math.round(g.gapIrr).toLocaleString(),
+    })),
+  });
+
   // Find overweight and underweight layers
   // BUG FIX: For HOLDINGS_PLUS_CASH mode, a layer is only "underweight" if:
   // 1. Its gapIrr > 0 (needs more to reach target % of total)
@@ -530,6 +549,11 @@ function generateRebalanceTrades(
     }
     return g.gap > 1;
   }); // Need to buy
+
+  logger.info('Layer Classification:', {
+    overweight: overweight.map(g => ({ layer: g.layer, gapIrr: Math.round(g.gapIrr).toLocaleString() })),
+    underweight: underweight.map(g => ({ layer: g.layer, gapIrr: Math.round(g.gapIrr).toLocaleString() })),
+  });
 
   // Calculate total sellable amount from overweight layers
   let totalSellableAmount = 0;
@@ -612,6 +636,14 @@ function generateRebalanceTrades(
     }
   }
 
+  logger.info('Inter-layer trades generated:', {
+    tradesCount: trades.length,
+    totalBuyIrr: Math.round(totalBuyIrr).toLocaleString(),
+    totalSellIrr: Math.round(totalSellIrr).toLocaleString(),
+    remainingCash: Math.round(remainingCash).toLocaleString(),
+    trades: trades.map(t => ({ side: t.side, asset: t.assetId, amount: Math.round(t.amountIrr).toLocaleString(), layer: t.layer })),
+  });
+
   // INTRA-LAYER REBALANCING: Rebalance assets within layers that are at target
   // This handles cases where a layer is at its target % but individual assets
   // within the layer are significantly over/underweight
@@ -655,6 +687,23 @@ function generateRebalanceTrades(
         intraUnderweight.push({ assetId, deficit: deficitValue, currentWeight, targetWeight });
       }
     }
+
+    // Log intra-layer analysis
+    logger.info(`Intra-layer analysis for ${layer}:`, {
+      layerTotal: Math.round(layerTotal).toLocaleString(),
+      overweight: intraOverweight.map(a => ({
+        asset: a.assetId,
+        current: (a.currentWeight * 100).toFixed(1) + '%',
+        target: (a.targetWeight * 100).toFixed(1) + '%',
+        excess: Math.round(a.excess).toLocaleString(),
+      })),
+      underweight: intraUnderweight.map(a => ({
+        asset: a.assetId,
+        current: (a.currentWeight * 100).toFixed(1) + '%',
+        target: (a.targetWeight * 100).toFixed(1) + '%',
+        deficit: Math.round(a.deficit).toLocaleString(),
+      })),
+    });
 
     // If we have both overweight and underweight assets in this layer, rebalance
     if (intraOverweight.length > 0 && intraUnderweight.length > 0) {
@@ -719,6 +768,17 @@ function generateRebalanceTrades(
 
   // Check for locked collateral
   const hasLockedCollateral = snapshot.holdings.some((h) => h.frozen);
+
+  logger.info('=== REBALANCE CALCULATION COMPLETE ===', {
+    totalTrades: trades.length,
+    totalBuyIrr: Math.round(totalBuyIrr).toLocaleString(),
+    totalSellIrr: Math.round(totalSellIrr).toLocaleString(),
+    beforeAllocation: snapshot.allocation,
+    afterAllocation,
+    residualDrift: residualDrift.toFixed(2) + '%',
+    canFullyRebalance,
+    allTrades: trades.map(t => ({ side: t.side, asset: t.assetId, amount: Math.round(t.amountIrr).toLocaleString(), layer: t.layer })),
+  });
 
   return {
     trades,
