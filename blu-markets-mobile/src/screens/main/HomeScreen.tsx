@@ -109,13 +109,18 @@ function formatActivityMessage(entry: ActionLogEntry): string {
       if (entry.message && entry.message.length > 0) return entry.message;
       return assetName ? `Sold ${assetName}` : 'Executed sell';
     // BUG-1 FIX: Handle both frontend 'BORROW' and backend 'LOAN_CREATE'
+    // Prefer backend message which includes full context (collateral asset, etc.)
     case 'BORROW':
     case 'LOAN_CREATE':
+      if (entry.message && entry.message.length > 0) return entry.message;
       return `Borrowed ${formatIRRShort(entry.amountIRR)}${assetName ? ` against ${assetName}` : ''}`;
     case 'REPAY':
     case 'LOAN_REPAY':
-      return `Repaid ${formatIRRShort(entry.amountIRR)}`;
+      // Backend sends rich message like "Settled PAXG loan (11M IRR)" or "Repaid 4M IRR · BTC loan (1/6)"
+      if (entry.message && entry.message.length > 0) return entry.message;
+      return `Repaid ${formatIRRShort(entry.amountIRR)}${assetName ? ` · ${assetName} loan` : ''}`;
     case 'LOAN_LIQUIDATE':
+      if (entry.message && entry.message.length > 0) return entry.message;
       return `Loan liquidated${assetName ? ` (${assetName})` : ''}`;
     // BUG-1 FIX: Handle both frontend 'PROTECT' and backend 'PROTECTION_PURCHASE'
     case 'PROTECT':
