@@ -482,6 +482,18 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           },
         });
 
+        // Create action log for Activity Feed
+        await tx.actionLog.create({
+          data: {
+            portfolioId: portfolio.id,
+            actionType: 'LOAN_CREATE',
+            boundary: 'SAFE',
+            message: `Borrowed ${amountIrr.toLocaleString()} IRR against ${collateralAssetId}`,
+            amountIrr,
+            assetId: collateralAssetId,
+          },
+        });
+
         return loan;
       });
 
@@ -715,6 +727,20 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
             loanId: loan.id,
             boundary: 'SAFE',
             message: `Loan repayment: ${amountToApply.toLocaleString()} IRR`,
+          },
+        });
+
+        // Create action log for Activity Feed
+        await tx.actionLog.create({
+          data: {
+            portfolioId: loan.portfolio_id,
+            actionType: 'LOAN_REPAY',
+            boundary: 'SAFE',
+            message: isFullySettled
+              ? `Settled ${loan.collateral_asset_id} loan (${amountToApply.toLocaleString()} IRR)`
+              : `Repaid ${amountToApply.toLocaleString()} IRR · ${loan.collateral_asset_id} loan (${installmentsPaid}/6)`,
+            amountIrr: amountToApply,
+            assetId: loan.collateral_asset_id,
           },
         });
 
