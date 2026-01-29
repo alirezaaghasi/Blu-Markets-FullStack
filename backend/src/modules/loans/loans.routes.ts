@@ -479,7 +479,7 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
             assetId: collateralAssetId,
             loanId: loan.id,
             boundary: 'SAFE',
-            message: `Borrowed ${formatIrrCompact(amountIrr)} against ${collateralAssetId}`,
+            message: `Borrowed ${formatIrrCompact(amountIrr)} IRR against ${collateralAssetId}`,
           },
         });
 
@@ -489,7 +489,7 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
             portfolioId: portfolio.id,
             actionType: 'LOAN_CREATE',
             boundary: 'SAFE',
-            message: `Borrowed ${formatIrrCompact(amountIrr)} against ${collateralAssetId}`,
+            message: `Borrowed ${formatIrrCompact(amountIrr)} IRR against ${collateralAssetId}`,
             amountIrr,
             assetId: collateralAssetId,
           },
@@ -646,7 +646,16 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         const totalDueDecimal = toDecimal(loan.total_due_irr);
         const currentPaidDecimal = toDecimal(loan.paid_irr);
         const remainingDueDecimal = subtract(totalDueDecimal, currentPaidDecimal);
-        const amountToApplyDecimal = min(amountDecimal, remainingDueDecimal);
+
+        // ROUNDING FIX: If remaining is tiny (< 100 IRR), treat any payment as full settlement
+        // This handles accumulated rounding errors in interest/installment calculations
+        const ROUNDING_TOLERANCE_IRR = 100;
+        const remainingIsNegligible = remainingDueDecimal.lessThanOrEqualTo(ROUNDING_TOLERANCE_IRR);
+
+        // If remaining is negligible and user pays anything, settle the full remainder
+        const amountToApplyDecimal = remainingIsNegligible
+          ? remainingDueDecimal
+          : min(amountDecimal, remainingDueDecimal);
         const amountToApply = toNumber(amountToApplyDecimal);
 
         // Deduct from cash
@@ -657,12 +666,15 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
 
         // Update loan with fresh calculations
         const newPaidDecimal = add(currentPaidDecimal, amountToApplyDecimal);
-        const isFullySettled = isGreaterThanOrEqual(newPaidDecimal, totalDueDecimal);
+        // ROUNDING FIX: Use tolerance when checking if fully settled
+        const newRemainingDecimal = subtract(totalDueDecimal, newPaidDecimal);
+        const isFullySettled = newRemainingDecimal.lessThanOrEqualTo(ROUNDING_TOLERANCE_IRR);
 
         await tx.loan.update({
           where: { id: loan.id },
           data: {
-            paidIrr: toNumber(newPaidDecimal),
+            // ROUNDING FIX: Set paidIrr to totalDueIrr when fully settled to avoid showing tiny remainder
+            paidIrr: isFullySettled ? toNumber(totalDueDecimal) : toNumber(newPaidDecimal),
             status: isFullySettled ? 'REPAID' : 'ACTIVE',
           },
         });
@@ -681,12 +693,15 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           const paymentToInstDecimal = min(remainingPaymentDecimal, instRemainingDecimal);
 
           const newInstPaidDecimal = add(instPaidDecimal, paymentToInstDecimal);
-          const instFullyPaid = isGreaterThanOrEqual(newInstPaidDecimal, instTotalDecimal);
+          // ROUNDING FIX: Use tolerance when checking if installment fully paid
+          const instNewRemainingDecimal = subtract(instTotalDecimal, newInstPaidDecimal);
+          const instFullyPaid = instNewRemainingDecimal.lessThanOrEqualTo(ROUNDING_TOLERANCE_IRR);
 
           await tx.loanInstallment.update({
             where: { id: inst.id },
             data: {
-              paidIrr: toNumber(newInstPaidDecimal),
+              // ROUNDING FIX: Set paidIrr to totalIrr when fully paid to avoid showing tiny remainder
+              paidIrr: instFullyPaid ? toNumber(instTotalDecimal) : toNumber(newInstPaidDecimal),
               status: instFullyPaid ? 'PAID' : isGreaterThan(newInstPaidDecimal, 0) ? 'PARTIAL' : 'PENDING',
               paidAt: instFullyPaid ? new Date() : null,
             },
@@ -727,19 +742,20 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
             amountIrr: amountToApply,
             loanId: loan.id,
             boundary: 'SAFE',
-            message: `Repaid ${formatIrrCompact(amountToApply)} on ${loan.collateral_asset_id} loan`,
+            message: `Repaid ${formatIrrCompact(amountToApply)} IRR on ${loan.collateral_asset_id} loan`,
           },
         });
 
         // Create action log for Activity Feed
+        // Use paidCount (updated count) and installments.length for accurate message
         await tx.actionLog.create({
           data: {
             portfolioId: loan.portfolio_id,
             actionType: 'LOAN_REPAY',
             boundary: 'SAFE',
             message: isFullySettled
-              ? `Settled ${loan.collateral_asset_id} loan (${formatIrrCompact(amountToApply)})`
-              : `Repaid ${formatIrrCompact(amountToApply)} · ${loan.collateral_asset_id} loan (${installmentsPaid}/6)`,
+              ? `Settled ${loan.collateral_asset_id} loan (${formatIrrCompact(amountToApply)} IRR)`
+              : `Repaid ${formatIrrCompact(amountToApply)} IRR · ${loan.collateral_asset_id} loan (${paidCount}/${installments.length})`,
             amountIrr: amountToApply,
             assetId: loan.collateral_asset_id,
           },

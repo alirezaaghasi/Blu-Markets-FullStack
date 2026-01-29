@@ -25,7 +25,8 @@ import {
   LOAN_MIN_AMOUNT,
 } from '../constants/business';
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
-import { addLoan, freezeHolding, addCash, logAction } from '../store/slices/portfolioSlice';
+import { addLoan, freezeHolding, addCash, logAction, setPortfolioValues } from '../store/slices/portfolioSlice';
+import { portfolio as portfolioApi } from '../services/api';
 import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
 import { loans as loansApi } from '../services/api';
 import type { LoanCapacityResponse, LoanPreviewResponse } from '../services/api';
@@ -240,6 +241,21 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
           assetId: selectedAssetId,
         })
       );
+
+      // Refresh full portfolio data to update all values (prevents stale data)
+      try {
+        const portfolioData = await portfolioApi.get();
+        dispatch(setPortfolioValues({
+          totalValueIrr: portfolioData.totalValueIrr || 0,
+          holdingsValueIrr: portfolioData.holdingsValueIrr || 0,
+          currentAllocation: portfolioData.allocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
+          driftPct: portfolioData.driftPct || 0,
+          status: portfolioData.status || 'BALANCED',
+        }));
+      } catch (e) {
+        // Non-fatal - status will update on next refresh
+        console.warn('Failed to refresh portfolio after loan:', e);
+      }
 
       // BUG-005 FIX: Show success modal with backend-provided values
       // totalInterest comes from loanPreview API (backend-calculated)

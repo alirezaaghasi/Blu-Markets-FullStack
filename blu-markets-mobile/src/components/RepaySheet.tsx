@@ -16,7 +16,8 @@ import { colors, typography, spacing, borderRadius } from '../constants/theme';
 import { Loan } from '../types';
 import { ASSETS, LAYER_COLORS } from '../constants/assets';
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
-import { updateLoan, removeLoan, unfreezeHolding, subtractCash, logAction } from '../store/slices/portfolioSlice';
+import { updateLoan, removeLoan, unfreezeHolding, subtractCash, logAction, setPortfolioValues } from '../store/slices/portfolioSlice';
+import { portfolio as portfolioApi } from '../services/api';
 import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
 import { loans as loansApi } from '../services/api';
 
@@ -113,6 +114,20 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
           })
         );
 
+        // Refresh full portfolio data to update all values (prevents stale data)
+        try {
+          const portfolioData = await portfolioApi.get();
+          dispatch(setPortfolioValues({
+            totalValueIrr: portfolioData.totalValueIrr || 0,
+            holdingsValueIrr: portfolioData.holdingsValueIrr || 0,
+            currentAllocation: portfolioData.allocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
+            driftPct: portfolioData.driftPct || 0,
+            status: portfolioData.status || 'BALANCED',
+          }));
+        } catch (e) {
+          console.warn('Failed to refresh portfolio after repayment:', e);
+        }
+
         // Show success modal for full settlement
         setSuccessResult({
           title: 'Loan Fully Settled!',
@@ -141,6 +156,20 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
             assetId: loan.collateralAssetId,
           })
         );
+
+        // Refresh full portfolio data to update all values (prevents stale data)
+        try {
+          const portfolioData = await portfolioApi.get();
+          dispatch(setPortfolioValues({
+            totalValueIrr: portfolioData.totalValueIrr || 0,
+            holdingsValueIrr: portfolioData.holdingsValueIrr || 0,
+            currentAllocation: portfolioData.allocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
+            driftPct: portfolioData.driftPct || 0,
+            status: portfolioData.status || 'BALANCED',
+          }));
+        } catch (e) {
+          console.warn('Failed to refresh portfolio after repayment:', e);
+        }
 
         // Show success modal for partial payment (using backend-calculated values)
         setSuccessResult({

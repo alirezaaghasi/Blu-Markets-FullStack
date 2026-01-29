@@ -292,7 +292,7 @@ export async function addFunds(
         afterSnapshot: { cashIrr: newCashIrr },
         amountIrr,
         boundary: 'SAFE',
-        message: `Added ${formatIrrCompact(amountIrr)} cash`,
+        message: `Added ${formatIrrCompact(amountIrr)} IRR cash`,
       },
     });
 
@@ -302,7 +302,7 @@ export async function addFunds(
         portfolioId: portfolio.id,
         actionType: 'ADD_FUNDS',
         boundary: 'SAFE',
-        message: `Added ${formatIrrCompact(amountIrr)} cash`,
+        message: `Added ${formatIrrCompact(amountIrr)} IRR cash`,
         amountIrr,
       },
     });

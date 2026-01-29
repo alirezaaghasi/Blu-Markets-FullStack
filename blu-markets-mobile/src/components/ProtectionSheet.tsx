@@ -17,7 +17,8 @@ import { ProtectableHolding, ProtectionQuote, Holding } from '../types';
 import { ASSETS, LAYER_COLORS } from '../constants/assets';
 import { PROTECTION_DURATION_PRESETS, PROTECTION_ELIGIBLE_ASSETS } from '../constants/business';
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
-import { addProtection, subtractCash, logAction } from '../store/slices/portfolioSlice';
+import { addProtection, subtractCash, logAction, setPortfolioValues } from '../store/slices/portfolioSlice';
+import { portfolio as portfolioApi } from '../services/api';
 import { protection as protectionApi, formatPremiumPct, formatDuration, getRegimeColor } from '../services/api/protection';
 import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
 
@@ -226,6 +227,20 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
           assetId: holding.assetId,
         })
       );
+
+      // Refresh full portfolio data to update all values (prevents stale data)
+      try {
+        const portfolioData = await portfolioApi.get();
+        dispatch(setPortfolioValues({
+          totalValueIrr: portfolioData.totalValueIrr || 0,
+          holdingsValueIrr: portfolioData.holdingsValueIrr || 0,
+          currentAllocation: portfolioData.allocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
+          driftPct: portfolioData.driftPct || 0,
+          status: portfolioData.status || 'BALANCED',
+        }));
+      } catch (e) {
+        console.warn('Failed to refresh portfolio after protection purchase:', e);
+      }
 
       // Calculate expiry date
       const expiryDate = new Date();

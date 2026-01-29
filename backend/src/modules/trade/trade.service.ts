@@ -473,7 +473,7 @@ export async function executeTrade(
         quantity,
         amountIrr,
         boundary: preview.boundary,
-        message: `${action === 'BUY' ? 'Bought' : 'Sold'} ${assetId} (${formatIrrCompact(amountIrr)})`,
+        message: `${action === 'BUY' ? 'Bought' : 'Sold'} ${assetId} (${formatIrrCompact(amountIrr)} IRR)`,
       },
     });
 
@@ -483,7 +483,7 @@ export async function executeTrade(
         portfolioId: portfolio.id,
         actionType: action === 'BUY' ? 'TRADE_BUY' : 'TRADE_SELL',
         boundary: preview.boundary,
-        message: `${action === 'BUY' ? 'Bought' : 'Sold'} ${assetId} (${formatIrrCompact(amountIrr)})`,
+        message: `${action === 'BUY' ? 'Bought' : 'Sold'} ${assetId} (${formatIrrCompact(amountIrr)} IRR)`,
         amountIrr,
         assetId,
       },

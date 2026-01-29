@@ -481,7 +481,7 @@ const HomeScreen: React.FC = () => {
                     key={entry?.id || `activity-${index}`}
                     style={{
                       flexDirection: 'row',
-                      alignItems: 'center',
+                      alignItems: 'flex-start',
                       backgroundColor: COLORS.background.surface,
                       borderRadius: 10,
                       paddingVertical: 10,
@@ -498,6 +498,7 @@ const HomeScreen: React.FC = () => {
                       borderRadius: 5,
                       backgroundColor: dotColor,
                       marginRight: 12,
+                      marginTop: 4,
                     }} />
                     {/* Time */}
                     <Text style={{
@@ -505,17 +506,19 @@ const HomeScreen: React.FC = () => {
                       fontSize: 12,
                       marginRight: 12,
                       minWidth: 55,
+                      marginTop: 2,
                     }}>
                       {time}
                     </Text>
-                    {/* Message */}
+                    {/* Message - allow 2 lines for long messages */}
                     <Text
                       style={{
                         color: COLORS.text.primary,
                         fontSize: 14,
                         flex: 1,
+                        lineHeight: 20,
                       }}
-                      numberOfLines={1}
+                      numberOfLines={2}
                     >
                       {message}
                     </Text>

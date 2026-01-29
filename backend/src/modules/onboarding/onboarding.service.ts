@@ -343,7 +343,7 @@ export async function createInitialPortfolio(
         },
         amountIrr: totalAmount,
         boundary: 'SAFE',
-        message: `Started with ${formatIrrCompact(totalAmount)}`,
+        message: `Started with ${formatIrrCompact(totalAmount)} IRR`,
       },
     });
 
@@ -353,7 +353,7 @@ export async function createInitialPortfolio(
         portfolioId: newPortfolio.id,
         actionType: 'PORTFOLIO_CREATED',
         boundary: 'SAFE',
-        message: `Started with ${formatIrrCompact(totalAmount)}`,
+        message: `Started with ${formatIrrCompact(totalAmount)} IRR`,
         amountIrr: totalAmount,
       },
     });
@@ -370,7 +370,7 @@ export async function createInitialPortfolio(
           quantity: holding.quantity,
           amountIrr: holding.valueIrr,
           boundary: 'SAFE',
-          message: `Bought ${holding.assetId} (${formatIrrCompact(holding.valueIrr)})`,
+          message: `Bought ${holding.assetId} (${formatIrrCompact(holding.valueIrr)} IRR)`,
           beforeSnapshot: {},
           afterSnapshot: {},
         },

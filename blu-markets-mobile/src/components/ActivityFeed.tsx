@@ -89,14 +89,16 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({
 const ActivityEntry: React.FC<{ entry: ActionLogEntry }> = ({ entry }) => {
   return (
     <View style={styles.entryContainer}>
-      <View
-        style={[
-          styles.entryDot,
-          { backgroundColor: BOUNDARY_COLORS[entry.boundary] },
-        ]}
-      />
-      <Text style={styles.entryTime}>{formatTime(entry.timestamp)}</Text>
-      <Text style={styles.entryMessage} numberOfLines={1}>
+      <View style={styles.entryLeft}>
+        <View
+          style={[
+            styles.entryDot,
+            { backgroundColor: BOUNDARY_COLORS[entry.boundary] },
+          ]}
+        />
+        <Text style={styles.entryTime}>{formatTime(entry.timestamp)}</Text>
+      </View>
+      <Text style={styles.entryMessage} numberOfLines={2}>
         {entry.message}
       </Text>
       <Text style={styles.entryIndicator}>
@@ -133,8 +135,13 @@ const styles = StyleSheet.create({
   },
   entryContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingVertical: spacing[2],
+  },
+  entryLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 0,
   },
   entryDot: {
     width: 8,
@@ -145,13 +152,15 @@ const styles = StyleSheet.create({
   entryTime: {
     fontSize: typography.fontSize.sm,
     color: colors.textSecondary,
-    width: 70,
+    width: 60,
+    marginRight: spacing[2],
   },
   entryMessage: {
     flex: 1,
     fontSize: typography.fontSize.sm,
     color: colors.textPrimaryDark,
     marginRight: spacing[2],
+    lineHeight: 18,
   },
   entryIndicator: {
     fontSize: 12,
