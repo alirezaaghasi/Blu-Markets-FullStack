@@ -83,8 +83,8 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
 
     setIsExecuting(true);
     try {
-      // Execute rebalance via backend
-      const result = await rebalance.execute();
+      // Execute rebalance via backend (pass mode to deploy cash if selected)
+      const result = await rebalance.execute(mode);
 
       // Refresh portfolio data from backend
       const portfolioData = await portfolio.get();
