@@ -8,6 +8,8 @@ import websocket from '@fastify/websocket';
 
 import { env } from './config/env.js';
 import { errorHandler } from './middleware/error-handler.js';
+import { registerRequestContext } from './middleware/request-context.js';
+import { getAllMetrics } from './utils/logger.js';
 
 // Routes
 import { authRoutes } from './modules/auth/auth.routes.js';
@@ -56,8 +58,8 @@ export async function buildApp(): Promise<FastifyInstance> {
     origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
-    exposedHeaders: ['X-Request-ID'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'X-Trace-Id'],
+    exposedHeaders: ['X-Request-ID', 'X-Trace-Id'],
     maxAge: 86400, // 24 hours preflight cache
   });
 
@@ -111,11 +113,22 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Error handler
   app.setErrorHandler(errorHandler);
 
+  // Request context for traceId propagation and timing
+  registerRequestContext(app);
+
   // Health check
   app.get('/health', async () => ({
     status: 'ok',
     timestamp: new Date().toISOString(),
     version: '1.0.0',
+  }));
+
+  // Metrics endpoint (for observability)
+  app.get('/metrics', async () => ({
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    counters: getAllMetrics(),
   }));
 
   // API Routes

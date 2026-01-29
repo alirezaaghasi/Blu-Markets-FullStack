@@ -30,6 +30,7 @@ import {
 import { logger } from '../../utils/logger.js';
 import { getLayerAssets, ASSETS_CONFIG } from '../../config/assets.js';
 import { getDynamicLayerWeights, type StrategyPreset } from '../../services/intra-layer-balancer.js';
+import { SPREAD_BY_LAYER, MIN_TRADE_IRR } from '../../config/business-rules.js';
 
 // Rebalance modes per PRD Section 18.3
 export type RebalanceMode = 'HOLDINGS_ONLY' | 'HOLDINGS_PLUS_CASH' | 'SMART';
@@ -37,19 +38,8 @@ export type RebalanceMode = 'HOLDINGS_ONLY' | 'HOLDINGS_PLUS_CASH' | 'SMART';
 // Strategy presets per PRD Section 18.2
 export type RebalanceStrategy = 'CONSERVATIVE' | 'BALANCED' | 'AGGRESSIVE';
 
-// Spread per layer (per PRD Section 7.1)
-// FOUNDATION: 0.15% (range 0.1%-0.2%) - stablecoins, gold
-// GROWTH: 0.30% (range 0.2%-0.4%) - BTC, ETH, etc.
-// UPSIDE: 0.60% (range 0.4%-0.8%) - higher volatility altcoins
-const SPREAD_BY_LAYER: Record<Layer, number> = {
-  FOUNDATION: 0.0015,
-  GROWTH: 0.003,
-  UPSIDE: 0.006,
-};
-
-// Minimum trade amount (per PRD: 100,000 IRR)
-const MIN_TRADE_AMOUNT = 100_000;
-// REBALANCE_COOLDOWN_HOURS imported from domain.ts (24 hours)
+// Alias for backward compatibility
+const MIN_TRADE_AMOUNT = MIN_TRADE_IRR;
 
 interface LayerHoldings {
   frozen: { assetId: AssetId; quantity: number; valueIrr: number }[];
@@ -235,6 +225,15 @@ export async function executeRebalance(
   }
 
   const result = await prisma.$transaction(async (tx) => {
+    // CRITICAL: Acquire row-level locks on portfolio and holdings to prevent race conditions
+    // This ensures no other transaction can modify these rows until we commit
+    await tx.$executeRaw`
+      SELECT 1 FROM "portfolios" WHERE id = ${portfolio.id}::uuid FOR UPDATE
+    `;
+    await tx.$executeRaw`
+      SELECT 1 FROM "holdings" WHERE portfolio_id = ${portfolio.id}::uuid FOR UPDATE
+    `;
+
     // CRITICAL: Re-fetch portfolio and holdings inside transaction
     // to get current frozen status and prevent race conditions with loan creation
     const currentPortfolio = await tx.portfolio.findUnique({
@@ -623,14 +622,14 @@ function generateRebalanceTrades(
       );
 
       for (const trade of layerSellTrades) {
-        // Calculate net proceeds after spread
+        // Calculate net proceeds after spread using Decimal arithmetic
         const assetLayer = getAssetLayer(trade.assetId as AssetId);
         const spread = SPREAD_BY_LAYER[assetLayer];
-        const netProceeds = trade.amountIrr * (1 - spread);
+        const netProceedsDecimal = multiply(trade.amountIrr, subtract(1, spread));
 
         trades.push(trade);
         totalSellIrr += trade.amountIrr;
-        totalNetSellProceeds += netProceeds;
+        totalNetSellProceeds += toNumber(netProceedsDecimal);
       }
     }
   }
@@ -812,7 +811,9 @@ function generateRebalanceTrades(
       }
 
       // Calculate available for buys based on ACTUAL sellable excess (not theoretical)
-      const netSellableAfterSpread = actualSellableExcess * (1 - spread);
+      // Use Decimal arithmetic for precision
+      const netSellableAfterSpreadDecimal = multiply(actualSellableExcess, subtract(1, spread));
+      const netSellableAfterSpread = toNumber(netSellableAfterSpreadDecimal);
       const availableForIntraBuys = Math.min(netSellableAfterSpread, totalDeficit);
 
       logger.info(`Intra-layer sellable analysis for ${layer}:`, {
@@ -827,7 +828,8 @@ function generateRebalanceTrades(
 
       if (availableForIntraBuys >= MIN_TRADE_AMOUNT && sellablePlan.length > 0) {
         // Generate SELL trades for overweight assets (only those we confirmed are sellable)
-        let actualIntraSellProceeds = 0;
+        // Use Decimal arithmetic for accumulating proceeds
+        let actualIntraSellProceedsDecimal = toDecimal(0);
         for (const plan of sellablePlan) {
           trades.push({
             side: 'SELL',
@@ -836,14 +838,15 @@ function generateRebalanceTrades(
             layer,
           });
           totalSellIrr += plan.amount;
-          // Track net proceeds for intra-layer budget
-          actualIntraSellProceeds += plan.amount * (1 - spread);
+          // Track net proceeds for intra-layer budget using Decimal
+          const proceedsDecimal = multiply(plan.amount, subtract(1, spread));
+          actualIntraSellProceedsDecimal = add(actualIntraSellProceedsDecimal, proceedsDecimal);
         }
 
         // CRITICAL FIX: In HOLDINGS_ONLY mode, only generate intra-layer buys
         // that can be funded by intra-layer sell proceeds
         // Add sell proceeds to intra-layer budget
-        intraLayerCashBudget += actualIntraSellProceeds;
+        intraLayerCashBudget += toNumber(actualIntraSellProceedsDecimal);
 
         // Generate BUY trades for underweight assets
         const buyRatio = availableForIntraBuys / totalDeficit;

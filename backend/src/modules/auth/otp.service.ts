@@ -123,10 +123,15 @@ async function sendSms(phone: string, code: string): Promise<void> {
     return;
   }
 
-  // Production: Send via Kavenegar
+  // SECURITY FIX: In production, fail fast if SMS cannot be sent
+  // Silent failures cause user lockouts with no actionable error
   if (!env.KAVENEGAR_API_KEY) {
-    logger.warn('KAVENEGAR_API_KEY not configured, OTP not sent');
-    return;
+    logger.error('KAVENEGAR_API_KEY not configured in production');
+    throw new AppError(
+      'SERVICE_UNAVAILABLE',
+      'SMS service is not configured. Please contact support.',
+      503
+    );
   }
 
   try {
@@ -144,10 +149,26 @@ async function sendSms(phone: string, code: string): Promise<void> {
     );
 
     if (!response.ok) {
-      logger.error('Kavenegar SMS failed', undefined, { response: await response.text() });
+      const responseText = await response.text();
+      logger.error('Kavenegar SMS failed', undefined, { status: response.status, response: responseText });
+      throw new AppError(
+        'SERVICE_UNAVAILABLE',
+        'Failed to send verification code. Please try again.',
+        503
+      );
     }
   } catch (error) {
+    // Re-throw AppErrors (from above)
+    if (error instanceof AppError) {
+      throw error;
+    }
+    // Network/other errors
     logger.error('Failed to send SMS', error);
+    throw new AppError(
+      'SERVICE_UNAVAILABLE',
+      'SMS service temporarily unavailable. Please try again.',
+      503
+    );
   }
 }
 

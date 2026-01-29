@@ -25,51 +25,63 @@ import { AppError } from '../middleware/error-handler.js';
 import { logger } from '../utils/logger.js';
 import { toDecimal, multiply, toNumber, roundIrr } from '../utils/money.js';
 import { PROTECTION_ELIGIBLE_ASSETS, type AssetId, type Layer } from '../types/domain.js';
+import {
+  cacheQuote,
+  getAndValidateCachedQuote as getAndValidateCachedQuoteImpl,
+  reserveQuote as reserveQuoteImpl,
+  releaseQuote as releaseQuoteImpl,
+  consumeQuote as consumeQuoteImpl,
+  invalidateQuotesForHolding as invalidateQuotesForHoldingImpl,
+} from './quote-cache.service.js';
+import {
+  PROTECTION_DURATION_DAYS,
+  MIN_COVERAGE_PCT as MIN_COVERAGE_PCT_RULE,
+  MAX_COVERAGE_PCT as MAX_COVERAGE_PCT_RULE,
+  DEFAULT_COVERAGE_PCT as DEFAULT_COVERAGE_PCT_RULE,
+  MIN_NOTIONAL_IRR as MIN_NOTIONAL_IRR_RULE,
+  QUOTE_VALIDITY_MS as QUOTE_VALIDITY_MS_RULE,
+  PREMIUM_TOLERANCE as PREMIUM_TOLERANCE_RULE,
+  GLOBAL_MIN_PREMIUM_FLOOR_30D as GLOBAL_MIN_PREMIUM_FLOOR_30D_RULE,
+  EXECUTION_SPREAD as EXECUTION_SPREAD_RULE,
+  MIN_PREMIUM_30D as MIN_PREMIUM_30D_RULE,
+  MAX_PREMIUM_30D as MAX_PREMIUM_30D_RULE,
+} from '../config/business-rules.js';
 
 // ============================================================================
-// CONSTANTS
+// CONSTANTS (Re-exported from business-rules.ts for backward compatibility)
 // ============================================================================
 
 /** Duration presets in days */
-export const DURATION_PRESETS = [7, 14, 30, 60, 90, 180] as const;
+export const DURATION_PRESETS = PROTECTION_DURATION_DAYS;
 export type DurationDays = (typeof DURATION_PRESETS)[number];
 
 /** Coverage limits */
-export const MIN_COVERAGE_PCT = 0.1; // 10%
-export const MAX_COVERAGE_PCT = 1.0; // 100%
-export const DEFAULT_COVERAGE_PCT = 1.0;
+export const MIN_COVERAGE_PCT = MIN_COVERAGE_PCT_RULE;
+export const MAX_COVERAGE_PCT = MAX_COVERAGE_PCT_RULE;
+export const DEFAULT_COVERAGE_PCT = DEFAULT_COVERAGE_PCT_RULE;
 
 /** Strike (fixed at ATM for MVP) */
 export const DEFAULT_STRIKE_PCT = 1.0;
 
-/** Quote validity duration (5 minutes) */
-export const QUOTE_VALIDITY_MS = 5 * 60 * 1000;
+/** Quote validity duration */
+export const QUOTE_VALIDITY_MS = QUOTE_VALIDITY_MS_RULE;
 
-/** Premium tolerance for purchase validation (5%) */
-export const PREMIUM_TOLERANCE = 0.05;
+/** Premium tolerance for purchase validation */
+export const PREMIUM_TOLERANCE = PREMIUM_TOLERANCE_RULE;
 
 /** Maximum cache size to prevent memory exhaustion (DoS protection) */
 export const MAX_QUOTE_CACHE_SIZE = 10_000;
 
 /** Minimum notional in IRR */
-export const MIN_NOTIONAL_IRR = 1_000_000;
+export const MIN_NOTIONAL_IRR = MIN_NOTIONAL_IRR_RULE;
 
-/** Global minimum premium floor (2.5% per 30 days, non-negotiable) */
-export const GLOBAL_MIN_PREMIUM_FLOOR_30D = 0.025;
+/** Global minimum premium floor */
+export const GLOBAL_MIN_PREMIUM_FLOOR_30D = GLOBAL_MIN_PREMIUM_FLOOR_30D_RULE;
 
-// PROTECTION_ELIGIBLE_ASSETS imported from domain.ts (single source of truth)
-
-/**
- * Execution spread by asset (bid-ask spread cost)
- */
-const EXECUTION_SPREAD: Record<string, number> = {
-  BTC: 0.004, // 0.4%
-  ETH: 0.005, // 0.5%
-  SOL: 0.008, // 0.8%
-  PAXG: 0.003, // 0.3%
-  KAG: 0.004, // 0.4%
-  QQQ: 0.002, // 0.2%
-};
+// Local aliases for internal use
+const EXECUTION_SPREAD = EXECUTION_SPREAD_RULE;
+const MIN_PREMIUM_30D = MIN_PREMIUM_30D_RULE;
+const MAX_PREMIUM_30D = MAX_PREMIUM_30D_RULE;
 
 /**
  * Profit margin per day by layer
@@ -80,252 +92,18 @@ const PROFIT_MARGIN_PER_DAY: Record<Layer, number> = {
   UPSIDE: 0.0001, // 0.01% per day
 };
 
-/**
- * Premium bounds (per 30 days)
- * These prevent unrealistic pricing in edge cases
- * IMPORTANT: All values must be >= GLOBAL_MIN_PREMIUM_FLOOR_30D (2.5%)
- */
-const MIN_PREMIUM_30D: Record<string, number> = {
-  BTC: 0.025, // 2.5% (floor)
-  ETH: 0.025, // 2.5% (floor)
-  SOL: 0.025, // 2.5% (floor)
-  PAXG: 0.025, // 2.5% (floor)
-  KAG: 0.025, // 2.5% (floor)
-  QQQ: 0.025, // 2.5% (floor)
-};
-
-const MAX_PREMIUM_30D: Record<string, number> = {
-  BTC: 0.08, // 8%
-  ETH: 0.10, // 10%
-  SOL: 0.12, // 12%
-  PAXG: 0.03, // 3%
-  KAG: 0.035, // 3.5%
-  QQQ: 0.04, // 4%
-};
-
 // ============================================================================
-// QUOTE CACHE (In-memory for MVP)
+// QUOTE CACHE (Redis-backed with in-memory fallback)
 // ============================================================================
-// NOTE: For production multi-instance deployments, replace with Redis or
-// database-backed quotes. The current implementation uses atomic reservation
-// to prevent race conditions within a single instance.
+// Uses Redis for horizontal scaling. Falls back to in-memory when Redis unavailable.
+// See quote-cache.service.ts for implementation details.
 
-type QuoteStatus = 'available' | 'reserved' | 'consumed';
-
-interface CachedQuote {
-  quote: ProtectionQuote;
-  userId: string;
-  createdAt: Date;
-  status: QuoteStatus;
-  reservedAt?: Date;
-}
-
-/** In-memory quote cache with TTL and size limit */
-const quoteCache = new Map<string, CachedQuote>();
-
-/** Index of quotes by holdingId for fast invalidation */
-const quotesByHolding = new Map<string, Set<string>>();
-
-/**
- * Clean up expired quotes periodically.
- *
- * Reservation expiration is tied to quote validity (not a fixed timeout) to prevent
- * releasing a reservation while a transaction is still running. This is safer because:
- * 1. Quote validity (5 min) is longer than any reasonable transaction time
- * 2. If quote expires during transaction, the transaction will fail on quote validation anyway
- * 3. DB-level check for existing active protection provides additional safety net
- */
-function cleanupExpiredQuotes(): void {
-  const now = new Date();
-  for (const [quoteId, cached] of quoteCache.entries()) {
-    // Remove expired quotes (this also handles reserved quotes that expired)
-    // When a quote expires, any reservation on it is implicitly released
-    if (now > cached.quote.validUntil) {
-      removeQuoteFromCache(quoteId, cached.quote.holdingId);
-      continue;
-    }
-    // Note: We intentionally do NOT release reservations based on a fixed timeout.
-    // Reserved quotes remain reserved until:
-    // 1. Transaction succeeds (consumeQuote called)
-    // 2. Transaction fails (releaseQuote called)
-    // 3. Quote expires (removed by cleanup above)
-  }
-}
-
-// Run cleanup every minute
-setInterval(cleanupExpiredQuotes, 60_000);
-
-/**
- * Remove a quote from cache and holding index
- */
-function removeQuoteFromCache(quoteId: string, holdingId: string): void {
-  quoteCache.delete(quoteId);
-  const holdingQuotes = quotesByHolding.get(holdingId);
-  if (holdingQuotes) {
-    holdingQuotes.delete(quoteId);
-    if (holdingQuotes.size === 0) {
-      quotesByHolding.delete(holdingId);
-    }
-  }
-}
-
-/**
- * Evict oldest quotes when cache exceeds size limit (LRU eviction)
- */
-function evictOldestQuotes(): void {
-  if (quoteCache.size <= MAX_QUOTE_CACHE_SIZE) {
-    return;
-  }
-
-  // Sort by creation time and evict oldest 10%
-  const entries = Array.from(quoteCache.entries());
-  entries.sort((a, b) => a[1].createdAt.getTime() - b[1].createdAt.getTime());
-
-  const evictCount = Math.max(1, Math.floor(quoteCache.size * 0.1));
-  for (let i = 0; i < evictCount && i < entries.length; i++) {
-    const [quoteId, cached] = entries[i];
-    removeQuoteFromCache(quoteId, cached.quote.holdingId);
-  }
-}
-
-/**
- * Store a quote in the cache
- */
-function cacheQuote(quote: ProtectionQuote, userId: string): void {
-  // Evict old quotes if cache is full
-  evictOldestQuotes();
-
-  quoteCache.set(quote.quoteId, {
-    quote,
-    userId,
-    createdAt: new Date(),
-    status: 'available',
-  });
-
-  // Index by holdingId for fast invalidation
-  let holdingQuotes = quotesByHolding.get(quote.holdingId);
-  if (!holdingQuotes) {
-    holdingQuotes = new Set();
-    quotesByHolding.set(quote.holdingId, holdingQuotes);
-  }
-  holdingQuotes.add(quote.quoteId);
-}
-
-/**
- * Retrieve and validate a cached quote (read-only, does not reserve)
- * @throws AppError if quote not found, expired, or belongs to different user
- */
-export function getAndValidateCachedQuote(quoteId: string, userId: string): ProtectionQuote {
-  const cached = quoteCache.get(quoteId);
-
-  if (!cached) {
-    throw new AppError('QUOTE_NOT_FOUND', 'Quote not found or already used', 404, { quoteId });
-  }
-
-  if (cached.userId !== userId) {
-    throw new AppError('UNAUTHORIZED', 'Quote does not belong to user', 401);
-  }
-
-  if (!isQuoteValid(cached.quote)) {
-    removeQuoteFromCache(quoteId, cached.quote.holdingId);
-    throw new AppError('QUOTE_EXPIRED', 'Quote has expired, please request a new quote', 410, {
-      quoteId,
-      expiredAt: cached.quote.validUntil.toISOString(),
-    });
-  }
-
-  // Check if already consumed or reserved by another transaction
-  if (cached.status === 'consumed') {
-    throw new AppError('QUOTE_NOT_FOUND', 'Quote has already been used', 404, { quoteId });
-  }
-
-  if (cached.status === 'reserved') {
-    throw new AppError('QUOTE_IN_USE', 'Quote is being processed by another transaction', 409, { quoteId });
-  }
-
-  return cached.quote;
-}
-
-/**
- * Atomically reserve a quote for purchase (prevents race conditions)
- * Must be called BEFORE starting the database transaction.
- * @returns The quote if reservation successful
- * @throws AppError if quote not found, expired, already reserved, or belongs to different user
- */
-export function reserveQuote(quoteId: string, userId: string): ProtectionQuote {
-  const cached = quoteCache.get(quoteId);
-
-  if (!cached) {
-    throw new AppError('QUOTE_NOT_FOUND', 'Quote not found or already used', 404, { quoteId });
-  }
-
-  if (cached.userId !== userId) {
-    throw new AppError('UNAUTHORIZED', 'Quote does not belong to user', 401);
-  }
-
-  if (!isQuoteValid(cached.quote)) {
-    removeQuoteFromCache(quoteId, cached.quote.holdingId);
-    throw new AppError('QUOTE_EXPIRED', 'Quote has expired, please request a new quote', 410, {
-      quoteId,
-      expiredAt: cached.quote.validUntil.toISOString(),
-    });
-  }
-
-  // Atomic status check and update (synchronous, single-threaded in Node.js)
-  if (cached.status === 'consumed') {
-    throw new AppError('QUOTE_NOT_FOUND', 'Quote has already been used', 404, { quoteId });
-  }
-
-  if (cached.status === 'reserved') {
-    throw new AppError('QUOTE_IN_USE', 'Quote is being processed by another transaction', 409, { quoteId });
-  }
-
-  // Reserve the quote atomically
-  cached.status = 'reserved';
-  cached.reservedAt = new Date();
-
-  return cached.quote;
-}
-
-/**
- * Release a reserved quote (call on transaction failure)
- */
-export function releaseQuote(quoteId: string): void {
-  const cached = quoteCache.get(quoteId);
-  if (cached && cached.status === 'reserved') {
-    cached.status = 'available';
-    cached.reservedAt = undefined;
-  }
-}
-
-/**
- * Consume a quote (mark as consumed after successful purchase)
- * Also invalidates all other quotes for the same holding to prevent duplicate purchases.
- * Call this AFTER the transaction succeeds.
- */
-export function consumeQuote(quoteId: string): void {
-  const cached = quoteCache.get(quoteId);
-  if (cached) {
-    // Mark as consumed (not just deleted, for debugging/audit)
-    cached.status = 'consumed';
-    // Invalidate ALL quotes for this holding to prevent duplicate protection purchases
-    invalidateQuotesForHolding(cached.quote.holdingId);
-  }
-}
-
-/**
- * Invalidate all cached quotes for a specific holding
- * Called after purchase to prevent duplicate protection purchases
- */
-export function invalidateQuotesForHolding(holdingId: string): void {
-  const holdingQuotes = quotesByHolding.get(holdingId);
-  if (holdingQuotes) {
-    for (const quoteId of holdingQuotes) {
-      quoteCache.delete(quoteId);
-    }
-    quotesByHolding.delete(holdingId);
-  }
-}
+// Re-export cache functions (now async for Redis support)
+export const getAndValidateCachedQuote = getAndValidateCachedQuoteImpl;
+export const reserveQuote = reserveQuoteImpl;
+export const releaseQuote = releaseQuoteImpl;
+export const consumeQuote = consumeQuoteImpl;
+export const invalidateQuotesForHolding = invalidateQuotesForHoldingImpl;
 
 // ============================================================================
 // TYPES
@@ -638,7 +416,7 @@ export async function getProtectionQuote(
   };
 
   // Cache the quote for later validation during purchase
-  cacheQuote(quote, userId);
+  await cacheQuote(quote, userId);
 
   return quote;
 }
@@ -724,10 +502,14 @@ export async function getPremiumCurve(
 
   const spotPriceUsd = priceData.priceUsd;
   const spotPriceIrr = priceData.priceIrr;
-  const holdingValueUsd = Number(holding.quantity) * spotPriceUsd;
-  const holdingValueIrr = Number(holding.quantity) * spotPriceIrr;
-  const notionalUsd = holdingValueUsd * coveragePct;
-  const notionalIrr = holdingValueIrr * coveragePct;
+
+  // FINANCIAL FIX: Use Decimal arithmetic for precise calculations with large IRR values
+  const quantityDecimal = toDecimal(holding.quantity);
+  const holdingValueUsdDecimal = multiply(quantityDecimal, spotPriceUsd);
+  const holdingValueIrrDecimal = multiply(quantityDecimal, spotPriceIrr);
+  const notionalUsdDecimal = multiply(holdingValueUsdDecimal, coveragePct);
+  const notionalIrrDecimal = multiply(holdingValueIrrDecimal, coveragePct);
+
   const strikePct = DEFAULT_STRIKE_PCT;
   const layer = getAssetLayer(assetId);
   const executionSpreadPct = EXECUTION_SPREAD[assetId] || 0.005;
@@ -755,7 +537,9 @@ export async function getPremiumCurve(
       const maxPremium = (MAX_PREMIUM_30D[assetId] || 0.10) * (durationDays / 30);
       totalPremiumPct = Math.max(minPremium, Math.min(maxPremium, totalPremiumPct));
 
-      const premiumIrr = notionalIrr * totalPremiumPct;
+      // FINANCIAL FIX: Use Decimal for premium calculation to match main quote path
+      const premiumIrrDecimal = multiply(notionalIrrDecimal, totalPremiumPct);
+      const premiumIrr = toNumber(roundIrr(premiumIrrDecimal));
 
       quotes.push({
         durationDays,

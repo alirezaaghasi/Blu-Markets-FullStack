@@ -27,12 +27,11 @@ import {
   MIN_COVERAGE_PCT,
   MAX_COVERAGE_PCT,
   MIN_NOTIONAL_IRR,
-  PROTECTION_ELIGIBLE_ASSETS,
   type ProtectionQuote,
 } from '../../services/protection-pricing.service.js';
 import { getImpliedVolatility, getRegimeDescription } from '../../services/volatility.service.js';
 import { calculatePutGreeks, daysToYears } from '../../services/options-math.js';
-import type { AssetId } from '../../types/domain.js';
+import { PROTECTION_ELIGIBLE_ASSETS, type AssetId } from '../../types/domain.js';
 
 // ============================================================================
 // SCHEMAS
@@ -256,7 +255,7 @@ export const protectionRoutes: FastifyPluginAsync = async (app: FastifyInstance)
 
       // CRITICAL: Atomically reserve the quote BEFORE starting any transaction
       // This prevents race conditions where multiple requests use the same quote
-      const reservedQuote = reserveQuote(body.quoteId, userId);
+      const reservedQuote = await reserveQuote(body.quoteId, userId);
 
       try {
         // Verify the quote parameters match what was requested
@@ -302,6 +301,15 @@ export const protectionRoutes: FastifyPluginAsync = async (app: FastifyInstance)
         // Create protection in transaction
         // FINANCIAL FIX: All checks moved inside transaction to prevent race conditions
         const protection = await prisma.$transaction(async (tx) => {
+          // DATA INTEGRITY FIX: Acquire row-level locks to prevent race conditions
+          // Lock portfolio row first, then holding row to prevent double-spend on concurrent purchases
+          await tx.$executeRaw`
+            SELECT 1 FROM "portfolios" WHERE user_id = ${userId}::uuid FOR UPDATE
+          `;
+          await tx.$executeRaw`
+            SELECT 1 FROM "holdings" WHERE id = ${body.holdingId}::uuid FOR UPDATE
+          `;
+
           // CRITICAL: Fetch portfolio inside transaction to get consistent cash balance
           const portfolio = await tx.portfolio.findUnique({
             where: { userId },
@@ -441,7 +449,7 @@ export const protectionRoutes: FastifyPluginAsync = async (app: FastifyInstance)
         });
 
         // SUCCESS: Consume the quote to prevent reuse
-        consumeQuote(body.quoteId);
+        await consumeQuote(body.quoteId);
 
         return {
           protection: {
@@ -461,7 +469,7 @@ export const protectionRoutes: FastifyPluginAsync = async (app: FastifyInstance)
         };
       } catch (error) {
         // FAILURE: Release the quote so it can be used again
-        releaseQuote(body.quoteId);
+        await releaseQuote(body.quoteId);
         throw error;
       }
     },

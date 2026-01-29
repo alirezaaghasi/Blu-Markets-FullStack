@@ -1,12 +1,13 @@
 import { prisma } from '../../config/database.js';
 import { AppError } from '../../middleware/error-handler.js';
-import { getAssetPrice, getCurrentFxRate, getCurrentPrices } from '../../services/price-fetcher.service.js';
+import { getAssetPrice, getCurrentFxRate, getCurrentPrices, isPriceStale } from '../../services/price-fetcher.service.js';
 import { logger } from '../../utils/logger.js';
 import {
   getPortfolioSnapshot,
   getAssetLayer,
   classifyBoundary,
 } from '../portfolio/portfolio.service.js';
+import { SPREAD_BY_LAYER, MAX_PRICE_AGE_MINUTES } from '../../config/business-rules.js';
 import type {
   AssetId,
   TradeAction,
@@ -30,13 +31,6 @@ import {
   Decimal,
   formatIrrCompact,
 } from '../../utils/money.js';
-
-// Spread rates per PRD Section 21 - Layer-based
-const SPREAD_BY_LAYER: Record<Layer, number> = {
-  FOUNDATION: 0.0015, // 0.15%
-  GROWTH: 0.003,      // 0.30%
-  UPSIDE: 0.006,      // 0.60%
-};
 
 function getSpreadForAsset(assetId: AssetId): number {
   const layer = getAssetLayer(assetId);
@@ -215,8 +209,8 @@ export async function previewTrade(
     // 3. Frontend calculation errors
     // Solution: If user is trying to sell more than they have, cap it to sell all
     if (quantity > holding.quantity) {
-      // Calculate max sell value (what the user actually has)
-      const maxSellValueIrr = holding.quantity * price.priceIrr;
+      // Calculate max sell value (what the user actually has) using Decimal
+      const maxSellValueIrr = toNumber(roundIrr(multiply(holding.quantity, price.priceIrr)));
 
       // Log the mismatch for debugging
       logger.info('SELL amount exceeds holding - capping to sell all', {
@@ -225,7 +219,7 @@ export async function previewTrade(
         holdingQuantity: holding.quantity,
         requestedAmountIrr: amountIrr,
         maxSellValueIrr,
-        ratio: quantity / holding.quantity,
+        ratio: toNumber(divide(quantity, holding.quantity)),
       });
 
       // Cap to sell all - user clearly wants to sell everything
@@ -364,6 +358,17 @@ export async function executeTrade(
       throw new AppError('SERVICE_UNAVAILABLE', 'Current price not available', 503);
     }
 
+    // FINANCIAL FIX: Reject trade if price data is stale
+    // This prevents trades at outdated prices which could cause financial loss
+    if (isPriceStale(currentPrice.fetchedAt, MAX_PRICE_AGE_MINUTES)) {
+      logger.warn('Trade rejected due to stale price', {
+        assetId,
+        fetchedAt: currentPrice.fetchedAt,
+        ageMinutes: (Date.now() - currentPrice.fetchedAt.getTime()) / 60000,
+      });
+      throw new AppError('SERVICE_UNAVAILABLE', 'Price data is stale. Please try again.', 503);
+    }
+
     // MONEY FIX M-02: Recalculate trade values with current price using Decimal arithmetic
     const spread = getSpreadForAsset(assetId);
     let effectiveAmountIrr = amountIrr;
@@ -372,7 +377,9 @@ export async function executeTrade(
     if (action === 'SELL') {
       const existingHolding = currentPortfolio.holdings.find((h) => h.assetId === assetId);
       if (existingHolding) {
-        const maxSellValueIrr = Number(existingHolding.quantity) * currentPrice.priceIrr;
+        // Use Decimal arithmetic for precision
+        const maxSellValueIrrDecimal = roundIrr(multiply(existingHolding.quantity, currentPrice.priceIrr));
+        const maxSellValueIrr = toNumber(maxSellValueIrrDecimal);
         if (amountIrr > maxSellValueIrr) {
           logger.info('executeTrade: SELL amount exceeds holding - capping to sell all', {
             assetId,
@@ -526,6 +533,10 @@ export async function executeTrade(
       ? computeAllocationFromHoldings(updatedPortfolio.holdings, priceMap)
       : beforeAllocation;
 
+    // FIX: Use effectiveAmountIrr for ledger/action log (actual executed amount, not requested)
+    // This ensures sell-all scenarios record the actual amount traded
+    const loggedAmountIrr = action === 'SELL' ? effectiveAmountIrr : amountIrr;
+
     // Create ledger entry with accurate snapshots
     const ledgerEntry = await tx.ledgerEntry.create({
       data: {
@@ -545,9 +556,9 @@ export async function executeTrade(
         },
         assetId,
         quantity,
-        amountIrr,
+        amountIrr: loggedAmountIrr,
         boundary: preview.boundary,
-        message: `${action === 'BUY' ? 'Bought' : 'Sold'} ${assetId} (${formatIrrCompact(amountIrr)} IRR)`,
+        message: `${action === 'BUY' ? 'Bought' : 'Sold'} ${assetId} (${formatIrrCompact(loggedAmountIrr)} IRR)`,
       },
     });
 
@@ -557,8 +568,8 @@ export async function executeTrade(
         portfolioId: portfolio.id,
         actionType: action === 'BUY' ? 'TRADE_BUY' : 'TRADE_SELL',
         boundary: preview.boundary,
-        message: `${action === 'BUY' ? 'Bought' : 'Sold'} ${assetId} (${formatIrrCompact(amountIrr)} IRR)`,
-        amountIrr,
+        message: `${action === 'BUY' ? 'Bought' : 'Sold'} ${assetId} (${formatIrrCompact(loggedAmountIrr)} IRR)`,
+        amountIrr: loggedAmountIrr,
         assetId,
       },
     });
@@ -569,7 +580,7 @@ export async function executeTrade(
         action,
         assetId,
         quantity,
-        amountIrr,
+        amountIrr: loggedAmountIrr,
         priceIrr,
         priceUsd,
       },

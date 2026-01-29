@@ -5,10 +5,9 @@ import { env } from '../config/env.js';
 import { getCurrentPrices } from './price-fetcher.service.js';
 import { logger } from '../utils/logger.js';
 import { toDecimal, multiply, subtract, divide, toNumber, max } from '../utils/money.js';
+import { withLock } from './distributed-lock.service.js';
+import { CRITICAL_LTV_THRESHOLD } from '../config/business-rules.js';
 import type { AssetId } from '../types/domain.js';
-
-// Critical LTV threshold for auto-liquidation (90%)
-const CRITICAL_LTV_THRESHOLD = 0.90;
 
 let jobIntervals: {
   loanCheck: NodeJS.Timeout | null;
@@ -49,8 +48,23 @@ export function stopBackgroundJobs(): void {
 
 /**
  * Check all active loans for critical LTV and trigger liquidation if needed
+ * Uses distributed lock to prevent duplicate runs across instances.
  */
 async function runLoanLiquidationCheck(): Promise<void> {
+  // Acquire distributed lock (5-minute TTL matches check interval)
+  const result = await withLock('loan-liquidation-check', 300, async () => {
+    return runLoanLiquidationCheckImpl();
+  });
+
+  if (result === null) {
+    logger.debug('Skipping loan check - another instance is running');
+  }
+}
+
+/**
+ * Implementation of loan liquidation check (called with lock held)
+ */
+async function runLoanLiquidationCheckImpl(): Promise<void> {
   try {
     // Get all active loans - only select fields needed for LTV calculation
     // Removed: portfolio.holdings include (unused, inflates query size)

@@ -9,6 +9,7 @@ import cron from 'node-cron';
 import { prisma } from '../config/database.js';
 import { getCurrentPrices } from '../services/price-fetcher.service.js';
 import { calculateSettlement } from '../services/protection-pricing.service.js';
+import { withLock } from '../services/distributed-lock.service.js';
 import { logger } from '../utils/logger.js';
 import type { AssetId } from '../types/domain.js';
 import type { Protection } from '@prisma/client';
@@ -37,12 +38,20 @@ export function initializeProtectionJobs(): void {
   cron.schedule(
     '0 0 * * *',
     async () => {
-      logger.info('Running protection expiry processing');
-      try {
-        const result = await processExpiredProtections();
-        logger.info('Expiry processing completed', { ...result });
-      } catch (error) {
-        logger.error('Expiry processing failed', error);
+      // Use distributed lock to prevent duplicate processing across instances (1 hour TTL)
+      const result = await withLock('protection-expiry-processing', 3600, async () => {
+        logger.info('Running protection expiry processing');
+        try {
+          const result = await processExpiredProtections();
+          logger.info('Expiry processing completed', { ...result });
+          return result;
+        } catch (error) {
+          logger.error('Expiry processing failed', error);
+          throw error;
+        }
+      });
+      if (result === null) {
+        logger.debug('Skipping expiry processing - another instance is running');
       }
     },
     { timezone: 'UTC' }
@@ -52,12 +61,20 @@ export function initializeProtectionJobs(): void {
   cron.schedule(
     '0 */6 * * *',
     async () => {
-      logger.info('Running risk exposure check');
-      try {
-        const exposure = await checkRiskExposure();
-        logger.info('Risk exposure calculated', { ...exposure });
-      } catch (error) {
-        logger.error('Risk exposure check failed', error);
+      // Use distributed lock to prevent duplicate processing (30 min TTL)
+      const result = await withLock('risk-exposure-check', 1800, async () => {
+        logger.info('Running risk exposure check');
+        try {
+          const exposure = await checkRiskExposure();
+          logger.info('Risk exposure calculated', { ...exposure });
+          return exposure;
+        } catch (error) {
+          logger.error('Risk exposure check failed', error);
+          throw error;
+        }
+      });
+      if (result === null) {
+        logger.debug('Skipping risk exposure check - another instance is running');
       }
     },
     { timezone: 'UTC' }

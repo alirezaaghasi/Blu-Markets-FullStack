@@ -41,6 +41,7 @@ interface TokenPayload {
   sub: string;
   phone: string;
   portfolioId?: string;
+  sessionId?: string;
 }
 
 interface RefreshPayload {
@@ -108,13 +109,6 @@ export class AuthService {
     // SECURITY FIX: Use consistent expiry derived from JWT_REFRESH_EXPIRY env variable
     const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_SECONDS * 1000);
 
-    // Generate access JWT
-    const accessToken = signAccessToken({
-      sub: userId,
-      phone,
-      portfolioId,
-    } as TokenPayload);
-
     let sessionId: string;
 
     if (existingSessionId) {
@@ -133,6 +127,14 @@ export class AuthService {
       });
       sessionId = session.id;
     }
+
+    // Generate access JWT with sessionId for revocation checking
+    const accessToken = signAccessToken({
+      sub: userId,
+      phone,
+      portfolioId,
+      sessionId, // SECURITY FIX: Include sessionId for revocation check
+    } as TokenPayload);
 
     // Generate refresh JWT with session ID embedded
     const refreshJwt = signRefreshToken({

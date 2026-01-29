@@ -327,8 +327,8 @@ model Protection {
   @@index([status])
   @@index([expiryDate])
   @@index([holdingId, status]) // For efficient protection-exists checks
-  // Note: Consider adding a partial unique index at DB level for stronger enforcement:
-  // CREATE UNIQUE INDEX protection_holding_active_unique ON protections (holding_id) WHERE status = 'ACTIVE';
+  // Partial unique index enforced at DB level: protection_holding_active_unique
+  // Prevents multiple ACTIVE protections per holding (see migration 20260123000000)
   @@map("protections")
 }
 

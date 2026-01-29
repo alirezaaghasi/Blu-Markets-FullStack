@@ -12,11 +12,14 @@ const ACCESS_TOKEN_KEY = 'blu_access_token';
 const REFRESH_TOKEN_KEY = 'blu_refresh_token';
 
 // Cross-platform secure storage
-// Uses localStorage on web, SecureStore on native
+// Uses localStorage on web (with typeof check for SSR/native), SecureStore on native
 const storage = {
   async setItem(key: string, value: string): Promise<void> {
     if (Platform.OS === 'web') {
-      localStorage.setItem(key, value);
+      // SECURITY FIX: Check typeof before accessing localStorage to prevent ReferenceError
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(key, value);
+      }
     } else {
       const SecureStore = await import('expo-secure-store');
       await SecureStore.setItemAsync(key, value);
@@ -24,7 +27,8 @@ const storage = {
   },
   async getItem(key: string): Promise<string | null> {
     if (Platform.OS === 'web') {
-      return localStorage.getItem(key);
+      // SECURITY FIX: Check typeof before accessing localStorage to prevent ReferenceError
+      return typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
     } else {
       const SecureStore = await import('expo-secure-store');
       return await SecureStore.getItemAsync(key);
@@ -32,7 +36,10 @@ const storage = {
   },
   async removeItem(key: string): Promise<void> {
     if (Platform.OS === 'web') {
-      localStorage.removeItem(key);
+      // SECURITY FIX: Check typeof before accessing localStorage to prevent ReferenceError
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(key);
+      }
     } else {
       const SecureStore = await import('expo-secure-store');
       await SecureStore.deleteItemAsync(key);

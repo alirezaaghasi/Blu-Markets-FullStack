@@ -25,6 +25,9 @@ export const usePricePolling = (options: UsePricePollingOptions = {}) => {
   const consecutiveErrorsRef = useRef<number>(0);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
+  // Forward declare restartWithBackoff for use in fetchAllPrices
+  const restartWithBackoffRef = useRef<() => void>(() => {});
+
   // Fetch all prices
   const fetchAllPrices = useCallback(async () => {
     try {
@@ -45,6 +48,8 @@ export const usePricePolling = (options: UsePricePollingOptions = {}) => {
       if (__DEV__) console.warn(
         `Price fetch failed (attempt ${consecutiveErrorsRef.current}), next retry in ${backoffRef.current / 1000}s`
       );
+      // PERFORMANCE FIX: Actually apply backoff by restarting with new interval
+      restartWithBackoffRef.current();
     }
   }, [dispatch]);
 
@@ -85,6 +90,9 @@ export const usePricePolling = (options: UsePricePollingOptions = {}) => {
     // Store timeout so it can be cleared if needed
     pollingIntervalRef.current = backoffTimeout;
   }, [startPolling, stopPolling]);
+
+  // Update the ref so fetchAllPrices can call it without circular dependency
+  restartWithBackoffRef.current = restartWithBackoff;
 
   // Handle app state changes (pause when backgrounded)
   useEffect(() => {

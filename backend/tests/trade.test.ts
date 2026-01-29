@@ -48,6 +48,7 @@ vi.mock('../src/services/price-fetcher.service.js', () => ({
     ['ETH', { priceUsd: 3500, priceIrr: 2170000000 }],
     ['USDT', { priceUsd: 1, priceIrr: 620000 }],
   ])),
+  isPriceStale: vi.fn().mockReturnValue(false), // Price is fresh by default
 }));
 
 import { getPortfolioSnapshot, classifyBoundary } from '../src/modules/portfolio/portfolio.service.js';

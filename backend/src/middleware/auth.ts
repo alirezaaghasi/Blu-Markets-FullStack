@@ -2,11 +2,13 @@ import { FastifyReply, FastifyRequest } from 'fastify';
 import { createVerifier } from 'fast-jwt';
 import { env } from '../config/env.js';
 import { AppError } from './error-handler.js';
+import { prisma } from '../config/database.js';
 
 export interface JwtPayload {
   sub: string; // user id
   phone: string;
   portfolioId?: string;
+  sessionId?: string; // Added for session revocation checking
   iat: number;
   exp: number;
 }
@@ -34,9 +36,25 @@ export async function authenticate(
 
     const token = authHeader.slice(7);
     const decoded = verifyAccessToken(token) as JwtPayload;
+
+    // SECURITY FIX: Verify session is not revoked
+    // This enables immediate logout by revoking the session
+    if (decoded.sessionId) {
+      const session = await prisma.session.findUnique({
+        where: { id: decoded.sessionId },
+        select: { revoked: true, expiresAt: true },
+      });
+      if (!session || session.revoked || session.expiresAt < new Date()) {
+        throw new AppError('UNAUTHORIZED', 'Session revoked or expired', 401);
+      }
+    }
+
     request.userId = decoded.sub;
     request.portfolioId = decoded.portfolioId;
   } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
     throw new AppError('UNAUTHORIZED', 'Invalid or expired token', 401);
   }
 }
