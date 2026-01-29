@@ -55,9 +55,33 @@ export const tradeRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
             allocation: {
               type: 'object',
               properties: {
-                before: { type: 'object' },
-                target: { type: 'object' },
-                after: { type: 'object' },
+                before: {
+                  type: 'object',
+                  properties: {
+                    foundation: { type: 'number' },
+                    growth: { type: 'number' },
+                    upside: { type: 'number' },
+                  },
+                  additionalProperties: true,
+                },
+                target: {
+                  type: 'object',
+                  properties: {
+                    foundation: { type: 'number' },
+                    growth: { type: 'number' },
+                    upside: { type: 'number' },
+                  },
+                  additionalProperties: true,
+                },
+                after: {
+                  type: 'object',
+                  properties: {
+                    foundation: { type: 'number' },
+                    growth: { type: 'number' },
+                    upside: { type: 'number' },
+                  },
+                  additionalProperties: true,
+                },
               },
             },
             boundary: { type: 'string', enum: ['SAFE', 'DRIFT', 'STRUCTURAL', 'STRESS'] },
