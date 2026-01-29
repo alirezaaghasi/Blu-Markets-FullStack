@@ -101,20 +101,20 @@ export async function registerPriceWebSocket(app: FastifyInstance): Promise<void
       return;
     }
 
-    // JWT Authentication - prefer Authorization header over query string
-    // SECURITY: Query string tokens can leak via proxy logs, referrers, or analytics
-    // Prefer: Authorization header (works in React Native/mobile clients)
-    // Fallback: Query string (for browser clients that can't set headers)
+    // AUDIT FIX #4: JWT Authentication via secure channels only
+    // SECURITY: Query string tokens are no longer accepted as they leak via proxy logs
+    // Supported auth methods (in order of preference):
+    // 1. Authorization header: "Bearer <token>" (standard, works in most clients)
+    // 2. Sec-WebSocket-Protocol header: "Bearer-<token>" (React Native workaround)
     const headerToken = req.headers.authorization?.replace('Bearer ', '');
-    const queryToken = (req.query as Record<string, string>).token;
 
-    if (queryToken && !headerToken) {
-      logger.warn('DEPRECATED: WebSocket using query string token. This will be removed in v2.0', {
-        clientIp: req.ip,
-      });
-    }
+    // React Native WebSocket doesn't support custom headers, so we use protocol header
+    const protocolHeader = req.headers['sec-websocket-protocol'] as string | undefined;
+    const protocolToken = protocolHeader?.startsWith('Bearer-')
+      ? protocolHeader.replace('Bearer-', '')
+      : null;
 
-    const token = headerToken || queryToken;
+    const token = headerToken || protocolToken;
 
     if (!token) {
       logger.warn('WebSocket connection rejected: No token provided');

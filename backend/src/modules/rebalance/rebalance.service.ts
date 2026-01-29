@@ -106,44 +106,52 @@ export async function previewRebalance(
   const snapshot = await getPortfolioSnapshot(userId);
   const prices = await getCurrentPrices();
 
-  // DEBUG: Log snapshot allocation info
-  logger.info('REBALANCE DEBUG - Snapshot:', {
-    currentAllocation: snapshot.allocation,
-    targetAllocation: snapshot.targetAllocation,
-    cashIrr: snapshot.cashIrr,
-    holdingsValueIrr: snapshot.holdingsValueIrr,
-    totalValueIrr: snapshot.totalValueIrr,
-    driftPct: snapshot.driftPct,
-  });
+  // AUDIT FIX #6: Debug logging only in development to prevent sensitive data leaks
+  if (process.env.NODE_ENV === 'development' || process.env.REBALANCE_DEBUG === 'true') {
+    logger.debug('REBALANCE DEBUG - Snapshot:', {
+      currentAllocation: snapshot.allocation,
+      targetAllocation: snapshot.targetAllocation,
+      cashIrr: snapshot.cashIrr,
+      holdingsValueIrr: snapshot.holdingsValueIrr,
+      totalValueIrr: snapshot.totalValueIrr,
+      driftPct: snapshot.driftPct,
+    });
+  }
 
   // Partition holdings by layer and frozen status
   const holdingsByLayer = partitionHoldingsByLayer(snapshot, prices);
 
-  // DEBUG: Log layer values
-  logger.info('REBALANCE DEBUG - Holdings by Layer:', {
-    FOUNDATION: { total: holdingsByLayer.FOUNDATION.totalValue, unfrozen: holdingsByLayer.FOUNDATION.unfrozenValue },
-    GROWTH: { total: holdingsByLayer.GROWTH.totalValue, unfrozen: holdingsByLayer.GROWTH.unfrozenValue },
-    UPSIDE: { total: holdingsByLayer.UPSIDE.totalValue, unfrozen: holdingsByLayer.UPSIDE.unfrozenValue },
-  });
+  // AUDIT FIX #6: Debug logging only in development
+  if (process.env.NODE_ENV === 'development' || process.env.REBALANCE_DEBUG === 'true') {
+    logger.debug('REBALANCE DEBUG - Holdings by Layer:', {
+      FOUNDATION: { total: holdingsByLayer.FOUNDATION.totalValue, unfrozen: holdingsByLayer.FOUNDATION.unfrozenValue },
+      GROWTH: { total: holdingsByLayer.GROWTH.totalValue, unfrozen: holdingsByLayer.GROWTH.unfrozenValue },
+      UPSIDE: { total: holdingsByLayer.UPSIDE.totalValue, unfrozen: holdingsByLayer.UPSIDE.unfrozenValue },
+    });
+  }
 
   // Calculate gap analysis
   // BUG FIX: When mode is HOLDINGS_PLUS_CASH, calculate gaps based on total portfolio value
   // (holdings + cash) so that all layers appear underweight and cash gets deployed
   const gapAnalysis = calculateGapAnalysis(snapshot, holdingsByLayer, mode);
 
-  // DEBUG: Log gap analysis
-  logger.info('REBALANCE DEBUG - Gap Analysis:', { gaps: gapAnalysis, mode });
+  // AUDIT FIX #6: Debug logging only in development
+  if (process.env.NODE_ENV === 'development' || process.env.REBALANCE_DEBUG === 'true') {
+    logger.debug('REBALANCE DEBUG - Gap Analysis:', { gaps: gapAnalysis, mode });
+  }
 
   // Generate rebalance trades
   const result = generateRebalanceTrades(snapshot, holdingsByLayer, gapAnalysis, mode, prices);
 
-  // DEBUG: Log generated trades
-  logger.info('REBALANCE DEBUG - Generated Trades:', {
-    trades: result.trades,
-    totalBuyIrr: result.totalBuyIrr,
-    totalSellIrr: result.totalSellIrr,
-    afterAllocation: result.afterAllocation,
-  });
+  // AUDIT FIX #6: Debug logging only in development
+  if (process.env.NODE_ENV === 'development' || process.env.REBALANCE_DEBUG === 'true') {
+    logger.debug('REBALANCE DEBUG - Generated Trades:', {
+      trades: result.trades,
+      totalBuyIrr: result.totalBuyIrr,
+      totalSellIrr: result.totalSellIrr,
+      afterAllocation: result.afterAllocation,
+    });
+  }
 
   // Check if there are any locked collateral
   const hasLockedCollateral = snapshot.holdings.some((h) => h.frozen);

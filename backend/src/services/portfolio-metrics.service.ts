@@ -6,6 +6,8 @@ import { env } from '../config/env.js';
 import { getCurrentPrices } from './price-fetcher.service.js';
 import { logger } from '../utils/logger.js';
 import type { AssetId, Layer, TargetAllocation, PortfolioStatus } from '../types/domain.js';
+// AUDIT FIX #3: Import Decimal utilities for precise financial math
+import { toDecimal, add, multiply, divide, toNumber } from '../utils/money.js';
 
 // Prisma Decimal type alias for cleaner signatures
 type Decimal = Prisma.Decimal;
@@ -110,30 +112,42 @@ async function updatePortfolioMetrics(
   },
   prices: Map<AssetId, { priceIrr: number; priceUsd: number }>
 ): Promise<{ updated: boolean; statusChanged: boolean }> {
-  const cashIrr = Number(portfolio.cashIrr);
+  // AUDIT FIX #3: Use Decimal arithmetic to prevent floating-point drift
+  const cashDecimal = toDecimal(portfolio.cashIrr);
 
-  // Calculate holdings value by layer
-  const layerValues = { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
-  let holdingsValueIrr = 0;
+  // Calculate holdings value by layer using Decimal
+  const layerValues = {
+    FOUNDATION: toDecimal(0),
+    GROWTH: toDecimal(0),
+    UPSIDE: toDecimal(0),
+  };
+  let holdingsValueDecimal = toDecimal(0);
 
   for (const holding of portfolio.holdings) {
     const price = prices.get(holding.assetId as AssetId);
     if (price) {
-      const value = Number(holding.quantity) * price.priceIrr;
-      holdingsValueIrr += value;
-      layerValues[holding.layer as Layer] += value;
+      const valueDecimal = multiply(toDecimal(holding.quantity), price.priceIrr);
+      holdingsValueDecimal = add(holdingsValueDecimal, valueDecimal);
+      layerValues[holding.layer as Layer] = add(layerValues[holding.layer as Layer], valueDecimal);
     }
   }
 
-  const totalValueIrr = cashIrr + holdingsValueIrr;
+  const holdingsValueIrr = toNumber(holdingsValueDecimal);
+  const totalValueIrr = toNumber(add(cashDecimal, holdingsValueDecimal));
 
   // DRIFT FIX: Calculate allocation percentages based on HOLDINGS VALUE ONLY
   // Cash is "unallocated dry powder" - not part of any layer
   // This ensures adding cash doesn't create artificial drift
   // Allocation represents how invested holdings are distributed across layers
-  const foundationPct = holdingsValueIrr > 0 ? (layerValues.FOUNDATION / holdingsValueIrr) * 100 : 0;
-  const growthPct = holdingsValueIrr > 0 ? (layerValues.GROWTH / holdingsValueIrr) * 100 : 0;
-  const upsidePct = holdingsValueIrr > 0 ? (layerValues.UPSIDE / holdingsValueIrr) * 100 : 0;
+  let foundationPct = 0;
+  let growthPct = 0;
+  let upsidePct = 0;
+
+  if (holdingsValueIrr > 0) {
+    foundationPct = toNumber(multiply(divide(layerValues.FOUNDATION, holdingsValueDecimal), 100));
+    growthPct = toNumber(multiply(divide(layerValues.GROWTH, holdingsValueDecimal), 100));
+    upsidePct = toNumber(multiply(divide(layerValues.UPSIDE, holdingsValueDecimal), 100));
+  }
 
   // Get target allocation
   const target: TargetAllocation = {

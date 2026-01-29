@@ -41,6 +41,33 @@ function getSpreadForAsset(assetId: AssetId): number {
   return SPREAD_BY_LAYER[layer];
 }
 
+// AUDIT FIX #2: Helper to compute allocation from actual holdings
+// This ensures ledger snapshots reflect actual state, not stale preview data
+function computeAllocationFromHoldings(
+  holdings: { assetId: string; quantity: any; layer: string }[],
+  priceMap: Map<string, number>
+): TargetAllocation {
+  const layerValues: Record<Layer, number> = { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
+  let totalValue = 0;
+
+  for (const holding of holdings) {
+    const price = priceMap.get(holding.assetId) || 0;
+    const value = Number(holding.quantity) * price;
+    totalValue += value;
+    layerValues[holding.layer as Layer] += value;
+  }
+
+  if (totalValue === 0) {
+    return { foundation: 0, growth: 0, upside: 0 };
+  }
+
+  return {
+    foundation: (layerValues.FOUNDATION / totalValue) * 100,
+    growth: (layerValues.GROWTH / totalValue) * 100,
+    upside: (layerValues.UPSIDE / totalValue) * 100,
+  };
+}
+
 // Friction copy per boundary type
 const FRICTION_COPY: Record<Boundary, string> = {
   SAFE: '',
@@ -401,22 +428,45 @@ export async function executeTrade(
       }
     }
 
-    // Create ledger entry
+    // AUDIT FIX #2: Compute allocation from actual holdings, not stale preview
+    // Build price map for allocation calculation
+    const priceMap = new Map<string, number>();
+    priceMap.set(assetId, priceIrr);
+    for (const h of currentPortfolio.holdings) {
+      if (!priceMap.has(h.assetId)) {
+        const hp = await getAssetPrice(h.assetId as AssetId);
+        if (hp) priceMap.set(h.assetId, hp.priceIrr);
+      }
+    }
+
+    // Compute before allocation from actual state at transaction start
+    const beforeAllocation = computeAllocationFromHoldings(currentPortfolio.holdings, priceMap);
+
+    // Re-fetch holdings to compute after allocation from actual updated state
+    const updatedPortfolio = await tx.portfolio.findUnique({
+      where: { id: portfolio.id },
+      include: { holdings: true },
+    });
+    const afterAllocation = updatedPortfolio
+      ? computeAllocationFromHoldings(updatedPortfolio.holdings, priceMap)
+      : beforeAllocation;
+
+    // Create ledger entry with accurate snapshots
     const ledgerEntry = await tx.ledgerEntry.create({
       data: {
         portfolioId: portfolio.id,
         entryType: action === 'BUY' ? 'TRADE_BUY' : 'TRADE_SELL',
         beforeSnapshot: {
-          cashIrr: Number(portfolio.cashIrr),
-          foundation: preview.allocation.before.foundation,
-          growth: preview.allocation.before.growth,
-          upside: preview.allocation.before.upside,
+          cashIrr: Number(currentPortfolio.cashIrr),
+          foundation: beforeAllocation.foundation,
+          growth: beforeAllocation.growth,
+          upside: beforeAllocation.upside,
         },
         afterSnapshot: {
           cashIrr: newCashIrr,
-          foundation: preview.allocation.after.foundation,
-          growth: preview.allocation.after.growth,
-          upside: preview.allocation.after.upside,
+          foundation: afterAllocation.foundation,
+          growth: afterAllocation.growth,
+          upside: afterAllocation.upside,
         },
         assetId,
         quantity,

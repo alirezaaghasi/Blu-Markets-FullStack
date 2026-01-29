@@ -2,6 +2,40 @@
 
 ---
 
+# Session 6: 2026-01-29 — External Code Review Fixes
+
+## Issues to Fix
+
+| # | Issue | Severity | Status |
+|---|-------|----------|--------|
+| 1 | Non-transactional add-funds flow | HIGH | ✅ Fixed |
+| 2 | Ledger snapshots from stale preview data | MEDIUM | ✅ Fixed |
+| 3 | Floating-point math in metrics worker | MEDIUM | ✅ Fixed |
+| 4 | WebSocket auth tokens in query string (backend) | MEDIUM | ✅ Fixed |
+| 5 | WebSocket auth tokens in query string (mobile) | MEDIUM | ✅ Fixed |
+| 6 | Rebalance debug logging at info level | MEDIUM | ✅ Fixed |
+| 7 | Portfolio snapshot duplicate fetches | LOW | ✅ Fixed |
+| 8 | Activity feed uses `any` without validation | LOW | ✅ Fixed |
+| 9 | Activity feed stale closure | LOW | ✅ Fixed |
+
+## Fix Log
+
+### 2026-01-29
+
+- **07:50** - Created AUDIT_FIXES.md with implementation plan
+- **07:50** - Starting Issue 1: Non-transactional add-funds flow
+- **07:55** - ✅ Issue 1 Fixed: Wrapped addFunds in transaction with atomic increment
+- **07:56** - ✅ Issue 2 Fixed: Added computeAllocationFromHoldings helper, ledger uses actual state
+- **07:58** - ✅ Issue 3 Fixed: Imported Decimal utilities, replaced Number math with Decimal
+- **08:00** - ✅ Issue 4 Fixed: Backend accepts token via Sec-WebSocket-Protocol header
+- **08:01** - ✅ Issue 5 Fixed: Mobile sends token via WebSocket protocol array
+- **08:02** - ✅ Issue 6 Fixed: Changed logger.info to logger.debug with env check
+- **08:03** - ✅ Issue 7 Fixed: getPortfolioSnapshot reuses holdings from getPortfolioSummary
+- **08:05** - ✅ Issues 8 & 9 Fixed: Added type guard, mapActivity helper, hasLoadedRef
+- **08:06** - ✅ All TypeScript compilation passes (backend + mobile)
+
+---
+
 # Session 3: 2026-01-27 — User-Reported Bug Fixes
 
 ## Current Work: 4 Critical User-Reported Bugs

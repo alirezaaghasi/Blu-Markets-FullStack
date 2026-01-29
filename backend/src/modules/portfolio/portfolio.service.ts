@@ -223,14 +223,16 @@ export async function getPortfolioHoldings(userId: string): Promise<HoldingRespo
 }
 
 export async function getPortfolioSnapshot(userId: string): Promise<PortfolioSnapshot> {
+  // AUDIT FIX #7: Reuse holdings from summary to avoid duplicate DB/price fetches
+  // getPortfolioSummary already loads portfolio with holdings and prices
   const summary = await getPortfolioSummary(userId);
-  const holdings = await getPortfolioHoldings(userId);
 
   return {
     id: summary.id,
     userId,
     cashIrr: summary.cashIrr,
-    holdings: holdings.map((h) => ({
+    // Use holdings from summary (already computed with prices)
+    holdings: summary.holdings.map((h) => ({
       assetId: h.assetId,
       quantity: h.quantity,
       layer: h.layer,
@@ -251,56 +253,61 @@ export async function addFunds(
   userId: string,
   amountIrr: number
 ): Promise<{ previousCashIrr: number; newCashIrr: number; amountAdded: number; ledgerEntryId: string }> {
-  const portfolio = await prisma.portfolio.findUnique({
-    where: { userId },
-  });
-
-  if (!portfolio) {
-    throw new AppError('NOT_FOUND', 'Portfolio not found', 404);
-  }
-
   if (amountIrr < 1000000) {
     throw new AppError('VALIDATION_ERROR', 'Minimum deposit is 1,000,000 IRR', 400);
   }
 
-  // MONEY FIX M-02: Use Decimal for cash calculation
-  const beforeCash = Number(portfolio.cashIrr);
-  const newCashIrr = toNumber(roundIrr(add(beforeCash, amountIrr)));
+  // AUDIT FIX #1: Wrap all operations in a transaction to prevent lost updates
+  // Uses atomic increment to handle concurrent requests safely
+  return await prisma.$transaction(async (tx) => {
+    const portfolio = await tx.portfolio.findUnique({
+      where: { userId },
+    });
 
-  // Update portfolio
-  await prisma.portfolio.update({
-    where: { id: portfolio.id },
-    data: {
-      cashIrr: newCashIrr,
-      totalValueIrr: { increment: amountIrr },
-    },
+    if (!portfolio) {
+      throw new AppError('NOT_FOUND', 'Portfolio not found', 404);
+    }
+
+    // Capture before state for ledger
+    const beforeCash = Number(portfolio.cashIrr);
+
+    // Update portfolio with atomic increment (prevents read-then-write race condition)
+    const updated = await tx.portfolio.update({
+      where: { id: portfolio.id },
+      data: {
+        cashIrr: { increment: amountIrr },
+        totalValueIrr: { increment: amountIrr },
+      },
+    });
+
+    const newCashIrr = Number(updated.cashIrr);
+
+    // Create ledger entry within same transaction
+    const ledgerEntry = await tx.ledgerEntry.create({
+      data: {
+        portfolioId: portfolio.id,
+        entryType: 'ADD_FUNDS',
+        beforeSnapshot: { cashIrr: beforeCash },
+        afterSnapshot: { cashIrr: newCashIrr },
+        amountIrr,
+        boundary: 'SAFE',
+        message: `Added ${formatIrr(amountIrr)} to portfolio`,
+      },
+    });
+
+    // Create action log within same transaction
+    await tx.actionLog.create({
+      data: {
+        portfolioId: portfolio.id,
+        actionType: 'ADD_FUNDS',
+        boundary: 'SAFE',
+        message: `Added ${formatIrr(amountIrr)}`,
+        amountIrr,
+      },
+    });
+
+    return { previousCashIrr: beforeCash, newCashIrr, amountAdded: amountIrr, ledgerEntryId: ledgerEntry.id };
   });
-
-  // Create ledger entry
-  const ledgerEntry = await prisma.ledgerEntry.create({
-    data: {
-      portfolioId: portfolio.id,
-      entryType: 'ADD_FUNDS',
-      beforeSnapshot: { cashIrr: beforeCash },
-      afterSnapshot: { cashIrr: newCashIrr },
-      amountIrr,
-      boundary: 'SAFE',
-      message: `Added ${formatIrr(amountIrr)} to portfolio`,
-    },
-  });
-
-  // Create action log
-  await prisma.actionLog.create({
-    data: {
-      portfolioId: portfolio.id,
-      actionType: 'ADD_FUNDS',
-      boundary: 'SAFE',
-      message: `Added ${formatIrr(amountIrr)}`,
-      amountIrr,
-    },
-  });
-
-  return { previousCashIrr: beforeCash, newCashIrr, amountAdded: amountIrr, ledgerEntryId: ledgerEntry.id };
 }
 
 // MONEY FIX M-02: Use Decimal for allocation calculations

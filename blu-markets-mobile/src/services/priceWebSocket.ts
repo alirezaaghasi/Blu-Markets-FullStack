@@ -151,15 +151,19 @@ class PriceWebSocketService {
     this.setStatus('connecting');
 
     try {
-      // BUG-001 FIX: Include auth token in WebSocket handshake
+      // AUDIT FIX #5: Send auth token via protocol header, not query string
+      // Query string tokens can leak via network logs, crash diagnostics, and proxies
+      // Using Sec-WebSocket-Protocol header is secure and works with React Native
       const token = await tokenStorage.getAccessToken();
-      const wsUrl = token ? `${WEBSOCKET_URL}?token=${encodeURIComponent(token)}` : WEBSOCKET_URL;
 
       if (!token && __DEV__) {
         console.warn('[WebSocket] Connecting without auth token - connection may be rejected by backend');
       }
 
-      this.ws = new WebSocket(wsUrl);
+      // Pass token as subprotocol (becomes Sec-WebSocket-Protocol header)
+      // Format: "Bearer-<token>" which backend extracts
+      const protocols = token ? [`Bearer-${token}`] : undefined;
+      this.ws = new WebSocket(WEBSOCKET_URL, protocols);
 
       // ST-2: Set connection timeout to prevent hanging on slow/broken connections
       this.connectionTimeout = setTimeout(() => {
