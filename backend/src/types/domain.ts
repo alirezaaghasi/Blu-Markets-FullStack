@@ -150,11 +150,11 @@ export interface Loan {
   status: LoanStatus;
 }
 
-// LTV limits by layer (per PRD)
+// LTV limits by layer (per PRD Section 10.1)
 export const LTV_BY_LAYER: Record<Layer, number> = {
   FOUNDATION: 0.70,
   GROWTH: 0.50,
-  UPSIDE: 0.25,
+  UPSIDE: 0.30,
 };
 
 // ============================================================================
@@ -181,13 +181,14 @@ export const PROTECTION_RATES: Record<Layer, number> = {
 
 // Protection eligible assets - assets with liquid derivatives markets for hedging
 // Criteria: Must have big, liquid derivatives market (futures/options)
+// Note: PAXG & KAG hedged via gold/silver commodities derivatives (COMEX)
 export const PROTECTION_ELIGIBLE_ASSETS: AssetId[] = [
   'BTC',   // CME futures, Deribit/Binance options
   'ETH',   // CME futures, major exchange options
-  'PAXG',  // Gold - COMEX futures/options
-  'KAG',   // Silver - COMEX futures/options
   'QQQ',   // Nasdaq-100 options (most liquid)
+  'PAXG',  // Gold - COMEX futures/options
   'SOL',   // CME futures, exchange perps
+  'KAG',   // Silver - COMEX futures/options
 ];
 
 // ============================================================================

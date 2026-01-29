@@ -1235,11 +1235,17 @@ function validateBorrow({ assetId, amountIRR, prices, fxRate }, state) {
 
 | Layer | Eligible Assets |
 |-------|-----------------|
-| FOUNDATION | PAXG only |
-| GROWTH | BTC, ETH, BNB, XRP, QQQ |
-| UPSIDE | SOL, LINK, AVAX |
+| FOUNDATION | PAXG, KAG |
+| GROWTH | BTC, ETH, QQQ |
+| UPSIDE | SOL |
 
-**Not Eligible:** USDT, IRR_FIXED_INCOME, KAG, TON, MATIC, ARB
+**Eligibility Criteria:** Assets must have big, liquid derivatives markets (futures/options) for hedging.
+
+**Notes:**
+- PAXG hedged via COMEX gold futures/options
+- KAG hedged via COMEX silver futures/options
+
+**Not Eligible:** USDT, IRR_FIXED_INCOME, BNB, XRP, TON, LINK, AVAX, MATIC, ARB
 
 ### 11.2 Premium Rates by Layer
 

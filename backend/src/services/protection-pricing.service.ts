@@ -24,7 +24,7 @@ import { getCurrentPrices } from './price-fetcher.service.js';
 import { AppError } from '../middleware/error-handler.js';
 import { logger } from '../utils/logger.js';
 import { toDecimal, multiply, toNumber, roundIrr } from '../utils/money.js';
-import type { AssetId, Layer } from '../types/domain.js';
+import { PROTECTION_ELIGIBLE_ASSETS, type AssetId, type Layer } from '../types/domain.js';
 
 // ============================================================================
 // CONSTANTS
@@ -57,8 +57,7 @@ export const MIN_NOTIONAL_IRR = 1_000_000;
 /** Global minimum premium floor (2.5% per 30 days, non-negotiable) */
 export const GLOBAL_MIN_PREMIUM_FLOOR_30D = 0.025;
 
-/** Assets eligible for protection */
-export const PROTECTION_ELIGIBLE_ASSETS: AssetId[] = ['BTC', 'ETH', 'PAXG', 'KAG', 'QQQ', 'SOL'];
+// PROTECTION_ELIGIBLE_ASSETS imported from domain.ts (single source of truth)
 
 /**
  * Execution spread by asset (bid-ask spread cost)
