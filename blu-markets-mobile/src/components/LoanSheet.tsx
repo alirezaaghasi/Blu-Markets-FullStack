@@ -377,13 +377,11 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
                         </Text>
                       </View>
                     </View>
-                    <View style={[styles.selectIndicator, isSelected && styles.selectIndicatorSelected]}>
-                      {isSelected ? (
+                    {isSelected && (
+                      <View style={styles.selectedBadge}>
                         <Text style={styles.checkmark}>✓</Text>
-                      ) : (
-                        <Text style={styles.selectText}>Select</Text>
-                      )}
-                    </View>
+                      </View>
+                    )}
                   </TouchableOpacity>
                 );
               })}
@@ -503,20 +501,35 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
           )}
         </ScrollView>
 
-        {/* Confirm Button */}
+        {/* Action Button - shows contextual text based on current step */}
         <View style={styles.footer}>
-          <TouchableOpacity
-            style={[
-              styles.confirmButton,
-              (!isValid || isSubmitting) && styles.confirmButtonDisabled,
-            ]}
-            onPress={handleConfirm}
-            disabled={!isValid || isSubmitting}
-          >
-            <Text style={styles.confirmButtonText}>
-              {isSubmitting ? 'Processing...' : 'Confirm Loan'}
-            </Text>
-          </TouchableOpacity>
+          {!selectedAssetId ? (
+            // Step 1: No asset selected yet
+            <View style={[styles.confirmButton, styles.confirmButtonDisabled]}>
+              <Text style={styles.confirmButtonText}>Select an asset above</Text>
+            </View>
+          ) : amountIRR <= 0 ? (
+            // Step 2: Asset selected but no amount
+            <View style={[styles.confirmButton, styles.confirmButtonDisabled]}>
+              <Text style={styles.confirmButtonText}>Enter borrow amount</Text>
+            </View>
+          ) : !isValid ? (
+            // Validation errors
+            <View style={[styles.confirmButton, styles.confirmButtonDisabled]}>
+              <Text style={styles.confirmButtonText}>Fix errors above</Text>
+            </View>
+          ) : (
+            // Ready to confirm
+            <TouchableOpacity
+              style={[styles.confirmButton, isSubmitting && styles.confirmButtonDisabled]}
+              onPress={handleConfirm}
+              disabled={isSubmitting}
+            >
+              <Text style={styles.confirmButtonText}>
+                {isSubmitting ? 'Processing...' : 'Confirm Loan'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </SafeAreaView>
 
@@ -648,27 +661,18 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     color: colors.textSecondary,
   },
+  selectedBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   checkmark: {
     fontSize: 16,
     color: colors.textPrimaryDark,
     fontWeight: typography.fontWeight.bold,
-  },
-  selectIndicator: {
-    paddingHorizontal: spacing[3],
-    paddingVertical: spacing[2],
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.surfaceDark,
-    borderWidth: 1,
-    borderColor: colors.borderDark,
-  },
-  selectIndicatorSelected: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  selectText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    fontWeight: typography.fontWeight.medium,
   },
   amountInput: {
     backgroundColor: colors.cardDark,
