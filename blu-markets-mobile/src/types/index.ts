@@ -305,6 +305,7 @@ export interface PortfolioState {
 
 export interface PriceState {
   prices: Record<AssetId, number>; // USD prices
+  pricesIrr?: Record<AssetId, number>; // Direct IRR prices from backend
   fxRate: number; // IRR per USD
   fxSource: 'bonbast' | 'fallback';
   updatedAt: string;

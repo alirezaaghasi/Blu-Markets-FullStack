@@ -82,6 +82,8 @@ interface TradeResult {
 
 // BUG-1 FIX: Format IRR with compact notation (matching HoldingCard format)
 const formatIRRCompact = (num: number): string => {
+  // Guard against undefined/null (BUG-020 FIX)
+  if (num === undefined || num === null || isNaN(num)) return '0';
   if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(1)}B`;
   if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
   if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
@@ -270,6 +272,7 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
 
   // Format number with commas
   const formatNumber = (num: number): string => {
+    if (num === undefined || num === null || isNaN(num)) return '0';
     return num.toLocaleString('en-US');
   };
 
@@ -324,8 +327,17 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
 
       // TYPE SAFETY FIX: Use properly typed backend response values
       // Backend returns newCashIrr and newHoldingQuantity directly (no nested object)
-      const newCash = response.newCashIrr;
-      const newHoldingQty = response.newHoldingQuantity;
+      // Guard against undefined response fields (BUG-020 FIX)
+      const newCash = response.newCashIrr ?? cashIRR; // Fall back to current cash if undefined
+      const newHoldingQty = response.newHoldingQuantity ?? 0;
+
+      if (__DEV__) {
+        console.log('[TradeBottomSheet] Trade response:', {
+          newCashIrr: response.newCashIrr,
+          newHoldingQuantity: response.newHoldingQuantity,
+          rawResponse: response,
+        });
+      }
 
       // Update holding quantity from backend response
       dispatch(updateHoldingFromTrade({

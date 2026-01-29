@@ -90,16 +90,30 @@ const portfolioSlice = createSlice({
 
     // Cash management
     setCash: (state, action: PayloadAction<number>) => {
-      state.cashIRR = action.payload;
+      // Guard against undefined/null - preserve existing value if invalid
+      const value = action.payload;
+      if (value !== undefined && value !== null && !isNaN(value)) {
+        state.cashIRR = value;
+      }
     },
     updateCash: (state, action: PayloadAction<number>) => {
-      state.cashIRR = action.payload;
+      // Guard against undefined/null - preserve existing value if invalid
+      const value = action.payload;
+      if (value !== undefined && value !== null && !isNaN(value)) {
+        state.cashIRR = value;
+      }
     },
     addCash: (state, action: PayloadAction<number>) => {
-      state.cashIRR += action.payload;
+      const value = action.payload;
+      if (value !== undefined && value !== null && !isNaN(value)) {
+        state.cashIRR += value;
+      }
     },
     subtractCash: (state, action: PayloadAction<number>) => {
-      state.cashIRR = Math.max(0, state.cashIRR - action.payload);
+      const value = action.payload;
+      if (value !== undefined && value !== null && !isNaN(value)) {
+        state.cashIRR = Math.max(0, state.cashIRR - value);
+      }
     },
 
     // Holdings management
