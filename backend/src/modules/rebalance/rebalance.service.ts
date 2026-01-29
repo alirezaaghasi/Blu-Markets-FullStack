@@ -503,15 +503,24 @@ function generateRebalanceTrades(
   let totalSellIrr = 0;
 
   // Find overweight and underweight layers
-  // BUG FIX: For HOLDINGS_PLUS_CASH mode, use gapIrr (absolute value) instead of gap (percentage)
-  // because layers can be "overweight by %" but "underweight by IRR" when cash is included
+  // BUG FIX: For HOLDINGS_PLUS_CASH mode, a layer is only "underweight" if:
+  // 1. Its gapIrr > 0 (needs more to reach target % of total)
+  // 2. AND it's not already overweight by percentage (based on current holdings)
+  // This prevents buying into layers that are already over-allocated due to frozen assets
   const useIrrGaps = mode === 'HOLDINGS_PLUS_CASH' || mode === 'SMART';
   const overweight = gapAnalysis.filter((g) =>
     useIrrGaps ? g.gapIrr < -MIN_TRADE_AMOUNT : g.gap < -1
   ); // Need to sell
-  const underweight = gapAnalysis.filter((g) =>
-    useIrrGaps ? g.gapIrr > MIN_TRADE_AMOUNT : g.gap > 1
-  ); // Need to buy
+  const underweight = gapAnalysis.filter((g) => {
+    if (useIrrGaps) {
+      // Layer is underweight only if:
+      // - gapIrr > MIN_TRADE_AMOUNT (needs buying to reach target value)
+      // - AND gap > -5 (not already significantly overweight by percentage)
+      // This prevents buying Upside when it's 38% of holdings but target is 10%
+      return g.gapIrr > MIN_TRADE_AMOUNT && g.gap > -5;
+    }
+    return g.gap > 1;
+  }); // Need to buy
 
   // Calculate total sellable amount from overweight layers
   let totalSellableAmount = 0;
@@ -563,12 +572,16 @@ function generateRebalanceTrades(
   // Per PRD Section 7.3: Distribute buys according to layer weights
   const totalGapIrr = underweight.reduce((sum, l) => sum + l.gapIrr, 0);
 
+  // BUG FIX: Track remaining cash to ensure we don't exceed available funds
+  let remainingCash = totalAvailableForBuys;
+
   for (const gap of underweight) {
-    if (totalGapIrr <= 0) continue;
+    if (totalGapIrr <= 0 || remainingCash < MIN_TRADE_AMOUNT) continue;
 
     const layerKey = gap.layer as Layer;
     const proportion = gap.gapIrr / totalGapIrr;
-    const layerBuyAmount = Math.min(gap.gapIrr, totalAvailableForBuys * proportion);
+    // Cap layer buy amount to remaining cash
+    const layerBuyAmount = Math.min(gap.gapIrr, totalAvailableForBuys * proportion, remainingCash);
 
     if (layerBuyAmount >= MIN_TRADE_AMOUNT) {
       // Generate intra-layer buy trades according to HRAM weights
@@ -580,8 +593,12 @@ function generateRebalanceTrades(
       );
 
       for (const trade of layerBuyTrades) {
-        trades.push(trade);
-        totalBuyIrr += trade.amountIrr;
+        // Double-check we don't exceed remaining cash
+        if (trade.amountIrr <= remainingCash) {
+          trades.push(trade);
+          totalBuyIrr += trade.amountIrr;
+          remainingCash -= trade.amountIrr;
+        }
       }
     }
   }
