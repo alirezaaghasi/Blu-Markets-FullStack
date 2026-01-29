@@ -32,7 +32,7 @@ import { ASSETS, LAYER_COLORS, LAYER_NAMES } from '../constants/assets';
 import { MIN_TRADE_AMOUNT, SPREAD_BY_LAYER } from '../constants/business';
 import { calculateFixedIncomeValue } from '../utils/fixedIncome';
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
-import { updateHoldingFromTrade, updateCash, logAction, setStatus, setPortfolioValues } from '../store/slices/portfolioSlice';
+import { updateHoldingFromTrade, updateCash, logAction, setStatus, setPortfolioValues, setHoldings } from '../store/slices/portfolioSlice';
 import {
   validateBuyTrade,
   validateSellTrade,
@@ -134,6 +134,35 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [tradeResult, setTradeResult] = useState<TradeResult | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // BUG-021 FIX: Refresh holdings from backend when sheet opens
+  // This ensures the asset picker shows all current holdings, not stale Redux state
+  useEffect(() => {
+    if (!visible) return;
+
+    const refreshHoldings = async () => {
+      try {
+        const portfolioData = await portfolioApi.get();
+        dispatch(setHoldings(portfolioData.holdings.map((h: Holding) => ({
+          id: h.id,
+          assetId: h.assetId,
+          quantity: h.quantity,
+          frozen: h.frozen,
+          layer: h.layer,
+        }))));
+        dispatch(updateCash(portfolioData.cashIrr));
+        if (__DEV__) {
+          console.log('[TradeBottomSheet] Refreshed holdings:', portfolioData.holdings.length);
+        }
+      } catch (error) {
+        if (__DEV__) {
+          console.error('[TradeBottomSheet] Failed to refresh holdings:', error);
+        }
+      }
+    };
+
+    refreshHoldings();
+  }, [visible, dispatch]);
 
   const asset = ASSETS[assetId];
   // Guard: If asset not found, use defaults to prevent crashes
@@ -348,12 +377,22 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
       // Update cash from backend (includes spread/fees)
       dispatch(updateCash(newCash));
 
-      // BUG-STATUS FIX: Refresh portfolio status after trade to update badge and rebalance button
+      // BUG-STATUS FIX: Refresh full portfolio after trade to update status, badge, holdings
       try {
         const portfolioData = await portfolioApi.get();
-        console.log('[TradeBottomSheet] Post-trade portfolio status:', portfolioData.status);
-        console.log('[TradeBottomSheet] Post-trade allocation:', portfolioData.allocation);
-        console.log('[TradeBottomSheet] Post-trade driftPct:', portfolioData.driftPct);
+        if (__DEV__) {
+          console.log('[TradeBottomSheet] Post-trade portfolio status:', portfolioData.status);
+          console.log('[TradeBottomSheet] Post-trade holdings count:', portfolioData.holdings.length);
+        }
+        // BUG-021 FIX: Refresh ALL holdings from backend, not just the single traded asset
+        dispatch(setHoldings(portfolioData.holdings.map((h: Holding) => ({
+          id: h.id,
+          assetId: h.assetId,
+          quantity: h.quantity,
+          frozen: h.frozen,
+          layer: h.layer,
+        }))));
+        dispatch(updateCash(portfolioData.cashIrr));
         dispatch(setStatus(portfolioData.status));
         dispatch(setPortfolioValues({
           totalValueIrr: portfolioData.totalValueIrr || 0,
@@ -362,10 +401,9 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
           driftPct: portfolioData.driftPct || 0,
           status: portfolioData.status || 'BALANCED',
         }));
-        console.log('[TradeBottomSheet] Dispatched status update:', portfolioData.status);
       } catch (e) {
         // Non-fatal - status will update on next refresh
-        console.warn('Failed to refresh portfolio status after trade:', e);
+        if (__DEV__) console.warn('Failed to refresh portfolio after trade:', e);
       }
 
       // Log action to activity feed
