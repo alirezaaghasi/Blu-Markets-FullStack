@@ -612,6 +612,102 @@ function generateRebalanceTrades(
     }
   }
 
+  // INTRA-LAYER REBALANCING: Rebalance assets within layers that are at target
+  // This handles cases where a layer is at its target % but individual assets
+  // within the layer are significantly over/underweight
+  const INTRA_LAYER_OVERWEIGHT_THRESHOLD = 0.15; // 15% overweight triggers sell
+  const INTRA_LAYER_UNDERWEIGHT_THRESHOLD = 0.10; // 10% underweight triggers buy
+
+  for (const layer of ['FOUNDATION', 'GROWTH', 'UPSIDE'] as Layer[]) {
+    const layerHoldings = holdingsByLayer[layer];
+    const layerTotal = layerHoldings.frozen.reduce((sum, h) => sum + h.valueIrr, 0) +
+                       layerHoldings.unfrozen.reduce((sum, h) => sum + h.valueIrr, 0);
+
+    if (layerTotal < MIN_TRADE_AMOUNT) continue;
+
+    // Get target weights for this layer
+    const layerWeights = getDynamicLayerWeights(layer, 'BALANCED');
+    const layerAssets = getLayerAssets(layer);
+
+    // Calculate current weights within layer
+    const assetValues: Record<string, number> = {};
+    for (const h of [...layerHoldings.frozen, ...layerHoldings.unfrozen]) {
+      assetValues[h.assetId] = (assetValues[h.assetId] || 0) + h.valueIrr;
+    }
+
+    // Find overweight and underweight assets WITHIN this layer
+    const intraOverweight: { assetId: string; excess: number; currentWeight: number; targetWeight: number }[] = [];
+    const intraUnderweight: { assetId: string; deficit: number; currentWeight: number; targetWeight: number }[] = [];
+
+    for (const assetId of layerAssets) {
+      const currentValue = assetValues[assetId] || 0;
+      const currentWeight = layerTotal > 0 ? currentValue / layerTotal : 0;
+      const targetWeight = layerWeights[assetId] || 0;
+      const diff = currentWeight - targetWeight;
+
+      if (diff > INTRA_LAYER_OVERWEIGHT_THRESHOLD) {
+        // This asset is > 15% overweight within its layer
+        const excessValue = (diff - 0.05) * layerTotal; // Sell down to 5% above target
+        intraOverweight.push({ assetId, excess: excessValue, currentWeight, targetWeight });
+      } else if (diff < -INTRA_LAYER_UNDERWEIGHT_THRESHOLD) {
+        // This asset is > 10% underweight within its layer
+        const deficitValue = (-diff - 0.05) * layerTotal; // Buy up to 5% below target
+        intraUnderweight.push({ assetId, deficit: deficitValue, currentWeight, targetWeight });
+      }
+    }
+
+    // If we have both overweight and underweight assets in this layer, rebalance
+    if (intraOverweight.length > 0 && intraUnderweight.length > 0) {
+      // Calculate total excess to sell
+      const totalExcess = intraOverweight.reduce((sum, a) => sum + a.excess, 0);
+      const totalDeficit = intraUnderweight.reduce((sum, a) => sum + a.deficit, 0);
+
+      // Account for spread when selling
+      const spread = SPREAD_BY_LAYER[layer];
+      const netExcessAfterSpread = totalExcess * (1 - spread);
+
+      // Limit buys to available proceeds
+      const availableForIntraBuys = Math.min(netExcessAfterSpread, totalDeficit);
+
+      if (availableForIntraBuys >= MIN_TRADE_AMOUNT) {
+        // Generate SELL trades for overweight assets
+        for (const asset of intraOverweight) {
+          const sellAmount = Math.min(asset.excess, totalExcess);
+          if (sellAmount >= MIN_TRADE_AMOUNT) {
+            // Check if asset is frozen
+            const frozenHolding = layerHoldings.frozen.find(h => h.assetId === asset.assetId);
+            const unfrozenHolding = layerHoldings.unfrozen.find(h => h.assetId === asset.assetId);
+
+            if (unfrozenHolding && unfrozenHolding.valueIrr >= sellAmount) {
+              trades.push({
+                side: 'SELL',
+                assetId: asset.assetId as AssetId,
+                amountIrr: Math.round(sellAmount),
+                layer,
+              });
+              totalSellIrr += sellAmount;
+            }
+          }
+        }
+
+        // Generate BUY trades for underweight assets
+        const buyRatio = availableForIntraBuys / totalDeficit;
+        for (const asset of intraUnderweight) {
+          const buyAmount = Math.round(asset.deficit * buyRatio);
+          if (buyAmount >= MIN_TRADE_AMOUNT && prices.has(asset.assetId as AssetId)) {
+            trades.push({
+              side: 'BUY',
+              assetId: asset.assetId as AssetId,
+              amountIrr: buyAmount,
+              layer,
+            });
+            totalBuyIrr += buyAmount;
+          }
+        }
+      }
+    }
+  }
+
   // Calculate after allocation
   const afterAllocation = calculateAfterAllocation(snapshot, trades, prices);
 
