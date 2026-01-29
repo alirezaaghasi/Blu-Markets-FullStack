@@ -22,6 +22,7 @@ import { useAppSelector } from '../../hooks/useStore';
 import { Loan, AssetId, Holding } from '../../types';
 import { EmptyState } from '../../components/EmptyState';
 import { LoanSheet } from '../../components/LoanSheet';
+import { RepaySheet } from '../../components/RepaySheet';
 
 // BUG-012 FIX: Collateral eligibility should come from backend
 // This list is a fallback for UI responsiveness; backend API is authoritative
@@ -46,6 +47,10 @@ export function LoansTab({ loanId }: LoansTabProps) {
 
   // BUG-3 FIX: State for LoanSheet instead of direct loan creation
   const [loanSheetVisible, setLoanSheetVisible] = useState(false);
+
+  // State for RepaySheet - opens when user taps "Pay Now" on a loan
+  const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null);
+  const [repaySheetVisible, setRepaySheetVisible] = useState(false);
 
   // Get holdings from portfolio to find eligible collateral
   const holdings = useAppSelector((state) => state.portfolio?.holdings || []);
@@ -79,6 +84,18 @@ export function LoansTab({ loanId }: LoansTabProps) {
   const handleLoanSheetClose = () => {
     setLoanSheetVisible(false);
     refresh(); // Refresh the list after any action
+  };
+
+  // Open RepaySheet when user wants to make a payment
+  const handleOpenRepaySheet = (loan: Loan) => {
+    setSelectedLoan(loan);
+    setRepaySheetVisible(true);
+  };
+
+  const handleRepaySheetClose = () => {
+    setRepaySheetVisible(false);
+    setSelectedLoan(null);
+    refresh(); // Refresh loans after repayment
   };
 
   const hasLoans = loans.length > 0;
@@ -235,7 +252,7 @@ export function LoansTab({ loanId }: LoansTabProps) {
             key={loan.id}
             loan={loan}
             highlighted={loan.id === loanId}
-            onRepay={(amount) => repayLoan(loan.id, amount)}
+            onRepay={() => handleOpenRepaySheet(loan)}
           />
         ))}
       </ScrollView>
@@ -246,6 +263,15 @@ export function LoansTab({ loanId }: LoansTabProps) {
         onClose={handleLoanSheetClose}
         eligibleHoldings={eligibleHoldings}
       />
+
+      {/* RepaySheet for loan repayment confirmation */}
+      {selectedLoan && (
+        <RepaySheet
+          visible={repaySheetVisible}
+          onClose={handleRepaySheetClose}
+          loan={selectedLoan}
+        />
+      )}
     </>
   );
 }
@@ -257,7 +283,7 @@ function LoanCard({
 }: {
   loan: Loan;
   highlighted: boolean;
-  onRepay: (amount: number) => void;
+  onRepay: () => void;
 }) {
   // Safety check for installments array
   const installments = loan.installments || [];
@@ -328,7 +354,7 @@ function LoanCard({
           </Text>
           <TouchableOpacity
             style={styles.payButton}
-            onPress={() => onRepay(nextInstallment.totalIRR)}
+            onPress={onRepay}
           >
             <Text style={styles.payButtonText}>Pay Now</Text>
           </TouchableOpacity>
