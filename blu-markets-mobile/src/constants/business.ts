@@ -150,7 +150,9 @@ const getWebSocketUrl = () => {
 
 export const WEBSOCKET_URL = getWebSocketUrl();
 export const WEBSOCKET_RECONNECT_INTERVAL_MS = 3_000; // 3 seconds
-export const WEBSOCKET_ENABLED = true;
+// DISABLED: WebSocket doesn't work reliably through Codespaces port forwarding
+// The app will use REST polling instead (30-second intervals)
+export const WEBSOCKET_ENABLED = false;
 
 // Demo Mode Configuration
 // Token used to identify demo mode - centralized to avoid hardcoded strings

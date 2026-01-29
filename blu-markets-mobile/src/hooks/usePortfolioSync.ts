@@ -119,20 +119,36 @@ export function usePortfolioSync(options: UsePortfolioSyncOptions = {}) {
     const pricesIrr: Record<string, number> = {};
 
     if (pricesData.prices) {
-      // Backend returns prices in various formats, normalize them
-      Object.entries(pricesData.prices).forEach(([assetId, priceData]) => {
-        if (typeof priceData === 'number') {
-          prices[assetId] = priceData;
-        } else if (typeof priceData === 'object' && priceData !== null) {
-          const p = priceData as { priceUsd?: number; priceIrr?: number; usd?: number; irr?: number };
-          prices[assetId] = p.priceUsd ?? p.usd ?? 0;
-          pricesIrr[assetId] = p.priceIrr ?? p.irr ?? 0;
-        }
-      });
+      // Backend returns prices as an ARRAY of objects, not a Record
+      // Each item has: { assetId, priceUsd, priceIrr, change24hPct, source, fetchedAt }
+      if (Array.isArray(pricesData.prices)) {
+        pricesData.prices.forEach((p: { assetId: string; priceUsd?: number; priceIrr?: number }) => {
+          if (p.assetId) {
+            prices[p.assetId] = p.priceUsd ?? 0;
+            pricesIrr[p.assetId] = p.priceIrr ?? 0;
+          }
+        });
+      } else {
+        // Fallback: handle as object/record format (legacy or local mock)
+        Object.entries(pricesData.prices).forEach(([assetId, priceData]) => {
+          if (typeof priceData === 'number') {
+            prices[assetId] = priceData;
+          } else if (typeof priceData === 'object' && priceData !== null) {
+            const p = priceData as { priceUsd?: number; priceIrr?: number; usd?: number; irr?: number };
+            prices[assetId] = p.priceUsd ?? p.usd ?? 0;
+            pricesIrr[assetId] = p.priceIrr ?? p.irr ?? 0;
+          }
+        });
+      }
     }
 
+    // Extract fxRate - backend returns { usdIrr, source, fetchedAt } object
+    const fxRateValue = typeof pricesData.fxRate === 'number'
+      ? pricesData.fxRate
+      : (pricesData.fxRate as { usdIrr?: number })?.usdIrr ?? 0;
+
     dispatch(setPrices(prices));
-    dispatch(setFxRate({ rate: pricesData.fxRate, source: 'bonbast' }));
+    dispatch(setFxRate({ rate: fxRateValue, source: 'bonbast' }));
     if (Object.keys(pricesIrr).length > 0) {
       dispatch(setPricesIrr(pricesIrr));
     }
@@ -140,7 +156,8 @@ export function usePortfolioSync(options: UsePortfolioSyncOptions = {}) {
     if (__DEV__) {
       console.log('[usePortfolioSync] Synced prices:', {
         count: Object.keys(prices).length,
-        fxRate: pricesData.fxRate,
+        irrCount: Object.keys(pricesIrr).length,
+        fxRate: fxRateValue,
       });
     }
   }, [pricesData, dispatch]);

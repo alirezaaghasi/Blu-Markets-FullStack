@@ -233,7 +233,9 @@ export async function getPortfolioSnapshot(userId: string): Promise<PortfolioSna
     userId,
     cashIrr: summary.cashIrr,
     // Use holdings from summary (already computed with prices)
+    // CRITICAL: Include id field for protection/loan operations
     holdings: summary.holdings.map((h) => ({
+      id: h.id,
       assetId: h.assetId,
       quantity: h.quantity,
       layer: h.layer,

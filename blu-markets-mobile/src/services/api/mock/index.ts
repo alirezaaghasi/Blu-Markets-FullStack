@@ -210,41 +210,53 @@ export const onboarding = {
     const growthIRR = amountIrr * targetAllocation.GROWTH;
     const upsideIRR = amountIrr * targetAllocation.UPSIDE;
 
-    // Asset distribution within layers:
-    // Foundation: USDT 70%, IRR_FIXED_INCOME 30%
-    // Growth: BTC 60%, ETH 40%
-    // Upside: SOL 100%
+    // Asset distribution within layers (matching real backend):
+    // Foundation: PAXG 50%, USDT 50%
+    // Growth: BTC 40%, ETH 35%, BNB 25%
+    // Upside: SOL 40%, TON 30%, LINK 30%
 
     // Get prices with fallbacks
-    const usdtPrice = prices['USDT'] || 1.0;
-    const btcPrice = prices['BTC'] || 97500;
-    const ethPrice = prices['ETH'] || 3200;
-    const solPrice = prices['SOL'] || 185;
+    const effectiveFxRate = fxRate > 0 ? fxRate : DEFAULT_FX_RATE;
+    const paxgPrice = prices['PAXG'] || DEFAULT_MOCK_PRICES.PAXG || 2650;
+    const usdtPrice = prices['USDT'] || DEFAULT_MOCK_PRICES.USDT || 1.0;
+    const btcPrice = prices['BTC'] || DEFAULT_MOCK_PRICES.BTC || 97500;
+    const ethPrice = prices['ETH'] || DEFAULT_MOCK_PRICES.ETH || 3200;
+    const bnbPrice = prices['BNB'] || DEFAULT_MOCK_PRICES.BNB || 680;
+    const solPrice = prices['SOL'] || DEFAULT_MOCK_PRICES.SOL || 185;
+    const tonPrice = prices['TON'] || DEFAULT_MOCK_PRICES.TON || 5.2;
+    const linkPrice = prices['LINK'] || DEFAULT_MOCK_PRICES.LINK || 22;
 
-    // Calculate quantities (accounting for spread on Growth and Upside)
-    const usdtAmount = foundationIRR * 0.70;
-    const fixedIncomeAmount = foundationIRR * 0.30;
-    const btcAmount = growthIRR * 0.60;
-    const ethAmount = growthIRR * 0.40;
-    const solAmount = upsideIRR;
+    // Calculate amounts per asset
+    // Foundation layer
+    const paxgAmount = foundationIRR * 0.50;
+    const usdtAmount = foundationIRR * 0.50;
+    // Growth layer
+    const btcAmount = growthIRR * 0.40;
+    const ethAmount = growthIRR * 0.35;
+    const bnbAmount = growthIRR * 0.25;
+    // Upside layer
+    const solAmount = upsideIRR * 0.40;
+    const tonAmount = upsideIRR * 0.30;
+    const linkAmount = upsideIRR * 0.30;
 
-    // Convert to quantities
-    const usdtQuantity = usdtAmount / (usdtPrice * fxRate);
-    const fixedIncomeQuantity = fixedIncomeAmount / FIXED_INCOME_UNIT_PRICE;
+    // Convert to quantities (apply spread for non-Foundation assets)
+    const paxgQuantity = (paxgAmount * (1 - SPREAD_BY_LAYER.FOUNDATION)) / (paxgPrice * effectiveFxRate);
+    const usdtQuantity = (usdtAmount * (1 - SPREAD_BY_LAYER.FOUNDATION)) / (usdtPrice * effectiveFxRate);
+    const btcQuantity = (btcAmount * (1 - SPREAD_BY_LAYER.GROWTH)) / (btcPrice * effectiveFxRate);
+    const ethQuantity = (ethAmount * (1 - SPREAD_BY_LAYER.GROWTH)) / (ethPrice * effectiveFxRate);
+    const bnbQuantity = (bnbAmount * (1 - SPREAD_BY_LAYER.GROWTH)) / (bnbPrice * effectiveFxRate);
+    const solQuantity = (solAmount * (1 - SPREAD_BY_LAYER.UPSIDE)) / (solPrice * effectiveFxRate);
+    const tonQuantity = (tonAmount * (1 - SPREAD_BY_LAYER.UPSIDE)) / (tonPrice * effectiveFxRate);
+    const linkQuantity = (linkAmount * (1 - SPREAD_BY_LAYER.UPSIDE)) / (linkPrice * effectiveFxRate);
 
-    // Apply spread for Growth and Upside assets
-    const btcQuantity = (btcAmount * (1 - SPREAD_BY_LAYER.GROWTH)) / (btcPrice * fxRate);
-    const ethQuantity = (ethAmount * (1 - SPREAD_BY_LAYER.GROWTH)) / (ethPrice * fxRate);
-    const solQuantity = (solAmount * (1 - SPREAD_BY_LAYER.UPSIDE)) / (solPrice * fxRate);
-
-    // Create holdings array
+    // Create holdings array (8 assets)
     const holdings: Holding[] = [];
 
+    if (paxgQuantity > 0) {
+      holdings.push({ assetId: 'PAXG', quantity: paxgQuantity, frozen: false, layer: 'FOUNDATION' });
+    }
     if (usdtQuantity > 0) {
       holdings.push({ assetId: 'USDT', quantity: usdtQuantity, frozen: false, layer: 'FOUNDATION' });
-    }
-    if (fixedIncomeQuantity > 0) {
-      holdings.push({ assetId: 'IRR_FIXED_INCOME', quantity: fixedIncomeQuantity, frozen: false, layer: 'FOUNDATION' });
     }
     if (btcQuantity > 0) {
       holdings.push({ assetId: 'BTC', quantity: btcQuantity, frozen: false, layer: 'GROWTH' });
@@ -252,8 +264,17 @@ export const onboarding = {
     if (ethQuantity > 0) {
       holdings.push({ assetId: 'ETH', quantity: ethQuantity, frozen: false, layer: 'GROWTH' });
     }
+    if (bnbQuantity > 0) {
+      holdings.push({ assetId: 'BNB', quantity: bnbQuantity, frozen: false, layer: 'GROWTH' });
+    }
     if (solQuantity > 0) {
       holdings.push({ assetId: 'SOL', quantity: solQuantity, frozen: false, layer: 'UPSIDE' });
+    }
+    if (tonQuantity > 0) {
+      holdings.push({ assetId: 'TON', quantity: tonQuantity, frozen: false, layer: 'UPSIDE' });
+    }
+    if (linkQuantity > 0) {
+      holdings.push({ assetId: 'LINK', quantity: linkQuantity, frozen: false, layer: 'UPSIDE' });
     }
 
     // Initialize portfolio with calculated holdings
@@ -376,13 +397,25 @@ export const portfolio = {
   },
 };
 
+// Default mock prices for when Redux state is empty
+const DEFAULT_MOCK_PRICES: Partial<Record<AssetId, number>> = {
+  BTC: 97500, ETH: 3200, SOL: 185, BNB: 680, XRP: 2.2, TON: 5.2,
+  PAXG: 2650, KAG: 30, USDT: 1.0, QQQ: 521, LINK: 22, AVAX: 35,
+  MATIC: 0.45, ARB: 0.8,
+};
+const DEFAULT_FX_RATE = 620000; // ~62,000 Toman = 620,000 IRR per USD
+
 // Trade APIs
 export const trade = {
   preview: async (assetId: AssetId, action: 'BUY' | 'SELL', amountIrr: number): Promise<TradePreview> => {
     await delay(MOCK_DELAY);
 
     const state = getState();
-    const { prices, fxRate } = state.prices;
+    // Use Redux prices if available, otherwise fall back to default mock prices
+    const prices = Object.keys(state.prices.prices || {}).length > 0
+      ? state.prices.prices
+      : DEFAULT_MOCK_PRICES as Record<string, number>;
+    const fxRate = state.prices.fxRate > 0 ? state.prices.fxRate : DEFAULT_FX_RATE;
     const { holdings, targetLayerPct, cashIRR } = state.portfolio;
     const asset = ASSETS[assetId];
     const side = action; // Use action as side internally for compatibility
@@ -391,8 +424,16 @@ export const trade = {
       throw new Error(`Unknown asset: ${assetId}`);
     }
 
-    const priceUSD = prices[assetId] || 0;
-    const priceIRR = priceUSD * fxRate;
+    // Special handling for fixed income - price is already in IRR
+    let priceUSD: number;
+    let priceIRR: number;
+    if (assetId === 'IRR_FIXED_INCOME') {
+      priceUSD = 0; // Fixed income doesn't have USD price
+      priceIRR = FIXED_INCOME_UNIT_PRICE; // 500,000 IRR per unit
+    } else {
+      priceUSD = prices[assetId] || DEFAULT_MOCK_PRICES[assetId] || 100;
+      priceIRR = priceUSD * fxRate;
+    }
     const spread = asset.layer === 'FOUNDATION' ? 0.0015 : asset.layer === 'GROWTH' ? 0.003 : 0.006;
     const quantity = amountIrr / priceIRR;
 
@@ -405,7 +446,7 @@ export const trade = {
       if (a) {
         const val = h.assetId === 'IRR_FIXED_INCOME'
           ? h.quantity * FIXED_INCOME_UNIT_PRICE
-          : h.quantity * (prices[h.assetId] || 0) * fxRate;
+          : h.quantity * (prices[h.assetId] || DEFAULT_MOCK_PRICES[h.assetId as AssetId] || 0) * fxRate;
         layerValues[a.layer] += val;
       }
     });
@@ -476,12 +517,19 @@ export const trade = {
     await delay(MOCK_DELAY);
 
     const state = getState();
-    const { prices, fxRate } = state.prices;
+    const { prices, fxRate: stateFxRate } = state.prices;
+    const fxRate = stateFxRate > 0 ? stateFxRate : DEFAULT_FX_RATE;
     const { holdings: currentHoldings, cashIRR: currentCash } = state.portfolio;
 
     // Mock backend calculation (in production, backend computes these values)
-    const priceUSD = prices[assetId] || 0;
-    const priceIRR = priceUSD * fxRate;
+    // Special handling for fixed income - price is already in IRR
+    let priceIRR: number;
+    if (assetId === 'IRR_FIXED_INCOME') {
+      priceIRR = FIXED_INCOME_UNIT_PRICE; // 500,000 IRR per unit
+    } else {
+      const priceUSD = prices[assetId] || DEFAULT_MOCK_PRICES[assetId] || 0;
+      priceIRR = priceUSD * fxRate;
+    }
     const quantity = priceIRR > 0 ? amountIrr / priceIRR : 0;
 
     let newCashIRR: number;
@@ -1449,10 +1497,25 @@ export const prices = {
     await delay(MOCK_DELAY);
 
     const state = getState();
+    const fxRate = state.prices.fxRate;
+
+    // Convert prices record to array format matching backend
+    const pricesArray = Object.entries(state.prices.prices).map(([assetId, priceUsd]) => ({
+      assetId,
+      priceUsd: priceUsd as number,
+      priceIrr: (priceUsd as number) * fxRate,
+      source: 'mock',
+      fetchedAt: state.prices.updatedAt || new Date().toISOString(),
+    }));
+
     return {
-      prices: state.prices.prices,
-      fxRate: state.prices.fxRate,
-      timestamp: state.prices.updatedAt,
+      prices: pricesArray,
+      fxRate: {
+        usdIrr: fxRate,
+        source: 'mock',
+        fetchedAt: state.prices.updatedAt || new Date().toISOString(),
+      },
+      status: 'live',
     };
   },
 };

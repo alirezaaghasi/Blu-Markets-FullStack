@@ -30,7 +30,7 @@ const currentEnv = getEnvironment();
 
 // Demo mode toggle - use demo mode in development unless explicitly disabled
 // Set EXPO_PUBLIC_USE_BACKEND=true to use real backend
-export const DEMO_MODE = __DEV__ && process.env.EXPO_PUBLIC_USE_BACKEND !== 'true';
+export const DEMO_MODE = false; // Using real backend
 
 // API URLs - can be overridden via environment variables
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || ENV[currentEnv].API_BASE_URL;

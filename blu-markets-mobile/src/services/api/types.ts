@@ -201,10 +201,19 @@ export interface EligibleAssetsResponse {
   }>;
 }
 
+export interface PriceItem {
+  assetId: string;
+  priceUsd: number;
+  priceIrr: number;
+  change24hPct?: number;
+  source: string;
+  fetchedAt: string;
+}
+
 export interface PricesResponse {
-  prices: Record<string, number>;
-  fxRate: number;
-  timestamp: string;
+  prices: PriceItem[];
+  fxRate: { usdIrr: number; source: string; fetchedAt: string };
+  status: 'live' | 'stale' | 'offline';
 }
 
 export interface TradeExecuteResponse {
