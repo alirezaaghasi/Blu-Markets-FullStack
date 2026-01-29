@@ -1,6 +1,6 @@
 // Loan Bottom Sheet Component
 // Based on PRD Section 6.5 - Borrow Flow
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   SafeAreaView,
   ScrollView,
   Alert,
+  Animated,
 } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../constants/theme';
 import { Holding, AssetId } from '../types';
@@ -64,6 +65,21 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
   const [loanPreview, setLoanPreview] = useState<LoanPreviewResponse | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
+  // Ref for ScrollView to scroll to amount input when asset is selected
+  const scrollViewRef = useRef<ScrollView>(null);
+  const amountSectionY = useRef(0);
+
+  // Reset state when sheet opens/closes
+  useEffect(() => {
+    if (visible) {
+      // Reset state when sheet opens for fresh start
+      setSelectedAssetId(null);
+      setAmountInput('');
+      setDurationDays(90);
+      setLoanPreview(null);
+    }
+  }, [visible]);
+
   // BUG-024 FIX: Fetch loan capacity with cleanup to prevent state updates on unmounted component
   useEffect(() => {
     if (!visible) return;
@@ -112,12 +128,9 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
     };
   }, [selectedAssetId, amountIRR, durationDays]);
 
-  // Set initial selected asset when eligibleHoldings loads
-  React.useEffect(() => {
-    if (!selectedAssetId && eligibleHoldings.length > 0) {
-      setSelectedAssetId(eligibleHoldings[0].assetId);
-    }
-  }, [eligibleHoldings, selectedAssetId]);
+  // REMOVED: Auto-selection was causing UX issues where tapping the first asset
+  // appeared to do nothing because it was already selected.
+  // Users must now explicitly tap an asset to proceed to the amount input step.
 
   // Selected holding and asset
   const selectedHolding = eligibleHoldings.find((h) => h.assetId === selectedAssetId);
@@ -309,10 +322,17 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+        >
           {/* Collateral Selection */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Select Collateral</Text>
+            <Text style={styles.sectionTitle}>Step 1: Select Collateral</Text>
+            {!selectedAssetId && (
+              <Text style={styles.sectionHelper}>Tap an asset to use as collateral for your loan</Text>
+            )}
             <View style={styles.collateralList}>
               {eligibleHoldings.map((holding) => {
                 const asset = ASSETS[holding.assetId];
@@ -331,27 +351,39 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
                     onPress={() => {
                       setSelectedAssetId(holding.assetId);
                       setAmountInput('');
+                      // Scroll to amount input section after selection
+                      setTimeout(() => {
+                        scrollViewRef.current?.scrollTo({ y: 200, animated: true });
+                      }, 100);
                     }}
+                    activeOpacity={0.7}
                   >
                     <View style={styles.collateralInfo}>
                       <View
                         style={[
                           styles.assetIcon,
                           { backgroundColor: `${LAYER_COLORS[asset.layer]}20` },
+                          isSelected && { backgroundColor: `${LAYER_COLORS[asset.layer]}40` },
                         ]}
                       >
                         <Text style={styles.assetIconText}>
                           {asset.symbol}
                         </Text>
                       </View>
-                      <View>
+                      <View style={{ flex: 1 }}>
                         <Text style={styles.collateralName}>{asset.name}</Text>
                         <Text style={styles.collateralValue}>
                           Max: {formatNumber(maxBorrow)} IRR ({(asset.ltv * 100).toFixed(0)}% LTV)
                         </Text>
                       </View>
                     </View>
-                    {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                    <View style={[styles.selectIndicator, isSelected && styles.selectIndicatorSelected]}>
+                      {isSelected ? (
+                        <Text style={styles.checkmark}>✓</Text>
+                      ) : (
+                        <Text style={styles.selectText}>Select</Text>
+                      )}
+                    </View>
                   </TouchableOpacity>
                 );
               })}
@@ -362,7 +394,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
             <>
               {/* Amount Input */}
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Borrow Amount (IRR)</Text>
+                <Text style={styles.sectionTitle}>Step 2: Borrow Amount (IRR)</Text>
                 <TextInput
                   style={styles.amountInput}
                   value={amountInput}
@@ -394,7 +426,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
 
               {/* Duration Selection */}
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Loan Duration</Text>
+                <Text style={styles.sectionTitle}>Step 3: Loan Duration</Text>
                 <View style={styles.durationOptions}>
                   {LOAN_DURATION_OPTIONS.map((days) => (
                     <TouchableOpacity
@@ -567,6 +599,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing[3],
     textTransform: 'uppercase',
   },
+  sectionHelper: {
+    fontSize: typography.fontSize.sm,
+    color: colors.primary,
+    marginBottom: spacing[3],
+    marginTop: -spacing[2],
+  },
   collateralList: {
     gap: spacing[2],
   },
@@ -611,9 +649,26 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   checkmark: {
-    fontSize: 20,
-    color: colors.primary,
+    fontSize: 16,
+    color: colors.textPrimaryDark,
     fontWeight: typography.fontWeight.bold,
+  },
+  selectIndicator: {
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.surfaceDark,
+    borderWidth: 1,
+    borderColor: colors.borderDark,
+  },
+  selectIndicatorSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  selectText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+    fontWeight: typography.fontWeight.medium,
   },
   amountInput: {
     backgroundColor: colors.cardDark,
