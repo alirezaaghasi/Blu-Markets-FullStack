@@ -227,7 +227,7 @@ export async function reserveQuote(quoteId: string, userId: string): Promise<Pro
 
       const cached = JSON.parse(result as string) as CachedQuote;
 
-      // Check expiry
+      // Check expiry - convert string back to Date (JSON serialization loses Date type)
       const validUntil = new Date(cached.quote.validUntil);
       if (new Date() > validUntil) {
         await removeQuoteFromCache(quoteId, cached.quote.holdingId);
@@ -237,6 +237,8 @@ export async function reserveQuote(quoteId: string, userId: string): Promise<Pro
         });
       }
 
+      // Restore Date object before returning (JSON.parse converts Dates to strings)
+      cached.quote.validUntil = validUntil;
       return cached.quote;
     } catch (error) {
       if (error instanceof AppError) {
@@ -257,6 +259,7 @@ export async function reserveQuote(quoteId: string, userId: string): Promise<Pro
     throw new AppError('UNAUTHORIZED', 'Quote does not belong to user', 401);
   }
 
+  // Convert string back to Date (JSON serialization loses Date type)
   const validUntil = new Date(cached.quote.validUntil);
   if (new Date() > validUntil) {
     removeQuoteFromCacheMemory(quoteId, cached.quote.holdingId);
@@ -280,6 +283,8 @@ export async function reserveQuote(quoteId: string, userId: string): Promise<Pro
   cached.status = 'reserved';
   cached.reservedAt = new Date().toISOString();
 
+  // Restore Date object before returning
+  cached.quote.validUntil = validUntil;
   return cached.quote;
 }
 
