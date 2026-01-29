@@ -23,6 +23,7 @@ import { Button, Badge } from './common';
 import { TradePreview, Boundary, AssetId } from '../types';
 import { ASSETS } from '../constants/assets';
 import AllocationBar from './AllocationBar';
+import { formatCrypto, formatUSD, formatIRR } from '../utils/currency';
 
 interface ConfirmTradeModalProps {
   /** Visibility state */
@@ -143,20 +144,21 @@ export const ConfirmTradeModal: React.FC<ConfirmTradeModalProps> = ({
                   <View style={styles.detailsGrid}>
                     <DetailRow
                       label="Amount"
-                      value={`${formatNumber(preview.amountIRR ?? 0)} IRR`}
+                      value={formatIRR(preview.amountIRR ?? 0)}
                     />
                     <DetailRow
                       label={isBuy ? 'You receive' : 'You sell'}
-                      value={`${(preview.quantity ?? 0).toFixed(6)} ${asset.symbol ?? ''}`}
+                      value={formatCrypto(preview.quantity ?? 0, asset.symbol ?? '')}
                     />
                     <DetailRow
                       label="Price"
-                      value={`$${(preview.priceUSD ?? 0).toLocaleString()}`}
+                      value={formatUSD(preview.priceUSD ?? 0)}
                     />
                     <DetailRow
-                      label={`Spread (${formatPercent(preview.spread ?? 0)})`}
-                      value={`${formatNumber(Math.round((preview.amountIRR ?? 0) * (preview.spread ?? 0)))} IRR`}
+                      label="Fee"
+                      value={formatIRR(Math.round((preview.amountIRR ?? 0) * (preview.spread ?? 0)))}
                       muted
+                      info="Trading fee based on asset type. Foundation assets: 0.1%, Growth: 0.3%, Upside: 0.5%"
                     />
                   </View>
                 </View>
@@ -269,17 +271,37 @@ export const ConfirmTradeModal: React.FC<ConfirmTradeModalProps> = ({
   );
 };
 
-// Detail Row Component
+// Detail Row Component with optional info tooltip
 const DetailRow: React.FC<{
   label: string;
   value: string;
   muted?: boolean;
-}> = ({ label, value, muted }) => (
-  <View style={styles.detailRow}>
-    <Text style={[styles.detailLabel, muted && styles.detailMuted]}>{label}</Text>
-    <Text style={[styles.detailValue, muted && styles.detailMuted]}>{value}</Text>
-  </View>
-);
+  info?: string;
+}> = ({ label, value, muted, info }) => {
+  const [showInfo, setShowInfo] = React.useState(false);
+
+  return (
+    <View>
+      <View style={styles.detailRow}>
+        <View style={styles.detailLabelRow}>
+          <Text style={[styles.detailLabel, muted && styles.detailMuted]}>{label}</Text>
+          {info && (
+            <Text
+              style={styles.infoIcon}
+              onPress={() => setShowInfo(!showInfo)}
+            >
+              ⓘ
+            </Text>
+          )}
+        </View>
+        <Text style={[styles.detailValue, muted && styles.detailMuted]}>{value}</Text>
+      </View>
+      {showInfo && info && (
+        <Text style={styles.infoTooltip}>{info}</Text>
+      )}
+    </View>
+  );
+};
 
 // Layer Percent Component
 const LayerPercent: React.FC<{
@@ -417,6 +439,25 @@ const styles = StyleSheet.create({
   },
   detailMuted: {
     color: COLORS.text.muted,
+  },
+  detailLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[1],
+  },
+  infoIcon: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.text.muted,
+    paddingHorizontal: SPACING[1],
+  },
+  infoTooltip: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.text.secondary,
+    backgroundColor: COLORS.background.surface,
+    padding: SPACING[2],
+    borderRadius: RADIUS.sm,
+    marginTop: SPACING[1],
+    marginBottom: SPACING[1],
   },
   allocationSection: {
     backgroundColor: COLORS.background.surface,

@@ -1,6 +1,11 @@
 // Currency Formatting Utilities
 // Handles IRR/USD display with proper formatting
-// Updated: 2026-01-29 - UI Enhancement Tasks 1, 24, 25
+// Updated: 2026-01-29 - UX Spec Implementation (UX-003)
+//
+// DECIMAL PRECISION RULES (per UX spec):
+// - IRR (fiat): No decimals, use abbreviations (e.g., "149.9M IRR")
+// - USDT: Always 2 decimals (e.g., "103.14 USDT")
+// - Crypto (BTC, ETH, etc.): Max 4 decimals (e.g., "0.0008 BTC")
 
 // Assets that should only show IRR (no USD equivalent)
 const IRR_ONLY_ASSETS = ['IRR_FIXED_INCOME'];
@@ -79,14 +84,14 @@ export const formatNumber = (num: number, abbreviate: boolean = false): string =
 };
 
 /**
- * Format crypto quantity with max 2 significant digits
+ * Format crypto quantity with MAX 4 DECIMALS (per UX spec UX-003)
  *
  * Examples:
- *   0.009277    → "0.0093"
- *   0.00038503  → "0.0004"
- *   7.5805      → "7.58"
- *   0.172369    → "0.17"
- *   125.789     → "125.8"
+ *   0.00084123  → "0.0008" (4 decimals max)
+ *   0.009277    → "0.0093" (4 decimals)
+ *   7.5805      → "7.58" (2 decimals for values >= 1)
+ *   0.172369    → "0.17" (2 decimals for values >= 0.1)
+ *   125.789     → "125.8" (1 decimal for values >= 100)
  *
  * @param quantity - The crypto quantity to format
  * @param symbol - Optional symbol to append (e.g., "BTC")
@@ -97,6 +102,7 @@ export const formatCrypto = (quantity: number, symbol?: string): string => {
   }
 
   let formatted: string;
+  const MAX_DECIMALS = 4; // UX spec: max 4 decimals for crypto
 
   if (quantity >= 100) {
     // Large numbers: 1 decimal place
@@ -107,11 +113,15 @@ export const formatCrypto = (quantity: number, symbol?: string): string => {
   } else if (quantity === 0) {
     formatted = '0';
   } else {
-    // Small numbers: count leading zeros after decimal, then add 2 significant digits
-    const str = quantity.toString();
-    const match = str.match(/^0\.(0*)/);
-    const leadingZeros = match ? match[1].length : 0;
-    formatted = quantity.toFixed(leadingZeros + 2);
+    // Small numbers: use up to MAX_DECIMALS
+    // Round to 4 decimal places max per UX spec
+    formatted = quantity.toFixed(MAX_DECIMALS);
+    // Remove trailing zeros but keep at least one decimal
+    formatted = formatted.replace(/\.?0+$/, '') || '0';
+    // Ensure we have proper decimal format
+    if (!formatted.includes('.') && quantity < 1 && quantity > 0) {
+      formatted = quantity.toFixed(MAX_DECIMALS).replace(/0+$/, '');
+    }
   }
 
   return symbol ? `${formatted} ${symbol}` : formatted;
@@ -193,22 +203,42 @@ export const getAssetName = (assetId: string): string => {
 };
 
 /**
- * Format USD amount with currency label
+ * Format USD amount with currency label (always 2 decimals per UX spec)
  */
 export const formatUSD = (amount: number): string => {
   if (amount === null || amount === undefined || isNaN(amount)) {
     return '--';
   }
 
-  // For small amounts, show more decimals
-  if (amount < 1) {
-    return `$${amount.toFixed(4)}`;
+  // UX spec: always 2 decimals for USD
+  if (amount >= 1000) {
+    return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
-  if (amount < 100) {
-    return `$${amount.toFixed(2)}`;
+  return `$${amount.toFixed(2)}`;
+};
+
+/**
+ * Format USDT amount (stablecoin) - ALWAYS 2 decimals per UX spec UX-003
+ *
+ * Examples:
+ *   103.144960 → "103.14 USDT"
+ *   1000.5     → "1,000.50 USDT"
+ *
+ * @param amount - The USDT amount to format
+ * @param showSymbol - Whether to show "USDT" suffix (default: true)
+ */
+export const formatUSDT = (amount: number, showSymbol: boolean = true): string => {
+  if (amount === null || amount === undefined || isNaN(amount)) {
+    return showSymbol ? '-- USDT' : '--';
   }
 
-  return `$${formatNumber(amount)}`;
+  const suffix = showSymbol ? ' USDT' : '';
+
+  // UX spec UX-003: USDT always 2 decimals
+  if (amount >= 1000) {
+    return `${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${suffix}`;
+  }
+  return `${amount.toFixed(2)}${suffix}`;
 };
 
 /**

@@ -577,7 +577,7 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
                       <AllocationBar current={targetLayerPct} target={targetLayerPct} compact />
                     </View>
                   </View>
-                  <Text style={styles.allocationLegend}>F / G / U %</Text>
+                  <Text style={styles.allocationLegend}>Foundation / Growth / Upside %</Text>
                 </View>
                 )}
 

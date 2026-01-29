@@ -480,20 +480,6 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
                 </View>
               )}
 
-              {/* Warnings */}
-              <View style={styles.warningCard}>
-                <Text style={styles.warningTitle}>Important Information</Text>
-                <Text style={styles.warningText}>
-                  • Your {selectedAsset?.name} will be locked for this loan and cannot be sold
-                </Text>
-                <Text style={styles.warningText}>
-                  • If the asset value drops below the loan amount, it may be sold to repay
-                </Text>
-                <Text style={styles.warningText}>
-                  • Repay early with no penalties
-                </Text>
-              </View>
-
               {/* Validation Errors */}
               {validationErrors.length > 0 && amountIRR > 0 && (
                 <View style={styles.errorCard}>
@@ -510,6 +496,14 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
 
         {/* Action Button - shows contextual text based on current step */}
         <View style={styles.footer}>
+          {/* UX-002: Loan warning moved above Confirm button for visibility */}
+          {selectedAssetId && isValid && (
+            <View style={styles.footerWarning}>
+              <Text style={styles.footerWarningText}>
+                ⚠️ Your {selectedAsset?.name} will be locked and may be sold if value drops below loan amount
+              </Text>
+            </View>
+          )}
           {!selectedAssetId ? (
             // Step 1: No asset selected yet
             <View style={[styles.confirmButton, styles.confirmButtonDisabled]}>
@@ -838,6 +832,21 @@ const styles = StyleSheet.create({
     paddingBottom: spacing[8],
     borderTopWidth: 1,
     borderTopColor: colors.borderDark,
+  },
+  // UX-002: Footer warning styles
+  footerWarning: {
+    backgroundColor: `${colors.warning}15`,
+    borderRadius: borderRadius.default,
+    padding: spacing[3],
+    marginBottom: spacing[3],
+    borderWidth: 1,
+    borderColor: `${colors.warning}30`,
+  },
+  footerWarningText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.warning,
+    textAlign: 'center',
+    lineHeight: 18,
   },
   confirmButton: {
     backgroundColor: colors.primary,

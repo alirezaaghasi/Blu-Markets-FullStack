@@ -309,7 +309,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
         <SafeAreaView style={styles.container}>
           <View style={styles.header}>
             <View style={styles.dragIndicator} />
-            <Text style={styles.title}>Protect Assets</Text>
+            <Text style={styles.title}>Insure Assets</Text>
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
               <Text style={styles.closeButtonText}>Cancel</Text>
             </TouchableOpacity>
@@ -373,7 +373,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
         <SafeAreaView style={styles.container}>
           <View style={styles.header}>
             <View style={styles.dragIndicator} />
-            <Text style={styles.title}>Select Asset to Protect</Text>
+            <Text style={styles.title}>Select Asset to Insure</Text>
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
               <Text style={styles.closeButtonText}>Cancel</Text>
             </TouchableOpacity>
@@ -453,7 +453,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
               <Text style={styles.backButtonText}>← Back</Text>
             </TouchableOpacity>
           )}
-          <Text style={styles.title}>Protect {asset?.name || holding.assetId}</Text>
+          <Text style={styles.title}>Insure {asset?.name || holding.assetId}</Text>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <Text style={styles.closeButtonText}>Cancel</Text>
           </TouchableOpacity>
@@ -650,7 +650,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
                 : isLoadingQuote
                 ? 'Loading...'
                 : quote
-                ? `Buy Protection for ${formatIRR(quote.premiumIrr || 0)}`
+                ? `Purchase Insurance for ${formatIRR(quote.premiumIrr || 0)}`
                 : 'Get Quote First'}
             </Text>
           </TouchableOpacity>

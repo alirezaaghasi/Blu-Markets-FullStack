@@ -118,20 +118,27 @@ const StatusBadge: React.FC<{ status: PortfolioStatus; onPress?: () => void }> =
 
 /**
  * Main Action Button (Row 1 - 3 equal width)
+ * P1: Added disabledReason prop for tooltip when button is disabled
  */
 const MainActionButton: React.FC<{
   label: string;
   onPress: () => void;
   disabled?: boolean;
-}> = ({ label, onPress, disabled }) => (
-  <TouchableOpacity
-    style={[styles.mainActionButton, disabled && styles.mainActionButtonDisabled]}
-    onPress={onPress}
-    disabled={disabled}
-    activeOpacity={0.7}
-  >
-    <Text style={[styles.mainActionLabel, disabled && styles.mainActionLabelDisabled]}>{label}</Text>
-  </TouchableOpacity>
+  disabledReason?: string;
+}> = ({ label, onPress, disabled, disabledReason }) => (
+  <View style={styles.mainActionWrapper}>
+    <TouchableOpacity
+      style={[styles.mainActionButton, disabled && styles.mainActionButtonDisabled]}
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.7}
+    >
+      <Text style={[styles.mainActionLabel, disabled && styles.mainActionLabelDisabled]}>{label}</Text>
+    </TouchableOpacity>
+    {disabled && disabledReason && (
+      <Text style={styles.disabledHint}>{disabledReason}</Text>
+    )}
+  </View>
 );
 
 /**
@@ -542,6 +549,7 @@ const HomeScreen: React.FC = () => {
             label="Rebalance"
             onPress={() => setRebalanceSheetVisible(true)}
             disabled={portfolioStatusResult.status === 'BALANCED'}
+            disabledReason={portfolioStatusResult.status === 'BALANCED' ? 'Already balanced' : undefined}
           />
           <MainActionButton
             label="Add Funds"
@@ -553,7 +561,9 @@ const HomeScreen: React.FC = () => {
           />
         </View>
 
-        {/* Row 2: Borrow, Protect */}
+        {/* Row 2: Borrow, Insure Assets */}
+        {/* UX-001: "Protect" → "Insure Assets" per UX spec */}
+        {/* ⚠️ LEGAL REVIEW NEEDED: "Insure" may have regulatory implications */}
         <View style={styles.actionsRowWide}>
           <WideActionButton
             label="Borrow"
@@ -561,7 +571,7 @@ const HomeScreen: React.FC = () => {
             disabled={holdingsValueIrr === 0}
           />
           <WideActionButton
-            label="Protect"
+            label="Insure Assets"
             onPress={() => setProtectionSheetVisible(true)}
             disabled={holdingsValueIrr === 0}
           />
@@ -836,13 +846,23 @@ const styles = StyleSheet.create({
     gap: SPACING[2],
     marginTop: SPACING[2],
   },
-  mainActionButton: {
+  mainActionWrapper: {
     flex: 1,
+    alignItems: 'center',
+  },
+  mainActionButton: {
+    width: '100%',
     backgroundColor: COLORS.background.elevated,
     borderRadius: RADIUS.lg,
     paddingVertical: SPACING[4],
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  disabledHint: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.text.muted,
+    marginTop: SPACING[1],
+    textAlign: 'center',
   },
   mainActionButtonDisabled: {
     opacity: 0.5,
