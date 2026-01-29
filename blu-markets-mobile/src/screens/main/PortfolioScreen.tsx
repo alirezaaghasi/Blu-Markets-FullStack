@@ -177,7 +177,7 @@ const PortfolioScreen: React.FC = () => {
 
         {/* Total Value Card */}
         <View style={styles.valueCard}>
-          <Text style={styles.valueLabel}>Total Holdings Value</Text>
+          <Text style={styles.valueLabel}>Total Value</Text>
           <Text style={styles.valueAmount}>{formatIRR(holdingsValueIRR)}</Text>
           <Text style={styles.cashLabel}>+ {formatIRR(cashIRR)} cash</Text>
         </View>

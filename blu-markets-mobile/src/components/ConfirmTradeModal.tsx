@@ -167,6 +167,27 @@ export const ConfirmTradeModal: React.FC<ConfirmTradeModalProps> = ({
                 {preview.before && preview.after && preview.target && (
                 <View style={styles.allocationSection}>
                   <Text style={styles.sectionTitle}>Allocation Impact</Text>
+                  {/* UX-012: Describe the main allocation change */}
+                  {(() => {
+                    const layers = ['FOUNDATION', 'GROWTH', 'UPSIDE'] as const;
+                    const changes = layers.map(l => ({
+                      layer: l,
+                      before: Math.round((preview.before?.[l] ?? 0) * 100),
+                      after: Math.round((preview.after?.[l] ?? 0) * 100),
+                      diff: Math.round((preview.after?.[l] ?? 0) * 100) - Math.round((preview.before?.[l] ?? 0) * 100),
+                    }));
+                    const biggest = changes.reduce((a, b) => Math.abs(b.diff) > Math.abs(a.diff) ? b : a);
+                    if (Math.abs(biggest.diff) >= 1) {
+                      const direction = biggest.diff > 0 ? 'increase' : 'decrease';
+                      const name = biggest.layer.charAt(0) + biggest.layer.slice(1).toLowerCase();
+                      return (
+                        <Text style={styles.allocationSummary}>
+                          Your {name} assets will {direction} from {biggest.before}% to {biggest.after}%
+                        </Text>
+                      );
+                    }
+                    return null;
+                  })()}
 
                   <View style={styles.allocationRow}>
                     <Text style={styles.allocationLabel}>Before</Text>
@@ -464,6 +485,12 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.xl,
     padding: SPACING[4],
     marginBottom: SPACING[4],
+  },
+  allocationSummary: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
+    marginBottom: SPACING[3],
+    fontStyle: 'italic',
   },
   sectionTitle: {
     fontSize: TYPOGRAPHY.fontSize.sm,

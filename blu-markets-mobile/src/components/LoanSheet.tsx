@@ -480,7 +480,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
                     <Text style={styles.summaryValue}>{formatIRR(Math.round(amountIRR + totalInterest))}</Text>
                   </View>
                   <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Monthly Payment</Text>
+                    <Text style={styles.summaryLabel}>6 Monthly Payments</Text>
                     <Text style={styles.summaryValue}>~{formatIRR(installmentAmount)}</Text>
                   </View>
                 </View>

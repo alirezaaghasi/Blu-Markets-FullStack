@@ -473,21 +473,18 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
               </View>
               <View>
                 <Text style={styles.assetName}>{asset?.name || holding.assetId}</Text>
+                {/* UX-026: Show asset name with ticker */}
                 <Text style={styles.assetQuantity}>
-                  {holding.quantity?.toFixed(6) || '0'} {holding.assetId}
+                  {holding.quantity?.toFixed(2) || '0'} of {asset?.name || holding.assetId} ({holding.assetId})
                 </Text>
               </View>
             </View>
+            {/* UX-025: Show IRR only, hide USD */}
             <View style={styles.assetValue}>
               <Text style={styles.assetValueLabel}>Value to Protect</Text>
               <Text style={styles.assetValueAmount}>
                 {formatIRR(holding.valueIrr || 0)}
               </Text>
-              {holding.valueUsd && (
-                <Text style={styles.assetValueUsd}>
-                  ${(holding.valueUsd || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} USD
-                </Text>
-              )}
             </View>
           </View>
 
@@ -615,7 +612,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
               <View style={styles.infoItem}>
                 <Text style={styles.infoBullet}>•</Text>
                 <Text style={styles.infoText}>
-                  If {holding.assetId} drops below today's price, you receive the difference
+                  If {holding.assetId} drops below today's price, we pay you the loss
                 </Text>
               </View>
               <View style={styles.infoItem}>

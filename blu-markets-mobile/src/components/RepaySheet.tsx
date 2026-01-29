@@ -132,7 +132,7 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
         // Show success modal for full settlement
         setSuccessResult({
           title: 'Loan Fully Settled!',
-          subtitle: 'Your collateral has been unfrozen',
+          subtitle: `Your ${asset.name} is now unlocked to trade again`,
           items: [
             { label: 'Amount Paid', value: `${formatNumber(repayAmount)} IRR` },
             { label: 'Collateral Released', value: asset.name, highlight: true },
@@ -323,7 +323,7 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
           {repayOption === 'FULL' && (
             <View style={styles.infoCard}>
               <Text style={styles.infoText}>
-                Settling your loan will unfreeze your {asset.name} collateral, allowing you to trade or use it again.
+                Paying off this loan unlocks your {asset.name} to trade again.
               </Text>
             </View>
           )}

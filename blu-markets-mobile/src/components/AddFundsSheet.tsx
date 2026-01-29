@@ -214,8 +214,7 @@ export const AddFundsSheet: React.FC<AddFundsSheetProps> = ({
             <View style={styles.infoCard}>
               <Text style={styles.infoIcon}>ℹ️</Text>
               <Text style={styles.infoText}>
-                Funds added will be available immediately as cash in your portfolio.
-                You can use them to buy assets or let our rebalancing system allocate them.
+                Funds added go to your Cash Wallet first. From there, you can buy assets or run a rebalance to invest them automatically.
               </Text>
             </View>
 
