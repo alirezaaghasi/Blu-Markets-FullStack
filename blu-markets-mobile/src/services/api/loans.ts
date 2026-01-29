@@ -54,25 +54,53 @@ function validateLoan(data: unknown): Loan | null {
                  typeof loan.totalDueIrr === 'number' ? loan.totalDueIrr : amountIRR,
     paidIRR: typeof loan.paidIRR === 'number' ? loan.paidIRR :
              typeof loan.paidIrr === 'number' ? loan.paidIrr : 0,
-    installments: Array.isArray(loan.installments) ? loan.installments : [],
+    // Backend provides remainingIrr directly
+    remainingIrr: typeof loan.remainingIrr === 'number' ? loan.remainingIrr :
+                  typeof loan.remainingIRR === 'number' ? loan.remainingIRR : undefined,
+    // Map installments with field name normalization (backend uses lowercase Irr)
+    installments: Array.isArray(loan.installments) ? loan.installments.map((inst: Record<string, unknown>) => ({
+      number: typeof inst.number === 'number' ? inst.number : 0,
+      dueISO: typeof inst.dueISO === 'string' ? inst.dueISO :
+              typeof inst.dueDate === 'string' ? inst.dueDate : new Date().toISOString(),
+      totalIRR: typeof inst.totalIRR === 'number' ? inst.totalIRR :
+                typeof inst.totalIrr === 'number' ? inst.totalIrr : 0,
+      paidIRR: typeof inst.paidIRR === 'number' ? inst.paidIRR :
+               typeof inst.paidIrr === 'number' ? inst.paidIrr : 0,
+      status: typeof inst.status === 'string' ? inst.status : 'PENDING',
+    })) : [],
     installmentsPaid: typeof loan.installmentsPaid === 'number' ? loan.installmentsPaid : 0,
   } as Loan;
 }
 
 function validateLoansResponse(data: unknown): LoansResponse {
-  if (!data || typeof data !== 'object') {
-    if (__DEV__) console.warn('[Loans API] Invalid response: not an object');
+  // Handle empty/null response
+  if (!data) {
+    if (__DEV__) console.warn('[Loans API] Invalid response: null or undefined');
     return { loans: [] };
   }
 
-  const response = data as Record<string, unknown>;
   const loans: Loan[] = [];
 
-  if (Array.isArray(response.loans)) {
-    for (const item of response.loans) {
-      const loan = validateLoan(item);
-      if (loan) loans.push(loan);
-      else if (__DEV__) console.warn('[Loans API] Skipping invalid loan:', item);
+  // Backend returns array directly, frontend expects { loans: [...] }
+  // Handle both formats for compatibility
+  let rawLoans: unknown[];
+  if (Array.isArray(data)) {
+    // Backend returns array directly
+    rawLoans = data;
+  } else if (typeof data === 'object' && Array.isArray((data as Record<string, unknown>).loans)) {
+    // Wrapped format { loans: [...] }
+    rawLoans = (data as Record<string, unknown>).loans as unknown[];
+  } else {
+    if (__DEV__) console.warn('[Loans API] Invalid response format:', data);
+    return { loans: [] };
+  }
+
+  for (const item of rawLoans) {
+    const loan = validateLoan(item);
+    if (loan) {
+      loans.push(loan);
+    } else if (__DEV__) {
+      console.warn('[Loans API] Skipping invalid loan:', item);
     }
   }
 
