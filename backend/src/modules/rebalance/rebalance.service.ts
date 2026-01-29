@@ -271,9 +271,17 @@ export async function executeRebalance(
         const newQuantity = toNumber(newQuantityDecimal);
         const netProceedsDecimal = roundIrr(multiply(trade.amountIrr, subtract(1, spread)));
 
+        // DIVERSIFICATION PROTECTION: Never delete holdings during rebalance
+        // Even if quantity becomes very small, keep the position to maintain diversification
+        // Only user-initiated sells should be able to close a position entirely
         if (isLessThan(newQuantityDecimal, 0.00000001)) {
-          await tx.holding.delete({ where: { id: holding.id } });
-          holdingsMap.delete(trade.assetId);
+          logger.warn('Rebalance attempted to liquidate position entirely - skipping to preserve diversification', {
+            assetId: trade.assetId,
+            originalQuantity: holding.quantity,
+            attemptedSellQuantity: toNumber(quantityToSellDecimal),
+          });
+          // Skip this trade rather than delete the holding
+          continue;
         } else {
           await tx.holding.update({
             where: { id: holding.id },
@@ -695,9 +703,19 @@ function generateLayerBuyTrades(
   return trades;
 }
 
+// DIVERSIFICATION PROTECTION: Never sell more than this percentage of any single asset
+// This prevents rebalancing from liquidating entire positions and destroying diversification
+const MAX_SELL_PERCENTAGE_PER_ASSET = 0.80; // 80% max - always keep at least 20%
+
+// Minimum value to keep per asset to maintain layer diversification
+const MIN_ASSET_VALUE_TO_KEEP = 5_000_000; // 5M IRR minimum position
+
 /**
  * Generate SELL trades for a layer using pro-rata allocation (PRD Section 7.3)
  * Sells from each asset proportionally to its current value within the layer
+ *
+ * DIVERSIFICATION FIX: Never sell more than 80% of any single asset to maintain
+ * layer diversification. Preferentially sells from larger positions.
  */
 function generateLayerSellTrades(
   layer: Layer,
@@ -708,32 +726,89 @@ function generateLayerSellTrades(
   const trades: RebalanceTrade[] = [];
   let remainingToSell = layerSellAmount;
 
-  // Sort unfrozen holdings by value (sell proportionally from each)
+  // Sort unfrozen holdings by value (largest first - sell more from bigger positions)
   const sortedHoldings = [...layerHoldings.unfrozen].sort((a, b) => b.valueIrr - a.valueIrr);
   const layerTotal = sortedHoldings.reduce((sum, h) => sum + h.valueIrr, 0);
 
   if (layerTotal <= 0) return trades;
 
+  // First pass: Calculate max sellable per asset while maintaining diversification
+  const maxSellable: Map<string, number> = new Map();
   for (const holding of sortedHoldings) {
-    if (remainingToSell < MIN_TRADE_AMOUNT) break;
+    // Max we can sell is 80% of value OR value minus minimum position, whichever is smaller
+    const maxByPercentage = holding.valueIrr * MAX_SELL_PERCENTAGE_PER_ASSET;
+    const maxByMinPosition = Math.max(0, holding.valueIrr - MIN_ASSET_VALUE_TO_KEEP);
+    maxSellable.set(holding.assetId, Math.min(maxByPercentage, maxByMinPosition));
+  }
 
-    // Pro-rata: sell proportion based on this asset's share of layer
-    const proportion = holding.valueIrr / layerTotal;
-    const sellAmount = Math.min(
-      layerSellAmount * proportion,  // Pro-rata amount
-      holding.valueIrr,               // Can't sell more than we have
-      remainingToSell                 // Don't exceed remaining need
-    );
+  // Second pass: Distribute sells proportionally but respect max limits
+  // We may need multiple iterations if some assets hit their cap
+  let iterations = 0;
+  const maxIterations = 5;
 
-    if (sellAmount >= MIN_TRADE_AMOUNT) {
-      trades.push({
-        side: 'SELL',
-        assetId: holding.assetId,
-        amountIrr: Math.round(sellAmount),
-        layer,
-      });
-      remainingToSell -= sellAmount;
+  while (remainingToSell >= MIN_TRADE_AMOUNT && iterations < maxIterations) {
+    iterations++;
+    const eligibleHoldings = sortedHoldings.filter(h => {
+      const maxForAsset = maxSellable.get(h.assetId) || 0;
+      const alreadySelling = trades.find(t => t.assetId === h.assetId)?.amountIrr || 0;
+      return maxForAsset - alreadySelling >= MIN_TRADE_AMOUNT;
+    });
+
+    if (eligibleHoldings.length === 0) break;
+
+    const eligibleTotal = eligibleHoldings.reduce((sum, h) => {
+      const maxForAsset = maxSellable.get(h.assetId) || 0;
+      const alreadySelling = trades.find(t => t.assetId === h.assetId)?.amountIrr || 0;
+      return sum + (maxForAsset - alreadySelling);
+    }, 0);
+
+    if (eligibleTotal <= 0) break;
+
+    let soldThisRound = 0;
+    for (const holding of eligibleHoldings) {
+      if (remainingToSell < MIN_TRADE_AMOUNT) break;
+
+      const maxForAsset = maxSellable.get(holding.assetId) || 0;
+      const alreadySelling = trades.find(t => t.assetId === holding.assetId)?.amountIrr || 0;
+      const remainingCapacity = maxForAsset - alreadySelling;
+
+      // Pro-rata based on remaining sellable capacity
+      const proportion = remainingCapacity / eligibleTotal;
+      const sellAmount = Math.min(
+        remainingToSell * proportion,
+        remainingCapacity,
+        remainingToSell
+      );
+
+      if (sellAmount >= MIN_TRADE_AMOUNT) {
+        const existingTrade = trades.find(t => t.assetId === holding.assetId);
+        if (existingTrade) {
+          existingTrade.amountIrr += Math.round(sellAmount);
+        } else {
+          trades.push({
+            side: 'SELL',
+            assetId: holding.assetId,
+            amountIrr: Math.round(sellAmount),
+            layer,
+          });
+        }
+        remainingToSell -= sellAmount;
+        soldThisRound += sellAmount;
+      }
     }
+
+    // If we couldn't sell anything this round, break to prevent infinite loop
+    if (soldThisRound < MIN_TRADE_AMOUNT) break;
+  }
+
+  // Log warning if we couldn't sell enough due to diversification protection
+  if (remainingToSell >= MIN_TRADE_AMOUNT) {
+    logger.warn('Rebalance: Could not fully reduce layer due to diversification protection', {
+      layer,
+      targetSell: layerSellAmount,
+      actualSell: layerSellAmount - remainingToSell,
+      shortfall: remainingToSell,
+    });
   }
 
   return trades;
