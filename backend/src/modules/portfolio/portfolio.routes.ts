@@ -57,6 +57,7 @@ export const portfolioRoutes: FastifyPluginAsync = async (app: FastifyInstance) 
               items: {
                 type: 'object',
                 properties: {
+                  id: { type: 'string' },  // Database ID for API calls (protection, loans)
                   assetId: { type: 'string' },
                   name: { type: 'string' },
                   quantity: { type: 'number' },
@@ -68,6 +69,7 @@ export const portfolioRoutes: FastifyPluginAsync = async (app: FastifyInstance) 
                   priceUsd: { type: 'number' },
                   change24hPct: { type: 'number' },
                   pctOfPortfolio: { type: 'number' },
+                  purchasedAt: { type: 'string' },  // For Fixed Income accrual
                 },
               },
             },
@@ -92,6 +94,7 @@ export const portfolioRoutes: FastifyPluginAsync = async (app: FastifyInstance) 
           items: {
             type: 'object',
             properties: {
+              id: { type: 'string' },  // Database ID for API calls (protection, loans)
               assetId: { type: 'string' },
               name: { type: 'string' },
               quantity: { type: 'number' },
@@ -103,6 +106,7 @@ export const portfolioRoutes: FastifyPluginAsync = async (app: FastifyInstance) 
               priceIrr: { type: 'number' },
               change24hPct: { type: 'number' },
               pctOfPortfolio: { type: 'number' },
+              purchasedAt: { type: 'string' },  // For Fixed Income accrual
             },
           },
         },
