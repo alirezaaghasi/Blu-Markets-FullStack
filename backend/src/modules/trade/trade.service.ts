@@ -1,6 +1,6 @@
 import { prisma } from '../../config/database.js';
 import { AppError } from '../../middleware/error-handler.js';
-import { getAssetPrice, getCurrentFxRate } from '../../services/price-fetcher.service.js';
+import { getAssetPrice, getCurrentFxRate, getCurrentPrices } from '../../services/price-fetcher.service.js';
 import { logger } from '../../utils/logger.js';
 import {
   getPortfolioSnapshot,
@@ -45,28 +45,44 @@ function getSpreadForAsset(assetId: AssetId): number {
 
 // AUDIT FIX #2: Helper to compute allocation from actual holdings
 // This ensures ledger snapshots reflect actual state, not stale preview data
+// TYPE SAFETY FIX: Use proper types and Decimal arithmetic
 function computeAllocationFromHoldings(
-  holdings: { assetId: string; quantity: any; layer: string }[],
+  holdings: { assetId: string; quantity: number | string | Decimal; layer: string }[],
   priceMap: Map<string, number>
 ): TargetAllocation {
-  const layerValues: Record<Layer, number> = { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
-  let totalValue = 0;
+  let foundationValue = toDecimal(0);
+  let growthValue = toDecimal(0);
+  let upsideValue = toDecimal(0);
+  let totalValue = toDecimal(0);
 
   for (const holding of holdings) {
     const price = priceMap.get(holding.assetId) || 0;
-    const value = Number(holding.quantity) * price;
-    totalValue += value;
-    layerValues[holding.layer as Layer] += value;
+    const quantityDecimal = toDecimal(holding.quantity);
+    const value = multiply(quantityDecimal, price);
+    totalValue = add(totalValue, value);
+
+    switch (holding.layer as Layer) {
+      case 'FOUNDATION':
+        foundationValue = add(foundationValue, value);
+        break;
+      case 'GROWTH':
+        growthValue = add(growthValue, value);
+        break;
+      case 'UPSIDE':
+        upsideValue = add(upsideValue, value);
+        break;
+    }
   }
 
-  if (totalValue === 0) {
+  const totalNum = toNumber(totalValue);
+  if (totalNum === 0) {
     return { foundation: 0, growth: 0, upside: 0 };
   }
 
   return {
-    foundation: (layerValues.FOUNDATION / totalValue) * 100,
-    growth: (layerValues.GROWTH / totalValue) * 100,
-    upside: (layerValues.UPSIDE / totalValue) * 100,
+    foundation: toNumber(multiply(divide(foundationValue, totalValue), 100)),
+    growth: toNumber(multiply(divide(growthValue, totalValue), 100)),
+    upside: toNumber(multiply(divide(upsideValue, totalValue), 100)),
   };
 }
 
@@ -486,13 +502,15 @@ export async function executeTrade(
     }
 
     // AUDIT FIX #2: Compute allocation from actual holdings, not stale preview
-    // Build price map for allocation calculation
+    // AUDIT FIX #8: Batch fetch all prices at once to avoid N+1 queries
+    // getCurrentPrices() uses a 5-second cache and fetches all prices in one query
+    const allPrices = await getCurrentPrices();
     const priceMap = new Map<string, number>();
-    priceMap.set(assetId, priceIrr);
+    priceMap.set(assetId, priceIrr); // Use transaction-locked price for traded asset
     for (const h of currentPortfolio.holdings) {
       if (!priceMap.has(h.assetId)) {
-        const hp = await getAssetPrice(h.assetId as AssetId);
-        if (hp) priceMap.set(h.assetId, hp.priceIrr);
+        const cachedPrice = allPrices.get(h.assetId as AssetId);
+        if (cachedPrice) priceMap.set(h.assetId, cachedPrice.priceIrr);
       }
     }
 

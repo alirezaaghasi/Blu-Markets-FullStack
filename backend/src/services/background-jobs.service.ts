@@ -4,6 +4,7 @@ import { prisma } from '../config/database.js';
 import { env } from '../config/env.js';
 import { getCurrentPrices } from './price-fetcher.service.js';
 import { logger } from '../utils/logger.js';
+import { toDecimal, multiply, subtract, divide, toNumber, max } from '../utils/money.js';
 import type { AssetId } from '../types/domain.js';
 
 // Critical LTV threshold for auto-liquidation (90%)
@@ -79,10 +80,17 @@ async function runLoanLiquidationCheck(): Promise<void> {
         continue;
       }
 
-      // Calculate current collateral value
-      const collateralValueIrr = Number(loan.collateralQuantity) * price.priceIrr;
+      // FINANCIAL FIX: Use Decimal arithmetic for precise LTV calculations
+      // Prevents floating-point errors that could cause false liquidations
+      const collateralQtyDecimal = toDecimal(loan.collateralQuantity);
+      const collateralValueDecimal = multiply(collateralQtyDecimal, price.priceIrr);
+      const collateralValueIrr = toNumber(collateralValueDecimal);
+
       // Guard against negative remaining due (e.g., overpayment edge case)
-      const remainingDue = Math.max(0, Number(loan.totalDueIrr) - Number(loan.paidIrr));
+      const totalDueDecimal = toDecimal(loan.totalDueIrr);
+      const paidDecimal = toDecimal(loan.paidIrr);
+      const remainingDueDecimal = max(toDecimal(0), subtract(totalDueDecimal, paidDecimal));
+      const remainingDue = toNumber(remainingDueDecimal);
 
       // Guard against division by zero
       if (collateralValueIrr <= 0) {
@@ -91,8 +99,9 @@ async function runLoanLiquidationCheck(): Promise<void> {
         continue;
       }
 
-      // Calculate current LTV
-      const currentLtv = remainingDue / collateralValueIrr;
+      // Calculate current LTV using Decimal arithmetic
+      const currentLtvDecimal = divide(remainingDueDecimal, collateralValueDecimal);
+      const currentLtv = toNumber(currentLtvDecimal);
 
       // Update LTV in database
       await prisma.loan.update({
@@ -125,21 +134,42 @@ async function liquidateLoan(
   remainingDue: number
 ): Promise<void> {
   await prisma.$transaction(async (tx) => {
-    // CRITICAL: Re-fetch loan with status check to prevent race conditions
-    // Another process might have already liquidated or repaid this loan
-    const loan = await tx.loan.findFirst({
-      where: {
-        id: loanId,
-        status: 'ACTIVE', // Only liquidate if still active
-      },
-      include: { portfolio: true },
-    });
+    // RACE CONDITION FIX: Use FOR UPDATE to lock the row and prevent concurrent processing
+    // This prevents races between repayment and liquidation flows
+    const lockedLoans = await tx.$queryRaw<Array<{
+      id: string;
+      status: string;
+      portfolio_id: string;
+      collateral_asset_id: string;
+      collateral_quantity: string;
+      total_due_irr: string;
+      paid_irr: string;
+    }>>`
+      SELECT l.*, p.id as portfolio_id
+      FROM loans l
+      JOIN portfolios p ON l.portfolio_id = p.id
+      WHERE l.id = ${loanId}::uuid AND l.status = 'ACTIVE'
+      FOR UPDATE
+    `;
 
     // If loan not found or not active, it was already processed
-    if (!loan) {
+    if (!lockedLoans || lockedLoans.length === 0) {
       logger.info('Loan already processed or not found, skipping', { loanId });
       return;
     }
+
+    const loanRow = lockedLoans[0];
+    // Reconstruct loan object from raw query result
+    const loan = {
+      id: loanRow.id,
+      status: loanRow.status,
+      portfolioId: loanRow.portfolio_id,
+      collateralAssetId: loanRow.collateral_asset_id,
+      collateralQuantity: loanRow.collateral_quantity,
+      totalDueIrr: loanRow.total_due_irr,
+      paidIrr: loanRow.paid_irr,
+      portfolio: { id: loanRow.portfolio_id },
+    };
 
     // Calculate proceeds (collateral value minus any excess)
     const proceeds = Math.min(collateralValueIrr, remainingDue);

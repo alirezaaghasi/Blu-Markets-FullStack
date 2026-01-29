@@ -294,34 +294,35 @@ export const protectionRoutes: FastifyPluginAsync = async (app: FastifyInstance)
         // Use the reserved quote for the purchase
         const freshQuote = reservedQuote;
 
-        // Get portfolio and verify cash balance
-        const portfolio = await prisma.portfolio.findUnique({
-          where: { userId },
-          include: {
-            holdings: true,
-            protections: { where: { status: 'ACTIVE' } },
-          },
-        });
-
-        if (!portfolio) {
-          throw new AppError('NOT_FOUND', 'Portfolio not found', 404);
-        }
-
-        // Verify sufficient cash
-        if (Number(portfolio.cashIrr) < freshQuote.premiumIrr) {
-          throw new AppError('INSUFFICIENT_CASH', 'Not enough cash for premium', 400, {
-            required: freshQuote.premiumIrr,
-            available: Number(portfolio.cashIrr),
-          });
-        }
-
         // Calculate dates
         const startDate = new Date();
         const expiryDate = new Date(startDate);
         expiryDate.setDate(expiryDate.getDate() + body.durationDays);
 
         // Create protection in transaction
+        // FINANCIAL FIX: All checks moved inside transaction to prevent race conditions
         const protection = await prisma.$transaction(async (tx) => {
+          // CRITICAL: Fetch portfolio inside transaction to get consistent cash balance
+          const portfolio = await tx.portfolio.findUnique({
+            where: { userId },
+            include: {
+              holdings: true,
+              protections: { where: { status: 'ACTIVE' } },
+            },
+          });
+
+          if (!portfolio) {
+            throw new AppError('NOT_FOUND', 'Portfolio not found', 404);
+          }
+
+          // FINANCIAL FIX: Verify cash balance inside transaction to prevent double-spend
+          if (Number(portfolio.cashIrr) < freshQuote.premiumIrr) {
+            throw new AppError('INSUFFICIENT_CASH', 'Not enough cash for premium', 400, {
+              required: freshQuote.premiumIrr,
+              available: Number(portfolio.cashIrr),
+            });
+          }
+
           // CRITICAL: Re-check that holding doesn't already have active protection
           // This prevents duplicate purchases from multiple cached quotes
           const existingProtection = await tx.protection.findFirst({
@@ -434,7 +435,9 @@ export const protectionRoutes: FastifyPluginAsync = async (app: FastifyInstance)
             },
           });
 
-          return newProtection;
+          // Return both protection and the new cash balance
+          const newCashIrr = Number(portfolio.cashIrr) - freshQuote.premiumIrr;
+          return { protection: newProtection, newCashIrr };
         });
 
         // SUCCESS: Consume the quote to prevent reuse
@@ -442,19 +445,19 @@ export const protectionRoutes: FastifyPluginAsync = async (app: FastifyInstance)
 
         return {
           protection: {
-            id: protection.id,
-            assetId: protection.assetId,
-            coveragePct: Number(protection.coveragePct),
-            notionalIrr: Number(protection.notionalIrr),
-            strikeIrr: Number(protection.strikeIrr),
-            premiumIrr: Number(protection.premiumIrr),
-            premiumPct: Number(protection.premiumPct),
-            durationDays: protection.durationDays,
-            startDate: protection.startDate.toISOString(),
-            expiryDate: protection.expiryDate.toISOString(),
-            status: protection.status,
+            id: protection.protection.id,
+            assetId: protection.protection.assetId,
+            coveragePct: Number(protection.protection.coveragePct),
+            notionalIrr: Number(protection.protection.notionalIrr),
+            strikeIrr: Number(protection.protection.strikeIrr),
+            premiumIrr: Number(protection.protection.premiumIrr),
+            premiumPct: Number(protection.protection.premiumPct),
+            durationDays: protection.protection.durationDays,
+            startDate: protection.protection.startDate.toISOString(),
+            expiryDate: protection.protection.expiryDate.toISOString(),
+            status: protection.protection.status,
           },
-          newCashIrr: Number(portfolio.cashIrr) - freshQuote.premiumIrr,
+          newCashIrr: protection.newCashIrr,
         };
       } catch (error) {
         // FAILURE: Release the quote so it can be used again

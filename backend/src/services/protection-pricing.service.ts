@@ -23,6 +23,7 @@ import {
 import { getCurrentPrices } from './price-fetcher.service.js';
 import { AppError } from '../middleware/error-handler.js';
 import { logger } from '../utils/logger.js';
+import { toDecimal, multiply, toNumber, roundIrr } from '../utils/money.js';
 import type { AssetId, Layer } from '../types/domain.js';
 
 // ============================================================================
@@ -535,11 +536,19 @@ export async function getProtectionQuote(
 
   const fxRate = priceData.priceIrr / priceData.priceUsd;
 
-  // Calculate notional
-  const holdingValueUsd = Number(holding.quantity) * spotPriceUsd;
-  const holdingValueIrr = Number(holding.quantity) * spotPriceIrr;
-  const notionalUsd = holdingValueUsd * coveragePct;
-  const notionalIrr = holdingValueIrr * coveragePct;
+  // FINANCIAL FIX: Use Decimal arithmetic for precise money calculations
+  // Prevents floating-point errors especially with large IRR values
+  const quantityDecimal = toDecimal(holding.quantity);
+  const holdingValueUsdDecimal = multiply(quantityDecimal, spotPriceUsd);
+  const holdingValueIrrDecimal = multiply(quantityDecimal, spotPriceIrr);
+  const notionalUsdDecimal = multiply(holdingValueUsdDecimal, coveragePct);
+  const notionalIrrDecimal = multiply(holdingValueIrrDecimal, coveragePct);
+
+  // Convert back to numbers for subsequent calculations
+  const holdingValueUsd = toNumber(holdingValueUsdDecimal);
+  const holdingValueIrr = toNumber(holdingValueIrrDecimal);
+  const notionalUsd = toNumber(notionalUsdDecimal);
+  const notionalIrr = toNumber(roundIrr(notionalIrrDecimal));
 
   // Validate minimum notional
   if (notionalIrr < MIN_NOTIONAL_IRR) {
@@ -584,9 +593,11 @@ export async function getProtectionQuote(
   const maxPremium = (MAX_PREMIUM_30D[assetId] || 0.10) * (durationDays / 30);
   totalPremiumPct = Math.max(minPremium, Math.min(maxPremium, totalPremiumPct));
 
-  // Calculate premium amounts
-  const premiumUsd = notionalUsd * totalPremiumPct;
-  const premiumIrr = notionalIrr * totalPremiumPct;
+  // FINANCIAL FIX: Use Decimal arithmetic for premium calculations
+  const premiumUsdDecimal = multiply(notionalUsdDecimal, totalPremiumPct);
+  const premiumIrrDecimal = multiply(notionalIrrDecimal, totalPremiumPct);
+  const premiumUsd = toNumber(premiumUsdDecimal);
+  const premiumIrr = toNumber(roundIrr(premiumIrrDecimal));
 
   // Calculate Greeks
   const greeks = calculatePutGreeks(spotPriceUsd, strikeUsd, timeYears, impliedVolatility, RISK_FREE_RATE);

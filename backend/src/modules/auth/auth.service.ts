@@ -6,8 +6,7 @@ import { AppError } from '../../middleware/error-handler.js';
 import { logger } from '../../utils/logger.js';
 import type { AuthTokens } from '../../types/api.js';
 
-const REFRESH_TOKEN_EXPIRY_DAYS = 7;
-
+// SECURITY FIX: Parse expiry string to seconds
 function parseExpiry(expiry: string): number {
   const match = expiry.match(/^(\d+)([smhd])$/);
   if (!match) return 900; // Default 15 minutes
@@ -28,6 +27,10 @@ function parseExpiry(expiry: string): number {
       return 900;
   }
 }
+
+// SECURITY FIX: Derive session expiry from JWT_REFRESH_EXPIRY to ensure consistency
+// Previously, session expiry was hard-coded to 7 days while JWT expiry came from env
+const REFRESH_TOKEN_EXPIRY_SECONDS = parseExpiry(env.JWT_REFRESH_EXPIRY);
 
 // Create JWT signers and verifiers with separate secrets for access and refresh tokens
 const signAccessToken = createSigner({ key: env.JWT_ACCESS_SECRET, expiresIn: parseExpiry(env.JWT_ACCESS_EXPIRY) * 1000 });
@@ -102,7 +105,8 @@ export class AuthService {
     ipAddress?: string,
     existingSessionId?: string // For rotation - update existing session instead of creating new
   ): Promise<AuthTokens> {
-    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+    // SECURITY FIX: Use consistent expiry derived from JWT_REFRESH_EXPIRY env variable
+    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_SECONDS * 1000);
 
     // Generate access JWT
     const accessToken = signAccessToken({

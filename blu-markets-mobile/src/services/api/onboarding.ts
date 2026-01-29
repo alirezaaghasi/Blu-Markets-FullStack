@@ -2,13 +2,51 @@
 // src/services/api/onboarding.ts
 
 import { apiClient } from './client';
-import type { QuestionnaireResponse, PortfolioResponse, TargetLayerPct } from './types';
+import type { QuestionnaireResponse, PortfolioResponse, TargetLayerPct, Holding, AssetId, Layer, PortfolioStatus } from './types';
 
 interface QuestionnaireAnswer {
   questionId: string;
   answerId: string;
   value: number;
   flag?: string; // Pathological user flags: panic_seller, gambler, high_proportion, inexperienced
+}
+
+// TYPE SAFETY FIX #9: Define proper types for backend API responses
+// These types handle both camelCase and snake_case field naming conventions from the API
+// Note: apiClient.post returns unwrapped data due to response interceptor
+interface BackendQuestionnaireResponse {
+  riskScore?: number;
+  risk_score?: number;
+  score?: number;
+  riskTier?: string;
+  risk_tier?: string;
+  profileName?: string;
+  profile_name?: string;
+  targetAllocation?: Record<string, number>;
+  target_allocation?: Record<string, number>;
+}
+
+interface BackendHolding {
+  assetId: string;
+  holdingId?: string;
+  quantity: number | string;
+  layer: string;
+  valueIrr?: number;
+  frozen?: boolean;
+}
+
+interface BackendPortfolioResponse {
+  cashIrr?: number;
+  cash_irr?: number;
+  holdings?: BackendHolding[];
+  targetAllocation?: Record<string, number>;
+  target_allocation?: Record<string, number>;
+  status?: string;
+  totalValueIrr?: number;
+  total_value_irr?: number;
+  totalValue?: number;
+  dailyChangePercent?: number;
+  daily_change_percent?: number;
 }
 
 /**
@@ -36,8 +74,9 @@ function normalizeAllocation(allocation: Record<string, number> | undefined): Ta
 
 /**
  * Normalize backend questionnaire response to match mobile QuestionnaireResponse type
+ * TYPE SAFETY FIX #9: Use proper types instead of `any`
  */
-function normalizeQuestionnaireResponse(data: any): QuestionnaireResponse {
+function normalizeQuestionnaireResponse(data: BackendQuestionnaireResponse): QuestionnaireResponse {
   return {
     riskScore: data.riskScore ?? data.risk_score ?? data.score ?? 5,
     riskTier: data.riskTier ?? data.risk_tier ?? 'MEDIUM',
@@ -47,14 +86,30 @@ function normalizeQuestionnaireResponse(data: any): QuestionnaireResponse {
 }
 
 /**
- * Normalize backend portfolio response to match mobile PortfolioResponse type
+ * Transform backend holdings array to frontend Holding[] type
+ * TYPE SAFETY FIX #9: Properly transform backend fields to frontend types
  */
-function normalizePortfolioResponse(data: any): PortfolioResponse {
+function normalizeHoldings(backendHoldings: BackendHolding[] | undefined): Holding[] {
+  if (!backendHoldings) return [];
+  return backendHoldings.map((h) => ({
+    id: h.holdingId,
+    assetId: h.assetId as AssetId,
+    quantity: typeof h.quantity === 'string' ? parseFloat(h.quantity) : h.quantity,
+    frozen: h.frozen ?? false,
+    layer: h.layer as Layer,
+  }));
+}
+
+/**
+ * Normalize backend portfolio response to match mobile PortfolioResponse type
+ * TYPE SAFETY FIX #9: Use proper types instead of `any`
+ */
+function normalizePortfolioResponse(data: BackendPortfolioResponse): PortfolioResponse {
   return {
     cashIrr: data.cashIrr ?? data.cash_irr ?? 0,
-    holdings: data.holdings ?? [],
+    holdings: normalizeHoldings(data.holdings),
     targetAllocation: normalizeAllocation(data.targetAllocation ?? data.target_allocation),
-    status: data.status ?? 'IDLE',
+    status: (data.status ?? 'IDLE') as PortfolioStatus,
     totalValueIrr: data.totalValueIrr ?? data.total_value_irr ?? data.totalValue ?? 0,
     dailyChangePercent: data.dailyChangePercent ?? data.daily_change_percent ?? 0,
   };
@@ -62,7 +117,8 @@ function normalizePortfolioResponse(data: any): PortfolioResponse {
 
 export const onboarding = {
   submitQuestionnaire: async (answers: QuestionnaireAnswer[]): Promise<QuestionnaireResponse> => {
-    const data = await apiClient.post('/onboarding/questionnaire', { answers });
+    // apiClient.post returns unwrapped data due to response interceptor
+    const data = await apiClient.post('/onboarding/questionnaire', { answers }) as unknown as BackendQuestionnaireResponse;
     return normalizeQuestionnaireResponse(data);
   },
 
@@ -71,10 +127,11 @@ export const onboarding = {
       consentRisk: true,
       consentLoss: true,
       consentNoGuarantee: true,
-    }),
+    }) as unknown as Promise<{ success: boolean }>,
 
   createPortfolio: async (amountIrr: number): Promise<PortfolioResponse> => {
-    const data = await apiClient.post('/onboarding/initial-funding', { amountIrr });
+    // apiClient.post returns unwrapped data due to response interceptor
+    const data = await apiClient.post('/onboarding/initial-funding', { amountIrr }) as unknown as BackendPortfolioResponse;
     return normalizePortfolioResponse(data);
   },
 };
