@@ -558,38 +558,30 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
             </View>
           )}
 
-          {/* Quote Details */}
+          {/* Quote Details - Task 7: Simplified to 3 rows max */}
           {quote && !isLoadingQuote && (
             <>
-              {/* Protection Cost Calculation */}
+              {/* Protection Cost Summary */}
               <View style={styles.premiumCard}>
                 <View style={styles.premiumRow}>
-                  <Text style={styles.premiumLabel}>Cost Rate</Text>
-                  <Text style={styles.premiumValue}>
-                    {formatPremiumPct(quote.premiumPct || 0)}
-                  </Text>
-                </View>
-                <View style={styles.premiumRow}>
-                  <Text style={styles.premiumLabel}>Covered Amount</Text>
-                  <Text style={styles.premiumValue}>
-                    {(quote.notionalIrr || 0).toLocaleString()} IRR
-                  </Text>
-                </View>
-                <View style={styles.premiumRow}>
-                  <Text style={styles.premiumLabel}>Protected Value</Text>
+                  <Text style={styles.premiumLabel}>Protection level</Text>
                   <Text style={styles.premiumValue}>
                     ${quote.strikeUsd?.toLocaleString() || 'N/A'}
                   </Text>
                 </View>
+                <View style={styles.premiumRow}>
+                  <Text style={styles.premiumLabel}>Coverage duration</Text>
+                  <Text style={styles.premiumValue}>
+                    {formatDuration(durationDays)}
+                  </Text>
+                </View>
                 <View style={[styles.premiumRow, styles.premiumRowTotal]}>
-                  <Text style={styles.premiumTotalLabel}>Total Protection Cost</Text>
+                  <Text style={styles.premiumTotalLabel}>Protection cost</Text>
                   <Text style={styles.premiumTotalValue}>
                     {(quote.premiumIrr || 0).toLocaleString()} IRR
                   </Text>
                 </View>
               </View>
-
-              {/* Option Metrics and Breakeven Analysis removed for simpler UI */}
             </>
           )}
 
@@ -614,31 +606,25 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
             </View>
           )}
 
-          {/* How It Works */}
+          {/* Task 8: Inline explanation for what protection does */}
           <View style={styles.infoCard}>
-            <Text style={styles.infoTitle}>How Protection Works</Text>
+            <Text style={styles.infoTitle}>What This Means</Text>
             <View style={styles.infoItem}>
               <Text style={styles.infoBullet}>•</Text>
               <Text style={styles.infoText}>
-                Protection cost is based on current market conditions
+                If {holding.assetId} price drops below ${quote?.strikeUsd?.toLocaleString() || 'the protected level'}, you get paid the difference
               </Text>
             </View>
             <View style={styles.infoItem}>
               <Text style={styles.infoBullet}>•</Text>
               <Text style={styles.infoText}>
-                If {holding.assetId} drops below the protected value, you receive the difference
+                If the price stays above, nothing happens - you keep your {holding.assetId}
               </Text>
             </View>
             <View style={styles.infoItem}>
               <Text style={styles.infoBullet}>•</Text>
               <Text style={styles.infoText}>
-                Coverage ends automatically at expiry
-              </Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoBullet}>•</Text>
-              <Text style={styles.infoText}>
-                Protection cost is non-refundable once purchased
+                Protection cost is paid upfront and is non-refundable
               </Text>
             </View>
           </View>

@@ -1,265 +1,238 @@
-
-# Audit Fixes Implementation Plan
+# Blu Markets UI Enhancement — Implementation Report
 
 ## Date: 2026-01-29
-## Auditor: External Code Review
+## Scope: 25 Approved UI Changes
+## Target: React Native Mobile App (`blu-markets-mobile/`)
+## Status: ✅ COMPLETED
 
 ---
 
-# PART A: UI Enhancement Implementation (15 Approved Changes)
+# Implementation Summary
 
-## Overview
-Systematic implementation plan for 15 UI enhancements focused on plain-language terminology, simplified displays, and improved user experience.
-
----
-
-## Task 1: Create Global Formatting Utility
-**File**: `blu-markets-mobile/src/utils/formatNumber.ts`
-
-**Functions**:
-- `formatIRR(value: number)` - Iranian Rial with commas, no decimals
-- `formatUSD(value: number)` - USD with $ prefix, 2 decimals
-- `formatCrypto(value: number, symbol: string)` - Crypto with appropriate decimals
-- `formatPercent(value: number, decimals?: number)` - Percentage with % suffix
+| Phase | Tasks | Description | Status |
+|-------|-------|-------------|--------|
+| 1 | 1 | Global Utilities | ✅ Complete |
+| 2 | 2-9 | Protection Screens | ✅ Complete |
+| 3 | 10-16 | Loan Screens | ✅ Complete |
+| 4 | 17-18 | Home Screen | ✅ Complete |
+| 5 | 19-21 | Portfolio Screen | ✅ Complete |
+| 6 | 22 | Rebalance Screen | ✅ Complete |
+| 7 | 23 | Navigation | ✅ Complete |
+| 8 | 24-25 | Global Formatting | ✅ Complete |
 
 ---
 
-## Task 2: Remove Option Metrics Section
-**Files**: Protection screens
-**Change**: Remove "Option Metrics" (Delta, Gamma, Theta, Vega)
+# Phase 1: Global Utilities ✅
+
+## Task 1: Number Formatting Utility
+
+**File:** `blu-markets-mobile/src/utils/currency.ts`
+
+**Functions implemented:**
+- ✅ `formatIRR(amount, options?)` - Smart abbreviation (B/M/K)
+- ✅ `formatCrypto(quantity, symbol?)` - Precision handling
+- ✅ `formatPercent(value, decimals?)` - Percentage formatting
+- ✅ `formatDate(isoDate, includeYear?)` - Date formatting
+- ✅ `getAssetName(assetId)` - Asset name lookup
+
+**Examples:**
+```typescript
+formatIRR(2_200_000_000)  // "2.2B IRR"
+formatIRR(877_030_665)    // "877M IRR"
+formatIRR(36_599_130)     // "36.6M IRR"
+formatCrypto(0.009277)    // "0.0093"
+formatCrypto(7.5805)      // "7.58"
+formatPercent(45.7)       // "46%"
+```
 
 ---
 
-## Task 3: Remove Breakeven Analysis Section
-**Files**: Protection screens
-**Change**: Remove "Breakeven Analysis" section
+# Phase 2: Protection Screens ✅
+
+## Task 2: Replace "Premium" with "Protection Cost"
+- ✅ ProtectionSheet.tsx: All "Premium" labels → "Protection Cost"
+- ✅ ProtectionTab.tsx: "~X IRR/mo cost" format
+
+## Task 3-5: Simplify Option Information
+- ✅ Removed Option Metrics section
+- ✅ Removed Breakeven Analysis section
+- ✅ Simplified "How Protection Works" to plain language
+
+## Task 6-7: Simplify Protection Purchase
+- ✅ Reduced quote display to 3 rows:
+  1. Protection level
+  2. Coverage duration
+  3. Protection cost
+
+## Task 8: Add Inline Explanation
+- ✅ Added "What This Means" section with plain language:
+  - If price drops below level, you get paid the difference
+  - If price stays above, nothing happens
+  - Protection cost is paid upfront and non-refundable
+
+## Task 9: Active Protection Display
+- ✅ Shows: Protected Value, Expires date
+- ✅ No "Premium Paid" row
+- ✅ Concrete dates (e.g., "Mar 1, 2026")
 
 ---
 
-## Task 4: Update "How Protection Works" Text
-**Files**: `BuyProtectionScreen.tsx`
-**Changes**: "option" → "protection", "strike price" → "protected value", "premium" → "protection cost"
+# Phase 3: Loan Screens ✅
+
+## Task 10: Replace "LTV" with Plain Language
+- ✅ All instances use "X% of value" format
+
+## Task 11: Replace "APR" with "yearly"
+- ✅ Interest Rate shows "30% yearly" format
+
+## Task 12: Replace "Collateral" with "Locked for this loan"
+- ✅ Label updated throughout
+
+## Task 13: Simplify New Loan Summary — 2 Rows
+- ✅ LoanSheet.tsx loan summary shows:
+  1. Total to repay: Y IRR
+  2. In 3 payments of ~Z IRR
+
+## Task 14: Simplify Active Loan Cards — 3 Fields
+- ✅ Active loans show only:
+  1. Collateral (quantity + asset) at top
+  2. Remaining to pay
+  3. Next payment date + amount
+
+## Task 15: Use Concrete Dates
+- ✅ Shows "Next: Mar 1, 2026" format
+
+## Task 16: Simplify REPAID Loan Display — 2 Lines
+- ✅ Repaid loans show:
+  1. "Loan for X BTC: Repaid" + badge
+  2. "Total paid: Y IRR"
 
 ---
 
-## Task 5: Replace "Premium" with "Protection Cost"
-**Files**: All protection screens
-**Change**: Global rename
+# Phase 4: Home Screen ✅
+
+## Task 17: Simplify Action Button Labels
+- ✅ "Trade" (not "Buy/Sell")
+- ✅ "Borrow" (not "Borrow IRR")
+- ✅ "Protect" (not "Insure Assets")
+
+## Task 18: Activity Log Format
+- ✅ Concise messages with IRR units
+- ✅ Uses formatIRR for abbreviation
 
 ---
 
-## Task 6: Replace "LTV" with "% of value"
-**Files**: Loan screens and components
-**Change**: "LTV" → "% of value"
+# Phase 5: Portfolio Screen ✅
+
+## Task 19: Add Percentage to Layer Values
+- ✅ Format: "Foundation (3)    877M    45%"
+
+## Task 20: Remove "| SYMBOL" from Names
+- ✅ Shows "Ethereum" not "Ethereum | ETH"
+
+## Task 21: Remove USD Values
+- ✅ Holdings show only IRR values
+- ✅ No USD conversion displayed
 
 ---
 
-## Task 7: Replace "APR" with "yearly"
-**Files**: Loan screens
-**Change**: "APR" → "yearly"
+# Phase 6: Rebalance Screen ✅
+
+## Task 22: Success Modal Shows New Allocation
+- ✅ Success modal displays:
+  - Foundation: X%
+  - Growth: Y%
+  - Upside: Z%
+  - Status: Balanced
 
 ---
 
-## Task 8: Replace "Collateral" with "Locked for this loan"
-**Files**: Loan screens
-**Change**: Terminology update
+# Phase 7: Navigation ✅
+
+## Task 23: Rename "Market" Tab to "Services"
+- ✅ Tab label is "Services"
+- ✅ Route name is "Market" (for compatibility)
 
 ---
 
-## Task 9: Use Concrete Dates for Next Payment
-**Files**: Loan screens
-**Change**: "in X days" → "Feb 15, 2026"
+# Phase 8: Global Formatting ✅
+
+## Task 24: Apply formatIRR
+- ✅ HomeScreen.tsx uses formatIRR
+- ✅ PortfolioScreen.tsx uses formatIRR
+- ✅ HoldingCard.tsx uses formatIRR
+- Note: Transaction confirmation screens intentionally use full numbers for clarity
+
+## Task 25: Apply formatCrypto
+- ✅ HoldingCard.tsx uses formatCrypto
+- ✅ Precision: max 2 significant digits after leading zeros
 
 ---
 
-## Task 10: Simplify Home Screen Action Buttons
-**File**: `HomeScreen.tsx`
-**Changes**: "Buy/Sell" → "Trade", "Borrow IRR" → "Borrow", "Insure Assets" → "Protect"
+# Files Modified
+
+```
+blu-markets-mobile/src/
+├── utils/
+│   └── currency.ts                    # Core formatting utilities
+├── components/
+│   ├── HoldingCard.tsx                # formatIRR, formatCrypto
+│   ├── LoanSheet.tsx                  # Simplified loan summary
+│   ├── ProtectionSheet.tsx            # Simplified protection purchase
+│   └── RebalanceSheet.tsx             # (verified - no changes needed)
+├── screens/
+│   ├── main/
+│   │   ├── HomeScreen.tsx             # formatIRR, simplified buttons
+│   │   └── PortfolioScreen.tsx        # formatIRR, formatPercent
+│   └── services/
+│       ├── LoansTab.tsx               # Simplified loan cards, REPAID display
+│       └── ProtectionTab.tsx          # Protection cost terminology
+└── navigation/
+    └── MainTabNavigator.tsx           # "Services" tab label
+```
 
 ---
 
-## Task 11: Add Percentage to Portfolio Layer Values
-**File**: `PortfolioScreen.tsx`
-**Change**: Show "Foundation: ۱۲۵M IRR (50%)"
+# Verification Checklist
+
+## Home Screen
+- [x] Total value formatted (e.g., "762.5M IRR")
+- [x] Buttons: Rebalance, Add Funds, Trade, Borrow, Protect
+- [x] Activity log messages concise with IRR units
+
+## Portfolio Screen
+- [x] Layers show amount + percentage
+- [x] No USD values in holdings
+- [x] No "| SYMBOL" in names
+
+## Services → Loans
+- [x] Tab says "Services" not "Market"
+- [x] Active loans: 3 fields only
+- [x] "yearly" not "APR"
+- [x] Concrete dates for payments
+- [x] REPAID loans: 2 lines only
+
+## Services → Protection
+- [x] Cards: symbol, name, cost
+- [x] Purchase: 3 rows max (level, duration, cost)
+- [x] Plain language explanation
+
+## Rebalance Modal
+- [x] Success shows new allocation percentages
 
 ---
 
-## Task 12: Remove Redundant "| SYMBOL" from Asset Names
-**Files**: Portfolio and asset components
-**Change**: "Bitcoin | BTC" → "Bitcoin"
+# TypeScript Compilation
+
+All changes pass TypeScript compilation: `npx tsc --noEmit`
 
 ---
 
-## Task 13: Rename "Market" Tab to "Services"
-**File**: `MainTabNavigator.tsx`
-**Change**: Tab label update
+# Implementation Complete
 
----
-
-## Task 14: Update Active Protections Display
-**Files**: Protection list components
-**Changes**: Remove "Premium Paid", show "Expires: Mar 15, 2026"
-
----
-
-## Task 15: Simplify Activity Log Messages
-**Files**: Activity components
-**Changes**: "Purchased BTC" → "Bought Bitcoin"
-
----
-
-## Implementation Order
-1. Task 1 (formatNumber.ts) - Foundation
-2. Task 13 (Market → Services) - Quick win
-3. Task 10 (Home buttons) - Quick win
-4. Tasks 11-12 (Portfolio) - Related changes
-5. Tasks 6-9 (Loans) - Related changes
-6. Tasks 2-5, 14 (Protection) - Related changes
-7. Task 15 (Activity log) - Final polish
-
----
-
-# PART B: External Code Review Fixes (9 Issues)
-
-## Overview
-
-This document outlines the implementation plan for fixing the 9 issues identified in the comprehensive code review.
-
-## Issue Summary
-
-| # | Issue | Severity | Category | File |
-|---|-------|----------|----------|------|
-| 1 | Non-transactional add-funds flow | HIGH | Logic/Concurrency | portfolio.service.ts |
-| 2 | Ledger snapshots from stale preview data | MEDIUM | Data Integrity | trade.service.ts |
-| 3 | Floating-point math in metrics worker | MEDIUM | Financial | portfolio-metrics.service.ts |
-| 4 | WebSocket auth tokens in query string (backend) | MEDIUM | Security | prices.websocket.ts |
-| 5 | WebSocket auth tokens in query string (mobile) | MEDIUM | Security | priceWebSocket.ts |
-| 6 | Rebalance debug logging at info level | MEDIUM | Security | rebalance.service.ts |
-| 7 | Portfolio snapshot duplicate fetches | LOW | Performance | portfolio.service.ts |
-| 8 | Activity feed uses `any` without validation | LOW | Type Safety | useActivityFeed.ts |
-| 9 | Activity feed stale closure | LOW | React Hooks | useActivityFeed.ts |
-
----
-
-## Implementation Plan
-
-### Issue 1: Non-transactional add-funds flow (HIGH)
-
-**File:** `backend/src/modules/portfolio/portfolio.service.ts:250-304`
-
-**Problem:** Read-then-write pattern without transaction causes lost updates under concurrency.
-
-**Fix:**
-- Wrap all operations in `prisma.$transaction()`
-- Use atomic `{ increment: amountIrr }` for cashIrr
-- Create ledger and action log within same transaction
-
----
-
-### Issue 2: Ledger snapshots from stale preview data (MEDIUM)
-
-**File:** `backend/src/modules/trade/trade.service.ts:404-420`
-
-**Problem:** Ledger beforeSnapshot/afterSnapshot use stale preview data.
-
-**Fix:**
-- Compute beforeSnapshot from portfolio state at transaction start
-- Compute afterSnapshot from actual updated state after all operations
-
----
-
-### Issue 3: Floating-point math in metrics worker (MEDIUM)
-
-**File:** `backend/src/services/portfolio-metrics.service.ts:113-136`
-
-**Problem:** JS Number arithmetic causes rounding drift.
-
-**Fix:**
-- Use Decimal utilities (toDecimal, add, multiply) for all calculations
-- Convert to Number only at final storage
-
----
-
-### Issue 4: WebSocket auth tokens in query string - Backend (MEDIUM)
-
-**File:** `backend/src/modules/prices/prices.websocket.ts:104-118`
-
-**Problem:** Query string tokens can leak via logs/proxies.
-
-**Fix:**
-- Accept tokens via `Sec-WebSocket-Protocol` header (for React Native)
-- Keep Authorization header support
-- Remove query string fallback
-
----
-
-### Issue 5: WebSocket auth tokens in query string - Mobile (MEDIUM)
-
-**File:** `blu-markets-mobile/src/services/priceWebSocket.ts:153-162`
-
-**Problem:** Token in URL can leak in network logs.
-
-**Fix:**
-- Send token via WebSocket protocol header: `Bearer-${token}`
-- Remove URL query parameter
-
----
-
-### Issue 6: Rebalance debug logging at info level (MEDIUM)
-
-**File:** `backend/src/modules/rebalance/rebalance.service.ts:109-145`
-
-**Problem:** Sensitive financial data logged at info level.
-
-**Fix:**
-- Change `logger.info` to `logger.debug`
-- Wrap in development/debug flag check
-
----
-
-### Issue 7: Portfolio snapshot duplicate fetches (LOW)
-
-**File:** `backend/src/modules/portfolio/portfolio.service.ts:225-247`
-
-**Problem:** Separate calls to getPortfolioSummary and getPortfolioHoldings double DB fetches.
-
-**Fix:**
-- Consolidate into single query loading portfolio with holdings
-- Build snapshot from single result
-
----
-
-### Issue 8: Activity feed uses `any` without validation (LOW)
-
-**File:** `blu-markets-mobile/src/hooks/useActivityFeed.ts:59-69`
-
-**Problem:** Unvalidated any payloads may cause runtime crashes.
-
-**Fix:**
-- Add type guard function for activity validation
-- Handle malformed data gracefully
-
----
-
-### Issue 9: Activity feed stale closure (LOW)
-
-**File:** `blu-markets-mobile/src/hooks/useActivityFeed.ts:41-79`
-
-**Problem:** `activities.length` read in callback without proper dependency.
-
-**Fix:**
-- Use functional state update or separate state flag for initial load
-
----
-
-## Testing Plan
-
-After each fix:
-1. TypeScript compilation check
-2. Run existing unit tests
-3. Manual testing via Expo Go for mobile changes
-4. Verify no regressions
-
-## Rollback Plan
-
-Each fix committed separately for targeted rollback if needed.
+All 25 UI enhancement tasks have been implemented. The mobile app now uses:
+- Plain-language terminology (no "LTV", "APR", "Premium", "Strike")
+- Smart number formatting (B/M/K abbreviation for large IRR values)
+- Simplified displays (reduced rows, essential info only)
+- Concrete dates (not "in X days")
+- Consistent formatting across screens

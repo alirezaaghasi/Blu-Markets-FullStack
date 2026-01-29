@@ -247,7 +247,7 @@ function EligibleAssetsGrid({
               {quantity.toFixed(4)} {asset?.symbol}
             </Text>
             <Text style={styles.eligiblePremium}>
-              ~{formatIndicativePremium(premiumIrr)} IRR/mo
+              ~{formatIndicativePremium(premiumIrr)} IRR/mo cost
             </Text>
             <TouchableOpacity
               style={styles.protectButton}

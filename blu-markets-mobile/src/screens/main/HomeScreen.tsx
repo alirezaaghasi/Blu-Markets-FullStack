@@ -44,6 +44,7 @@ import { LoanSheet } from '../../components/LoanSheet';
 import { ProtectionSheet } from '../../components/ProtectionSheet';
 import { EmptyState } from '../../components/EmptyState';
 import { formatRelativeTime } from '../../utils/dateUtils';
+import { formatIRR } from '../../utils/currency';
 
 // =============================================================================
 // TYPES
@@ -54,20 +55,6 @@ type PortfolioStatus = 'BALANCED' | 'SLIGHTLY_OFF' | 'ATTENTION_REQUIRED';
 interface PortfolioStatusResult {
   status: PortfolioStatus;
   issues: string[];
-}
-
-// =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
-
-/**
- * Format IRR with appropriate suffix
- */
-function formatIRR(value: number): string {
-  if (value === undefined || value === null || isNaN(value)) return '0';
-  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`;
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  return value.toLocaleString('en-US');
 }
 
 /**
@@ -407,18 +394,18 @@ const HomeScreen: React.FC = () => {
       <View style={styles.valueSection}>
         {/* Total Holdings - ONE big number (backend-calculated) */}
         <Text style={styles.totalValueAmount}>
-          {formatIRR(totalValueIrr)} <Text style={styles.totalValueCurrency}>IRR</Text>
+          {formatIRR(totalValueIrr, { showUnit: false })} <Text style={styles.totalValueCurrency}>IRR</Text>
         </Text>
 
         {/* Compact row: Assets | Cash | View Portfolio */}
         <View style={styles.compactRow}>
           <View style={styles.compactItem}>
-            <Text style={styles.compactValue}>{formatIRR(holdingsValueIrr)}</Text>
+            <Text style={styles.compactValue}>{formatIRR(holdingsValueIrr, { showUnit: false })}</Text>
             <Text style={styles.compactLabel}>Assets</Text>
           </View>
           <View style={styles.compactDivider} />
           <View style={styles.compactItem}>
-            <Text style={styles.compactValue}>{formatIRR(cashIRR)}</Text>
+            <Text style={styles.compactValue}>{formatIRR(cashIRR, { showUnit: false })}</Text>
             <Text style={styles.compactLabel}>Cash</Text>
           </View>
           <View style={styles.compactDivider} />

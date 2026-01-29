@@ -20,17 +20,13 @@ import AllocationBar from '../../components/AllocationBar';
 import HoldingCard from '../../components/HoldingCard';
 import { EmptyState } from '../../components/EmptyState';
 import { portfolio as portfolioApi } from '../../services/api';
+import { formatIRR, formatPercent } from '../../utils/currency';
 
 // Layer configuration
 const LAYER_CONFIG: Record<Layer, { name: string; color: string }> = {
   FOUNDATION: { name: 'Foundation', color: COLORS.layers.foundation },
   GROWTH: { name: 'Growth', color: COLORS.layers.growth },
   UPSIDE: { name: 'Upside', color: COLORS.layers.upside },
-};
-
-const formatNumber = (num: number): string => {
-  if (num === undefined || num === null || isNaN(num)) return '0';
-  return num.toLocaleString('en-US');
 };
 
 const PortfolioScreen: React.FC = () => {
@@ -182,8 +178,8 @@ const PortfolioScreen: React.FC = () => {
         {/* Total Value Card */}
         <View style={styles.valueCard}>
           <Text style={styles.valueLabel}>Total Holdings Value</Text>
-          <Text style={styles.valueAmount}>{formatNumber(holdingsValueIRR)} IRR</Text>
-          <Text style={styles.cashLabel}>+ {formatNumber(cashIRR)} IRR cash</Text>
+          <Text style={styles.valueAmount}>{formatIRR(holdingsValueIRR)}</Text>
+          <Text style={styles.cashLabel}>+ {formatIRR(cashIRR)} cash</Text>
         </View>
 
         {/* Allocation Bar */}
@@ -221,8 +217,10 @@ const PortfolioScreen: React.FC = () => {
                   </View>
                   <View style={styles.layerHeaderRight}>
                     <Text style={styles.layerValue}>
-                      {formatNumber(layerValues[layer])} IRR
-                      <Text style={styles.layerPercent}> ({(currentAllocation[layer] * 100).toFixed(0)}%)</Text>
+                      {formatIRR(layerValues[layer], { showUnit: false })}
+                    </Text>
+                    <Text style={styles.layerPercent}>
+                      {formatPercent(currentAllocation[layer] * 100)}
                     </Text>
                     <Text style={styles.expandIcon}>{isExpanded ? '▼' : '▶'}</Text>
                   </View>

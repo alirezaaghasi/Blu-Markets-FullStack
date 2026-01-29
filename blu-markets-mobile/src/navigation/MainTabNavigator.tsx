@@ -1,6 +1,6 @@
 // Main Tab Navigator
 // Based on UI Restructure Specification - 4 Tabs Only
-// Home, Portfolio, Market, Profile
+// Home, Portfolio, Services (route: Market for compatibility), Profile
 
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';

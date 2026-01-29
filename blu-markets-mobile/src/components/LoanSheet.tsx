@@ -464,27 +464,19 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
                 </View>
               </View>
 
-              {/* Loan Preview */}
+              {/* Loan Preview - Task 13: Simplified to 2 rows */}
               {amountIRR > 0 && (
                 <View style={styles.previewCard}>
                   <Text style={styles.previewTitle}>Loan Summary</Text>
-                  <View style={styles.previewRow}>
-                    <Text style={styles.previewLabel}>Principal</Text>
-                    <Text style={styles.previewValue}>{formatNumber(amountIRR)} IRR</Text>
-                  </View>
-                  <View style={styles.previewRow}>
-                    <Text style={styles.previewLabel}>Interest ({(LOAN_ANNUAL_INTEREST_RATE * 100)}% yearly)</Text>
-                    <Text style={styles.previewValue}>{formatNumber(Math.round(totalInterest))} IRR</Text>
-                  </View>
                   <View style={[styles.previewRow, styles.previewRowTotal]}>
-                    <Text style={styles.previewTotalLabel}>Total to Repay</Text>
+                    <Text style={styles.previewTotalLabel}>Total to repay</Text>
                     <Text style={styles.previewTotalValue}>
                       {formatNumber(Math.round(amountIRR + totalInterest))} IRR
                     </Text>
                   </View>
                   <View style={styles.previewRow}>
-                    <Text style={styles.previewLabel}>Installments ({LOAN_INSTALLMENT_COUNT}x)</Text>
-                    <Text style={styles.previewValue}>~{formatNumber(installmentAmount)} IRR/each</Text>
+                    <Text style={styles.previewLabel}>In {LOAN_INSTALLMENT_COUNT} payments of</Text>
+                    <Text style={styles.previewValue}>~{formatNumber(installmentAmount)} IRR</Text>
                   </View>
                 </View>
               )}

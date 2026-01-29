@@ -288,9 +288,6 @@ function LoanCard({
   // Safety check for installments array
   const installments = loan.installments || [];
   const nextInstallment = installments.find((i) => i.status === 'PENDING');
-  const daysUntilDue = nextInstallment
-    ? Math.ceil((new Date(nextInstallment.dueISO).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-    : null;
 
   // BUG-012/BUG-020 FIX: Prefer backend-provided remainingIrr; calculation is fallback only
   // Backend loans.getAll API should return remainingIrr for each loan
@@ -302,6 +299,27 @@ function LoanCard({
       : (loan.totalDueIRR || loan.amountIRR) - (loan.paidIRR || 0)
   );
 
+  // Task 16: Simplified REPAID loan display
+  if (loan.status === 'REPAID') {
+    const totalPaid = loan.totalDueIRR || (loan.amountIRR + (loan.totalInterestIRR || 0));
+    return (
+      <View style={[styles.loanCard, highlighted && styles.loanCardHighlighted]}>
+        <View style={styles.repaidHeader}>
+          <Text style={styles.repaidTitle}>
+            Loan for {loan.collateralQuantity.toFixed(4)} {loan.collateralAssetId}: Repaid
+          </Text>
+          <View style={[styles.loanStatus, styles.loanStatusRepaid]}>
+            <Text style={[styles.loanStatusText, styles.loanStatusTextRepaid]}>REPAID</Text>
+          </View>
+        </View>
+        <Text style={styles.repaidTotal}>
+          Total paid: {(totalPaid ?? 0).toLocaleString()} IRR
+        </Text>
+      </View>
+    );
+  }
+
+  // Task 14: Active loans show only 3 fields - Collateral, Remaining, Next Payment
   return (
     <View style={[styles.loanCard, highlighted && styles.loanCardHighlighted]}>
       <View style={styles.loanHeader}>
@@ -311,43 +329,26 @@ function LoanCard({
           </Text>
           <Text style={styles.loanCollateralLabel}>Locked for this loan</Text>
         </View>
-        <View style={[
-          styles.loanStatus,
-          loan.status === 'REPAID' && styles.loanStatusRepaid,
-        ]}>
-          <Text style={[
-            styles.loanStatusText,
-            loan.status === 'REPAID' && styles.loanStatusTextRepaid,
-          ]}>
-            {loan.status}
-          </Text>
+        <View style={styles.loanStatus}>
+          <Text style={styles.loanStatusText}>{loan.status}</Text>
         </View>
       </View>
 
+      {/* Task 14: Simplified to Remaining only */}
       <View style={styles.loanDetails}>
         <View style={styles.loanDetailRow}>
-          <Text style={styles.loanDetailLabel}>Principal</Text>
-          <Text style={styles.loanDetailValue}>
-            {(loan.amountIRR ?? 0).toLocaleString()} IRR
-          </Text>
-        </View>
-        <View style={styles.loanDetailRow}>
-          <Text style={styles.loanDetailLabel}>Remaining</Text>
+          <Text style={styles.loanDetailLabel}>Remaining to pay</Text>
           <Text style={styles.loanDetailValue}>
             {(remainingIRR ?? 0).toLocaleString()} IRR
           </Text>
         </View>
-        <View style={styles.loanDetailRow}>
-          <Text style={styles.loanDetailLabel}>Interest Rate</Text>
-          {/* BUG-012 FIX: Prefer backend interestRate; dailyInterestRate*365 is fallback */}
-          <Text style={styles.loanDetailValue}>{((loan.interestRate ?? loan.dailyInterestRate * 365) * 100).toFixed(0)}% yearly</Text>
-        </View>
       </View>
 
+      {/* Task 14/15: Next payment with concrete date */}
       {nextInstallment && loan.status === 'ACTIVE' && (
         <View style={styles.nextPayment}>
           <Text style={styles.nextPaymentLabel}>
-            Next Payment: {new Date(nextInstallment.dueISO).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            Next: {new Date(nextInstallment.dueISO).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           </Text>
           <Text style={styles.nextPaymentValue}>
             {(nextInstallment.totalIRR ?? 0).toLocaleString()} IRR
@@ -481,6 +482,23 @@ const styles = StyleSheet.create({
   },
   loanStatusTextRepaid: {
     color: COLORS.text.muted,
+  },
+  // Task 16: Repaid loan styles
+  repaidHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING[2],
+  },
+  repaidTitle: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
+    color: COLORS.text.primary,
+    flex: 1,
+  },
+  repaidTotal: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
   },
   loanDetails: {
     borderTopWidth: 1,
