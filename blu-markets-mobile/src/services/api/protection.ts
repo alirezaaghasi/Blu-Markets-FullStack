@@ -145,9 +145,12 @@ export const protection = {
     // Fall back to requested coveragePct only if backend didn't return one
     const safeCoveragePct = backendQuote.coveragePct || coveragePct || 1;
 
-    // Calculate annualized premium percentage (guard against zero duration)
+    // BACKEND-DERIVED VALUES: Use backend-provided annualizedPct if available
+    // Only compute locally as fallback (guard against zero duration)
     const safeDurationDays = backendQuote.durationDays || durationDays || 30;
-    const annualizedPct = (backendQuote.premiumPct / safeDurationDays) * 365;
+    const annualizedPct = (backendQuote as Record<string, unknown>).annualizedPct !== undefined
+      ? Number((backendQuote as Record<string, unknown>).annualizedPct)
+      : (backendQuote.premiumPct / safeDurationDays) * 365;
 
     // Determine validity - prefer validity object, then backendQuote.validUntil
     // Only generate synthetic timestamp as last resort
@@ -159,12 +162,22 @@ export const protection = {
     const validForSeconds = validity?.secondsRemaining
       ?? Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000));
 
+    // BACKEND-DERIVED VALUES: Use backend-provided holding values if available
+    // Only compute from notional/coveragePct as fallback
+    const backendData = backendQuote as Record<string, unknown>;
+    const holdingValueIrr = backendData.holdingValueIrr !== undefined
+      ? Number(backendData.holdingValueIrr)
+      : backendQuote.notionalIrr / safeCoveragePct;
+    const holdingValueUsd = backendData.holdingValueUsd !== undefined
+      ? Number(backendData.holdingValueUsd)
+      : backendQuote.notionalUsd / safeCoveragePct;
+
     // Transform to frontend ProtectionQuote shape with safe defaults for optional fields
     const frontendQuote: ProtectionQuote = {
       quoteId: backendQuote.quoteId,
       assetId: backendQuote.assetId as AssetId,
-      holdingValueIrr: backendQuote.notionalIrr / safeCoveragePct,
-      holdingValueUsd: backendQuote.notionalUsd / safeCoveragePct,
+      holdingValueIrr,
+      holdingValueUsd,
       coveragePct: backendQuote.coveragePct,
       notionalIrr: backendQuote.notionalIrr,
       notionalUsd: backendQuote.notionalUsd,

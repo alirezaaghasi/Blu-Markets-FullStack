@@ -33,8 +33,21 @@ function normalizeAllocation(allocation: Record<string, number> | undefined): Ta
 
 /**
  * Normalize backend holding to frontend Holding type
+ * BACKEND-DERIVED VALUES: Forward valuation fields from backend, do NOT recompute
  */
 function normalizeHolding(h: Record<string, unknown>): Holding {
+  // Parse fixed income breakdown if present
+  const fixedIncomeRaw = h.fixedIncome ?? h.fixed_income;
+  const fixedIncome = fixedIncomeRaw && typeof fixedIncomeRaw === 'object'
+    ? {
+        principal: Number((fixedIncomeRaw as Record<string, unknown>).principal) || 0,
+        accruedInterest: Number((fixedIncomeRaw as Record<string, unknown>).accruedInterest ?? (fixedIncomeRaw as Record<string, unknown>).accrued_interest) || 0,
+        total: Number((fixedIncomeRaw as Record<string, unknown>).total) || 0,
+        daysHeld: Number((fixedIncomeRaw as Record<string, unknown>).daysHeld ?? (fixedIncomeRaw as Record<string, unknown>).days_held) || 0,
+        dailyRate: Number((fixedIncomeRaw as Record<string, unknown>).dailyRate ?? (fixedIncomeRaw as Record<string, unknown>).daily_rate) || 0,
+      }
+    : undefined;
+
   return {
     id: (h.id) as string | undefined,  // Database ID for API calls (protection, loans)
     assetId: (h.assetId ?? h.asset_id) as AssetId,
@@ -42,6 +55,12 @@ function normalizeHolding(h: Record<string, unknown>): Holding {
     frozen: Boolean(h.frozen),
     layer: (h.layer as Layer) || 'FOUNDATION',
     purchasedAt: (h.purchasedAt ?? h.purchased_at) as string | undefined,  // For Fixed Income accrual
+    // Backend-derived valuation fields (do NOT recompute on frontend)
+    valueIrr: h.valueIrr !== undefined ? Number(h.valueIrr) : (h.value_irr !== undefined ? Number(h.value_irr) : undefined),
+    valueUsd: h.valueUsd !== undefined ? Number(h.valueUsd) : (h.value_usd !== undefined ? Number(h.value_usd) : undefined),
+    priceIrr: h.priceIrr !== undefined ? Number(h.priceIrr) : (h.price_irr !== undefined ? Number(h.price_irr) : undefined),
+    priceUsd: h.priceUsd !== undefined ? Number(h.priceUsd) : (h.price_usd !== undefined ? Number(h.price_usd) : undefined),
+    fixedIncome,
   };
 }
 

@@ -1,11 +1,15 @@
 // Holding Card Component
 // Displays a single asset holding with value and status
+//
+// BACKEND-DERIVED VALUES: This component now prefers backend-calculated values
+// (holding.valueIrr, holding.fixedIncome) over client-side calculations.
+// Client-side fallbacks exist only for demo/mock mode.
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../constants/theme';
 import { Holding, AssetId } from '../types';
 import { ASSETS, LAYER_COLORS, LAYER_NAMES } from '../constants/assets';
-import { calculateFixedIncomeValue, FixedIncomeBreakdown } from '../utils/fixedIncome';
+import { getFixedIncomeBreakdown, FixedIncomeBreakdown } from '../utils/fixedIncome';
 import { AssetIcon } from './AssetIcon';
 
 interface HoldingCardProps {
@@ -60,18 +64,26 @@ export const HoldingCard: React.FC<HoldingCardProps> = ({
   const asset = ASSETS[holding.assetId];
   const isFixedIncome = holding.assetId === 'IRR_FIXED_INCOME';
 
-  // Calculate Fixed Income breakdown with accrued interest
+  // BACKEND-DERIVED VALUES: Get Fixed Income breakdown
+  // Prefers holding.fixedIncome (backend) over client-side calculation
   const fixedIncomeBreakdown: FixedIncomeBreakdown | null = isFixedIncome
-    ? calculateFixedIncomeValue(holding.quantity, purchasedAt)
+    ? getFixedIncomeBreakdown({
+        quantity: holding.quantity,
+        purchasedAt: purchasedAt as string | undefined,
+        fixedIncome: holding.fixedIncome,
+      })
     : null;
 
-  // Fixed Income uses calculated total (principal + accrued)
-  // Other assets: prefer direct IRR price from backend, fallback to USD * fxRate
-  const valueIRR = isFixedIncome
-    ? (fixedIncomeBreakdown?.total || 0)
-    : priceIRR && priceIRR > 0
-      ? holding.quantity * priceIRR
-      : holding.quantity * priceUSD * fxRate;
+  // BACKEND-DERIVED VALUES: Prefer holding.valueIrr from backend when available
+  // This ensures UI displays same values as backend calculations
+  // Fallback to client-side calculation only for demo/mock mode
+  const valueIRR = holding.valueIrr !== undefined && holding.valueIrr > 0
+    ? holding.valueIrr  // Backend-provided value (authoritative)
+    : isFixedIncome
+      ? (fixedIncomeBreakdown?.total || 0)
+      : priceIRR && priceIRR > 0
+        ? holding.quantity * priceIRR
+        : holding.quantity * priceUSD * fxRate;
 
   return (
     <TouchableOpacity

@@ -80,6 +80,19 @@ export interface Holding {
   frozen: boolean;
   layer: Layer;
   purchasedAt?: string; // ISO string for fixed income accrual
+  // Backend-derived valuation fields (frontend should NOT recompute these)
+  valueIrr?: number; // Backend-calculated holding value in IRR
+  valueUsd?: number; // Backend-calculated holding value in USD
+  priceIrr?: number; // Current asset price in IRR
+  priceUsd?: number; // Current asset price in USD
+  // Fixed income breakdown (backend-calculated)
+  fixedIncome?: {
+    principal: number;
+    accruedInterest: number;
+    total: number;
+    daysHeld: number;
+    dailyRate: number;
+  };
 }
 
 export interface TargetLayerPct {
@@ -107,8 +120,10 @@ export interface Protection {
   settlementIrr?: number;
   settlementUsd?: number;
   settlementDate?: string;
-  // Calculated fields
-  daysRemaining?: number;
+  // Backend-derived fields (frontend should display these, NOT recompute)
+  daysRemaining?: number; // Days until protection expires
+  progressPct?: number; // Time elapsed progress (0-100)
+  currentValueUsd?: number; // Current protected asset value
   // Aliases for API compatibility (backend may return different field names)
   startISO?: string; // Alias for startDate
   endISO?: string; // Alias for expiryDate
@@ -224,10 +239,13 @@ export interface Loan {
   paidIRR?: number; // Amount already paid
   installments: LoanInstallment[];
   installmentsPaid: number;
-  // BUG-020 FIX: Optional backend-provided fields (replaces `as any` casts)
+  // Backend-derived fields (frontend should display these, NOT recompute)
   healthStatus?: LoanHealthStatus; // Backend-calculated health status
   remainingIrr?: number; // Remaining balance to repay
   currentLtv?: number; // Current loan-to-value ratio
+  progressPct?: number; // Repayment progress (0-100)
+  daysUntilDue?: number; // Days until loan is due
+  collateralValueIrr?: number; // Current collateral value in IRR
 }
 
 // Activity Feed Types

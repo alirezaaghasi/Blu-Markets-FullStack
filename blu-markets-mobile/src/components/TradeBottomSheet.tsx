@@ -30,7 +30,7 @@ import { Button } from './common';
 import { AssetId, Boundary, Holding, TradePreview } from '../types';
 import { ASSETS, LAYER_COLORS, LAYER_NAMES } from '../constants/assets';
 import { MIN_TRADE_AMOUNT, SPREAD_BY_LAYER } from '../constants/business';
-import { calculateFixedIncomeValue } from '../utils/fixedIncome';
+import { getFixedIncomeBreakdown } from '../utils/fixedIncome';
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
 import { logAction } from '../store/slices/portfolioSlice';
 import {
@@ -93,15 +93,26 @@ const formatIRRCompact = (num: number): string => {
 };
 
 // BUG-1 FIX: Calculate holding value for display (matches HoldingCard logic)
-// Updated to prefer direct IRR prices from backend over USD * fxRate calculation
+// BACKEND-DERIVED VALUES: Prefer holding.valueIrr from backend when available
+// This ensures UI displays same values as backend calculations
 const getHoldingValueIRR = (
   h: Holding,
   prices: Record<string, number>,
   pricesIrr: Record<string, number>,
   fxRate: number
 ): number => {
+  // BACKEND-DERIVED: Prefer backend-calculated value when available
+  if (h.valueIrr !== undefined && h.valueIrr > 0) {
+    return h.valueIrr;
+  }
+
+  // Fallback for demo/mock mode
   if (h.assetId === 'IRR_FIXED_INCOME') {
-    const breakdown = calculateFixedIncomeValue(h.quantity, h.purchasedAt);
+    const breakdown = getFixedIncomeBreakdown({
+      quantity: h.quantity,
+      purchasedAt: h.purchasedAt,
+      fixedIncome: h.fixedIncome,
+    });
     return breakdown?.total || h.quantity;
   }
   // Prefer direct IRR price from backend, fallback to USD * fxRate

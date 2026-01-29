@@ -73,6 +73,7 @@ export function calculateFixedIncomeValue(
 
 /**
  * Format Fixed Income breakdown as display string
+ * BACKEND-DERIVED VALUES: Accepts backend breakdown or local calculation
  */
 export function formatFixedIncomeBreakdown(breakdown: FixedIncomeBreakdown): string {
   const formatIRR = (value: number): string => {
@@ -86,4 +87,36 @@ export function formatFixedIncomeBreakdown(breakdown: FixedIncomeBreakdown): str
   }
 
   return `${formatIRR(breakdown.principal)} + ${formatIRR(breakdown.accrued)} accrued (${breakdown.daysHeld}d)`;
+}
+
+/**
+ * Get fixed income breakdown from backend-derived fields or calculate locally (fallback)
+ * BACKEND-DERIVED VALUES: Prefer backend fixedIncome object when available
+ */
+export function getFixedIncomeBreakdown(
+  holding: {
+    quantity: number;
+    purchasedAt?: string;
+    fixedIncome?: {
+      principal: number;
+      accruedInterest: number;
+      total: number;
+      daysHeld: number;
+      dailyRate: number;
+    };
+  }
+): FixedIncomeBreakdown {
+  // BACKEND-DERIVED: Use backend-provided breakdown if available
+  if (holding.fixedIncome) {
+    return {
+      principal: holding.fixedIncome.principal,
+      accrued: holding.fixedIncome.accruedInterest,
+      total: holding.fixedIncome.total,
+      daysHeld: holding.fixedIncome.daysHeld,
+      dailyRate: holding.fixedIncome.dailyRate,
+    };
+  }
+
+  // Fallback: calculate locally (for demo/mock mode only)
+  return calculateFixedIncomeValue(holding.quantity, holding.purchasedAt);
 }

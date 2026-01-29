@@ -71,12 +71,16 @@ export const irrToUsd = (amountIrr: number, fxRate: number): number => {
 /**
  * Format both IRR and USD values
  * Returns { irr: "1,234,567 IRR", usd: "$1,990" }
+ *
+ * BACKEND-DERIVED VALUES: Prefer backendUsd when available to avoid
+ * client-side FX conversion divergence from backend calculations.
  */
 export const formatDualCurrency = (
   amountIrr: number,
   fxRate: number,
   assetId?: string,
-  abbreviate: boolean = false
+  abbreviate: boolean = false,
+  backendUsd?: number  // BACKEND-DERIVED: Use when backend provides USD value
 ): { irr: string; usd: string | null } => {
   const irr = formatIRR(amountIrr, abbreviate);
 
@@ -85,7 +89,11 @@ export const formatDualCurrency = (
     return { irr, usd: null };
   }
 
-  const usdAmount = irrToUsd(amountIrr, fxRate);
+  // BACKEND-DERIVED: Prefer backend-provided USD value when available
+  // Only fall back to client-side conversion if backend didn't provide it
+  const usdAmount = backendUsd !== undefined && backendUsd > 0
+    ? backendUsd
+    : irrToUsd(amountIrr, fxRate);
   const usd = usdAmount > 0 ? formatUSD(usdAmount) : null;
 
   return { irr, usd };

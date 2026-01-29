@@ -108,9 +108,26 @@ const LoansScreen: React.FC = () => {
     const holding = holdings.find((h) => h.assetId === loan.collateralAssetId);
     if (!holding) return { level: 'Unknown', color: colors.textSecondary };
 
+    // BACKEND-DERIVED: Prefer loan.currentLtv or loan.collateralValueIrr if available
+    if (loan.currentLtv !== undefined && loan.currentLtv > 0) {
+      const currentLTV = loan.currentLtv;
+      if (currentLTV >= LOAN_HEALTH_THRESHOLDS.CRITICAL) {
+        return { level: 'Critical', color: colors.error };
+      }
+      if (currentLTV >= LOAN_HEALTH_THRESHOLDS.WARNING) {
+        return { level: 'Warning', color: colors.boundaryStructural };
+      }
+      if (currentLTV >= LOAN_HEALTH_THRESHOLDS.CAUTION) {
+        return { level: 'Caution', color: colors.warning };
+      }
+      return { level: 'Healthy', color: colors.success };
+    }
+
+    // UI ESTIMATE ONLY - fallback to client calculation
     const priceUSD = prices[loan.collateralAssetId] || 0;
-    // UI ESTIMATE ONLY - backend should provide authoritative LTV
-    const collateralValueIRR = holding.quantity * priceUSD * fxRate;
+    // BACKEND-DERIVED: Prefer loan.collateralValueIrr or holding.valueIrr
+    const collateralValueIRR = loan.collateralValueIrr ?? holding.valueIrr ?? (holding.quantity * priceUSD * fxRate);
+    if (collateralValueIRR <= 0) return { level: 'Unknown', color: colors.textSecondary };
     const currentLTV = loan.amountIRR / collateralValueIRR;
 
     if (currentLTV >= LOAN_HEALTH_THRESHOLDS.CRITICAL) {
@@ -323,8 +340,12 @@ const LoansScreen: React.FC = () => {
             {eligibleHoldings.slice(0, 3).map((holding) => {
               const asset = ASSETS[holding.assetId];
               const priceUSD = prices[holding.assetId] || 0;
-              // UI ESTIMATE ONLY - backend loan.preview is authoritative
-              const valueIRR = holding.quantity * priceUSD * fxRate;
+              // BACKEND-DERIVED: Prefer holding.valueIrr from backend when available
+              // Fallback to client calculation for demo/mock mode only
+              const valueIRR = holding.valueIrr !== undefined && holding.valueIrr > 0
+                ? holding.valueIrr
+                : holding.quantity * priceUSD * fxRate;
+              // UI ESTIMATE ONLY - backend loan.preview is authoritative for max borrow
               const maxBorrowIRR = valueIRR * asset.ltv;
 
               return (

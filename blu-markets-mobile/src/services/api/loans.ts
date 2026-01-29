@@ -54,9 +54,19 @@ function validateLoan(data: unknown): Loan | null {
                  typeof loan.totalDueIrr === 'number' ? loan.totalDueIrr : amountIRR,
     paidIRR: typeof loan.paidIRR === 'number' ? loan.paidIRR :
              typeof loan.paidIrr === 'number' ? loan.paidIrr : 0,
-    // Backend provides remainingIrr directly
+    // Backend-derived fields (do NOT recompute on frontend)
     remainingIrr: typeof loan.remainingIrr === 'number' ? loan.remainingIrr :
                   typeof loan.remainingIRR === 'number' ? loan.remainingIRR : undefined,
+    currentLtv: typeof loan.currentLtv === 'number' ? loan.currentLtv :
+                typeof loan.current_ltv === 'number' ? loan.current_ltv : undefined,
+    progressPct: typeof loan.progressPct === 'number' ? loan.progressPct :
+                 typeof loan.progress_pct === 'number' ? loan.progress_pct : undefined,
+    daysUntilDue: typeof loan.daysUntilDue === 'number' ? loan.daysUntilDue :
+                  typeof loan.days_until_due === 'number' ? loan.days_until_due : undefined,
+    collateralValueIrr: typeof loan.collateralValueIrr === 'number' ? loan.collateralValueIrr :
+                        typeof loan.collateral_value_irr === 'number' ? loan.collateral_value_irr : undefined,
+    healthStatus: typeof loan.healthStatus === 'string' ? loan.healthStatus :
+                  typeof loan.health_status === 'string' ? loan.health_status : undefined,
     // Map installments with field name normalization (backend uses lowercase Irr)
     installments: Array.isArray(loan.installments) ? loan.installments.map((inst: Record<string, unknown>) => ({
       number: typeof inst.number === 'number' ? inst.number : 0,
