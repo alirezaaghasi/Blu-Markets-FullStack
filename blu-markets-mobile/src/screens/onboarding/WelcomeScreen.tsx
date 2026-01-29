@@ -77,13 +77,16 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
           <Text style={styles.primaryButtonArrow}>→</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={handleDemoMode}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.secondaryButtonText}>Try Demo</Text>
-        </TouchableOpacity>
+        {/* SECURITY: Demo mode button only visible in development builds */}
+        {__DEV__ && (
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={handleDemoMode}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.secondaryButtonText}>Try Demo</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </SafeAreaView>
   );

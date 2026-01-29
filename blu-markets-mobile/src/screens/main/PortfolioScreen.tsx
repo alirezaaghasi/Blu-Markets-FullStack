@@ -112,7 +112,7 @@ const PortfolioScreen: React.FC = () => {
         }));
 
         if (portfolioResponse.holdings) {
-          dispatch(setHoldings(portfolioResponse.holdings.map((h: any) => ({
+          dispatch(setHoldings(portfolioResponse.holdings.map((h) => ({
             id: h.id,
             assetId: h.assetId,
             quantity: h.quantity,
@@ -146,7 +146,7 @@ const PortfolioScreen: React.FC = () => {
       }));
 
       if (portfolioResponse.holdings) {
-        dispatch(setHoldings(portfolioResponse.holdings.map((h: any) => ({
+        dispatch(setHoldings(portfolioResponse.holdings.map((h) => ({
           id: h.id,
           assetId: h.assetId,
           quantity: h.quantity,

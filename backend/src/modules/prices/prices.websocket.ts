@@ -50,12 +50,35 @@ export async function registerPriceWebSocket(app: FastifyInstance): Promise<void
   // Track connections per user for rate limiting
   const userConnectionCounts = new Map<string, number>();
 
+  /**
+   * Centralized cleanup for WebSocket connections
+   * Ensures connection counts are always properly decremented
+   * WEBSOCKET LEAK FIX: This function must be called in ALL cleanup paths
+   */
+  function cleanupClient(socket: WebSocket): void {
+    const state = clients.get(socket);
+    if (state) {
+      // Decrement user connection count
+      const count = userConnectionCounts.get(state.userId) || 1;
+      if (count <= 1) {
+        userConnectionCounts.delete(state.userId);
+      } else {
+        userConnectionCounts.set(state.userId, count - 1);
+      }
+      logger.debug('Cleaned up WebSocket client', {
+        userId: state.userId,
+        remainingConnections: Math.max(0, count - 1)
+      });
+    }
+    clients.delete(socket);
+  }
+
   // Heartbeat interval to detect stale connections
   const heartbeatInterval = setInterval(() => {
     clients.forEach((state, socket) => {
       if (!state.isAlive) {
-        logger.debug('Terminating inactive WebSocket client');
-        clients.delete(socket);
+        logger.debug('Terminating inactive WebSocket client', { userId: state.userId });
+        cleanupClient(socket);  // WEBSOCKET LEAK FIX: Properly decrement counter
         return socket.terminate();
       }
 
@@ -255,30 +278,15 @@ export async function registerPriceWebSocket(app: FastifyInstance): Promise<void
       }
     });
 
-    // Helper to cleanup client state and decrement connection count
-    const cleanupClient = () => {
-      const state = clients.get(socket);
-      if (state) {
-        // Decrement user connection count
-        const count = userConnectionCounts.get(state.userId) || 1;
-        if (count <= 1) {
-          userConnectionCounts.delete(state.userId);
-        } else {
-          userConnectionCounts.set(state.userId, count - 1);
-        }
-      }
-      clients.delete(socket);
-    };
-
-    // Handle disconnect
+    // Handle disconnect - use centralized cleanup function
     socket.on('close', () => {
       logger.debug('WebSocket client disconnected', { userId: clientState.userId });
-      cleanupClient();
+      cleanupClient(socket);
     });
 
     socket.on('error', (error: Error) => {
       logger.error('WebSocket error', error, { userId: clientState.userId });
-      cleanupClient();
+      cleanupClient(socket);
     });
   });
 

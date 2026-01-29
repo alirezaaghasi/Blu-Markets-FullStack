@@ -447,23 +447,40 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           },
         });
 
-        // Create installments (monthly) with safe arithmetic
-        const installmentPrincipalDecimal = roundIrr(divide(amountDecimal, durationMonths));
-        const installmentInterestDecimal = roundIrr(divide(totalInterestDecimal, durationMonths));
-        const installmentTotalDecimal = roundIrr(add(installmentPrincipalDecimal, installmentInterestDecimal));
+        // ROUNDING FIX: Distribute installments so sum exactly equals total
+        // Calculate base installment amounts (rounded down)
+        const basePrincipalDecimal = roundIrr(divide(amountDecimal, durationMonths));
+        const baseInterestDecimal = roundIrr(divide(totalInterestDecimal, durationMonths));
+        const baseTotalDecimal = roundIrr(add(basePrincipalDecimal, baseInterestDecimal));
+
+        // Calculate remainders that need to go to final installment
+        const basePrincipalSum = multiply(basePrincipalDecimal, durationMonths);
+        const baseInterestSum = multiply(baseInterestDecimal, durationMonths);
+        const principalRemainder = subtract(amountDecimal, basePrincipalSum);
+        const interestRemainder = subtract(totalInterestDecimal, baseInterestSum);
 
         for (let i = 1; i <= durationMonths; i++) {
           const installmentDueDate = new Date(startDate);
           installmentDueDate.setMonth(installmentDueDate.getMonth() + i);
+
+          // Final installment gets the remainder to ensure exact totals
+          const isLastInstallment = i === durationMonths;
+          const principalIrr = isLastInstallment
+            ? toNumber(add(basePrincipalDecimal, principalRemainder))
+            : toNumber(basePrincipalDecimal);
+          const interestIrr = isLastInstallment
+            ? toNumber(add(baseInterestDecimal, interestRemainder))
+            : toNumber(baseInterestDecimal);
+          const totalIrr = principalIrr + interestIrr;
 
           await tx.loanInstallment.create({
             data: {
               loanId: loan.id,
               number: i,
               dueDate: installmentDueDate,
-              principalIrr: toNumber(installmentPrincipalDecimal),
-              interestIrr: toNumber(installmentInterestDecimal),
-              totalIrr: toNumber(installmentTotalDecimal),
+              principalIrr,
+              interestIrr,
+              totalIrr,
             },
           });
         }

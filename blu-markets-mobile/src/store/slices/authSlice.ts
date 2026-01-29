@@ -31,7 +31,12 @@ const authSlice = createSlice({
       state.onboardingComplete = true;
     },
     // Demo mode: skip directly to main app with mock data
+    // SECURITY: Only allowed in development builds to prevent production bypass
     enableDemoMode: (state) => {
+      if (!__DEV__) {
+        console.warn('Demo mode is not available in production builds');
+        return;
+      }
       state.authToken = DEMO_TOKEN;
       state.isAuthenticated = true;
       state.onboardingComplete = true;

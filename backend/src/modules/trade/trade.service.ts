@@ -318,7 +318,11 @@ export async function executeTrade(
 
   // Execute trade within transaction with re-validation
   const result = await prisma.$transaction(async (tx) => {
-    // CRITICAL: Re-fetch and validate balances inside transaction to prevent race conditions
+    // CRITICAL: Lock portfolio row with FOR UPDATE to prevent race conditions
+    // This ensures no other transaction can read or modify the portfolio until we commit
+    await tx.$executeRaw`SELECT 1 FROM "portfolios" WHERE id = ${portfolio.id}::uuid FOR UPDATE`;
+
+    // Now safe to fetch and modify - row is locked
     const currentPortfolio = await tx.portfolio.findUnique({
       where: { id: portfolio.id },
       include: { holdings: true },
@@ -352,19 +356,19 @@ export async function executeTrade(
     let holdingQuantity: number;
 
     if (action === 'BUY') {
-      // Re-validate cash balance inside transaction
+      // Re-validate cash balance inside transaction (row is locked via FOR UPDATE)
       const currentCash = Number(currentPortfolio.cashIrr);
       if (currentCash < amountIrr) {
         throw new AppError('INSUFFICIENT_CASH', 'Insufficient cash balance (concurrent modification)', 400);
       }
 
-      // MONEY FIX M-02: Deduct cash (including spread) using Decimal
-      newCashIrr = toNumber(roundIrr(subtract(currentCash, amountIrr)));
-
-      await tx.portfolio.update({
+      // RACE CONDITION FIX: Use atomic decrement for cash deduction
+      // Combined with FOR UPDATE lock, this provides defense-in-depth
+      const updatedPortfolio = await tx.portfolio.update({
         where: { id: portfolio.id },
-        data: { cashIrr: newCashIrr },
+        data: { cashIrr: { decrement: amountIrr } },
       });
+      newCashIrr = Number(updatedPortfolio.cashIrr);
 
       // Add or update holding
       const existingHolding = currentPortfolio.holdings.find((h) => h.assetId === assetId);
@@ -404,28 +408,27 @@ export async function executeTrade(
         throw new AppError('ASSET_FROZEN', 'Asset is frozen as loan collateral', 400);
       }
 
-      // MONEY FIX M-02: Add cash (minus spread) using Decimal
+      // RACE CONDITION FIX: Use atomic increment for cash addition
+      // Combined with FOR UPDATE lock, this provides defense-in-depth
       const cashReceivedDecimal = subtract(amountIrr, spreadAmountIrr);
-      newCashIrr = toNumber(roundIrr(add(currentPortfolio.cashIrr, cashReceivedDecimal)));
-
-      await tx.portfolio.update({
+      const cashReceived = toNumber(roundIrr(cashReceivedDecimal));
+      const updatedPortfolio = await tx.portfolio.update({
         where: { id: portfolio.id },
-        data: { cashIrr: newCashIrr },
+        data: { cashIrr: { increment: cashReceived } },
       });
+      newCashIrr = Number(updatedPortfolio.cashIrr);
 
-      // MONEY FIX M-02: Reduce holding using Decimal
-      const newQuantity = toNumber(roundCrypto(subtract(currentQuantity, quantity)));
+      // RACE CONDITION FIX: Use atomic decrement for holding reduction
+      const updatedHolding = await tx.holding.update({
+        where: { id: existingHolding.id },
+        data: { quantity: { decrement: quantity } },
+      });
+      holdingQuantity = Number(updatedHolding.quantity);
 
-      if (newQuantity <= 0.00000001) {
-        // Remove holding if negligible
+      // Remove holding if negligible (cleanup after atomic operation)
+      if (holdingQuantity <= 0.00000001) {
         await tx.holding.delete({ where: { id: existingHolding.id } });
         holdingQuantity = 0;
-      } else {
-        const updatedHolding = await tx.holding.update({
-          where: { id: existingHolding.id },
-          data: { quantity: newQuantity },
-        });
-        holdingQuantity = newQuantity;
       }
     }
 

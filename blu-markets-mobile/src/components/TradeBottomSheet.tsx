@@ -322,10 +322,10 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
       // Execute trade via API
       const response = await trade.execute(assetId, side, amountIRR);
 
-      // BUG-017 FIX: Use backend-provided values only (no local calculations)
-      // BUG-CASH FIX: Extract values from either root level aliases or nested newBalance object
-      const newCash = response.newCashIrr ?? (response as any).newBalance?.cashIrr ?? cashIRR;
-      const newHoldingQty = response.newHoldingQuantity ?? (response as any).newBalance?.holdingQuantity ?? 0;
+      // TYPE SAFETY FIX: Use properly typed backend response values
+      // Backend returns newCashIrr and newHoldingQuantity directly (no nested object)
+      const newCash = response.newCashIrr;
+      const newHoldingQty = response.newHoldingQuantity;
 
       // Update holding quantity from backend response
       dispatch(updateHoldingFromTrade({
