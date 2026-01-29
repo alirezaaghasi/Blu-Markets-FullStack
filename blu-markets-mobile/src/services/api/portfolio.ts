@@ -36,6 +36,7 @@ function normalizeAllocation(allocation: Record<string, number> | undefined): Ta
  */
 function normalizeHolding(h: Record<string, unknown>): Holding {
   return {
+    id: (h.id) as string | undefined,  // Database ID for API calls (protection, loans)
     assetId: (h.assetId ?? h.asset_id) as AssetId,
     quantity: Number(h.quantity) || 0,
     frozen: Boolean(h.frozen),

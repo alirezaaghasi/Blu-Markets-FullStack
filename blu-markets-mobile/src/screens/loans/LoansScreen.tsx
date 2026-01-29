@@ -49,6 +49,7 @@ const LoansScreen: React.FC = () => {
           dispatch(setStatus(portfolioResponse.status));
           if (portfolioResponse.holdings) {
             dispatch(setHoldings(portfolioResponse.holdings.map((h: Holding) => ({
+              id: h.id,
               assetId: h.assetId,
               quantity: h.quantity,
               frozen: h.frozen,

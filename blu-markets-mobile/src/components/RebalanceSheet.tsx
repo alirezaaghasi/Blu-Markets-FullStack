@@ -100,6 +100,7 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
         status: portfolioData.status || 'BALANCED',
       }));
       dispatch(setHoldings(portfolioData.holdings.map((h: Holding) => ({
+        id: h.id,
         assetId: h.assetId,
         quantity: h.quantity,
         frozen: h.frozen,
