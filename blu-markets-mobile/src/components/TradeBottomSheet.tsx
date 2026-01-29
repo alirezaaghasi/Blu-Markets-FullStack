@@ -32,16 +32,18 @@ import { ASSETS, LAYER_COLORS, LAYER_NAMES } from '../constants/assets';
 import { MIN_TRADE_AMOUNT, SPREAD_BY_LAYER } from '../constants/business';
 import { calculateFixedIncomeValue } from '../utils/fixedIncome';
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
-import { updateHoldingFromTrade, updateCash, logAction, setStatus, setPortfolioValues, setHoldings } from '../store/slices/portfolioSlice';
+import { logAction } from '../store/slices/portfolioSlice';
 import {
   validateBuyTrade,
   validateSellTrade,
 } from '../utils/tradeValidation';
 import AllocationBar from './AllocationBar';
-import { trade, portfolio as portfolioApi } from '../services/api';
+import { trade } from '../services/api';
 import { ConfirmTradeModal } from './ConfirmTradeModal';
 import { TradeSuccessModal } from './TradeSuccessModal';
 import { TradeErrorModal } from './TradeErrorModal';
+// RTK Query - auto-invalidates portfolio cache after trade
+import { useExecuteTradeMutation } from '../store/api/apiSlice';
 
 interface TradeBottomSheetProps {
   visible: boolean;
@@ -135,34 +137,8 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
   const [tradeResult, setTradeResult] = useState<TradeResult | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // BUG-021 FIX: Refresh holdings from backend when sheet opens
-  // This ensures the asset picker shows all current holdings, not stale Redux state
-  useEffect(() => {
-    if (!visible) return;
-
-    const refreshHoldings = async () => {
-      try {
-        const portfolioData = await portfolioApi.get();
-        dispatch(setHoldings(portfolioData.holdings.map((h: Holding) => ({
-          id: h.id,
-          assetId: h.assetId,
-          quantity: h.quantity,
-          frozen: h.frozen,
-          layer: h.layer,
-        }))));
-        dispatch(updateCash(portfolioData.cashIrr));
-        if (__DEV__) {
-          console.log('[TradeBottomSheet] Refreshed holdings:', portfolioData.holdings.length);
-        }
-      } catch (error) {
-        if (__DEV__) {
-          console.error('[TradeBottomSheet] Failed to refresh holdings:', error);
-        }
-      }
-    };
-
-    refreshHoldings();
-  }, [visible, dispatch]);
+  // RTK Query mutation - auto-invalidates portfolio cache after trade
+  const [executeTrade] = useExecuteTradeMutation();
 
   const asset = ASSETS[assetId];
   // Guard: If asset not found, use defaults to prevent crashes
@@ -351,62 +327,20 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
 
     setIsSubmitting(true);
     try {
-      // Execute trade via API
-      const response = await trade.execute(assetId, side, amountIRR);
-
-      // TYPE SAFETY FIX: Use properly typed backend response values
-      // Backend returns newCashIrr and newHoldingQuantity directly (no nested object)
-      // Guard against undefined response fields (BUG-020 FIX)
-      const newCash = response.newCashIrr ?? cashIRR; // Fall back to current cash if undefined
-      const newHoldingQty = response.newHoldingQuantity ?? 0;
+      // Execute trade via RTK Query mutation
+      // This automatically invalidates 'Portfolio' and 'Holdings' tags
+      // The usePortfolioSync hook will refetch and sync to Redux
+      const response = await executeTrade({ assetId, side, amountIrr: amountIRR }).unwrap();
 
       if (__DEV__) {
-        console.log('[TradeBottomSheet] Trade response:', {
+        console.log('[TradeBottomSheet] Trade executed via RTK Query:', {
+          tradeId: response.tradeId,
           newCashIrr: response.newCashIrr,
           newHoldingQuantity: response.newHoldingQuantity,
-          rawResponse: response,
         });
       }
 
-      // Update holding quantity from backend response
-      dispatch(updateHoldingFromTrade({
-        assetId,
-        quantity: newHoldingQty,
-        side,
-      }));
-      // Update cash from backend (includes spread/fees)
-      dispatch(updateCash(newCash));
-
-      // BUG-STATUS FIX: Refresh full portfolio after trade to update status, badge, holdings
-      try {
-        const portfolioData = await portfolioApi.get();
-        if (__DEV__) {
-          console.log('[TradeBottomSheet] Post-trade portfolio status:', portfolioData.status);
-          console.log('[TradeBottomSheet] Post-trade holdings count:', portfolioData.holdings.length);
-        }
-        // BUG-021 FIX: Refresh ALL holdings from backend, not just the single traded asset
-        dispatch(setHoldings(portfolioData.holdings.map((h: Holding) => ({
-          id: h.id,
-          assetId: h.assetId,
-          quantity: h.quantity,
-          frozen: h.frozen,
-          layer: h.layer,
-        }))));
-        dispatch(updateCash(portfolioData.cashIrr));
-        dispatch(setStatus(portfolioData.status));
-        dispatch(setPortfolioValues({
-          totalValueIrr: portfolioData.totalValueIrr || 0,
-          holdingsValueIrr: portfolioData.holdingsValueIrr || 0,
-          currentAllocation: portfolioData.allocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
-          driftPct: portfolioData.driftPct || 0,
-          status: portfolioData.status || 'BALANCED',
-        }));
-      } catch (e) {
-        // Non-fatal - status will update on next refresh
-        if (__DEV__) console.warn('Failed to refresh portfolio after trade:', e);
-      }
-
-      // Log action to activity feed
+      // Log action to local activity feed
       dispatch(logAction({
         type: 'TRADE',
         boundary: preview?.boundary ?? 'SAFE',
@@ -414,14 +348,14 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
         amountIRR: amountIRR,
       }));
 
-      // Set trade result for success modal (using backend values)
+      // Set trade result for success modal
       setTradeResult({
         side,
         assetId,
         amountIRR,
         quantity: preview.quantity ?? 0,
-        newCashBalance: newCash,
-        newHoldingQuantity: newHoldingQty,
+        newCashBalance: response.newCashIrr ?? cashIRR,
+        newHoldingQuantity: response.newHoldingQuantity ?? 0,
       });
 
       // Close confirm modal, show success modal

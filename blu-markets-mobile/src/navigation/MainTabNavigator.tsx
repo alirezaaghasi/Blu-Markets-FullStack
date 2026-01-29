@@ -13,9 +13,20 @@ import PortfolioScreen from '../screens/main/PortfolioScreen';
 import MarketScreen from '../screens/services/ServicesScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 
+// RTK Query sync hook - keeps Redux state in sync with backend
+import { usePortfolioSync } from '../hooks/usePortfolioSync';
+
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-export function MainTabNavigator() {
+// Inner component that uses the sync hook
+function MainTabContent() {
+  // RTK Query syncs portfolio and prices to Redux slices
+  // This ensures all screens have fresh data and auto-refetch on changes
+  usePortfolioSync({
+    // Poll every 60 seconds to keep data fresh
+    pollingInterval: 60000,
+  });
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -66,6 +77,11 @@ export function MainTabNavigator() {
       />
     </Tab.Navigator>
   );
+}
+
+// Main export wraps the content to ensure hooks are called
+export function MainTabNavigator() {
+  return <MainTabContent />;
 }
 
 export default MainTabNavigator;

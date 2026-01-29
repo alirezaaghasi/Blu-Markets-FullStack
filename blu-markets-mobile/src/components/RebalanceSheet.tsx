@@ -1,6 +1,6 @@
 // Rebalance Bottom Sheet
 // Based on PRD Section 6.3 - Rebalance Flow
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -13,12 +13,12 @@ import {
 } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../constants/theme';
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
-import { Layer, Boundary, RebalancePreview, RebalanceMode, Holding } from '../types';
+import { RebalanceMode } from '../types';
 import { ASSETS, LAYER_COLORS, LAYER_NAMES } from '../constants/assets';
-import { BOUNDARY_MESSAGES } from '../constants/business';
-import { setStatus, setHoldings, updateCash, logAction, setPortfolioValues } from '../store/slices/portfolioSlice';
-import { rebalance, portfolio } from '../services/api';
+import { logAction } from '../store/slices/portfolioSlice';
 import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
+// RTK Query - auto-invalidates portfolio cache after rebalance
+import { useGetRebalancePreviewQuery, useExecuteRebalanceMutation } from '../store/api/apiSlice';
 
 interface RebalanceSheetProps {
   visible: boolean;
@@ -35,78 +35,45 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
   const dispatch = useAppDispatch();
   const [mode, setMode] = useState<RebalanceMode>('HOLDINGS_ONLY');
   const [showTrades, setShowTrades] = useState(false);
-  const [isExecuting, setIsExecuting] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [preview, setPreview] = useState<RebalancePreview | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successResult, setSuccessResult] = useState<TransactionSuccessResult | null>(null);
 
   const { cashIRR, targetLayerPct } = useAppSelector((state) => state.portfolio);
 
-  // BUG-024 FIX: Fetch preview with cleanup to prevent state updates on unmounted component
-  const fetchPreviewInternal = useCallback(async (isMountedRef?: { current: boolean }) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const result = await rebalance.preview(mode);
-      if (!isMountedRef || isMountedRef.current) {
-        setPreview(result);
-      }
-    } catch (err: any) {
-      if (!isMountedRef || isMountedRef.current) {
-        setError(err?.message || 'Failed to load rebalance preview');
-        setPreview(null);
-      }
-    } finally {
-      if (!isMountedRef || isMountedRef.current) {
-        setIsLoading(false);
-      }
-    }
-  }, [mode]);
+  // RTK Query: Fetch rebalance preview (auto-refetches when mode changes)
+  const {
+    data: preview,
+    isLoading,
+    error: previewError,
+    refetch: handleRetry,
+  } = useGetRebalancePreviewQuery(
+    { mode },
+    { skip: !visible } // Don't fetch when sheet is closed
+  );
 
-  useEffect(() => {
-    if (!visible) return;
+  // RTK Query: Execute rebalance mutation
+  const [executeRebalance, { isLoading: isExecuting }] = useExecuteRebalanceMutation();
 
-    const isMountedRef = { current: true };
-    fetchPreviewInternal(isMountedRef);
-    return () => { isMountedRef.current = false; };
-  }, [visible, mode, fetchPreviewInternal]);
-
-  // Manual retry handler (no cleanup needed for user-initiated action)
-  const handleRetry = useCallback(() => {
-    fetchPreviewInternal();
-  }, [fetchPreviewInternal]);
+  // Error message from query
+  const error = previewError ? 'Failed to load rebalance preview' : null;
 
   const handleConfirm = async () => {
     if (!preview || preview.trades.length === 0) return;
 
-    setIsExecuting(true);
     try {
-      // Execute rebalance via backend (pass mode to deploy cash if selected)
-      const result = await rebalance.execute(mode);
+      // Execute rebalance via RTK Query mutation
+      // This automatically invalidates 'Portfolio', 'Holdings', and 'Activity' tags
+      // The usePortfolioSync hook will refetch and sync to Redux
+      const result = await executeRebalance({ mode }).unwrap();
 
-      // Refresh portfolio data from backend
-      const portfolioData = await portfolio.get();
+      if (__DEV__) {
+        console.log('[RebalanceSheet] Rebalance executed via RTK Query:', {
+          tradesExecuted: result.tradesExecuted,
+          newStatus: result.newStatus,
+        });
+      }
 
-      // Update Redux state with ALL portfolio values (fixes stale data issue)
-      dispatch(updateCash(portfolioData.cashIrr));
-      dispatch(setStatus(portfolioData.status));
-      dispatch(setPortfolioValues({
-        totalValueIrr: portfolioData.totalValueIrr || 0,
-        holdingsValueIrr: portfolioData.holdingsValueIrr || 0,
-        currentAllocation: portfolioData.allocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
-        driftPct: portfolioData.driftPct || 0,
-        status: portfolioData.status || 'BALANCED',
-      }));
-      dispatch(setHoldings(portfolioData.holdings.map((h: Holding) => ({
-        id: h.id,
-        assetId: h.assetId,
-        quantity: h.quantity,
-        frozen: h.frozen,
-        layer: h.layer,
-      }))));
-
+      // Log action to local activity feed
       dispatch(logAction({
         type: 'REBALANCE',
         boundary: 'SAFE',
@@ -127,9 +94,7 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
       });
       setShowSuccess(true);
     } catch (err: any) {
-      Alert.alert('Rebalance Failed', err?.message || 'Unable to rebalance. Please try again.');
-    } finally {
-      setIsExecuting(false);
+      Alert.alert('Rebalance Failed', err?.message || err?.data?.message || 'Unable to rebalance. Please try again.');
     }
   };
 
