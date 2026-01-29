@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../constants/theme';
 import { useAppDispatch, useAppSelector } from '../hooks/useStore';
-import { updateCash, logAction } from '../store/slices/portfolioSlice';
+import { updateCash, logAction, setPortfolioValues } from '../store/slices/portfolioSlice';
 import { portfolio } from '../services/api';
 import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
 
@@ -91,8 +91,18 @@ export const AddFundsSheet: React.FC<AddFundsSheetProps> = ({
       const previousBalance = result.previousCashIrr ?? cashIRR;
       const actualAmountAdded = result.amountAdded ?? amountIRR;
 
-      // Update Redux with new cash balance
+      // Fetch full portfolio data to update all values (fixes stale data issue)
+      const portfolioData = await portfolio.get();
+
+      // Update Redux with ALL portfolio values
       dispatch(updateCash(newBalance));
+      dispatch(setPortfolioValues({
+        totalValueIrr: portfolioData.totalValueIrr || 0,
+        holdingsValueIrr: portfolioData.holdingsValueIrr || 0,
+        currentAllocation: portfolioData.allocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
+        driftPct: portfolioData.driftPct || 0,
+        status: portfolioData.status || 'BALANCED',
+      }));
       dispatch(logAction({
         type: 'ADD_FUNDS',
         boundary: 'SAFE',

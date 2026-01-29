@@ -16,7 +16,7 @@ import { useAppSelector, useAppDispatch } from '../hooks/useStore';
 import { Layer, Boundary, RebalancePreview, RebalanceMode, Holding } from '../types';
 import { ASSETS, LAYER_COLORS, LAYER_NAMES } from '../constants/assets';
 import { BOUNDARY_MESSAGES } from '../constants/business';
-import { setStatus, setHoldings, updateCash, logAction } from '../store/slices/portfolioSlice';
+import { setStatus, setHoldings, updateCash, logAction, setPortfolioValues } from '../store/slices/portfolioSlice';
 import { rebalance, portfolio } from '../services/api';
 import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
 
@@ -89,9 +89,16 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
       // Refresh portfolio data from backend
       const portfolioData = await portfolio.get();
 
-      // Update Redux state
+      // Update Redux state with ALL portfolio values (fixes stale data issue)
       dispatch(updateCash(portfolioData.cashIrr));
       dispatch(setStatus(portfolioData.status));
+      dispatch(setPortfolioValues({
+        totalValueIrr: portfolioData.totalValueIrr || 0,
+        holdingsValueIrr: portfolioData.holdingsValueIrr || 0,
+        currentAllocation: portfolioData.allocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
+        driftPct: portfolioData.driftPct || 0,
+        status: portfolioData.status || 'BALANCED',
+      }));
       dispatch(setHoldings(portfolioData.holdings.map((h: Holding) => ({
         assetId: h.assetId,
         quantity: h.quantity,

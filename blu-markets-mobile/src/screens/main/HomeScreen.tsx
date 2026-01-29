@@ -186,7 +186,7 @@ const HomeScreen: React.FC = () => {
     isLoading: isLoadingActivities,
     isRefreshing: isRefreshingActivities,
     refresh: refreshActivities,
-  } = useActivityFeed(5);
+  } = useActivityFeed(20);
 
   // Bottom sheet visibility state
   const [tradeSheetVisible, setTradeSheetVisible] = useState(false);
@@ -468,7 +468,7 @@ const HomeScreen: React.FC = () => {
           ) : (
             /* BUG-1 FIX: Simplified activity log with guaranteed visible text */
             <View>
-              {activities.slice(0, 5).map((entry: ActionLogEntry, index: number) => {
+              {activities.slice(0, 20).map((entry: ActionLogEntry, index: number) => {
                 const message = formatActivityMessage(entry) || 'Activity recorded';
                 const time = formatRelativeTime(entry?.timestamp) || 'Just now';
                 const boundary = entry?.boundary || 'SAFE';
