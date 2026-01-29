@@ -20,6 +20,7 @@ import {
   toNumber,
   isGreaterThan,
   Decimal,
+  formatIrrCompact,
 } from '../../utils/money.js';
 
 // Asset layer mapping per PRD (synced with frontend assets.ts)
@@ -291,7 +292,7 @@ export async function addFunds(
         afterSnapshot: { cashIrr: newCashIrr },
         amountIrr,
         boundary: 'SAFE',
-        message: `Added ${formatIrr(amountIrr)} to portfolio`,
+        message: `Added ${formatIrrCompact(amountIrr)} cash`,
       },
     });
 
@@ -301,7 +302,7 @@ export async function addFunds(
         portfolioId: portfolio.id,
         actionType: 'ADD_FUNDS',
         boundary: 'SAFE',
-        message: `Added ${formatIrr(amountIrr)}`,
+        message: `Added ${formatIrrCompact(amountIrr)} cash`,
         amountIrr,
       },
     });
@@ -382,9 +383,7 @@ function determineStatus(
   return 'ATTENTION_REQUIRED';
 }
 
-function formatIrr(amount: number): string {
-  return new Intl.NumberFormat('en-US').format(amount) + ' IRR';
-}
+// formatIrrCompact imported from utils/money.js
 
 export async function getAssetHolding(
   userId: string,

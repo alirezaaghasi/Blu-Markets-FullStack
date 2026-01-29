@@ -269,5 +269,26 @@ export function isEqual(
   return diff.lessThanOrEqualTo(toDecimal(tolerance));
 }
 
+/**
+ * Format IRR amount in compact form for display
+ * Examples: 500M, 27.5M, 1.2B, 850K
+ * Used in Activity Log and other user-facing messages
+ */
+export function formatIrrCompact(amount: number): string {
+  if (amount >= 1_000_000_000) {
+    const billions = amount / 1_000_000_000;
+    return billions % 1 === 0 ? `${billions}B` : `${billions.toFixed(1)}B`;
+  }
+  if (amount >= 1_000_000) {
+    const millions = amount / 1_000_000;
+    return millions % 1 === 0 ? `${millions}M` : `${millions.toFixed(1)}M`;
+  }
+  if (amount >= 1_000) {
+    const thousands = amount / 1_000;
+    return thousands % 1 === 0 ? `${thousands}K` : `${thousands.toFixed(1)}K`;
+  }
+  return amount.toLocaleString('en-US');
+}
+
 // Re-export Decimal class for advanced usage
 export { Decimal };

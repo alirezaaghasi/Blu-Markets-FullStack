@@ -16,6 +16,7 @@ import {
   isGreaterThan,
   isLessThan,
   Decimal,
+  formatIrrCompact,
 } from '../../utils/money.js';
 import { logger } from '../../utils/logger.js';
 
@@ -342,7 +343,7 @@ export async function createInitialPortfolio(
         },
         amountIrr: totalAmount,
         boundary: 'SAFE',
-        message: `Portfolio created with ${formatIrr(totalAmount)} - ${holdingsToCreate.length} assets allocated`,
+        message: `Started with ${formatIrrCompact(totalAmount)}`,
       },
     });
 
@@ -352,7 +353,7 @@ export async function createInitialPortfolio(
         portfolioId: newPortfolio.id,
         actionType: 'PORTFOLIO_CREATED',
         boundary: 'SAFE',
-        message: `Portfolio created with ${formatIrr(totalAmount)}`,
+        message: `Started with ${formatIrrCompact(totalAmount)}`,
         amountIrr: totalAmount,
       },
     });
@@ -369,7 +370,7 @@ export async function createInitialPortfolio(
           quantity: holding.quantity,
           amountIrr: holding.valueIrr,
           boundary: 'SAFE',
-          message: `Initial allocation: Bought ${holding.quantity.toFixed(6)} ${holding.assetId} (${formatIrr(holding.valueIrr)})`,
+          message: `Bought ${holding.assetId} (${formatIrrCompact(holding.valueIrr)})`,
           beforeSnapshot: {},
           afterSnapshot: {},
         },
@@ -391,6 +392,4 @@ export async function createInitialPortfolio(
   };
 }
 
-function formatIrr(amount: number): string {
-  return new Intl.NumberFormat('en-US').format(amount) + ' IRR';
-}
+// formatIrrCompact imported from utils/money.js

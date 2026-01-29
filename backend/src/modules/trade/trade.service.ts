@@ -27,6 +27,7 @@ import {
   isLessThan,
   isLessThanOrEqual,
   Decimal,
+  formatIrrCompact,
 } from '../../utils/money.js';
 
 // Spread rates per PRD Section 21 - Layer-based
@@ -472,7 +473,7 @@ export async function executeTrade(
         quantity,
         amountIrr,
         boundary: preview.boundary,
-        message: `${action === 'BUY' ? 'Bought' : 'Sold'} ${assetId} (${formatIrr(amountIrr)})`,
+        message: `${action === 'BUY' ? 'Bought' : 'Sold'} ${assetId} (${formatIrrCompact(amountIrr)})`,
       },
     });
 
@@ -482,7 +483,7 @@ export async function executeTrade(
         portfolioId: portfolio.id,
         actionType: action === 'BUY' ? 'TRADE_BUY' : 'TRADE_SELL',
         boundary: preview.boundary,
-        message: `${action === 'BUY' ? 'Bought' : 'Sold'} ${assetId} (${formatIrr(amountIrr)})`,
+        message: `${action === 'BUY' ? 'Bought' : 'Sold'} ${assetId} (${formatIrrCompact(amountIrr)})`,
         amountIrr,
         assetId,
       },
@@ -608,6 +609,4 @@ function determineStatusFromAllocation(
   return 'ATTENTION_REQUIRED';
 }
 
-function formatIrr(amount: number): string {
-  return new Intl.NumberFormat('en-US').format(amount) + ' IRR';
-}
+// formatIrrCompact imported from utils/money.js

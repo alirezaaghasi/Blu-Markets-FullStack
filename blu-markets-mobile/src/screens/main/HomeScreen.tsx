@@ -130,32 +130,6 @@ const StatusBadge: React.FC<{ status: PortfolioStatus; onPress?: () => void }> =
 };
 
 /**
- * Price Feed Status Indicator
- * Shows "Last updated: HH:MM" with yellow dot if stale (>5min), "Connecting..." if never fetched
- */
-const PriceFeedStatus: React.FC<{ lastUpdate?: Date }> = ({ lastUpdate }) => {
-  const now = new Date();
-  const isStale = lastUpdate ? (now.getTime() - lastUpdate.getTime()) > 5 * 60 * 1000 : true;
-  const neverFetched = !lastUpdate;
-
-  const timeString = lastUpdate
-    ? lastUpdate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-    : null;
-
-  const dotColor = neverFetched ? '#fde047' : isStale ? '#fde047' : '#4ade80';
-  const statusText = neverFetched
-    ? 'Connecting...'
-    : `Last updated: ${timeString}`;
-
-  return (
-    <View style={styles.priceFeedContainer}>
-      <View style={[styles.priceFeedDot, { backgroundColor: dotColor }]} />
-      <Text style={styles.priceFeedText}>{statusText}</Text>
-    </View>
-  );
-};
-
-/**
  * Main Action Button (Row 1 - 3 equal width)
  */
 const MainActionButton: React.FC<{
@@ -199,8 +173,8 @@ const HomeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const dispatch = useAppDispatch();
 
-  // Price connection status
-  const { isConnected: priceConnected, lastUpdate: priceLastUpdate } = usePriceConnection();
+  // Price connection status (for update time display)
+  const { lastUpdate: priceLastUpdate } = usePriceConnection();
 
   // Safe area insets for notched devices
   const insets = useSafeAreaInsets();
@@ -428,38 +402,33 @@ const HomeScreen: React.FC = () => {
       </View>
 
       {/* ================================================================ */}
-      {/* FIXED PORTFOLIO VALUE: One Big Number + Asset/Cash Breakdown */}
+      {/* COMPACT PORTFOLIO VALUE: Total + Assets/Cash/ViewPortfolio row */}
       {/* ================================================================ */}
       <View style={styles.valueSection}>
-        {/* Total Holdings - ONE number (backend-calculated) */}
+        {/* Total Holdings - ONE big number (backend-calculated) */}
         <Text style={styles.totalValueAmount}>
           {formatIRR(totalValueIrr)} <Text style={styles.totalValueCurrency}>IRR</Text>
         </Text>
-        <Text style={styles.totalValueLabel}>Total Holdings</Text>
 
-        {/* Asset Value vs Cash breakdown (backend-calculated) */}
-        <View style={styles.valueBreakdown}>
-          <View style={styles.valueBreakdownItem}>
-            <Text style={styles.breakdownValue}>{formatIRR(holdingsValueIrr)}</Text>
-            <Text style={styles.breakdownLabel}>Asset Value</Text>
+        {/* Compact row: Assets | Cash | View Portfolio */}
+        <View style={styles.compactRow}>
+          <View style={styles.compactItem}>
+            <Text style={styles.compactValue}>{formatIRR(holdingsValueIrr)}</Text>
+            <Text style={styles.compactLabel}>Assets</Text>
           </View>
-          <View style={styles.valueBreakdownDivider} />
-          <View style={styles.valueBreakdownItem}>
-            <Text style={styles.breakdownValue}>{formatIRR(cashIRR)}</Text>
-            <Text style={styles.breakdownLabel}>Cash</Text>
+          <View style={styles.compactDivider} />
+          <View style={styles.compactItem}>
+            <Text style={styles.compactValue}>{formatIRR(cashIRR)}</Text>
+            <Text style={styles.compactLabel}>Cash</Text>
           </View>
+          <View style={styles.compactDivider} />
+          <TouchableOpacity
+            style={styles.compactItem}
+            onPress={handleViewPortfolio}
+          >
+            <Text style={styles.viewPortfolioCompact}>View Portfolio →</Text>
+          </TouchableOpacity>
         </View>
-
-        {/* View Portfolio Link */}
-        <TouchableOpacity
-          style={styles.viewPortfolioLink}
-          onPress={handleViewPortfolio}
-        >
-          <Text style={styles.viewPortfolioText}>View Portfolio →</Text>
-        </TouchableOpacity>
-
-        {/* Price Feed Status */}
-        <PriceFeedStatus lastUpdate={priceLastUpdate} />
       </View>
 
       {/* ================================================================ */}
@@ -480,6 +449,12 @@ const HomeScreen: React.FC = () => {
         <View style={styles.activitySection}>
           <View style={styles.activityHeader}>
             <Text style={styles.sectionTitle}>Activity Log</Text>
+            {/* Update time moved from value section */}
+            <Text style={styles.updateTime}>
+              {priceLastUpdate
+                ? `Updated ${priceLastUpdate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
+                : 'Connecting...'}
+            </Text>
           </View>
 
           {isLoadingActivities ? (
@@ -508,9 +483,10 @@ const HomeScreen: React.FC = () => {
                       flexDirection: 'row',
                       alignItems: 'center',
                       backgroundColor: COLORS.background.surface,
-                      borderRadius: 12,
-                      padding: 14,
-                      marginBottom: 8,
+                      borderRadius: 10,
+                      paddingVertical: 10,
+                      paddingHorizontal: 12,
+                      marginBottom: 6,
                       borderWidth: 1,
                       borderColor: COLORS.border,
                     }}
@@ -714,94 +690,67 @@ const styles = StyleSheet.create({
     color: COLORS.text.primary,
   },
 
-  // Value Section
+  // Value Section - Compact Layout
   valueSection: {
     alignItems: 'center',
     paddingHorizontal: SPACING[4],
-    paddingTop: SPACING[6],
-    paddingBottom: SPACING[4],
+    paddingTop: SPACING[4],
+    paddingBottom: SPACING[2],
   },
   totalValueAmount: {
-    fontSize: 40,
+    fontSize: 44,
     fontWeight: '700',
     color: COLORS.text.primary,
     letterSpacing: -1,
   },
   totalValueCurrency: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: '600',
     color: COLORS.text.muted,
   },
-  totalValueLabel: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.text.secondary,
-    marginTop: SPACING[1],
-  },
-  valueBreakdown: {
+  // Compact row: Assets | Cash | View Portfolio
+  compactRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: SPACING[5],
-    backgroundColor: COLORS.background.elevated,
-    borderRadius: RADIUS.lg,
-    paddingVertical: SPACING[4],
-    paddingHorizontal: SPACING[5],
-  },
-  valueBreakdownItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  valueBreakdownDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: COLORS.background.surface,
-    marginHorizontal: SPACING[4],
-  },
-  breakdownValue: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: '700',
-    color: COLORS.text.primary,
-  },
-  breakdownLabel: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.muted,
-    marginTop: SPACING[1],
-  },
-  viewPortfolioLink: {
-    marginTop: SPACING[4],
+    justifyContent: 'center',
+    marginTop: SPACING[3],
     paddingVertical: SPACING[2],
   },
-  viewPortfolioText: {
+  compactItem: {
+    alignItems: 'center',
+    paddingHorizontal: SPACING[3],
+  },
+  compactDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: COLORS.background.elevated,
+  },
+  compactValue: {
     fontSize: TYPOGRAPHY.fontSize.base,
     fontWeight: '600',
-    color: COLORS.brand.primary,
+    color: COLORS.text.primary,
   },
-  priceFeedContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: SPACING[3],
-    opacity: 0.7,
-  },
-  priceFeedDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: SPACING[2],
-  },
-  priceFeedText: {
+  compactLabel: {
     fontSize: TYPOGRAPHY.fontSize.xs,
     color: COLORS.text.muted,
+    marginTop: 2,
+  },
+  viewPortfolioCompact: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '600',
+    color: COLORS.brand.primary,
   },
 
   // Activity Section
   activitySection: {
     paddingHorizontal: SPACING[4],
-    marginTop: SPACING[4],
+    marginTop: SPACING[2],
   },
   activityHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING[3],
+    marginBottom: SPACING[2],
   },
   sectionTitle: {
     fontSize: TYPOGRAPHY.fontSize.sm,
@@ -809,6 +758,10 @@ const styles = StyleSheet.create({
     color: COLORS.text.secondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  updateTime: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.text.muted,
   },
   loadingContainer: {
     padding: SPACING[6],

@@ -27,6 +27,7 @@ import {
   min,
   max,
   Decimal,
+  formatIrrCompact,
 } from '../../utils/money.js';
 
 const createLoanSchema = z.object({
@@ -478,7 +479,7 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
             assetId: collateralAssetId,
             loanId: loan.id,
             boundary: 'SAFE',
-            message: `Loan created: ${amountIrr.toLocaleString()} IRR against ${collateralAssetId}`,
+            message: `Borrowed ${formatIrrCompact(amountIrr)} against ${collateralAssetId}`,
           },
         });
 
@@ -488,7 +489,7 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
             portfolioId: portfolio.id,
             actionType: 'LOAN_CREATE',
             boundary: 'SAFE',
-            message: `Borrowed ${amountIrr.toLocaleString()} IRR against ${collateralAssetId}`,
+            message: `Borrowed ${formatIrrCompact(amountIrr)} against ${collateralAssetId}`,
             amountIrr,
             assetId: collateralAssetId,
           },
@@ -726,7 +727,7 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
             amountIrr: amountToApply,
             loanId: loan.id,
             boundary: 'SAFE',
-            message: `Loan repayment: ${amountToApply.toLocaleString()} IRR`,
+            message: `Repaid ${formatIrrCompact(amountToApply)} on ${loan.collateral_asset_id} loan`,
           },
         });
 
@@ -737,8 +738,8 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
             actionType: 'LOAN_REPAY',
             boundary: 'SAFE',
             message: isFullySettled
-              ? `Settled ${loan.collateral_asset_id} loan (${amountToApply.toLocaleString()} IRR)`
-              : `Repaid ${amountToApply.toLocaleString()} IRR · ${loan.collateral_asset_id} loan (${installmentsPaid}/6)`,
+              ? `Settled ${loan.collateral_asset_id} loan (${formatIrrCompact(amountToApply)})`
+              : `Repaid ${formatIrrCompact(amountToApply)} · ${loan.collateral_asset_id} loan (${installmentsPaid}/6)`,
             amountIrr: amountToApply,
             assetId: loan.collateral_asset_id,
           },
