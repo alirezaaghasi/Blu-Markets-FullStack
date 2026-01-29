@@ -686,18 +686,34 @@ const liquidityFactor = 1 + ((liquidityScore - 0.80) * LIQUIDITY_BONUS);
 
 ```typescript
 const BALANCER_CONFIG = {
+  // HRAM Weight Constraints
   MIN_WEIGHT: 0.05,                    // 5% minimum per asset
   MAX_WEIGHT: 0.40,                    // 40% maximum per asset
+
+  // HRAM Factors
   MOMENTUM_STRENGTH: 0.3,              // Default momentum influence
   CORRELATION_PENALTY: 0.2,            // Default correlation penalty
   LIQUIDITY_BONUS: 0.1,                // Bonus for liquid assets
+
+  // Calculation Windows
   VOLATILITY_WINDOW: 30,               // Days for volatility calculation
   MOMENTUM_WINDOW: 50,                 // Days for momentum SMA
   CORRELATION_WINDOW: 60,              // Days for correlation calculation
+
+  // Rebalance Triggers
   DRIFT_THRESHOLD: 0.05,               // 5% triggers normal rebalance
   EMERGENCY_DRIFT_THRESHOLD: 0.10,     // 10% triggers immediate rebalance
   MIN_REBALANCE_INTERVAL_DAYS: 1,      // 1 day between rebalances
   MIN_TRADE_VALUE_IRR: 100_000,        // Skip trades < 100,000 IRR
+
+  // Intra-Layer Thresholds
+  INTER_LAYER_DRIFT_THRESHOLD_FOR_INTRA: 5,  // Layer must be within 5% of target for intra-layer
+  INTRA_LAYER_OVERWEIGHT_THRESHOLD: 0.15,    // 15% overweight triggers sell within layer
+  INTRA_LAYER_UNDERWEIGHT_THRESHOLD: 0.10,   // 10% underweight triggers buy within layer
+
+  // Diversification Protection
+  MAX_SELL_PERCENTAGE_PER_ASSET: 0.80,       // Never sell more than 80% of any holding
+  MIN_ASSET_VALUE_TO_KEEP: 5_000_000,        // Maintain minimum 5M IRR position
 };
 ```
 
@@ -714,6 +730,17 @@ const BALANCER_CONFIG = {
 | **HOLDINGS_ONLY** | Sell overweight, buy underweight | Default mode |
 | **HOLDINGS_PLUS_CASH** | Use all available cash | User opts in |
 | **SMART** | Optimal combination of holdings + specified cash | Advanced mode |
+
+#### HOLDINGS_ONLY Mode Details
+- Cash is **NOT deployed** for any purpose (inter-layer or intra-layer)
+- Intra-layer buys must be funded entirely by intra-layer sells
+- If intra-layer sells cannot cover buys, buys are scaled down proportionally
+- User's cash balance remains unchanged after rebalance
+
+#### HOLDINGS_PLUS_CASH Mode Details
+- Cash **IS deployed** for inter-layer rebalancing (buying into underweight layers)
+- Intra-layer rebalancing remains self-funding (intra-layer sells fund intra-layer buys)
+- Cash is NOT used for intra-layer buys to avoid increasing exposure to already-overweight layers
 
 ### 7.2 Layer-Level Rebalancing
 
@@ -759,6 +786,35 @@ function previewRebalance(state, { mode, useCashAmount, prices, fxRate }) {
 
 ### 7.3 Intra-Layer Trade Execution
 
+#### Inter-Layer Priority Rule
+
+**Intra-layer rebalancing is only performed when a layer is within ±5% of its inter-layer target allocation.**
+
+| Layer Inter-Layer Status | Intra-Layer Action |
+|--------------------------|-------------------|
+| At target (drift ≤ 5%) | Perform intra-layer rebalancing |
+| Overweight (drift > 5%) | Skip - do not buy into overweight layer |
+| Underweight (drift > 5%) | Skip - inter-layer buys handle distribution |
+
+**Rationale:** Buying into an overweight layer (even to fix intra-layer imbalances) would increase exposure to that layer, conflicting with inter-layer rebalancing goals. Inter-layer allocation takes priority; intra-layer fine-tuning only matters once the layer is at its target.
+
+#### Frozen Collateral Handling
+
+When calculating intra-layer trades:
+1. Only **unfrozen** holdings can be sold
+2. Overweight assets that are frozen (loan collateral) are excluded from sell calculations
+3. Intra-layer buys are funded **only** by intra-layer sell proceeds (self-funding)
+4. If no sells are possible (all overweight assets frozen), no intra-layer buys are generated
+
+#### Diversification Protection
+
+To maintain portfolio diversification during rebalancing:
+
+| Constraint | Value | Description |
+|------------|-------|-------------|
+| MAX_SELL_PERCENTAGE_PER_ASSET | 80% | Never sell more than 80% of any single holding |
+| MIN_ASSET_VALUE_TO_KEEP | 5,000,000 IRR | Maintain minimum position size per asset |
+
 ```typescript
 // SELLS: Pro-rata from each asset based on current value
 function executeSells(surpluses, totalSurplus, amountToMove, sellableByLayer) {
@@ -766,7 +822,7 @@ function executeSells(surpluses, totalSurplus, amountToMove, sellableByLayer) {
     const toSell = surpluses[layer] / totalSurplus * amountToMove;
     const assets = sellableByLayer[layer];
     const layerTotal = sum(assets.map(h => h.valueIRR));
-    
+
     for (const h of assets) {
       const proportion = h.valueIRR / layerTotal;
       const sellAmount = toSell * proportion;
@@ -780,7 +836,7 @@ function executeBuys(deficits, totalDeficit, amountToAllocate, holdingsByLayer, 
   for (const layer of Object.keys(deficits)) {
     const layerBuy = deficits[layer] / totalDeficit * amountToAllocate;
     const layerWeights = weights[layer];  // From HRAM calculation
-    
+
     for (const h of holdingsByLayer[layer]) {
       const assetWeight = layerWeights[h.assetId];
       const buyAmount = layerBuy * assetWeight;
