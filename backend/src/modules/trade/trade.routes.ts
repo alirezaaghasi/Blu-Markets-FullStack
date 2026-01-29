@@ -115,6 +115,9 @@ export const tradeRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
                 holdingQuantity: { type: 'number' },
               },
             },
+            // Mobile client compatibility aliases
+            newCashIrr: { type: 'number' },
+            newHoldingQuantity: { type: 'number' },
             boundary: { type: 'string' },
             ledgerEntryId: { type: 'string' },
           },
