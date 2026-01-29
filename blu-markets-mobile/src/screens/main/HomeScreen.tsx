@@ -71,85 +71,25 @@ function formatIRR(value: number): string {
 }
 
 /**
- * Format IRR with short suffix for activity log
- */
-function formatIRRShort(value: number | undefined): string {
-  if (value === undefined || value === null || isNaN(value)) return '0';
-  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B IRR`;
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(0)}M IRR`;
-  return `${value.toLocaleString('en-US')} IRR`;
-}
-
-// Portfolio status is calculated by backend - frontend only displays it
-
-/**
- * Format activity log message
- * Returns user-friendly description based on action type and data
- * BUG-1 FIX: Handle backend action types (TRADE_BUY, PROTECTION_PURCHASE, etc.)
+ * Display activity message from backend.
+ * UI is purely representational - all messages come from the backend.
+ * Frontend does NOT generate, calculate, or decide what to show.
  */
 function formatActivityMessage(entry: ActionLogEntry): string {
-  // BUG-3 FIX: Robust null checks for all entry fields
+  // Safety check for null/undefined entry
   if (!entry) return 'Activity';
 
-  const assetName = entry.assetId ? (ASSETS[entry.assetId]?.name || entry.assetId) : '';
-  // BUG-1 FIX: entry.type may be string from backend, normalize to handle all cases
-  const actionType = String(entry.type || 'UNKNOWN').toUpperCase();
-
-  switch (actionType) {
-    case 'PORTFOLIO_CREATED':
-      return `Started with ${formatIRRShort(entry.amountIRR)}`;
-    case 'ADD_FUNDS':
-      return `Added ${formatIRRShort(entry.amountIRR)} cash`;
-    // BUG-1 FIX: Handle both frontend 'TRADE' and backend 'TRADE_BUY'/'TRADE_SELL'
-    case 'TRADE':
-    case 'TRADE_BUY':
-      if (entry.message && entry.message.length > 0) return entry.message;
-      return assetName ? `Bought ${assetName}` : 'Executed buy';
-    case 'TRADE_SELL':
-      if (entry.message && entry.message.length > 0) return entry.message;
-      return assetName ? `Sold ${assetName}` : 'Executed sell';
-    // BUG-1 FIX: Handle both frontend 'BORROW' and backend 'LOAN_CREATE'
-    // Prefer backend message which includes full context (collateral asset, etc.)
-    case 'BORROW':
-    case 'LOAN_CREATE':
-      if (entry.message && entry.message.length > 0) return entry.message;
-      return `Borrowed ${formatIRRShort(entry.amountIRR)}${assetName ? ` against ${assetName}` : ''}`;
-    case 'REPAY':
-    case 'LOAN_REPAY':
-      // Backend sends rich message like "Settled PAXG loan (11M IRR)" or "Repaid 4M IRR · BTC loan (1/6)"
-      if (entry.message && entry.message.length > 0) return entry.message;
-      return `Repaid ${formatIRRShort(entry.amountIRR)}${assetName ? ` · ${assetName} loan` : ''}`;
-    case 'LOAN_LIQUIDATE':
-      if (entry.message && entry.message.length > 0) return entry.message;
-      return `Loan liquidated${assetName ? ` (${assetName})` : ''}`;
-    // BUG-1 FIX: Handle both frontend 'PROTECT' and backend 'PROTECTION_PURCHASE'
-    case 'PROTECT':
-    case 'PROTECTION_PURCHASE':
-      return assetName ? `Protected ${assetName}` : 'Added protection';
-    case 'REBALANCE':
-      return entry.message && entry.message.length > 0 ? entry.message : 'Rebalanced portfolio';
-    case 'CANCEL_PROTECTION':
-    case 'PROTECTION_CANCEL':
-      return assetName ? `Cancelled ${assetName} protection` : 'Cancelled protection';
-    case 'PROTECTION_EXPIRE':
-      return assetName ? `${assetName} protection expired` : 'Protection expired';
-    case 'PROTECTION_SETTLEMENT':
-      return assetName ? `${assetName} protection settled` : 'Protection settled';
-    case 'UNKNOWN':
-      // BUG-3 FIX: Handle unknown type gracefully
-      if (entry.message && entry.message.length > 0) {
-        return entry.message;
-      }
-      return 'Activity recorded';
-    default:
-      // Robust fallback: prefer message, then type formatted, then generic text
-      if (entry.message && entry.message.length > 0) {
-        return entry.message;
-      }
-      // BUG-3 FIX: Ensure we never return empty string
-      const formattedType = actionType.replace(/_/g, ' ').toLowerCase();
-      return formattedType && formattedType.trim() ? formattedType : 'Activity';
+  // Backend is the single source of truth for activity messages
+  // Frontend only provides fallback for edge cases (should never happen in production)
+  if (entry.message && entry.message.length > 0) {
+    return entry.message;
   }
+
+  // Fallback only for legacy/missing data - log warning in dev
+  if (__DEV__) {
+    console.warn('[Activity] Missing message from backend for entry:', entry.type, entry.id);
+  }
+  return 'Activity recorded';
 }
 
 // =============================================================================
