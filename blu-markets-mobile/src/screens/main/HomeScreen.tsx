@@ -22,7 +22,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS } from '../../constants/colors';
 import { TYPOGRAPHY } from '../../constants/typography';
@@ -256,6 +256,10 @@ const HomeScreen: React.FC = () => {
 
   // Price connection status
   const { isConnected: priceConnected, lastUpdate: priceLastUpdate } = usePriceConnection();
+
+  // Safe area insets for notched devices
+  const insets = useSafeAreaInsets();
+  const FOOTER_BASE_HEIGHT = 140; // Base footer height without safe area
 
   // Activity feed from API
   const {
@@ -518,7 +522,7 @@ const HomeScreen: React.FC = () => {
       {/* ================================================================ */}
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: FOOTER_BASE_HEIGHT + insets.bottom + SPACING[4] }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -620,7 +624,7 @@ const HomeScreen: React.FC = () => {
       {/* ================================================================ */}
       {/* FIXED MAIN ACTIONS AT BOTTOM */}
       {/* ================================================================ */}
-      <View style={styles.fixedActionsContainer}>
+      <View style={[styles.fixedActionsContainer, { paddingBottom: SPACING[6] + insets.bottom }]}>
         {/* Row 1: Rebalance, Add Funds, Buy/Sell */}
         <View style={styles.actionsRow}>
           <MainActionButton
@@ -693,7 +697,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 160, // Account for fixed action buttons at bottom
+    // paddingBottom is applied dynamically with safe area insets
   },
 
   // Header
@@ -931,7 +935,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background.primary,
     paddingHorizontal: SPACING[4],
     paddingTop: SPACING[3],
-    paddingBottom: SPACING[6],
+    // paddingBottom is applied dynamically with safe area insets
     borderTopWidth: 1,
     borderTopColor: COLORS.background.elevated,
   },
