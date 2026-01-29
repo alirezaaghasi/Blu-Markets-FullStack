@@ -16,19 +16,19 @@ const BOUNDARY_COLORS: Record<Boundary, { bg: string; text: string }> = {
   STRESS: { bg: `${COLORS.boundary.stress}20`, text: COLORS.boundary.stress },
 };
 
-// Action type icons
+// P2: Action type icons - Unicode symbols (cleaner than emojis)
 const ACTION_ICONS: Record<ActionType | string, string> = {
-  PORTFOLIO_CREATED: '🎉',
-  ADD_FUNDS: '💵',
-  TRADE: '↔️',
-  REBALANCE: '⚖️',
-  PROTECT: '🛡️',
-  PROTECTION: '🛡️',
-  CANCEL_PROTECTION: '❌',
-  BORROW: '💰',
-  REPAY: '✓',
-  LOAN_PAYMENT: '💳',
-  ALERT: '⚠️',
+  PORTFOLIO_CREATED: '✦',  // Star
+  ADD_FUNDS: '+',          // Plus
+  TRADE: '⇄',              // Exchange arrows
+  REBALANCE: '⚖',          // Balance scale
+  PROTECT: '◈',            // Shield-like diamond
+  PROTECTION: '◈',         // Shield-like diamond
+  CANCEL_PROTECTION: '✕',  // X mark
+  BORROW: '↓',             // Down arrow (receive)
+  REPAY: '↑',              // Up arrow (send)
+  LOAN_PAYMENT: '↑',       // Up arrow (payment)
+  ALERT: '!',              // Exclamation
 };
 
 interface ActivityCardProps {

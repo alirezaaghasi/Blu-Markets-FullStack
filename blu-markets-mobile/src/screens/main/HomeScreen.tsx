@@ -645,7 +645,7 @@ const styles = StyleSheet.create({
   },
   statusLabel: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: '600',
+    fontWeight: '500',  // P2: Reduced from 600 for less visual weight
   },
   headerRight: {
     flexDirection: 'row',

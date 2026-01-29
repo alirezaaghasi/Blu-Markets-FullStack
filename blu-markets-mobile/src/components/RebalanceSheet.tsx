@@ -199,18 +199,39 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
                 </View>
               </View>
 
-              {/* Layer changes with arrows */}
+              {/* P2: Per-layer progress bars showing current vs target */}
               <View style={styles.layerChanges}>
                 {(['FOUNDATION', 'GROWTH', 'UPSIDE'] as const).map((layer) => {
                   const current = beforeAllocation[layer.toLowerCase() as keyof typeof beforeAllocation];
                   const target = targetAllocationDisplay[layer.toLowerCase() as keyof typeof targetAllocationDisplay];
+                  const maxPct = Math.max(current, target, 1);
                   return (
                     <View key={layer} style={styles.layerChangeRow}>
-                      <View style={[styles.layerDot, { backgroundColor: LAYER_COLORS[layer] }]} />
-                      <Text style={styles.layerName}>{LAYER_NAMES[layer]}</Text>
-                      <Text style={styles.layerChangeText}>
-                        {formatPercent(current)} → {formatPercent(target)}
-                      </Text>
+                      <View style={styles.layerHeader}>
+                        <View style={[styles.layerDot, { backgroundColor: LAYER_COLORS[layer] }]} />
+                        <Text style={styles.layerName}>{LAYER_NAMES[layer]}</Text>
+                        <Text style={styles.layerChangeText}>
+                          {formatPercent(current)} → {formatPercent(target)}
+                        </Text>
+                      </View>
+                      {/* Individual layer progress bar */}
+                      <View style={styles.layerProgressContainer}>
+                        <View style={styles.layerProgressBg}>
+                          {/* Current value bar */}
+                          <View style={[
+                            styles.layerProgressCurrent,
+                            {
+                              width: `${(current / maxPct) * 100}%`,
+                              backgroundColor: LAYER_COLORS[layer],
+                            }
+                          ]} />
+                          {/* Target marker */}
+                          <View style={[
+                            styles.layerTargetMarker,
+                            { left: `${(target / maxPct) * 100}%` }
+                          ]} />
+                        </View>
+                      </View>
                     </View>
                   );
                 })}
@@ -415,9 +436,12 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   layerChanges: {
-    gap: spacing[2],
+    gap: spacing[3],
   },
   layerChangeRow: {
+    gap: spacing[2],
+  },
+  layerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -433,9 +457,34 @@ const styles = StyleSheet.create({
     color: colors.textPrimaryDark,
   },
   layerChangeText: {
-    fontSize: typography.fontSize.base,
+    fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
     color: colors.textSecondary,
+  },
+  // P2: Per-layer progress bar styles
+  layerProgressContainer: {
+    marginLeft: 18, // Align with layer name (after dot)
+  },
+  layerProgressBg: {
+    height: 6,
+    backgroundColor: colors.surfaceDark,
+    borderRadius: 3,
+    position: 'relative',
+    overflow: 'visible',
+  },
+  layerProgressCurrent: {
+    height: '100%',
+    borderRadius: 3,
+    opacity: 0.8,
+  },
+  layerTargetMarker: {
+    position: 'absolute',
+    top: -2,
+    width: 2,
+    height: 10,
+    backgroundColor: colors.textPrimaryDark,
+    borderRadius: 1,
+    marginLeft: -1, // Center the marker
   },
   // Legacy allocation styles (kept for compatibility)
   allocationRow: {
