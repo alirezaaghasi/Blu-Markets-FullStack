@@ -36,15 +36,18 @@ export type RebalanceMode = 'HOLDINGS_ONLY' | 'HOLDINGS_PLUS_CASH' | 'SMART';
 // Strategy presets per PRD Section 18.2
 export type RebalanceStrategy = 'CONSERVATIVE' | 'BALANCED' | 'AGGRESSIVE';
 
-// Spread per layer (same as trade)
+// Spread per layer (per PRD Section 7.1)
+// FOUNDATION: 0.15% (range 0.1%-0.2%) - stablecoins, gold
+// GROWTH: 0.30% (range 0.2%-0.4%) - BTC, ETH, etc.
+// UPSIDE: 0.60% (range 0.4%-0.8%) - higher volatility altcoins
 const SPREAD_BY_LAYER: Record<Layer, number> = {
-  FOUNDATION: 0.002,
+  FOUNDATION: 0.0015,
   GROWTH: 0.003,
-  UPSIDE: 0.004,
+  UPSIDE: 0.006,
 };
 
-// Minimum trade amount
-const MIN_TRADE_AMOUNT = 1_000_000;
+// Minimum trade amount (per PRD: 100,000 IRR)
+const MIN_TRADE_AMOUNT = 100_000;
 
 // Cooldown period in hours (set to 0 for testing)
 const REBALANCE_COOLDOWN_HOURS = 0;
@@ -249,8 +252,16 @@ export async function executeRebalance(
       currentPortfolio.holdings.map((h) => [h.assetId, { id: h.id, quantity: Number(h.quantity), frozen: h.frozen }])
     );
 
+    // CRITICAL: Sort trades so SELLs execute before BUYs
+    // This ensures cash from sales is available for purchases
+    const sortedTrades = [...preview.trades].sort((a, b) => {
+      if (a.side === 'SELL' && b.side === 'BUY') return -1;
+      if (a.side === 'BUY' && b.side === 'SELL') return 1;
+      return 0;
+    });
+
     // Execute each trade
-    for (const trade of preview.trades) {
+    for (const trade of sortedTrades) {
       const price = prices.get(trade.assetId as AssetId);
       if (!price) continue;
 
@@ -267,39 +278,65 @@ export async function executeRebalance(
           continue;
         }
 
-        const quantityToSellDecimal = roundCrypto(divide(trade.amountIrr, price.priceIrr));
-        const newQuantityDecimal = subtract(holding.quantity, quantityToSellDecimal);
-        const newQuantity = toNumber(newQuantityDecimal);
-        const netProceedsDecimal = roundIrr(multiply(trade.amountIrr, subtract(1, spread)));
+        let quantityToSellDecimal = roundCrypto(divide(trade.amountIrr, price.priceIrr));
+        let newQuantityDecimal = subtract(holding.quantity, quantityToSellDecimal);
 
-        // DIVERSIFICATION PROTECTION: Never delete holdings during rebalance
-        // Even if quantity becomes very small, keep the position to maintain diversification
-        // Only user-initiated sells should be able to close a position entirely
-        if (isLessThan(newQuantityDecimal, 0.00000001)) {
-          logger.warn('Rebalance attempted to liquidate position entirely - skipping to preserve diversification', {
+        // DIVERSIFICATION PROTECTION: Keep at least 5% of holding to maintain diversification
+        // If sell would leave less than 5%, sell only up to 95% of the holding
+        const minRetainPct = 0.05;
+        const minRetainQuantity = multiply(holding.quantity, minRetainPct);
+
+        if (isLessThan(newQuantityDecimal, minRetainQuantity)) {
+          // Adjust to sell only 95% of available, keeping 5% reserve
+          const maxSellQuantity = multiply(holding.quantity, 1 - minRetainPct);
+          quantityToSellDecimal = roundCrypto(maxSellQuantity);
+          newQuantityDecimal = subtract(holding.quantity, quantityToSellDecimal);
+
+          logger.warn('Rebalance: Capped sell to preserve diversification', {
             assetId: trade.assetId,
             originalQuantity: holding.quantity,
-            attemptedSellQuantity: toNumber(quantityToSellDecimal),
+            attemptedSellQuantity: toNumber(divide(trade.amountIrr, price.priceIrr)),
+            cappedSellQuantity: toNumber(quantityToSellDecimal),
+            retainedQuantity: toNumber(newQuantityDecimal),
           });
-          // Skip this trade rather than delete the holding
-          continue;
-        } else {
-          await tx.holding.update({
-            where: { id: holding.id },
-            data: { quantity: newQuantity },
-          });
-          holding.quantity = newQuantity;
         }
+
+        const newQuantity = toNumber(newQuantityDecimal);
+        const actualSellAmountIrr = multiply(quantityToSellDecimal, price.priceIrr);
+        const netProceedsDecimal = roundIrr(multiply(actualSellAmountIrr, subtract(1, spread)));
+
+        await tx.holding.update({
+          where: { id: holding.id },
+          data: { quantity: newQuantity },
+        });
+        holding.quantity = newQuantity;
 
         cashIrr = toNumber(roundIrr(add(cashIrr, netProceedsDecimal)));
       } else {
         // BUY
-        // Cash guard: ensure sufficient cash after spreads before deduction
+        // If insufficient cash, buy what we can afford instead of failing
+        let buyAmountIrr = trade.amountIrr;
         if (isLessThan(cashIrr, trade.amountIrr)) {
-          throw new AppError('INSUFFICIENT_FUNDS', 'Insufficient cash after spreads', 400);
+          // Use all available cash for this buy (minus small buffer for rounding)
+          const availableForBuy = Math.max(0, cashIrr - 1000); // Keep 1000 IRR buffer
+          if (availableForBuy < MIN_TRADE_AMOUNT) {
+            logger.warn('Rebalance: Skipping buy due to insufficient cash', {
+              assetId: trade.assetId,
+              requestedAmountIrr: trade.amountIrr,
+              availableCashIrr: cashIrr,
+            });
+            continue; // Skip this buy, move to next trade
+          }
+          buyAmountIrr = availableForBuy;
+          logger.warn('Rebalance: Capped buy due to insufficient cash', {
+            assetId: trade.assetId,
+            requestedAmountIrr: trade.amountIrr,
+            cappedAmountIrr: buyAmountIrr,
+            availableCashIrr: cashIrr,
+          });
         }
 
-        const netAmountDecimal = roundIrr(multiply(trade.amountIrr, subtract(1, spread)));
+        const netAmountDecimal = roundIrr(multiply(buyAmountIrr, subtract(1, spread)));
         const quantityToBuyDecimal = roundCrypto(divide(netAmountDecimal, price.priceIrr));
         const quantityToBuy = toNumber(quantityToBuyDecimal);
         const holding = holdingsMap.get(trade.assetId);
@@ -325,7 +362,7 @@ export async function executeRebalance(
           holdingsMap.set(trade.assetId, { id: newHolding.id, quantity: quantityToBuy, frozen: false });
         }
 
-        cashIrr = toNumber(roundIrr(subtract(cashIrr, trade.amountIrr)));
+        cashIrr = toNumber(roundIrr(subtract(cashIrr, buyAmountIrr)));
       }
     }
 
@@ -626,11 +663,18 @@ function generateRebalanceTrades(
       );
 
       for (const trade of layerBuyTrades) {
-        // Double-check we don't exceed remaining cash
-        if (trade.amountIrr <= remainingCash) {
-          trades.push(trade);
-          totalBuyIrr += trade.amountIrr;
-          remainingCash -= trade.amountIrr;
+        if (remainingCash < MIN_TRADE_AMOUNT) break; // Stop if remaining cash is too small
+
+        // Cap trade to remaining cash if needed, rather than skipping entirely
+        const tradeAmount = Math.min(trade.amountIrr, remainingCash);
+
+        if (tradeAmount >= MIN_TRADE_AMOUNT) {
+          trades.push({
+            ...trade,
+            amountIrr: tradeAmount,
+          });
+          totalBuyIrr += tradeAmount;
+          remainingCash -= tradeAmount;
         }
       }
     }
@@ -644,11 +688,28 @@ function generateRebalanceTrades(
     trades: trades.map(t => ({ side: t.side, asset: t.assetId, amount: Math.round(t.amountIrr).toLocaleString(), layer: t.layer })),
   });
 
-  // INTRA-LAYER REBALANCING: Rebalance assets within layers that are at target
+  // INTRA-LAYER REBALANCING: Rebalance assets within layers that are AT TARGET
   // This handles cases where a layer is at its target % but individual assets
   // within the layer are significantly over/underweight
+  //
+  // KEY PRINCIPLE: Intra-layer rebalancing should ONLY happen when:
+  // 1. The layer is roughly at its inter-layer target (within threshold)
+  // 2. Individual assets within that layer are imbalanced
+  //
+  // If a layer is significantly OVERWEIGHT at inter-layer level, we should NOT
+  // be buying into it (even for intra-layer rebalancing) - that would increase
+  // exposure to an already overweight layer.
+  //
+  // If a layer is significantly UNDERWEIGHT, inter-layer rebalancing will buy
+  // into it, and intra-layer weights will be handled by the buy distribution.
   const INTRA_LAYER_OVERWEIGHT_THRESHOLD = 0.15; // 15% overweight triggers sell
   const INTRA_LAYER_UNDERWEIGHT_THRESHOLD = 0.10; // 10% underweight triggers buy
+  const INTER_LAYER_DRIFT_THRESHOLD_FOR_INTRA = 5; // Only do intra-layer if layer is within 5% of target
+
+  // In HOLDINGS_ONLY mode, intra-layer trades must net to zero or positive cash
+  // We'll accumulate sell proceeds and spend from those proceeds only
+  let intraLayerCashBudget = 0;
+  let intraLayerBuysPending: RebalanceTrade[] = [];
 
   for (const layer of ['FOUNDATION', 'GROWTH', 'UPSIDE'] as Layer[]) {
     const layerHoldings = holdingsByLayer[layer];
@@ -656,6 +717,22 @@ function generateRebalanceTrades(
                        layerHoldings.unfrozen.reduce((sum, h) => sum + h.valueIrr, 0);
 
     if (layerTotal < MIN_TRADE_AMOUNT) continue;
+
+    // CHECK: Is this layer roughly at its inter-layer target?
+    // If not, skip intra-layer rebalancing - inter-layer takes priority
+    const layerKey = layer.toLowerCase() as keyof typeof snapshot.allocation;
+    const currentLayerPct = snapshot.allocation[layerKey];
+    const targetLayerPct = snapshot.targetAllocation[layerKey];
+    const interLayerDrift = Math.abs(currentLayerPct - targetLayerPct);
+
+    if (interLayerDrift > INTER_LAYER_DRIFT_THRESHOLD_FOR_INTRA) {
+      logger.info(`Skipping intra-layer rebalancing for ${layer}: inter-layer drift ${interLayerDrift.toFixed(1)}% exceeds threshold ${INTER_LAYER_DRIFT_THRESHOLD_FOR_INTRA}%`, {
+        currentPct: currentLayerPct.toFixed(1),
+        targetPct: targetLayerPct.toFixed(1),
+        drift: interLayerDrift.toFixed(1),
+      });
+      continue;
+    }
 
     // Get target weights for this layer
     const layerWeights = getDynamicLayerWeights(layer, 'BALANCED');
@@ -707,58 +784,162 @@ function generateRebalanceTrades(
 
     // If we have both overweight and underweight assets in this layer, rebalance
     if (intraOverweight.length > 0 && intraUnderweight.length > 0) {
-      // Calculate total excess to sell
-      const totalExcess = intraOverweight.reduce((sum, a) => sum + a.excess, 0);
+      const spread = SPREAD_BY_LAYER[layer];
       const totalDeficit = intraUnderweight.reduce((sum, a) => sum + a.deficit, 0);
 
-      // Account for spread when selling
-      const spread = SPREAD_BY_LAYER[layer];
-      const netExcessAfterSpread = totalExcess * (1 - spread);
+      // CRITICAL FIX: Calculate ACTUAL sellable excess (only from unfrozen holdings)
+      // We must check what can actually be sold BEFORE determining buys
+      let actualSellableExcess = 0;
+      const sellablePlan: { assetId: string; amount: number; unfrozenValue: number }[] = [];
 
-      // Limit buys to available proceeds
-      const availableForIntraBuys = Math.min(netExcessAfterSpread, totalDeficit);
-
-      if (availableForIntraBuys >= MIN_TRADE_AMOUNT) {
-        // Generate SELL trades for overweight assets
-        for (const asset of intraOverweight) {
-          const sellAmount = Math.min(asset.excess, totalExcess);
-          if (sellAmount >= MIN_TRADE_AMOUNT) {
-            // Check if asset is frozen
-            const frozenHolding = layerHoldings.frozen.find(h => h.assetId === asset.assetId);
-            const unfrozenHolding = layerHoldings.unfrozen.find(h => h.assetId === asset.assetId);
-
-            if (unfrozenHolding && unfrozenHolding.valueIrr >= sellAmount) {
-              trades.push({
-                side: 'SELL',
-                assetId: asset.assetId as AssetId,
-                amountIrr: Math.round(sellAmount),
-                layer,
-              });
-              totalSellIrr += sellAmount;
-            }
+      for (const asset of intraOverweight) {
+        const unfrozenHolding = layerHoldings.unfrozen.find(h => h.assetId === asset.assetId);
+        if (unfrozenHolding) {
+          // Can only sell up to unfrozen value (respect 80% max sell rule)
+          const maxSellable = Math.min(
+            asset.excess,
+            unfrozenHolding.valueIrr * MAX_SELL_PERCENTAGE_PER_ASSET
+          );
+          if (maxSellable >= MIN_TRADE_AMOUNT) {
+            sellablePlan.push({
+              assetId: asset.assetId,
+              amount: maxSellable,
+              unfrozenValue: unfrozenHolding.valueIrr,
+            });
+            actualSellableExcess += maxSellable;
           }
         }
+      }
+
+      // Calculate available for buys based on ACTUAL sellable excess (not theoretical)
+      const netSellableAfterSpread = actualSellableExcess * (1 - spread);
+      const availableForIntraBuys = Math.min(netSellableAfterSpread, totalDeficit);
+
+      logger.info(`Intra-layer sellable analysis for ${layer}:`, {
+        theoreticalExcess: Math.round(intraOverweight.reduce((sum, a) => sum + a.excess, 0)).toLocaleString(),
+        actualSellableExcess: Math.round(actualSellableExcess).toLocaleString(),
+        availableForBuys: Math.round(availableForIntraBuys).toLocaleString(),
+        sellablePlan: sellablePlan.map(p => ({
+          asset: p.assetId,
+          sellAmount: Math.round(p.amount).toLocaleString(),
+        })),
+      });
+
+      if (availableForIntraBuys >= MIN_TRADE_AMOUNT && sellablePlan.length > 0) {
+        // Generate SELL trades for overweight assets (only those we confirmed are sellable)
+        let actualIntraSellProceeds = 0;
+        for (const plan of sellablePlan) {
+          trades.push({
+            side: 'SELL',
+            assetId: plan.assetId as AssetId,
+            amountIrr: Math.round(plan.amount),
+            layer,
+          });
+          totalSellIrr += plan.amount;
+          // Track net proceeds for intra-layer budget
+          actualIntraSellProceeds += plan.amount * (1 - spread);
+        }
+
+        // CRITICAL FIX: In HOLDINGS_ONLY mode, only generate intra-layer buys
+        // that can be funded by intra-layer sell proceeds
+        // Add sell proceeds to intra-layer budget
+        intraLayerCashBudget += actualIntraSellProceeds;
 
         // Generate BUY trades for underweight assets
         const buyRatio = availableForIntraBuys / totalDeficit;
         for (const asset of intraUnderweight) {
           const buyAmount = Math.round(asset.deficit * buyRatio);
           if (buyAmount >= MIN_TRADE_AMOUNT && prices.has(asset.assetId as AssetId)) {
-            trades.push({
-              side: 'BUY',
-              assetId: asset.assetId as AssetId,
-              amountIrr: buyAmount,
-              layer,
-            });
-            totalBuyIrr += buyAmount;
+            // In HOLDINGS_ONLY mode, accumulate buys and validate later
+            if (mode === 'HOLDINGS_ONLY') {
+              intraLayerBuysPending.push({
+                side: 'BUY',
+                assetId: asset.assetId as AssetId,
+                amountIrr: buyAmount,
+                layer,
+              });
+            } else {
+              // For other modes, add buys directly
+              trades.push({
+                side: 'BUY',
+                assetId: asset.assetId as AssetId,
+                amountIrr: buyAmount,
+                layer,
+              });
+              totalBuyIrr += buyAmount;
+            }
           }
         }
       }
     }
   }
 
+  // HOLDINGS_ONLY MODE: Process pending intra-layer buys with budget constraint
+  if (mode === 'HOLDINGS_ONLY' && intraLayerBuysPending.length > 0) {
+    const totalPendingBuys = intraLayerBuysPending.reduce((sum, t) => sum + t.amountIrr, 0);
+
+    if (totalPendingBuys <= intraLayerCashBudget) {
+      // All buys can be funded by intra-layer sells - add them all
+      for (const trade of intraLayerBuysPending) {
+        trades.push(trade);
+        totalBuyIrr += trade.amountIrr;
+      }
+      logger.info('Intra-layer buys approved (within budget)', {
+        budget: Math.round(intraLayerCashBudget).toLocaleString(),
+        totalBuys: Math.round(totalPendingBuys).toLocaleString(),
+      });
+    } else if (intraLayerCashBudget >= MIN_TRADE_AMOUNT) {
+      // Scale down buys proportionally to fit within budget
+      const scaleFactor = intraLayerCashBudget / totalPendingBuys;
+      logger.warn('Intra-layer buys scaled down to fit budget (HOLDINGS_ONLY)', {
+        budget: Math.round(intraLayerCashBudget).toLocaleString(),
+        originalTotal: Math.round(totalPendingBuys).toLocaleString(),
+        scaleFactor: scaleFactor.toFixed(3),
+      });
+
+      for (const trade of intraLayerBuysPending) {
+        const scaledAmount = Math.round(trade.amountIrr * scaleFactor);
+        if (scaledAmount >= MIN_TRADE_AMOUNT) {
+          trades.push({
+            ...trade,
+            amountIrr: scaledAmount,
+          });
+          totalBuyIrr += scaledAmount;
+        }
+      }
+    } else {
+      // Not enough budget - skip intra-layer buys entirely
+      logger.warn('Intra-layer buys skipped (insufficient budget for HOLDINGS_ONLY)', {
+        budget: Math.round(intraLayerCashBudget).toLocaleString(),
+        totalBuys: Math.round(totalPendingBuys).toLocaleString(),
+      });
+    }
+  }
+
+  // CRITICAL: Consolidate duplicate trades for the same asset+side
+  // This can happen when inter-layer and intra-layer phases both generate trades for same asset
+  const consolidatedTrades: RebalanceTrade[] = [];
+  const tradeMap = new Map<string, RebalanceTrade>();
+
+  for (const trade of trades) {
+    const key = `${trade.side}-${trade.assetId}`;
+    const existing = tradeMap.get(key);
+    if (existing) {
+      // Combine amounts
+      existing.amountIrr += trade.amountIrr;
+    } else {
+      const consolidated = { ...trade };
+      tradeMap.set(key, consolidated);
+      consolidatedTrades.push(consolidated);
+    }
+  }
+
+  // Recalculate totals after consolidation
+  totalSellIrr = consolidatedTrades.filter(t => t.side === 'SELL').reduce((sum, t) => sum + t.amountIrr, 0);
+  totalBuyIrr = consolidatedTrades.filter(t => t.side === 'BUY').reduce((sum, t) => sum + t.amountIrr, 0);
+
   // Calculate after allocation
-  const afterAllocation = calculateAfterAllocation(snapshot, trades, prices);
+  const afterAllocation = calculateAfterAllocation(snapshot, consolidatedTrades, prices);
 
   // Calculate residual drift
   const residualDrift = calculateDriftFromAllocation(afterAllocation, snapshot.targetAllocation);
@@ -770,18 +951,18 @@ function generateRebalanceTrades(
   const hasLockedCollateral = snapshot.holdings.some((h) => h.frozen);
 
   logger.info('=== REBALANCE CALCULATION COMPLETE ===', {
-    totalTrades: trades.length,
+    totalTrades: consolidatedTrades.length,
     totalBuyIrr: Math.round(totalBuyIrr).toLocaleString(),
     totalSellIrr: Math.round(totalSellIrr).toLocaleString(),
     beforeAllocation: snapshot.allocation,
     afterAllocation,
     residualDrift: residualDrift.toFixed(2) + '%',
     canFullyRebalance,
-    allTrades: trades.map(t => ({ side: t.side, asset: t.assetId, amount: Math.round(t.amountIrr).toLocaleString(), layer: t.layer })),
+    allTrades: consolidatedTrades.map(t => ({ side: t.side, asset: t.assetId, amount: Math.round(t.amountIrr).toLocaleString(), layer: t.layer })),
   });
 
   return {
-    trades,
+    trades: consolidatedTrades,
     beforeAllocation: snapshot.allocation,
     afterAllocation,
     totalBuyIrr,
@@ -795,6 +976,10 @@ function generateRebalanceTrades(
 /**
  * Generate BUY trades for a layer using intra-layer HRAM weights (PRD Section 7.3)
  * Distributes buy amount across assets proportionally to their target layer weights
+ *
+ * BUG FIX: The buy amounts are now capped to fit within the layerBuyAmount budget.
+ * Previously, individual buys were calculated as the full amount to reach target weight,
+ * which could exceed the available budget and result in ALL trades being skipped.
  */
 function generateLayerBuyTrades(
   layer: Layer,
@@ -820,43 +1005,95 @@ function generateLayerBuyTrades(
   // After buying, layer will be worth: currentLayerTotal + layerBuyAmount
   const afterLayerValue = currentLayerTotal + layerBuyAmount;
 
-  // Calculate how much each asset should be worth after rebalancing
-  // and how much we need to buy to get there
+  // STEP 1: Calculate how much each asset needs to reach target weight
+  const buyNeededByAsset: { assetId: string; buyNeeded: number; targetWeight: number }[] = [];
+  let totalBuyNeeded = 0;
+
   for (const assetId of layerAssets) {
     const targetWeight = layerWeights[assetId] || 0;
     const targetValue = afterLayerValue * targetWeight;
     const currentValue = currentValues[assetId] || 0;
     const buyNeeded = targetValue - currentValue;
 
-    // Only buy if we need more than minimum trade amount
-    if (buyNeeded >= MIN_TRADE_AMOUNT) {
-      const price = prices.get(assetId);
-      if (!price) continue;
-
-      trades.push({
-        side: 'BUY',
-        assetId,
-        amountIrr: Math.round(buyNeeded),
-        layer,
-      });
+    // Only consider assets that need buying (positive buyNeeded)
+    if (buyNeeded > 0 && prices.has(assetId)) {
+      buyNeededByAsset.push({ assetId, buyNeeded, targetWeight });
+      totalBuyNeeded += buyNeeded;
     }
   }
 
-  // If no individual trades meet minimum, buy the highest-weight asset
-  if (trades.length === 0 && layerBuyAmount >= MIN_TRADE_AMOUNT) {
-    // Find asset with highest target weight that has a price
-    const sortedAssets = layerAssets
-      .filter(a => prices.has(a))
-      .sort((a, b) => (layerWeights[b] || 0) - (layerWeights[a] || 0));
+  // STEP 2: Scale down buys proportionally if total exceeds budget
+  // This ensures we stay within layerBuyAmount while maintaining relative proportions
+  const scaleFactor = totalBuyNeeded > layerBuyAmount ? layerBuyAmount / totalBuyNeeded : 1;
 
-    if (sortedAssets.length > 0) {
-      trades.push({
-        side: 'BUY',
-        assetId: sortedAssets[0],
-        amountIrr: Math.round(layerBuyAmount),
-        layer,
-      });
+  logger.debug('generateLayerBuyTrades:', {
+    layer,
+    layerBuyAmount: Math.round(layerBuyAmount).toLocaleString(),
+    totalBuyNeeded: Math.round(totalBuyNeeded).toLocaleString(),
+    scaleFactor: scaleFactor.toFixed(4),
+    assetsNeedingBuys: buyNeededByAsset.length,
+  });
+
+  // STEP 3: Generate trades with scaled amounts
+  // First pass: identify which trades meet minimum and which don't
+  const viableTrades: { assetId: string; buyNeeded: number; scaledAmount: number }[] = [];
+  let skippedAmount = 0;
+
+  for (const { assetId, buyNeeded } of buyNeededByAsset) {
+    const scaledBuyAmount = Math.round(buyNeeded * scaleFactor);
+
+    if (scaledBuyAmount >= MIN_TRADE_AMOUNT) {
+      viableTrades.push({ assetId, buyNeeded, scaledAmount: scaledBuyAmount });
+    } else {
+      // Track amount that would have gone to this asset
+      skippedAmount += scaledBuyAmount;
     }
+  }
+
+  // STEP 4: Redistribute skipped amount to viable trades proportionally
+  // This ensures we deploy the full layerBuyAmount when possible
+  if (skippedAmount > 0 && viableTrades.length > 0) {
+    const viableTotal = viableTrades.reduce((sum, t) => sum + t.scaledAmount, 0);
+    for (const trade of viableTrades) {
+      const proportion = trade.scaledAmount / viableTotal;
+      const bonus = Math.round(skippedAmount * proportion);
+      trade.scaledAmount += bonus;
+    }
+
+    logger.debug('generateLayerBuyTrades: Redistributed skipped amount', {
+      layer,
+      skippedAmount: Math.round(skippedAmount).toLocaleString(),
+      redistributedTo: viableTrades.length + ' trades',
+    });
+  }
+
+  // Generate final trades
+  for (const { assetId, scaledAmount } of viableTrades) {
+    trades.push({
+      side: 'BUY',
+      assetId,
+      amountIrr: scaledAmount,
+      layer,
+    });
+  }
+
+  // If no individual trades meet minimum after scaling, buy the highest-weight underweight asset
+  if (trades.length === 0 && layerBuyAmount >= MIN_TRADE_AMOUNT && buyNeededByAsset.length > 0) {
+    // Sort by target weight to find highest-weight asset that needs buying
+    const sortedAssets = buyNeededByAsset.sort((a, b) => b.targetWeight - a.targetWeight);
+
+    trades.push({
+      side: 'BUY',
+      assetId: sortedAssets[0].assetId,
+      amountIrr: Math.round(layerBuyAmount),
+      layer,
+    });
+
+    logger.debug('generateLayerBuyTrades: Using fallback - buying highest-weight asset', {
+      layer,
+      assetId: sortedAssets[0].assetId,
+      amount: Math.round(layerBuyAmount).toLocaleString(),
+    });
   }
 
   return trades;
@@ -880,7 +1117,7 @@ function generateLayerSellTrades(
   layer: Layer,
   layerSellAmount: number,
   layerHoldings: LayerHoldings,
-  prices: Map<AssetId, { priceIrr: number }>
+  _prices: Map<AssetId, { priceIrr: number }> // Retained for API consistency
 ): RebalanceTrade[] {
   const trades: RebalanceTrade[] = [];
   let remainingToSell = layerSellAmount;
