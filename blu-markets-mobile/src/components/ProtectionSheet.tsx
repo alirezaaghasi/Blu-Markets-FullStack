@@ -15,7 +15,7 @@ import {
 import { colors, typography, spacing, borderRadius } from '../constants/theme';
 import { ProtectableHolding, ProtectionQuote, Holding } from '../types';
 import { ASSETS, LAYER_COLORS } from '../constants/assets';
-import { PROTECTION_DURATION_PRESETS, PROTECTION_ELIGIBLE_ASSETS } from '../constants/business';
+import { PROTECTION_DURATION_PRESETS } from '../constants/business';
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
 import { addProtection, subtractCash, logAction, setPortfolioValues } from '../store/slices/portfolioSlice';
 import { portfolio as portfolioApi } from '../services/api';
@@ -75,39 +75,49 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
     };
   };
 
-  // Derive eligible holdings for protection if not provided
-  // Maps Holding to ProtectableHolding shape with required fields
-  const eligibleHoldings = React.useMemo((): ProtectableHolding[] => {
-    if (propHolding) return [convertToProtectableHolding(propHolding)];
-    return holdings
-      .filter((h) => {
-        const asset = ASSETS[h.assetId];
-        // Protectable: only assets in PROTECTION_ELIGIBLE_ASSETS list, not frozen, with quantity
-        return asset && (PROTECTION_ELIGIBLE_ASSETS as readonly string[]).includes(h.assetId) && !h.frozen && h.quantity > 0;
-      })
-      .map((h): ProtectableHolding => {
-        const asset = ASSETS[h.assetId];
-        const priceUSD = prices[h.assetId] || 0;
-        const priceIRR = priceUSD * fxRate;
-        const valueIRR = h.quantity * priceIRR;
-        const valueUSD = h.quantity * priceUSD;
-        return {
-          holdingId: h.id || `demo-${h.assetId}`,
-          assetId: h.assetId,
-          name: asset?.name || h.assetId,
-          layer: h.layer,
-          quantity: h.quantity,
-          valueIrr: valueIRR,
-          valueUsd: valueUSD,
-          priceUsd: priceUSD,
-          priceIrr: priceIRR,
-          isProtectable: true,
-          hasExistingProtection: false,
-          volatility: { iv: 0.5, regime: 'NORMAL', regimeColor: '#3B82F6' },
-          indicativePremium: { thirtyDayPct: 0.01, thirtyDayIrr: valueIRR * 0.01 },
-        };
-      });
-  }, [propHolding, holdings, prices, fxRate]);
+  // FIX: Fetch eligible holdings from backend instead of filtering locally
+  // Backend is the source of truth for which assets are protection-eligible
+  const [eligibleHoldings, setEligibleHoldings] = useState<ProtectableHolding[]>([]);
+  const [isLoadingHoldings, setIsLoadingHoldings] = useState(false);
+  const [holdingsError, setHoldingsError] = useState<string | null>(null);
+
+  // Fetch eligible holdings from backend when sheet opens without propHolding
+  useEffect(() => {
+    if (!visible) return;
+
+    // If a specific holding is provided, use it directly
+    if (propHolding) {
+      setEligibleHoldings([convertToProtectableHolding(propHolding)]);
+      return;
+    }
+
+    // Fetch from backend
+    let isMounted = true;
+    const fetchEligible = async () => {
+      setIsLoadingHoldings(true);
+      setHoldingsError(null);
+      try {
+        const response = await protectionApi.getHoldings();
+        if (isMounted) {
+          // Filter out already protected and non-protectable assets
+          const protectable = (response.holdings || []).filter(
+            (h) => h.isProtectable && !h.hasExistingProtection && h.quantity > 0
+          );
+          setEligibleHoldings(protectable);
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          setHoldingsError(err?.message || 'Failed to load eligible assets');
+          setEligibleHoldings([]);
+        }
+      } finally {
+        if (isMounted) setIsLoadingHoldings(false);
+      }
+    };
+
+    fetchEligible();
+    return () => { isMounted = false; };
+  }, [visible, propHolding, prices, fxRate]);
 
   const [selectedHoldingId, setSelectedHoldingId] = useState<string | null>(null);
   const [durationDays, setDurationDays] = useState(30);
@@ -119,12 +129,19 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
   const [showSuccess, setShowSuccess] = useState(false);
   const [successResult, setSuccessResult] = useState<TransactionSuccessResult | null>(null);
 
-  // Select first eligible holding if none selected
+  // FIX: Show asset picker when opened without a specific holding
+  const [showAssetPicker, setShowAssetPicker] = useState(!propHolding);
+
+  // Reset asset picker state when sheet opens/closes or propHolding changes
   useEffect(() => {
-    if (!selectedHoldingId && eligibleHoldings.length > 0) {
-      setSelectedHoldingId(eligibleHoldings[0].holdingId);
+    if (visible) {
+      // If opened with a specific holding, skip picker; otherwise show it
+      setShowAssetPicker(!propHolding);
+      if (!propHolding) {
+        setSelectedHoldingId(null);
+      }
     }
-  }, [eligibleHoldings, selectedHoldingId]);
+  }, [visible, propHolding]);
 
   // Get the active holding - convert propHolding to ProtectableHolding if needed
   const holding: ProtectableHolding | undefined = propHolding
@@ -277,8 +294,8 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
     }, 150);
   };
 
-  // Show empty state if no eligible holdings
-  if (!holding) {
+  // Show loading, error, or empty state
+  if (isLoadingHoldings || holdingsError || (eligibleHoldings.length === 0 && !propHolding)) {
     return (
       <Modal
         visible={visible}
@@ -295,16 +312,118 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
             </TouchableOpacity>
           </View>
           <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>
-              No assets available for protection.
-            </Text>
-            <Text style={styles.emptyStateSubtext}>
-              Growth and Upside layer assets can be protected against price drops.
-            </Text>
+            {isLoadingHoldings ? (
+              <>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={[styles.emptyStateText, { marginTop: spacing[4] }]}>
+                  Loading eligible assets...
+                </Text>
+              </>
+            ) : holdingsError ? (
+              <>
+                <Text style={styles.emptyStateText}>
+                  {holdingsError}
+                </Text>
+                <TouchableOpacity
+                  style={{ marginTop: spacing[4], padding: spacing[3], backgroundColor: colors.primary, borderRadius: borderRadius.default }}
+                  onPress={() => {
+                    setHoldingsError(null);
+                    setIsLoadingHoldings(true);
+                    protectionApi.getHoldings().then((res) => {
+                      const protectable = (res.holdings || []).filter(
+                        (h) => h.isProtectable && !h.hasExistingProtection && h.quantity > 0
+                      );
+                      setEligibleHoldings(protectable);
+                    }).catch((err) => {
+                      setHoldingsError(err?.message || 'Failed to load');
+                    }).finally(() => setIsLoadingHoldings(false));
+                  }}
+                >
+                  <Text style={{ color: colors.textPrimaryDark, fontWeight: '600' }}>Retry</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={styles.emptyStateText}>
+                  No assets available for protection.
+                </Text>
+                <Text style={styles.emptyStateSubtext}>
+                  Growth and Upside layer assets can be protected against price drops.
+                </Text>
+              </>
+            )}
           </View>
         </SafeAreaView>
       </Modal>
     );
+  }
+
+  // FIX: Show asset picker when opened from HomeScreen without a specific holding
+  if (showAssetPicker && !propHolding) {
+    return (
+      <Modal
+        visible={visible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={onClose}
+      >
+        <SafeAreaView style={styles.container}>
+          <View style={styles.header}>
+            <View style={styles.dragIndicator} />
+            <Text style={styles.title}>Select Asset to Protect</Text>
+            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+              <Text style={styles.closeButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+            <Text style={styles.pickerSubtitle}>
+              Choose an asset from your portfolio to protect against price drops.
+            </Text>
+            {eligibleHoldings.map((h) => {
+              const assetInfo = ASSETS[h.assetId];
+              return (
+                <TouchableOpacity
+                  key={h.holdingId}
+                  style={styles.assetPickerItem}
+                  onPress={() => {
+                    setSelectedHoldingId(h.holdingId);
+                    setShowAssetPicker(false);
+                  }}
+                >
+                  <View
+                    style={[
+                      styles.assetIcon,
+                      { backgroundColor: `${LAYER_COLORS[assetInfo?.layer || 'GROWTH']}20` },
+                    ]}
+                  >
+                    <Text style={styles.assetIconText}>{h.assetId.slice(0, 2)}</Text>
+                  </View>
+                  <View style={styles.assetPickerInfo}>
+                    <Text style={styles.assetPickerName}>{assetInfo?.name || h.assetId}</Text>
+                    <Text style={styles.assetPickerQuantity}>
+                      {h.quantity?.toFixed(6)} {h.assetId}
+                    </Text>
+                  </View>
+                  <View style={styles.assetPickerValue}>
+                    <Text style={styles.assetPickerValueText}>
+                      {(h.valueIrr || 0).toLocaleString()} IRR
+                    </Text>
+                    <Text style={styles.assetPickerLayerBadge}>
+                      {h.layer}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+    );
+  }
+
+  // Guard: ensure holding is defined before rendering main form
+  if (!holding) {
+    return null;
   }
 
   return (
@@ -318,6 +437,19 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.dragIndicator} />
+          {/* Back button when opened from HomeScreen (not with specific holding) */}
+          {!propHolding && (
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => {
+                setShowAssetPicker(true);
+                setSelectedHoldingId(null);
+                setQuote(null);
+              }}
+            >
+              <Text style={styles.backButtonText}>← Back</Text>
+            </TouchableOpacity>
+          )}
           <Text style={styles.title}>Protect {asset?.name || holding.assetId}</Text>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <Text style={styles.closeButtonText}>Cancel</Text>
@@ -616,6 +748,48 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
   },
+  // Asset picker styles
+  pickerSubtitle: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing[4],
+  },
+  assetPickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.cardDark,
+    borderRadius: borderRadius.lg,
+    padding: spacing[4],
+    marginBottom: spacing[3],
+  },
+  assetPickerInfo: {
+    flex: 1,
+    marginLeft: spacing[3],
+  },
+  assetPickerName: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textPrimaryDark,
+  },
+  assetPickerQuantity: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  assetPickerValue: {
+    alignItems: 'flex-end',
+  },
+  assetPickerValueText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.textPrimaryDark,
+  },
+  assetPickerLayerBadge: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: 2,
+    textTransform: 'uppercase',
+  },
   header: {
     alignItems: 'center',
     paddingVertical: spacing[3],
@@ -640,6 +814,16 @@ const styles = StyleSheet.create({
     top: spacing[3],
   },
   closeButtonText: {
+    color: colors.primary,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
+  },
+  backButton: {
+    position: 'absolute',
+    left: spacing[4],
+    top: spacing[3],
+  },
+  backButtonText: {
     color: colors.primary,
     fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.medium,
