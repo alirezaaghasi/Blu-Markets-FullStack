@@ -1,6 +1,6 @@
 // Portfolio Screen
 // Based on CLAUDE_CODE_HANDOFF.md - Holdings by layer view
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import HoldingCard from '../../components/HoldingCard';
 import { EmptyState } from '../../components/EmptyState';
 import { formatIRR } from '../../utils/currency';
 import { PORTFOLIO_EXPLAINERS, getLayerPosition } from '../../constants/messages';
+import { hasSeenPortfolioTooltip, markPortfolioTooltipSeen } from '../../utils/storage';
 
 // Layer configuration
 const LAYER_CONFIG: Record<Layer, { name: string; color: string }> = {
@@ -35,6 +36,24 @@ const PortfolioScreen: React.FC = () => {
     GROWTH: true,
     UPSIDE: true,
   });
+  // REC-1: First-time portfolio health tooltip
+  const [showHealthTooltip, setShowHealthTooltip] = useState(false);
+
+  // REC-1: Check if user has seen portfolio tooltip on first mount
+  useEffect(() => {
+    const checkTooltip = async () => {
+      const seen = await hasSeenPortfolioTooltip();
+      if (!seen) {
+        setShowHealthTooltip(true);
+      }
+    };
+    checkTooltip();
+  }, []);
+
+  const dismissHealthTooltip = async () => {
+    setShowHealthTooltip(false);
+    await markPortfolioTooltipSeen();
+  };
 
   // Use centralized portfolio sync - handles RTK Query and Redux sync
   const { refetchPortfolio } = usePortfolioSync();
@@ -194,6 +213,27 @@ const PortfolioScreen: React.FC = () => {
               </View>
             )}
           </View>
+
+          {/* REC-1: First-time Portfolio Health Tooltip */}
+          {showHealthTooltip && (
+            <TouchableOpacity
+              style={styles.healthTooltipOverlay}
+              onPress={dismissHealthTooltip}
+              activeOpacity={1}
+            >
+              <View style={styles.healthTooltipBox}>
+                <Text style={styles.healthTooltipTitle}>Understanding Your Portfolio</Text>
+                <Text style={styles.healthTooltipText}>
+                  Your portfolio is organized into three layers:{'\n\n'}
+                  • <Text style={styles.healthTooltipBold}>Foundation</Text> — Stable assets for long-term security{'\n'}
+                  • <Text style={styles.healthTooltipBold}>Growth</Text> — Balanced assets for steady returns{'\n'}
+                  • <Text style={styles.healthTooltipBold}>Upside</Text> — Higher risk assets for potential growth{'\n\n'}
+                  The allocation bar shows how your holdings compare to your target profile.
+                </Text>
+                <Text style={styles.healthTooltipDismiss}>Tap anywhere to dismiss</Text>
+              </View>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Your Holdings */}
@@ -432,6 +472,39 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     color: COLORS.text.muted,
+  },
+  // REC-1: Health Tooltip styles
+  healthTooltipOverlay: {
+    marginTop: SPACING[4],
+    backgroundColor: COLORS.brand.primary + '10',
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.brand.primary + '30',
+  },
+  healthTooltipBox: {
+    padding: SPACING[4],
+  },
+  healthTooltipTitle: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.brand.primary,
+    marginBottom: SPACING[3],
+  },
+  healthTooltipText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    lineHeight: 22,
+    color: COLORS.text.secondary,
+  },
+  healthTooltipBold: {
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.primary,
+  },
+  healthTooltipDismiss: {
+    marginTop: SPACING[3],
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.text.muted,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 });
 

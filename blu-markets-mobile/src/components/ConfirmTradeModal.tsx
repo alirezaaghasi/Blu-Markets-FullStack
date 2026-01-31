@@ -82,6 +82,8 @@ export const ConfirmTradeModal: React.FC<ConfirmTradeModalProps> = ({
   preview,
   loading = false,
 }) => {
+  const [showAllocationInfo, setShowAllocationInfo] = React.useState(false);
+
   if (!preview) return null;
 
   const asset = ASSETS[preview.assetId];
@@ -167,7 +169,21 @@ export const ConfirmTradeModal: React.FC<ConfirmTradeModalProps> = ({
                 {/* Allocation Impact */}
                 {preview.before && preview.after && preview.target && (
                 <View style={styles.allocationSection}>
-                  <Text style={styles.sectionTitle}>Allocation Impact</Text>
+                  <View style={styles.allocationHeader}>
+                    <Text style={styles.sectionTitle}>Allocation Impact</Text>
+                    <Text
+                      style={styles.allocationInfoIcon}
+                      onPress={() => setShowAllocationInfo(!showAllocationInfo)}
+                    >
+                      ⓘ
+                    </Text>
+                  </View>
+                  {showAllocationInfo && (
+                    <Text style={styles.allocationInfoTooltip}>
+                      This shows how this trade affects your portfolio balance across layers.
+                      Staying close to your target allocation helps manage risk according to your profile.
+                    </Text>
+                  )}
                   {/* UX-012: Describe the main allocation change */}
                   {(() => {
                     const layers = ['FOUNDATION', 'GROWTH', 'UPSIDE'] as const;
@@ -486,6 +502,27 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.xl,
     padding: SPACING[4],
     marginBottom: SPACING[4],
+  },
+  allocationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING[1],
+  },
+  allocationInfoIcon: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.muted,
+    paddingHorizontal: SPACING[2],
+    paddingVertical: SPACING[1],
+  },
+  allocationInfoTooltip: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.text.secondary,
+    backgroundColor: COLORS.background.elevated,
+    padding: SPACING[3],
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING[3],
+    lineHeight: TYPOGRAPHY.fontSize.xs * 1.5,
   },
   allocationSummary: {
     fontSize: TYPOGRAPHY.fontSize.sm,

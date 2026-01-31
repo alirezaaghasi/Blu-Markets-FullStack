@@ -75,6 +75,7 @@ const STORAGE_KEYS = {
   ONBOARDING: '@blu_markets_onboarding',
   PRICES_CACHE: '@blu_markets_prices_cache',
   LAST_SYNC: '@blu_markets_last_sync',
+  PORTFOLIO_TOOLTIP_SEEN: '@blu_markets_portfolio_tooltip_seen',
 } as const;
 
 // Type-safe storage interface
@@ -237,5 +238,24 @@ export const getLastSyncTime = async (): Promise<number | null> => {
   } catch (error) {
     devError('[Storage] Failed to get last sync time:', error);
     return null;
+  }
+};
+
+// REC-1: Check if user has seen portfolio health tooltip
+export const hasSeenPortfolioTooltip = async (): Promise<boolean> => {
+  try {
+    const seen = await AsyncStorage.getItem(STORAGE_KEYS.PORTFOLIO_TOOLTIP_SEEN);
+    return seen === 'true';
+  } catch {
+    return false;
+  }
+};
+
+// REC-1: Mark portfolio health tooltip as seen
+export const markPortfolioTooltipSeen = async (): Promise<void> => {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEYS.PORTFOLIO_TOOLTIP_SEEN, 'true');
+  } catch (error) {
+    devError('[Storage] Failed to mark portfolio tooltip seen:', error);
   }
 };

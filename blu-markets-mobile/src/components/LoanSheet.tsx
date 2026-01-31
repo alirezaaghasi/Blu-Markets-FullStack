@@ -406,6 +406,28 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
                 </View>
               )}
 
+              {/* REC-8: Payment Schedule - Show all payment dates upfront */}
+              {amountIRR > 0 && !isLoadingPreview && installmentAmount > 0 && (
+                <View style={styles.scheduleSection}>
+                  <Text style={styles.sectionTitle}>Payment Schedule</Text>
+                  <View style={styles.scheduleList}>
+                    {Array.from({ length: durationDays / 30 }, (_, i) => {
+                      const paymentDate = new Date();
+                      paymentDate.setMonth(paymentDate.getMonth() + i + 1);
+                      return (
+                        <View key={i} style={styles.scheduleRow}>
+                          <Text style={styles.schedulePaymentNum}>Payment {i + 1}</Text>
+                          <Text style={styles.scheduleDate}>
+                            {paymentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </Text>
+                          <Text style={styles.scheduleAmount}>{formatIRR(installmentAmount)}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
               {/* Validation Errors */}
               {validationErrors.length > 0 && amountIRR > 0 && (
                 <View style={styles.errorCard}>
@@ -732,6 +754,41 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     color: colors.textPrimaryDark,
+  },
+
+  // REC-8: Payment Schedule styles
+  scheduleSection: {
+    backgroundColor: colors.cardDark,
+    borderRadius: 12,
+    padding: 16,
+  },
+  scheduleList: {
+    gap: 0,
+  },
+  scheduleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderDark,
+  },
+  schedulePaymentNum: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  scheduleDate: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.textPrimaryDark,
+    textAlign: 'center',
+  },
+  scheduleAmount: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textPrimaryDark,
+    textAlign: 'right',
   },
 
   // Error Card

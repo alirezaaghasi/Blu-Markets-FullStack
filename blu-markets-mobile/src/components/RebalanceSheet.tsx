@@ -77,15 +77,16 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
       }));
 
       // Show success modal with new allocation
+      // PCD-Compliant: State-focused messaging, no celebration language
       const afterAlloc = preview.after || preview.target;
       setSuccessResult({
-        title: 'Rebalance Complete!',
-        subtitle: `Successfully executed ${result.tradesExecuted} trades`,
+        title: 'Rebalance Completed',
+        subtitle: `${result.tradesExecuted} trades executed`,
         items: [
           { label: 'Foundation', value: `${(afterAlloc.FOUNDATION * 100).toFixed(0)}%` },
           { label: 'Growth', value: `${(afterAlloc.GROWTH * 100).toFixed(0)}%` },
           { label: 'Upside', value: `${(afterAlloc.UPSIDE * 100).toFixed(0)}%` },
-          { label: 'Status', value: 'Balanced', highlight: true },
+          { label: 'Status', value: 'Balanced' },
         ],
       });
       setShowSuccess(true);
