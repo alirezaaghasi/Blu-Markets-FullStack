@@ -10,6 +10,7 @@ import { tokenStorage } from '../utils/secureStorage';
 import { useAppDispatch } from './useStore';
 import { setAuthToken, completeOnboarding, logout } from '../store/slices/authSlice';
 import { API_BASE_URL } from '../config/api';
+import { refreshAccessToken as sharedRefreshAccessToken } from '../utils/authRefresh';
 
 interface AuthInitState {
   isInitializing: boolean;
@@ -58,34 +59,7 @@ async function validateToken(accessToken: string): Promise<{ onboardingComplete:
   }
 }
 
-/**
- * Attempts to refresh the access token using the refresh token.
- * Returns new tokens if successful, null if failed.
- */
-async function refreshAccessToken(refreshToken: string): Promise<{
-  accessToken: string;
-  refreshToken: string;
-} | null> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      return {
-        accessToken: data.accessToken,
-        refreshToken: data.refreshToken,
-      };
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
-}
+// Token refresh is handled by the shared authRefresh utility
 
 /**
  * Hook to initialize auth state from secure storage on app startup.
@@ -131,35 +105,29 @@ export function useAuthInit(): AuthInitState {
         let validationResult = await validateToken(accessToken);
 
         if (!validationResult) {
-          // Access token invalid/expired - try to refresh
-          const refreshToken = await tokenStorage.getRefreshToken();
+          // Access token invalid/expired - try to refresh using shared utility
+          // The shared function handles getting refresh token, storing new tokens, etc.
+          const newAccessToken = await sharedRefreshAccessToken();
 
-          if (refreshToken) {
-            const newTokens = await refreshAccessToken(refreshToken);
+          if (newAccessToken) {
+            // Validate with new token
+            validationResult = await validateToken(newAccessToken);
 
-            if (newTokens) {
-              // Store new tokens
-              await tokenStorage.setTokens(newTokens.accessToken, newTokens.refreshToken);
-
-              // Validate with new token
-              validationResult = await validateToken(newTokens.accessToken);
-
-              if (validationResult) {
-                // Success - restore auth state with new token
-                dispatch(setAuthToken(newTokens.accessToken));
-                if (validationResult.onboardingComplete) {
-                  dispatch(completeOnboarding());
-                }
-                if (mounted) {
-                  setState({ isInitializing: false, isAuthenticated: true, error: null });
-                }
-                return;
+            if (validationResult) {
+              // Success - restore auth state with new token
+              dispatch(setAuthToken(newAccessToken));
+              if (validationResult.onboardingComplete) {
+                dispatch(completeOnboarding());
               }
+              if (mounted) {
+                setState({ isInitializing: false, isAuthenticated: true, error: null });
+              }
+              return;
             }
           }
 
           // Refresh failed - clear tokens and require re-login
-          await tokenStorage.clearTokens();
+          // (shared utility already cleared tokens on failure)
           dispatch(logout());
           if (mounted) {
             setState({ isInitializing: false, isAuthenticated: false, error: null });

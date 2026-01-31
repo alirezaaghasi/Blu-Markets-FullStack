@@ -82,62 +82,58 @@ function formatActivityMessage(entry: ActionLogEntry): string {
 // =============================================================================
 
 /**
- * Portfolio Health Status Badge
- * BUG-F FIX: Made tappable to open rebalance sheet when attention is required
+ * Portfolio Health Status
+ * Simple, friendly status indicator for retail investors.
+ * Shows as a subtle line below portfolio value, not a card/notification.
  */
-const StatusBadge: React.FC<{ status: PortfolioStatus; onPress?: () => void }> = ({ status, onPress }) => {
-  const config = {
-    BALANCED: { label: 'Balanced', color: '#4ade80', dotColor: '#22c55e' },
-    SLIGHTLY_OFF: { label: 'Slightly Off', color: '#fde047', dotColor: '#eab308' },
-    ATTENTION_REQUIRED: { label: 'Attention Required', color: '#f87171', dotColor: '#ef4444' },
-  };
-
-  const { label, color, dotColor } = config[status];
-  const isTappable = status !== 'BALANCED' && onPress;
-
-  const content = (
-    <View style={[styles.statusBadge, { backgroundColor: `${color}20`, borderColor: `${color}40` }]}>
-      <View style={[styles.statusDot, { backgroundColor: dotColor }]} />
-      <Text style={[styles.statusLabel, { color: dotColor }]}>{label}</Text>
-    </View>
-  );
-
-  // BUG-F FIX: Make badge tappable when not balanced
-  if (isTappable) {
-    return (
-      <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-        {content}
-      </TouchableOpacity>
-    );
-  }
-
-  return content;
+const PORTFOLIO_STATUS_CONFIG: Record<PortfolioStatus, {
+  message: string;
+  color: string;
+}> = {
+  BALANCED: {
+    message: 'Your portfolio is healthy and well-diversified',
+    color: '#22c55e', // green
+  },
+  SLIGHTLY_OFF: {
+    message: 'Your mix has shifted a bit — rebalancing can help',
+    color: '#eab308', // yellow
+  },
+  ATTENTION_REQUIRED: {
+    message: 'Your portfolio needs rebalancing — tap to fix',
+    color: '#ef4444', // red
+  },
 };
 
 /**
  * Main Action Button (Row 1 - 3 equal width)
- * P1: Added disabledReason prop for tooltip when button is disabled
+ * Shows alert with disabledReason when tapped while disabled
  */
 const MainActionButton: React.FC<{
   label: string;
   onPress: () => void;
   disabled?: boolean;
   disabledReason?: string;
-}> = ({ label, onPress, disabled, disabledReason }) => (
-  <View style={styles.mainActionWrapper}>
-    <TouchableOpacity
-      style={[styles.mainActionButton, disabled && styles.mainActionButtonDisabled]}
-      onPress={onPress}
-      disabled={disabled}
-      activeOpacity={0.7}
-    >
-      <Text style={[styles.mainActionLabel, disabled && styles.mainActionLabelDisabled]}>{label}</Text>
-    </TouchableOpacity>
-    {disabled && disabledReason && (
-      <Text style={styles.disabledHint}>{disabledReason}</Text>
-    )}
-  </View>
-);
+}> = ({ label, onPress, disabled, disabledReason }) => {
+  const handlePress = () => {
+    if (disabled && disabledReason) {
+      Alert.alert('', disabledReason);
+    } else if (!disabled) {
+      onPress();
+    }
+  };
+
+  return (
+    <View style={styles.mainActionWrapper}>
+      <TouchableOpacity
+        style={[styles.mainActionButton, disabled && styles.mainActionButtonDisabled]}
+        onPress={handlePress}
+        activeOpacity={0.7}
+      >
+        <Text style={[styles.mainActionLabel, disabled && styles.mainActionLabelDisabled]}>{label}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
 
 /**
  * Wide Action Button (Row 2 - 2 half-width)
@@ -170,7 +166,7 @@ const HomeScreen: React.FC = () => {
 
   // Safe area insets for notched devices
   const insets = useSafeAreaInsets();
-  const FOOTER_BASE_HEIGHT = 140; // Base footer height without safe area
+  const FOOTER_BASE_HEIGHT = 110; // Minimal footer height for maximum activity log space
 
   // Activity feed from API
   const {
@@ -199,7 +195,6 @@ const HomeScreen: React.FC = () => {
   // Total Holdings = Cash + Asset Value (ensure correct sum even if backend value is stale)
   const totalValueIrr = cashIRR + holdingsValueIrr;
   devLog('[HomeScreen] Current portfolioStatus from Redux:', portfolioStatus);
-  const phone = useAppSelector((state) => state.auth.phone);
   const authToken = useAppSelector((state) => state.auth.authToken);
 
   // Check if we're in demo mode (runtime check)
@@ -277,20 +272,6 @@ const HomeScreen: React.FC = () => {
   // Note: No dedicated activity history screen exists
   // Full activity log is available in the Activity section on Home screen
 
-  const handleNotificationPress = useCallback(() => {
-    Alert.alert(
-      'Notifications',
-      nextLoanPayment && nextLoanPayment.daysUntil <= 7
-        ? `You have a loan payment due in ${nextLoanPayment.daysUntil} days`
-        : 'No new notifications',
-      [{ text: 'OK' }]
-    );
-  }, [nextLoanPayment]);
-
-  const handleProfilePress = useCallback(() => {
-    navigation.navigate('Profile');
-  }, [navigation]);
-
   const handleDeepLinkServices = useCallback((initialTab?: 'loans' | 'protection', loanId?: string) => {
     navigation.navigate('Market', { initialTab, loanId });
   }, [navigation]);
@@ -328,46 +309,32 @@ const HomeScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       {/* ================================================================ */}
-      {/* FIXED HEADER: Status Badge + Notification + Avatar */}
-      {/* ================================================================ */}
-      <View style={styles.header}>
-        {/* BUG-F FIX: Tapping status badge opens rebalance sheet when attention is required */}
-        <StatusBadge
-          status={portfolioStatusResult.status}
-          onPress={() => setRebalanceSheetVisible(true)}
-        />
-        <View style={styles.headerRight}>
-          <TouchableOpacity
-            style={styles.notificationButton}
-            onPress={handleNotificationPress}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Text style={styles.notificationIcon}>🔔</Text>
-            {nextLoanPayment && nextLoanPayment.daysUntil <= 7 && (
-              <View style={styles.notificationBadge} />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.avatarContainer}
-            onPress={handleProfilePress}
-          >
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {phone ? phone.slice(-2) : 'U'}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* ================================================================ */}
-      {/* COMPACT PORTFOLIO VALUE: Total + Assets/Cash/ViewPortfolio row */}
+      {/* PORTFOLIO VALUE + STATUS */}
       {/* ================================================================ */}
       <View style={styles.valueSection}>
         {/* Total Holdings - ONE big number (backend-calculated) */}
         <Text style={styles.totalValueAmount}>
           {formatIRR(totalValueIrr, { showUnit: false })} <Text style={styles.totalValueCurrency}>IRR</Text>
         </Text>
+
+        {/* Portfolio Health Status - simple friendly message */}
+        {(() => {
+          const { message, color } = PORTFOLIO_STATUS_CONFIG[portfolioStatusResult.status];
+          const isTappable = portfolioStatusResult.status !== 'BALANCED';
+
+          const statusContent = (
+            <View style={styles.statusLine}>
+              <View style={[styles.statusDot, { backgroundColor: color }]} />
+              <Text style={[styles.statusText, { color }]}>{message}</Text>
+            </View>
+          );
+
+          return isTappable ? (
+            <TouchableOpacity onPress={() => setRebalanceSheetVisible(true)} activeOpacity={0.7}>
+              {statusContent}
+            </TouchableOpacity>
+          ) : statusContent;
+        })()}
 
         {/* Compact row: Assets | Cash | View Portfolio */}
         <View style={styles.compactRow}>
@@ -507,7 +474,7 @@ const HomeScreen: React.FC = () => {
       {/* ================================================================ */}
       {/* FIXED MAIN ACTIONS AT BOTTOM */}
       {/* ================================================================ */}
-      <View style={[styles.fixedActionsContainer, { paddingBottom: SPACING[6] + insets.bottom }]}>
+      <View style={[styles.fixedActionsContainer, { paddingBottom: SPACING[2] }]}>
         {/* Row 1: Rebalance, Add Funds, Trade */}
         <View style={styles.actionsRow}>
           <MainActionButton
@@ -586,21 +553,13 @@ const styles = StyleSheet.create({
     // paddingBottom is applied dynamically with safe area insets
   },
 
-  // Header
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SPACING[4],
-    paddingVertical: SPACING[3],
-  },
-  statusBadge: {
+  // Status Line - simple health indicator below portfolio value
+  statusLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[2],
-    borderRadius: RADIUS.full,
-    borderWidth: 1,
+    justifyContent: 'center',
+    marginTop: SPACING[2],
+    marginBottom: SPACING[1],
   },
   statusDot: {
     width: 8,
@@ -608,51 +567,9 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginRight: SPACING[2],
   },
-  statusLabel: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: '500',  // P2: Reduced from 600 for less visual weight
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[3],
-  },
-  notificationButton: {
-    position: 'relative',
-    padding: SPACING[1],
-  },
-  notificationIcon: {
-    fontSize: 24,
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: COLORS.semantic.error,
-    borderWidth: 2,
-    borderColor: COLORS.background.primary,
-  },
-  avatarContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    padding: 2,
-    backgroundColor: COLORS.brand.primary,
-  },
-  avatar: {
-    flex: 1,
-    borderRadius: 18,
-    backgroundColor: COLORS.background.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: '700',
-    color: COLORS.text.primary,
+  statusText: {
+    fontSize: TYPOGRAPHY.fontSize.base, // Same as activity log messages
+    fontWeight: '500',
   },
 
   // Value Section - Compact Layout
@@ -797,7 +714,7 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: COLORS.background.primary,
     paddingHorizontal: SPACING[4],
-    paddingTop: SPACING[3],
+    paddingTop: SPACING[2],
     // paddingBottom is applied dynamically with safe area insets
     borderTopWidth: 1,
     borderTopColor: COLORS.background.elevated,
@@ -822,12 +739,6 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING[4],
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  disabledHint: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.muted,
-    marginTop: SPACING[1],
-    textAlign: 'center',
   },
   mainActionButtonDisabled: {
     opacity: 0.5,
