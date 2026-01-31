@@ -285,19 +285,19 @@ export const LOAN = {
   empty: {
     title: 'No Active Loans',
     description:
-      'You can borrow against your crypto holdings without selling them. Collateral remains yours and unlocks after repayment.',
+      'Borrow against your holdings without selling them. Your collateral remains yours and unlocks after repayment.',
   },
 
   // Education section
   education: {
-    title: 'How Crypto-Backed Loans Work',
+    title: 'How Asset-Backed Loans Work',
     step1: {
       title: 'Choose Collateral',
       description: 'Select an asset to lock as security. It remains yours but cannot be traded until repaid.',
     },
     step2: {
       title: 'Receive IRR',
-      description: 'Funds are added to your cash balance instantly.',
+      description: 'Funds are added to your cash balance.',
     },
     step3: {
       title: 'Repay & Unlock',
@@ -305,13 +305,13 @@ export const LOAN = {
     },
   },
 
-  // Benefits (path presentation, not advice)
+  // Features (factual presentation, not promotional)
   benefits: {
-    title: 'Benefits',
-    exposure: 'Maintain your crypto exposure',
+    title: 'Features',
+    exposure: 'Maintain market exposure',
     noCredit: 'No credit check required',
-    rates: 'Fixed interest rates', // Changed from "Competitive" - no comparative claims
-    flexible: 'Flexible repayment schedule',
+    rates: 'Fixed interest rates',
+    flexible: 'Flexible repayment terms',
   },
 
   // Success
