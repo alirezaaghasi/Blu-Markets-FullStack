@@ -916,3 +916,97 @@ export const PROTECTION_ACTIVE = PROTECTION.activeExplanation;
 // Loan legacy exports
 export const LOAN_COLLATERAL_LOCKED = LOAN.collateralLocked;
 export const LOAN_HEALTH_WARNING = LOAN.healthWarning;
+
+// =============================================================================
+// PORTFOLIO SCREEN EXPLAINERS (PCD-Compliant)
+// =============================================================================
+
+export const PORTFOLIO_EXPLAINERS = {
+  BALANCED: {
+    main:
+      'Your portfolio is currently aligned with its target allocation. ' +
+      'All layers remain close to their intended balance. ' +
+      'Overall risk and liquidity are consistent.',
+  },
+  SLIGHTLY_OFF: {
+    main:
+      'Your portfolio has shifted slightly from its target allocation. ' +
+      'Most layers remain close to their intended balance. ' +
+      'The overall structure is still broadly consistent.',
+    layers: {
+      FOUNDATION: {
+        below:
+          'Foundation is holding slightly less weight than its target range.',
+        close:
+          'Foundation is holding close to its intended target range.',
+        above:
+          'Foundation is holding slightly more weight than its target range.',
+      },
+      GROWTH: {
+        below:
+          'Growth is holding slightly less weight than its target range.',
+        close:
+          'Growth is holding close to its intended target range.',
+        above:
+          'Growth is holding slightly more weight than its target range.',
+      },
+      UPSIDE: {
+        below:
+          'Upside is holding slightly less weight than its target range.',
+        close:
+          'Upside is holding close to its intended target range.',
+        above:
+          'Upside is holding slightly more weight than its target range.',
+      },
+    },
+  },
+  ATTENTION_REQUIRED: {
+    main:
+      'Your portfolio is meaningfully offset from its target allocation. ' +
+      'One or more layers now differ noticeably from their intended balance. ' +
+      'This changes how risk and liquidity are distributed.',
+    layers: {
+      FOUNDATION: {
+        below:
+          'Foundation is holding materially less weight than its target range, ' +
+          'reducing its role in stabilizing the portfolio.',
+        close:
+          'Foundation remains close to its intended range within the portfolio.',
+        above:
+          'Foundation is holding materially more weight than its target range, ' +
+          'increasing its influence on overall stability.',
+      },
+      GROWTH: {
+        below:
+          'Growth is holding materially less weight than its target range, ' +
+          'reducing its contribution to long-term exposure.',
+        close:
+          'Growth remains close to its intended range within the portfolio.',
+        above:
+          'Growth is holding materially more weight than its target range, ' +
+          'increasing sensitivity to market movement.',
+      },
+      UPSIDE: {
+        below:
+          'Upside is holding materially less weight than its target range, ' +
+          'limiting high-variance exposure.',
+        close:
+          'Upside remains close to its intended range within the portfolio.',
+        above:
+          'Upside is holding materially more weight than its target range, ' +
+          'increasing exposure to short-term volatility.',
+      },
+    },
+  },
+} as const;
+
+// Helper type for layer position
+export type LayerPosition = 'below' | 'close' | 'above';
+
+// Helper function to determine layer position relative to target
+export const getLayerPosition = (current: number, target: number): LayerPosition => {
+  const diff = current - target;
+  if (diff < -1) return 'below';
+  if (diff > 1) return 'above';
+  return 'close';
+};

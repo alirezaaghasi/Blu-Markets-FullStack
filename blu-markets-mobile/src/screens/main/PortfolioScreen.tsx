@@ -15,11 +15,11 @@ import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING, RADIUS } from '../../constants/spacing';
 import { useAppSelector } from '../../hooks/useStore';
 import { usePortfolioSync } from '../../hooks/usePortfolioSync';
-import { Layer, Holding } from '../../types';
-import AllocationBar from '../../components/AllocationBar';
+import { Layer, Holding, PortfolioStatus } from '../../types';
 import HoldingCard from '../../components/HoldingCard';
 import { EmptyState } from '../../components/EmptyState';
 import { formatIRR } from '../../utils/currency';
+import { PORTFOLIO_EXPLAINERS, getLayerPosition } from '../../constants/messages';
 
 // Layer configuration
 const LAYER_CONFIG: Record<Layer, { name: string; color: string }> = {
@@ -46,7 +46,11 @@ const PortfolioScreen: React.FC = () => {
   // Backend-calculated values (frontend is presentation layer only)
   const holdingsValueIRR = useAppSelector((state) => state.portfolio.holdingsValueIrr) || 0;
   const currentAllocation = useAppSelector((state) => state.portfolio.currentAllocation) || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
+  const portfolioStatus = useAppSelector((state) => state.portfolio.status) as PortfolioStatus || 'BALANCED';
   const { prices, pricesIrr, fxRate, change24h } = useAppSelector((state) => state.prices);
+
+  // Calculate total value for percentage calculations
+  const totalValue = holdingsValueIRR + cashIRR;
 
   // Group holdings by layer
   const holdingsByLayer: Record<Layer, Holding[]> = {
@@ -129,14 +133,69 @@ const PortfolioScreen: React.FC = () => {
           <Text style={styles.cashLabel}>+ {formatIRR(cashIRR)} cash</Text>
         </View>
 
-        {/* Allocation Bar */}
+        {/* Target Allocation Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Allocation</Text>
-          <AllocationBar current={currentAllocation} target={targetLayerPct} />
+          <Text style={styles.sectionTitle}>Target Allocation</Text>
+
+          {/* Single Allocation Bar (Target) */}
+          <View style={styles.allocationBar}>
+            <View style={[styles.barSegment, { flex: targetLayerPct.FOUNDATION, backgroundColor: LAYER_CONFIG.FOUNDATION.color }]} />
+            <View style={[styles.barSegment, { flex: targetLayerPct.GROWTH, backgroundColor: LAYER_CONFIG.GROWTH.color }]} />
+            <View style={[styles.barSegment, { flex: targetLayerPct.UPSIDE, backgroundColor: LAYER_CONFIG.UPSIDE.color }]} />
+          </View>
+
+          {/* Legend */}
+          <View style={styles.allocationLegend}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: LAYER_CONFIG.FOUNDATION.color }]} />
+              <Text style={styles.legendText}>Foundation {Math.round(targetLayerPct.FOUNDATION * 100)}%</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: LAYER_CONFIG.GROWTH.color }]} />
+              <Text style={styles.legendText}>Growth {Math.round(targetLayerPct.GROWTH * 100)}%</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: LAYER_CONFIG.UPSIDE.color }]} />
+              <Text style={styles.legendText}>Upside {Math.round(targetLayerPct.UPSIDE * 100)}%</Text>
+            </View>
+          </View>
+
+          {/* PCD-Compliant Explainer */}
+          <View style={styles.explainerContainer}>
+            <Text style={styles.explainerMain}>
+              {PORTFOLIO_EXPLAINERS[portfolioStatus].main}
+            </Text>
+
+            {/* Per-layer breakdown for SLIGHTLY_OFF and ATTENTION_REQUIRED */}
+            {portfolioStatus !== 'BALANCED' && (
+              <View style={styles.explainerLayers}>
+                {(['FOUNDATION', 'GROWTH', 'UPSIDE'] as const).map((layer) => {
+                  const currentPct = Math.round(currentAllocation[layer] * 100);
+                  const targetPct = Math.round(targetLayerPct[layer] * 100);
+                  const position = getLayerPosition(currentPct, targetPct);
+
+                  // For SLIGHTLY_OFF, only show layers that drifted
+                  if (portfolioStatus === 'SLIGHTLY_OFF' && position === 'close') {
+                    return null;
+                  }
+
+                  const explainer = PORTFOLIO_EXPLAINERS[portfolioStatus];
+                  if (!('layers' in explainer)) return null;
+
+                  return (
+                    <Text key={layer} style={styles.explainerLayerText}>
+                      {explainer.layers[layer][position]}
+                    </Text>
+                  );
+                })}
+              </View>
+            )}
+          </View>
         </View>
 
-        {/* Holdings by Layer */}
+        {/* Your Holdings */}
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Your Holdings</Text>
           {holdings.length === 0 ? (
             <EmptyState
               icon="pie-chart"
@@ -163,10 +222,10 @@ const PortfolioScreen: React.FC = () => {
                   <View style={styles.layerHeaderRight}>
                     <View style={styles.layerValueContainer}>
                       <Text style={styles.layerValue}>
-                        {formatIRR(layerValues[layer], { showUnit: false })}
+                        {formatIRR(layerValues[layer], { showUnit: false })} IRR
                       </Text>
-                      <Text style={styles.layerTarget}>
-                        Target: {Math.round(targetLayerPct[layer] * 100)}%
+                      <Text style={styles.layerPercent}>
+                        {totalValue > 0 ? Math.round((layerValues[layer] / totalValue) * 100) : 0}%
                       </Text>
                     </View>
                     <Text style={styles.expandIcon}>{isExpanded ? '▼' : '▶'}</Text>
@@ -297,13 +356,13 @@ const styles = StyleSheet.create({
     marginRight: SPACING[3],
   },
   layerValue: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    fontSize: 18,
+    fontWeight: '600',
     color: COLORS.text.primary,
   },
-  layerTarget: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.muted,
+  layerPercent: {
+    fontSize: 14,
+    color: COLORS.text.secondary,
     marginTop: 2,
   },
   expandIcon: {
@@ -320,6 +379,55 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.muted,
+  },
+  // Allocation Bar styles
+  allocationBar: {
+    flexDirection: 'row',
+    height: 12,
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  barSegment: {
+    height: '100%',
+  },
+  // Legend styles
+  allocationLegend: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: SPACING[2],
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: SPACING[1],
+  },
+  legendText: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.text.secondary,
+  },
+  // Explainer styles
+  explainerContainer: {
+    marginTop: SPACING[4],
+    paddingHorizontal: SPACING[1],
+  },
+  explainerMain: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: COLORS.text.secondary,
+  },
+  explainerLayers: {
+    marginTop: SPACING[3],
+    gap: SPACING[2],
+  },
+  explainerLayerText: {
+    fontSize: 13,
+    lineHeight: 18,
     color: COLORS.text.muted,
   },
 });
