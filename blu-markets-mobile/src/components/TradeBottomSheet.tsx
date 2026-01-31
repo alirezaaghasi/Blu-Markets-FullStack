@@ -37,7 +37,7 @@ import {
   validateBuyTrade,
   validateSellTrade,
 } from '../utils/tradeValidation';
-import AllocationBar from './AllocationBar';
+// AllocationBar removed - using clear sentence instead of visual bars
 import { trade } from '../services/api';
 import { ConfirmTradeModal } from './ConfirmTradeModal';
 import { TradeSuccessModal } from './TradeSuccessModal';
@@ -83,6 +83,61 @@ interface TradeResult {
   newCashBalance: number;
   newHoldingQuantity: number;
 }
+
+// Target layer percentages type
+type TargetLayerPct = Record<'FOUNDATION' | 'GROWTH' | 'UPSIDE', number>;
+
+// Generate clear allocation impact sentence for retail users
+const generateAllocationImpactSentence = (
+  preview: TradePreview,
+  side: 'BUY' | 'SELL',
+  asset: typeof ASSETS[AssetId] | undefined,
+  target: TargetLayerPct
+): string => {
+  if (!asset || !preview.before || !preview.after) return '';
+
+  const layerName = LAYER_NAMES[asset.layer];
+  const beforePct = Math.round((preview.before[asset.layer] || 0) * 100);
+  const afterPct = Math.round((preview.after[asset.layer] || 0) * 100);
+  const targetPct = Math.round((target[asset.layer] || 0) * 100);
+
+  const beforeDistance = Math.abs(beforePct - targetPct);
+  const afterDistance = Math.abs(afterPct - targetPct);
+  const movingTowardTarget = afterDistance < beforeDistance;
+
+  const direction = side === 'BUY' ? 'increase' : 'decrease';
+  let sentence = `This will ${direction} your ${layerName} allocation from ${beforePct}% to ${afterPct}%`;
+
+  if (movingTowardTarget) {
+    sentence += ` (closer to your ${targetPct}% target).`;
+  } else if (afterDistance > beforeDistance) {
+    sentence += ` (further from your ${targetPct}% target).`;
+  } else {
+    sentence += `.`;
+  }
+
+  return sentence;
+};
+
+// Generate boundary explanation for retail users
+const getBoundaryExplanation = (boundary: Boundary, movesTowardTarget?: boolean): string => {
+  if (movesTowardTarget) {
+    return 'Good trade — moves toward your target allocation';
+  }
+
+  switch (boundary) {
+    case 'SAFE':
+      return 'Low impact on your portfolio balance';
+    case 'DRIFT':
+      return 'Moderate impact — consider rebalancing soon';
+    case 'STRUCTURAL':
+      return 'Significant impact — your portfolio will drift from target';
+    case 'STRESS':
+      return 'High impact — this moves your portfolio far from target';
+    default:
+      return '';
+  }
+};
 
 // BUG-1 FIX: Format IRR with compact notation (matching HoldingCard format)
 const formatIRRCompact = (num: number): string => {
@@ -528,64 +583,61 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
               <View style={styles.previewSection}>
                 <Text style={styles.previewTitle}>Trade Preview</Text>
 
-                {/* Quantity */}
+                {/* What user will receive - clearer for retail users */}
                 <View style={styles.previewRow}>
-                  <Text style={styles.previewLabel}>You will {side === 'BUY' ? 'receive' : 'sell'}</Text>
+                  <Text style={styles.previewLabel}>You will receive</Text>
                   <Text style={styles.previewValue}>
-                    {(preview.quantity ?? 0).toFixed(6)} {asset?.symbol ?? ''}
+                    {side === 'BUY'
+                      ? `${(preview.quantity ?? 0).toFixed(6)} ${asset?.symbol ?? ''}`
+                      : `${formatNumber(Math.round(amountIRR * (1 - (preview.spread ?? 0))))} IRR`
+                    }
                   </Text>
                 </View>
 
-                {/* Spread */}
+                {/* Transaction Fee with Info - replaces jargon "Spread" */}
                 <View style={styles.previewRow}>
-                  <Text style={styles.previewLabel}>Spread ({((preview.spread ?? 0) * 100).toFixed(2)}%)</Text>
+                  <View style={styles.feeLabel}>
+                    <Text style={styles.previewLabel}>Transaction Fee</Text>
+                    <TouchableOpacity
+                      onPress={() => Alert.alert(
+                        'Transaction Fee',
+                        `This ${((preview.spread ?? 0) * 100).toFixed(2)}% fee covers the bid-ask spread for ${asset?.name || 'this asset'}.\n\n` +
+                        `• Foundation assets: 0.15% (lowest)\n` +
+                        `• Growth assets: 0.30%\n` +
+                        `• Upside assets: 0.60% (higher volatility)`,
+                        [{ text: 'Got it' }]
+                      )}
+                      style={styles.infoButton}
+                    >
+                      <Text style={styles.infoIcon}>ⓘ</Text>
+                    </TouchableOpacity>
+                  </View>
                   <Text style={styles.previewValue}>
                     {formatNumber(Math.round(amountIRR * (preview.spread ?? 0)))} IRR
                   </Text>
                 </View>
 
-                {/* Allocation Preview */}
+                {/* Allocation Impact - Clear sentence instead of bars */}
                 {preview.before && preview.after && (
-                <View style={styles.allocationPreview}>
-                  <Text style={styles.allocationLabel}>Allocation Impact</Text>
-                  <View style={styles.allocationBars}>
-                    <View style={styles.allocationBarRow}>
-                      <Text style={styles.allocationBarLabel}>Before</Text>
-                      <Text style={styles.allocationBarPct}>
-                        {Math.round((preview.before.FOUNDATION || 0) * 100)}/{Math.round((preview.before.GROWTH || 0) * 100)}/{Math.round((preview.before.UPSIDE || 0) * 100)}
-                      </Text>
-                      <AllocationBar current={preview.before} target={targetLayerPct} compact />
-                    </View>
-                    <View style={styles.allocationBarRow}>
-                      <Text style={styles.allocationBarLabel}>After</Text>
-                      <Text style={styles.allocationBarPct}>
-                        {Math.round((preview.after.FOUNDATION || 0) * 100)}/{Math.round((preview.after.GROWTH || 0) * 100)}/{Math.round((preview.after.UPSIDE || 0) * 100)}
-                      </Text>
-                      <AllocationBar current={preview.after} target={targetLayerPct} compact />
-                    </View>
-                    <View style={styles.allocationBarRow}>
-                      <Text style={styles.allocationBarLabel}>Target</Text>
-                      <Text style={styles.allocationBarPct}>
-                        {Math.round((targetLayerPct.FOUNDATION || 0) * 100)}/{Math.round((targetLayerPct.GROWTH || 0) * 100)}/{Math.round((targetLayerPct.UPSIDE || 0) * 100)}
-                      </Text>
-                      <AllocationBar current={targetLayerPct} target={targetLayerPct} compact />
-                    </View>
+                  <View style={styles.allocationImpact}>
+                    <Text style={styles.allocationLabel}>Portfolio Impact</Text>
+                    <Text style={styles.allocationSentence}>
+                      {generateAllocationImpactSentence(preview, side, asset, targetLayerPct)}
+                    </Text>
                   </View>
-                  <Text style={styles.allocationLegend}>Foundation / Growth / Upside %</Text>
-                </View>
                 )}
 
-                {/* Boundary Indicator */}
+                {/* Boundary Indicator with Clear Explanation */}
                 {preview.boundary && BOUNDARY_COLORS[preview.boundary] && (
-                <View style={[styles.boundaryIndicator, { backgroundColor: `${BOUNDARY_COLORS[preview.boundary]}20` }]}>
-                  <View style={[styles.boundaryDot, { backgroundColor: BOUNDARY_COLORS[preview.boundary] }]} />
-                  <Text style={[styles.boundaryText, { color: BOUNDARY_COLORS[preview.boundary] }]}>
-                    {preview.boundary} {preview.movesTowardTarget ? '(moves toward target)' : ''}
-                  </Text>
-                </View>
+                  <View style={[styles.boundaryIndicator, { backgroundColor: `${BOUNDARY_COLORS[preview.boundary]}20` }]}>
+                    <View style={[styles.boundaryDot, { backgroundColor: BOUNDARY_COLORS[preview.boundary] }]} />
+                    <Text style={[styles.boundaryText, { color: BOUNDARY_COLORS[preview.boundary] }]}>
+                      {getBoundaryExplanation(preview.boundary, preview.movesTowardTarget)}
+                    </Text>
+                  </View>
                 )}
 
-                {/* Friction Copy */}
+                {/* Friction Copy (warnings from backend) */}
                 {Array.isArray(preview.frictionCopy) && preview.frictionCopy.length > 0 && (
                   <View style={styles.frictionCopy}>
                     {preview.frictionCopy.map((copy, index) => (
@@ -983,7 +1035,19 @@ const styles = StyleSheet.create({
     fontWeight: TYPOGRAPHY.fontWeight.medium,
     color: COLORS.text.primary,
   },
-  allocationPreview: {
+  feeLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  infoButton: {
+    marginLeft: 6,
+    padding: 4,
+  },
+  infoIcon: {
+    fontSize: 14,
+    color: COLORS.text.secondary,
+  },
+  allocationImpact: {
     marginTop: SPACING[4],
     paddingTop: SPACING[4],
     borderTopWidth: 1,
@@ -992,34 +1056,12 @@ const styles = StyleSheet.create({
   allocationLabel: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.text.secondary,
-    marginBottom: SPACING[3],
+    marginBottom: SPACING[2],
   },
-  allocationBars: {
-    gap: SPACING[2],
-  },
-  allocationBarRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[2],
-  },
-  allocationBarLabel: {
-    width: 45,
-    fontSize: TYPOGRAPHY.fontSize.xs,
+  allocationSentence: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.text.secondary,
-  },
-  allocationBarPct: {
-    width: 65,
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.primary,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  allocationLegend: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.secondary,
-    textAlign: 'right',
-    marginTop: SPACING[2],
-    fontStyle: 'italic',
+    lineHeight: 20,
   },
   boundaryIndicator: {
     flexDirection: 'row',
@@ -1037,6 +1079,8 @@ const styles = StyleSheet.create({
   boundaryText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: TYPOGRAPHY.fontWeight.medium,
+    flex: 1,
+    lineHeight: 20,
   },
   frictionCopy: {
     marginTop: SPACING[3],
