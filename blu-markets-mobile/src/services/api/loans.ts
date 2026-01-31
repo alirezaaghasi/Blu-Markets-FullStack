@@ -67,6 +67,9 @@ function validateLoan(data: unknown): Loan | null {
                         typeof loan.collateral_value_irr === 'number' ? loan.collateral_value_irr : undefined,
     healthStatus: typeof loan.healthStatus === 'string' ? loan.healthStatus :
                   typeof loan.health_status === 'string' ? loan.health_status : undefined,
+    // Settlement date for REPAID loans (when the loan was fully paid off)
+    settledAt: typeof loan.settledAt === 'string' ? loan.settledAt :
+               typeof loan.settled_at === 'string' ? loan.settled_at : undefined,
     // Map installments with field name normalization (backend uses lowercase Irr)
     installments: Array.isArray(loan.installments) ? loan.installments.map((inst: Record<string, unknown>) => ({
       number: typeof inst.number === 'number' ? inst.number : 0,

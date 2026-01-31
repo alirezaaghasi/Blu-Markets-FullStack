@@ -90,6 +90,8 @@ export const loansRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           remainingIrr,
           ltv: ltvPct,
           status: loan.status,
+          // For REPAID loans, include the settlement date (when loan was fully paid off)
+          settledAt: loan.status === 'REPAID' ? loan.updatedAt.toISOString() : null,
           installments: loan.installments.map((inst) => ({
             number: inst.number,
             dueDate: inst.dueDate.toISOString(),

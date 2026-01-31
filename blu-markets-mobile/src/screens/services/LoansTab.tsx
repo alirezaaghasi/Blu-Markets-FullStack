@@ -100,6 +100,9 @@ export function LoansTab({ loanId }: LoansTabProps) {
     refresh(); // Refresh loans after repayment
   };
 
+  // Separate active and repaid loans
+  const activeLoans = loans.filter((loan) => loan.status === 'ACTIVE');
+  const repaidLoans = loans.filter((loan) => loan.status === 'REPAID');
   const hasLoans = loans.length > 0;
 
   if (isLoading && loans.length === 0) {
@@ -247,15 +250,36 @@ export function LoansTab({ loanId }: LoansTabProps) {
         </View>
 
         {/* Active Loans */}
-        <Text style={styles.sectionTitle}>Active Loans</Text>
-        {loans.map((loan) => (
-          <LoanCard
-            key={loan.id}
-            loan={loan}
-            highlighted={loan.id === loanId}
-            onRepay={() => handleOpenRepaySheet(loan)}
-          />
-        ))}
+        {activeLoans.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>Active Loans</Text>
+            {activeLoans.map((loan) => (
+              <LoanCard
+                key={loan.id}
+                loan={loan}
+                highlighted={loan.id === loanId}
+                onRepay={() => handleOpenRepaySheet(loan)}
+              />
+            ))}
+          </>
+        )}
+
+        {/* Repaid Loans */}
+        {repaidLoans.length > 0 && (
+          <>
+            <Text style={[styles.sectionTitle, activeLoans.length > 0 && styles.sectionTitleSpaced]}>
+              Repaid Loans
+            </Text>
+            {repaidLoans.map((loan) => (
+              <LoanCard
+                key={loan.id}
+                loan={loan}
+                highlighted={loan.id === loanId}
+                onRepay={() => {}}
+              />
+            ))}
+          </>
+        )}
       </ScrollView>
 
       {/* BUG-3 FIX: LoanSheet for configuration and confirmation */}
@@ -303,8 +327,8 @@ function LoanCard({
   // Task 7 (Round 2): Simplified REPAID loan display - 2 lines only
   if (loan.status === 'REPAID') {
     const originalPrincipal = loan.amountIRR;
-    // Use dueISO as the settled date (best available option since settledAt isn't in type)
-    const settledDate = loan.dueISO;
+    // Use backend-provided settledAt, fallback to startISO if not available
+    const settledDate = loan.settledAt || loan.startISO;
     return (
       <View style={[styles.loanCard, highlighted && styles.loanCardHighlighted]}>
         <View style={styles.repaidHeader}>
@@ -430,6 +454,9 @@ const styles = StyleSheet.create({
     color: COLORS.text.secondary,
     textTransform: 'uppercase',
     marginBottom: SPACING[3],
+  },
+  sectionTitleSpaced: {
+    marginTop: SPACING[6],
   },
   loanCard: {
     backgroundColor: COLORS.background.elevated,

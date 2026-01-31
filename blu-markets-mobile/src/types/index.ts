@@ -246,6 +246,7 @@ export interface Loan {
   progressPct?: number; // Repayment progress (0-100)
   daysUntilDue?: number; // Days until loan is due
   collateralValueIrr?: number; // Current collateral value in IRR
+  settledAt?: string; // ISO date when loan was fully repaid (only for REPAID loans)
 }
 
 // Activity Feed Types
