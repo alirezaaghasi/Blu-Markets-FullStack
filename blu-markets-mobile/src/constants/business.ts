@@ -155,8 +155,11 @@ export const WEBSOCKET_RECONNECT_INTERVAL_MS = 3_000; // 3 seconds
 export const WEBSOCKET_ENABLED = false;
 
 // Demo Mode Configuration
-// Token used to identify demo mode - centralized to avoid hardcoded strings
-export const DEMO_TOKEN = 'demo-token';
+// Token used to identify demo mode in DEVELOPMENT ONLY
+// SECURITY: Demo mode is completely disabled in production builds
+// The __DEV__ check ensures this cannot be bypassed
+export const DEMO_MODE_ENABLED = __DEV__ && (process.env.EXPO_PUBLIC_ENABLE_DEMO !== 'false');
+export const DEMO_TOKEN = DEMO_MODE_ENABLED ? 'demo-token-dev-only' : '';
 
 // Risk Profile Allocations by Score (per PRD Section 17)
 export const RISK_PROFILE_ALLOCATIONS: Record<number, TargetLayerPct> = {

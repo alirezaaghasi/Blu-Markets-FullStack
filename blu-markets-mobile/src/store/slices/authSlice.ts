@@ -1,6 +1,6 @@
 // Auth Slice
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { DEMO_TOKEN } from '../../constants/business';
+import { DEMO_TOKEN, DEMO_MODE_ENABLED } from '../../constants/business';
 
 interface AuthState {
   phone: string | null;
@@ -31,10 +31,11 @@ const authSlice = createSlice({
       state.onboardingComplete = true;
     },
     // Demo mode: skip directly to main app with mock data
-    // SECURITY: Only allowed in development builds to prevent production bypass
+    // SECURITY: Only allowed in development builds with DEMO_MODE_ENABLED
+    // This cannot be bypassed in production as DEMO_MODE_ENABLED is false and DEMO_TOKEN is empty
     enableDemoMode: (state) => {
-      if (!__DEV__) {
-        console.warn('Demo mode is not available in production builds');
+      if (!DEMO_MODE_ENABLED || !DEMO_TOKEN) {
+        // Silent fail in production - do not expose that demo mode exists
         return;
       }
       state.authToken = DEMO_TOKEN;
