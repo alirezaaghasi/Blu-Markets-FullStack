@@ -37,6 +37,7 @@ import { resetPortfolio } from '../../store/slices/portfolioSlice';
 import { useBiometricAuth } from '../../hooks/useBiometricAuth';
 import { clearAllState } from '../../utils/storage';
 import type { RootStackParamList } from '../../navigation/types';
+import { ALERTS } from '../../constants/messages';
 
 // =============================================================================
 // TYPES
@@ -226,12 +227,12 @@ const ProfileScreen: React.FC = () => {
     if (value) {
       const success = await enableBiometric();
       if (!success) {
-        Alert.alert('Error', 'Failed to enable biometric authentication');
+        Alert.alert(ALERTS.profile.biometricEnableError.title, ALERTS.profile.biometricEnableError.message);
       }
     } else {
       const success = await disableBiometric();
       if (!success) {
-        Alert.alert('Error', 'Failed to disable biometric authentication');
+        Alert.alert(ALERTS.profile.biometricDisableError.title, ALERTS.profile.biometricDisableError.message);
       }
     }
   };

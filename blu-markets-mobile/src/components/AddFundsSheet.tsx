@@ -19,6 +19,7 @@ import { updateCash, logAction, setPortfolioValues } from '../store/slices/portf
 import { portfolio } from '../services/api';
 import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
 import { formatNumber } from '../utils/currency';
+import { ALERTS } from '../constants/messages';
 
 // Minimum deposit amount (100,000 IRR)
 const MIN_DEPOSIT = 100_000;
@@ -119,7 +120,7 @@ export const AddFundsSheet: React.FC<AddFundsSheetProps> = ({
       setShowSuccess(true);
       setAmountInput('');
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Failed to add funds. Please try again.');
+      Alert.alert(ALERTS.funds.addError.title, error?.message || ALERTS.funds.addError.message);
     } finally {
       setIsSubmitting(false);
     }

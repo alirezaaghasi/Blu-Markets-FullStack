@@ -25,6 +25,7 @@ import { useLoans } from '../../hooks/useLoans';
 import LoanSheet from '../../components/LoanSheet';
 import RepaySheet from '../../components/RepaySheet';
 import { EmptyState } from '../../components/EmptyState';
+import { HOLDING } from '../../constants/messages';
 
 const LoansScreen: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -251,7 +252,7 @@ const LoansScreen: React.FC = () => {
                             <Text style={styles.assetSymbol}> | {asset.symbol}</Text>
                           </Text>
                           <View style={styles.frozenBadge}>
-                            <Text style={styles.frozenBadgeText}>FROZEN</Text>
+                            <Text style={styles.frozenBadgeText}>{HOLDING.frozenBadge.toUpperCase()}</Text>
                           </View>
                         </View>
                         <Text style={styles.collateralAmount}>

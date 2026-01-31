@@ -205,26 +205,24 @@ export const calculateTotalDrift = (
   ) / 2; // Divide by 2 since drift is counted twice
 };
 
-// Generate friction copy based on boundary
+// Generate friction copy based on boundary (PCD compliant - no imperatives)
 export const getFrictionCopy = (boundary: Boundary, side: 'BUY' | 'SELL'): string[] => {
   const copy: string[] = [];
 
   if (boundary === 'DRIFT') {
-    copy.push('This trade moves you slightly away from your target allocation.');
-    copy.push('You can rebalance later to correct this drift.');
+    copy.push('This trade creates minor drift from target allocation.');
+    copy.push('Portfolio balance can be restored through future adjustments.');
   }
 
   if (boundary === 'STRUCTURAL') {
-    copy.push('This is a significant move away from your target allocation.');
-    copy.push('Please review carefully before confirming.');
+    copy.push('This trade creates significant drift from target allocation.');
+    copy.push('Your portfolio risk profile will change.');
   }
 
   if (boundary === 'STRESS') {
-    copy.push('Warning: This trade creates a major imbalance in your portfolio.');
-    copy.push('Your portfolio may become exposed to higher risk.');
-    if (side === 'SELL') {
-      copy.push('Consider whether you truly need to sell this amount.');
-    }
+    copy.push('This trade creates major drift from target allocation.');
+    copy.push('Downside exposure will increase beyond your stated boundaries.');
+    copy.push('Recovery to target may require substantial future changes.');
   }
 
   return copy;

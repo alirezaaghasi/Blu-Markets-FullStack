@@ -28,7 +28,7 @@ import { Button, OTPInput } from '../../components/common';
 import { useAppDispatch } from '../../hooks/useStore';
 import { setAuthToken } from '../../store/slices/authSlice';
 import { auth, setAuthTokens } from '../../services/api';
-import { ONBOARDING } from '../../constants/messages';
+import { ONBOARDING, ALERTS } from '../../constants/messages';
 
 type OTPVerifyScreenProps = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'OTPVerify'>;
@@ -87,7 +87,7 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
       }
     } catch (err: unknown) {
       if (__DEV__) console.error('[OTP] Verification error:', err);
-      let errorMessage = 'Verification failed. Please try again.';
+      let errorMessage = ALERTS.auth.verifyError.message;
       if (err instanceof Error) {
         errorMessage = err.message;
       } else if (err && typeof err === 'object' && 'message' in err) {

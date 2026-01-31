@@ -19,7 +19,7 @@ import { TYPOGRAPHY } from '../constants/typography';
 import { SPACING, RADIUS } from '../constants/spacing';
 import { LAYOUT } from '../constants/layout';
 import { Button } from './common';
-import { TRADE, BUTTONS } from '../constants/messages';
+import { TRADE, BUTTONS, TRADE_ERROR } from '../constants/messages';
 
 interface TradeErrorModalProps {
   /** Visibility state */
@@ -73,10 +73,10 @@ export const TradeErrorModal: React.FC<TradeErrorModalProps> = ({
 
               {/* Helpful Tips */}
               <View style={styles.tipsContainer}>
-                <Text style={styles.tipsTitle}>Try these steps:</Text>
-                <Text style={styles.tipItem}>• Check your internet connection</Text>
-                <Text style={styles.tipItem}>• Verify you have sufficient balance</Text>
-                <Text style={styles.tipItem}>• Wait a moment and try again</Text>
+                <Text style={styles.tipsTitle}>{TRADE_ERROR.tipsTitle}</Text>
+                {TRADE_ERROR.tips.map((tip, index) => (
+                  <Text key={index} style={styles.tipItem}>• {tip}</Text>
+                ))}
               </View>
 
               {/* Actions */}

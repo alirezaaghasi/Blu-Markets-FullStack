@@ -50,6 +50,7 @@ import {
   getBoundaryExplanation,
   getTradeAllocationImpact,
   getTransactionFeeExplanation,
+  ALERTS,
 } from '../constants/messages';
 
 interface TradeBottomSheetProps {
@@ -364,11 +365,11 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
       return;
     }
     if (!preview) {
-      Alert.alert('Preview Not Ready', previewError || 'Unable to get trade preview. Please try again.');
+      Alert.alert(ALERTS.trade.previewError.title, previewError || ALERTS.trade.previewError.message);
       return;
     }
     if ((preview.quantity ?? 0) <= 0) {
-      Alert.alert('Invalid Amount', 'Trade quantity is too small. Please enter a larger amount.');
+      Alert.alert(ALERTS.trade.invalidAmount.title, ALERTS.trade.invalidAmount.message);
       return;
     }
     setShowConfirmModal(true);
@@ -416,7 +417,7 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
       setShowConfirmModal(false);
       setShowSuccessModal(true);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to execute trade. Please try again.';
+      const errorMessage = error instanceof Error ? error.message : ALERTS.trade.executionError.message;
       setErrorMessage(errorMessage);
 
       // Close confirm modal, show error modal

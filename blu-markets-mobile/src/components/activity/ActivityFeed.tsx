@@ -6,6 +6,7 @@ import { COLORS } from '../../constants/colors';
 import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING, RADIUS } from '../../constants/spacing';
 import { ActivityEntry, ActivityEntryData } from './ActivityEntry';
+import { ACTIVITY } from '../../constants/messages';
 
 interface ActivityFeedProps {
   entries: ActivityEntryData[];
@@ -34,8 +35,8 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({
           </View>
         </View>
         <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No activity yet</Text>
-          <Text style={styles.emptySubtext}>Your actions will appear here</Text>
+          <Text style={styles.emptyText}>{ACTIVITY.emptyTitle}</Text>
+          <Text style={styles.emptySubtext}>{ACTIVITY.emptySubtitle}</Text>
         </View>
       </View>
     );

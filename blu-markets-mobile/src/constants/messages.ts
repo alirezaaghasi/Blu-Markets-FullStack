@@ -603,6 +603,124 @@ export const SUCCESS = {
 };
 
 // =============================================================================
+// ALERTS (All Alert.alert messages - PCD compliant)
+// =============================================================================
+
+export const ALERTS = {
+  // Trade alerts
+  trade: {
+    previewLoading: {
+      title: 'Please Wait',
+      message: 'Loading trade preview...',
+    },
+    previewError: {
+      title: 'Preview Not Ready',
+      message: 'Unable to get trade preview. You may try again.',
+    },
+    invalidAmount: {
+      title: 'Invalid Amount',
+      message: 'Trade quantity is below minimum. A larger amount is required.',
+    },
+    executionError: {
+      title: 'Trade Not Completed',
+      message: 'The trade could not be executed. Your balances remain unchanged.',
+    },
+  },
+
+  // Funds alerts
+  funds: {
+    addError: {
+      title: 'Something went wrong',
+      message: 'Funds could not be added. You may try again.',
+    },
+  },
+
+  // Loan alerts
+  loan: {
+    createError: {
+      title: 'Loan Not Created',
+      message: 'Loan could not be created. You may try again.',
+    },
+    repayError: {
+      title: 'Repayment Issue',
+      message: 'Repayment could not be processed. You may try again.',
+    },
+  },
+
+  // Rebalance alerts
+  rebalance: {
+    error: {
+      title: 'Rebalance Not Completed',
+      message: 'Rebalance could not be completed. You may try again.',
+    },
+  },
+
+  // Profile alerts
+  profile: {
+    biometricEnableError: {
+      title: 'Something went wrong',
+      message: 'Biometric authentication could not be enabled.',
+    },
+    biometricDisableError: {
+      title: 'Something went wrong',
+      message: 'Biometric authentication could not be disabled.',
+    },
+    updateError: {
+      title: 'Something went wrong',
+      message: 'Profile could not be updated. You may try again.',
+    },
+    calculateError: {
+      title: 'Something went wrong',
+      message: 'Profile could not be calculated. You may try again.',
+    },
+  },
+
+  // OTP/Auth alerts
+  auth: {
+    otpSendError: {
+      title: 'Something went wrong',
+      message: 'Code could not be sent. You may try again.',
+    },
+    verifyError: {
+      title: 'Verification Issue',
+      message: 'Verification was not successful. You may try again.',
+    },
+  },
+};
+
+// =============================================================================
+// TRADE ERROR MODAL (PCD compliant - no imperatives)
+// =============================================================================
+
+export const TRADE_ERROR = {
+  title: 'Trade Not Completed',
+  tipsTitle: 'You may try:',
+  tips: [
+    'Checking your internet connection',
+    'Verifying sufficient balance',
+    'Waiting a moment and retrying',
+  ],
+};
+
+// =============================================================================
+// ACTIVITY FEED
+// =============================================================================
+
+export const ACTIVITY = {
+  emptyTitle: 'No activity yet',
+  emptySubtitle: 'Your portfolio changes will appear here.',
+  seeAll: 'See All',
+};
+
+// =============================================================================
+// HOLDING CARD
+// =============================================================================
+
+export const HOLDING = {
+  frozenBadge: 'Locked', // Changed from "FROZEN"
+};
+
+// =============================================================================
 // COMMON UI LABELS
 // =============================================================================
 

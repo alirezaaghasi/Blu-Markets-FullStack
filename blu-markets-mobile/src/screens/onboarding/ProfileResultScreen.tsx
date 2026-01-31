@@ -32,6 +32,7 @@ import { store } from '../../store';
 import { setRiskProfile } from '../../store/slices/onboardingSlice';
 import { onboarding } from '../../services/api';
 import { QUESTIONS } from '../../constants/questionnaire';
+import { ONBOARDING, ALERTS } from '../../constants/messages';
 
 type ProfileResultScreenProps = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'ProfileResult'>;
@@ -151,7 +152,7 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation, r
         setIsLoading(false);
       } catch (err) {
         if (__DEV__) console.error('[ProfileResult] API error:', err);
-        setError('Failed to calculate profile. Please try again.');
+        setError(ALERTS.profile.calculateError.message);
         setIsLoading(false);
       }
     };
@@ -369,7 +370,7 @@ const ProfileResultScreen: React.FC<ProfileResultScreenProps> = ({ navigation, r
           onPress={handleContinue}
           activeOpacity={0.8}
         >
-          <Text style={styles.primaryButtonText}>Let's go!</Text>
+          <Text style={styles.primaryButtonText}>{ONBOARDING.result.cta}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

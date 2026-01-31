@@ -29,7 +29,7 @@ import { TransactionSuccessModal, TransactionSuccessResult } from './Transaction
 import { loans as loansApi } from '../services/api';
 import { formatIRR, formatNumber } from '../utils/currency';
 import type { LoanCapacityResponse, LoanPreviewResponse } from '../services/api';
-import { LOAN, BUTTONS } from '../constants/messages';
+import { LOAN, BUTTONS, ALERTS } from '../constants/messages';
 
 interface LoanSheetProps {
   visible: boolean;
@@ -240,7 +240,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
       setShowSuccess(true);
       setAmountInput('');
     } catch (error) {
-      Alert.alert('Error', 'Failed to create loan. Please try again.');
+      Alert.alert(ALERTS.loan.createError.title, ALERTS.loan.createError.message);
     } finally {
       setIsSubmitting(false);
     }

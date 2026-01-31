@@ -21,6 +21,7 @@ import { portfolio as portfolioApi } from '../services/api';
 import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
 import { loans as loansApi } from '../services/api';
 import { formatNumber } from '../utils/currency';
+import { ALERTS } from '../constants/messages';
 
 interface RepaySheetProps {
   visible: boolean;
@@ -183,7 +184,7 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
         setShowSuccess(true);
       }
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Failed to process repayment. Please try again.');
+      Alert.alert(ALERTS.loan.repayError.title, error?.message || ALERTS.loan.repayError.message);
     } finally {
       setIsSubmitting(false);
     }

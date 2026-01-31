@@ -29,7 +29,7 @@ import { useAppDispatch } from '../../hooks/useStore';
 import { setPhone } from '../../store/slices/onboardingSlice';
 import { IRAN_PHONE_PREFIX } from '../../constants/business';
 import { auth } from '../../services/api';
-import { ONBOARDING } from '../../constants/messages';
+import { ONBOARDING, ALERTS } from '../../constants/messages';
 
 type PhoneInputScreenProps = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'PhoneInput'>;
@@ -90,7 +90,7 @@ const PhoneInputScreen: React.FC<PhoneInputScreenProps> = ({ navigation }) => {
       dispatch(setPhone(fullPhone));
       navigation.navigate('OTPVerify', { phone: fullPhone });
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to send OTP. Please try again.';
+      const errorMessage = err instanceof Error ? err.message : ALERTS.auth.otpSendError.message;
       setError(errorMessage);
     } finally {
       setIsLoading(false);

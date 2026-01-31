@@ -22,6 +22,7 @@ import { QUESTIONS } from '../../constants/questionnaire';
 import { useAppDispatch } from '../../hooks/useStore';
 import { setRiskProfile, setTargetLayerPct } from '../../store/slices/portfolioSlice';
 import { containsPersian } from '../../components/RTLText';
+import { ALERTS } from '../../constants/messages';
 
 type Props = {
   navigation?: any;
@@ -78,7 +79,7 @@ const QuestionnaireScreen: React.FC<Props> = ({ navigation: propNavigation }) =>
       );
     } catch (error) {
       if (__DEV__) console.error('[Questionnaire] Retake quiz submission failed:', error);
-      Alert.alert('Error', 'Failed to update profile. Please try again.');
+      Alert.alert(ALERTS.profile.updateError.title, ALERTS.profile.updateError.message);
     } finally {
       setIsSubmitting(false);
     }

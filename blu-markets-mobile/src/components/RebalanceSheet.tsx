@@ -20,7 +20,7 @@ import { TransactionSuccessModal, TransactionSuccessResult } from './Transaction
 // RTK Query - auto-invalidates portfolio cache after rebalance
 import { useGetRebalancePreviewQuery, useExecuteRebalanceMutation } from '../store/api/apiSlice';
 import { formatIRR, formatPercent, formatNumber } from '../utils/currency';
-import { REBALANCE_NOT_NEEDED } from '../constants/messages';
+import { REBALANCE_NOT_NEEDED, ALERTS } from '../constants/messages';
 
 interface RebalanceSheetProps {
   visible: boolean;
@@ -90,7 +90,7 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
       });
       setShowSuccess(true);
     } catch (err: any) {
-      Alert.alert('Rebalance Failed', err?.message || err?.data?.message || 'Unable to rebalance. Please try again.');
+      Alert.alert(ALERTS.rebalance.error.title, err?.message || err?.data?.message || ALERTS.rebalance.error.message);
     }
   };
 

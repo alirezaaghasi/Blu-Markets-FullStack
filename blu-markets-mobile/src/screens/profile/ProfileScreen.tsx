@@ -22,6 +22,7 @@ import { RISK_PROFILE_NAMES } from '../../constants/business';
 import { useBiometricAuth } from '../../hooks/useBiometricAuth';
 import { clearAllState } from '../../utils/storage';
 import { formatPhoneDisplay, formatMemberSince } from '../../utils/formatters';
+import { ALERTS } from '../../constants/messages';
 
 const ProfileScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -57,12 +58,12 @@ const ProfileScreen: React.FC = () => {
     if (value) {
       const success = await enableBiometric();
       if (!success) {
-        Alert.alert('Error', 'Failed to enable biometric authentication');
+        Alert.alert(ALERTS.profile.biometricEnableError.title, ALERTS.profile.biometricEnableError.message);
       }
     } else {
       const success = await disableBiometric();
       if (!success) {
-        Alert.alert('Error', 'Failed to disable biometric authentication');
+        Alert.alert(ALERTS.profile.biometricDisableError.title, ALERTS.profile.biometricDisableError.message);
       }
     }
   };
