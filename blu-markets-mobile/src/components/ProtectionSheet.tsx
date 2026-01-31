@@ -221,7 +221,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
       return;
     }
     if (!canAfford) {
-      Alert.alert(ERRORS.validation.insufficientFunds, `You need ${(quote.premiumIrr ?? 0).toLocaleString()} IRR but only have ${(cashIRR ?? 0).toLocaleString()} IRR.`);
+      Alert.alert(ERRORS.validation.insufficientFunds, `You need ${formatIRR(quote.premiumIrr ?? 0)} but only have ${formatIRR(cashIRR ?? 0)}.`);
       return;
     }
 
@@ -243,7 +243,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
         logAction({
           type: 'PROTECT',
           boundary: 'SAFE',
-          message: `Insured ${asset.symbol} for ${formatDuration(durationDays)}`,
+          message: `Insured ${asset.name} for ${formatDuration(durationDays)}`,
           amountIRR: quote.premiumIrr,
           assetId: holding.assetId,
         })
@@ -274,7 +274,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
         items: [
           { label: PROTECTION.active.coverage, value: `${(coveragePct * 100).toFixed(0)}%` },
           { label: PROTECTION.config.duration, value: formatDuration(durationDays) },
-          { label: PROTECTION.quote.totalCost, value: `${(quote.premiumIrr ?? 0).toLocaleString()} IRR` },
+          { label: PROTECTION.quote.totalCost, value: formatIRR(quote.premiumIrr ?? 0) },
           { label: PROTECTION.active.expires, value: expiryDate.toLocaleDateString(), highlight: true },
         ],
       });

@@ -20,7 +20,7 @@ import { updateLoan, removeLoan, unfreezeHolding, subtractCash, logAction, setPo
 import { portfolio as portfolioApi } from '../services/api';
 import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
 import { loans as loansApi } from '../services/api';
-import { formatNumber } from '../utils/currency';
+import { formatNumber, formatIRR, formatDate } from '../utils/currency';
 import { ALERTS } from '../constants/messages';
 
 interface RepaySheetProps {
@@ -108,7 +108,7 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
           logAction({
             type: 'REPAY',
             boundary: 'SAFE',
-            message: `Fully repaid ${asset.symbol} loan`,
+            message: `Fully repaid ${asset.name} loan`,
             amountIRR: repayAmount,
             assetId: loan.collateralAssetId,
           })
@@ -133,7 +133,7 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
           title: 'Loan Fully Settled!',
           subtitle: `Your ${asset.name} is now unlocked to trade again`,
           items: [
-            { label: 'Amount Paid', value: `${formatNumber(repayAmount)} IRR` },
+            { label: 'Amount Paid', value: formatIRR(repayAmount) },
             { label: 'Collateral Released', value: asset.name, highlight: true },
             { label: 'Status', value: 'Closed', highlight: true },
           ],
@@ -151,7 +151,7 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
           logAction({
             type: 'REPAY',
             boundary: 'SAFE',
-            message: `Repaid ${formatNumber(repayAmount)} IRR · ${asset.symbol} loan (${paidCount}/${loan.installments.length})`,
+            message: `Repaid ${formatIRR(repayAmount)} · ${asset.name} loan (${paidCount}/${loan.installments.length})`,
             amountIRR: repayAmount,
             assetId: loan.collateralAssetId,
           })
@@ -176,9 +176,9 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
           title: 'Payment Received!',
           subtitle: `${remainingInstallments} installments remaining`,
           items: [
-            { label: 'Amount Paid', value: `${formatNumber(repayAmount)} IRR`, highlight: true },
+            { label: 'Amount Paid', value: formatIRR(repayAmount), highlight: true },
             { label: 'Progress', value: `${paidCount}/${loan.installments.length} installments` },
-            { label: 'Remaining Balance', value: `${formatNumber(remainingBalance)} IRR` },
+            { label: 'Remaining Balance', value: formatIRR(remainingBalance) },
           ],
         });
         setShowSuccess(true);
@@ -240,12 +240,61 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
             <View style={styles.summaryDetails}>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Outstanding</Text>
-                <Text style={styles.summaryValue}>{formatNumber(totalOutstanding)} IRR</Text>
+                <Text style={styles.summaryValue}>{formatIRR(totalOutstanding)}</Text>
               </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Next installment</Text>
-                <Text style={styles.summaryValue}>{formatNumber(minPayment)} IRR</Text>
-              </View>
+              {nextInstallment && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Next installment</Text>
+                  <Text style={styles.summaryValue}>
+                    {formatIRR(minPayment)} · Due {formatDate(nextInstallment.dueISO)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Payment Schedule */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Payment Schedule</Text>
+            <View style={styles.scheduleCard}>
+              {loan.installments.map((installment, index) => {
+                const isPaid = installment.status === 'PAID';
+                const isNext = !isPaid && index === loan.installments.findIndex(i => i.status !== 'PAID');
+                return (
+                  <View
+                    key={installment.number}
+                    style={[
+                      styles.scheduleRow,
+                      index < loan.installments.length - 1 && styles.scheduleRowBorder,
+                    ]}
+                  >
+                    <View style={styles.scheduleLeft}>
+                      <Text style={styles.scheduleInstallment}>
+                        Installment {installment.number}
+                      </Text>
+                      <Text style={styles.scheduleDate}>
+                        {formatDate(installment.dueISO, true)}
+                      </Text>
+                    </View>
+                    <View style={styles.scheduleRight}>
+                      <Text style={styles.scheduleAmount}>
+                        {formatIRR(installment.totalIRR)}
+                      </Text>
+                      <View style={[
+                        styles.statusBadge,
+                        isPaid ? styles.statusPaid : isNext ? styles.statusNext : styles.statusPending,
+                      ]}>
+                        <Text style={[
+                          styles.statusText,
+                          isPaid ? styles.statusTextPaid : isNext ? styles.statusTextNext : styles.statusTextPending,
+                        ]}>
+                          {isPaid ? 'Paid' : isNext ? 'Due Next' : 'Upcoming'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
             </View>
           </View>
 
@@ -262,7 +311,7 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
                 </View>
                 <View style={styles.optionInfo}>
                   <Text style={styles.optionTitle}>Minimum Payment</Text>
-                  <Text style={styles.optionAmount}>{formatNumber(minPayment)} IRR</Text>
+                  <Text style={styles.optionAmount}>{formatIRR(minPayment)}</Text>
                 </View>
               </TouchableOpacity>
 
@@ -297,7 +346,7 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
                 </View>
                 <View style={styles.optionInfo}>
                   <Text style={styles.optionTitle}>Full Settlement</Text>
-                  <Text style={styles.optionAmount}>{formatNumber(totalOutstanding)} IRR</Text>
+                  <Text style={styles.optionAmount}>{formatIRR(totalOutstanding)}</Text>
                 </View>
               </TouchableOpacity>
             </View>
@@ -307,14 +356,14 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
           <View style={styles.cashInfo}>
             <Text style={styles.cashLabel}>Available Cash</Text>
             <Text style={[styles.cashValue, !canAfford && styles.cashValueInsufficient]}>
-              {formatNumber(cashIRR)} IRR
+              {formatIRR(cashIRR)}
             </Text>
           </View>
 
           {!canAfford && (
             <View style={styles.errorBanner}>
               <Text style={styles.errorText}>
-                Insufficient cash. Add {formatNumber(repayAmount - cashIRR)} IRR more.
+                Insufficient cash. Add {formatIRR(repayAmount - cashIRR)} more.
               </Text>
             </View>
           )}
@@ -341,7 +390,7 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
             <Text style={styles.confirmButtonText}>
               {isSubmitting
                 ? 'Processing...'
-                : `Repay ${formatNumber(repayAmount)} IRR`}
+                : `Repay ${formatIRR(repayAmount)}`}
             </Text>
           </TouchableOpacity>
         </View>
@@ -555,6 +604,70 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     color: colors.textSecondary,
     lineHeight: 20,
+  },
+  scheduleCard: {
+    backgroundColor: colors.cardDark,
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+  },
+  scheduleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing[3],
+  },
+  scheduleRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderDark,
+  },
+  scheduleLeft: {
+    flex: 1,
+  },
+  scheduleRight: {
+    alignItems: 'flex-end',
+  },
+  scheduleInstallment: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.textPrimaryDark,
+  },
+  scheduleDate: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  scheduleAmount: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.textPrimaryDark,
+    marginBottom: 4,
+  },
+  statusBadge: {
+    paddingHorizontal: spacing[2],
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+  },
+  statusPaid: {
+    backgroundColor: `${colors.success}20`,
+  },
+  statusNext: {
+    backgroundColor: `${colors.primary}20`,
+  },
+  statusPending: {
+    backgroundColor: `${colors.textSecondary}15`,
+  },
+  statusText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium,
+  },
+  statusTextPaid: {
+    color: colors.success,
+  },
+  statusTextNext: {
+    color: colors.primary,
+  },
+  statusTextPending: {
+    color: colors.textSecondary,
   },
   footer: {
     padding: spacing[4],

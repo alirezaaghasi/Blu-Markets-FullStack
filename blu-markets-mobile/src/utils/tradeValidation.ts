@@ -26,6 +26,7 @@ if (__DEV__) {
 import { AssetId, Layer, Boundary, TargetLayerPct, Holding, TradePreview, ValidationResult } from '../types';
 import { ASSETS, LAYER_COLORS } from '../constants/assets';
 import { MIN_TRADE_AMOUNT, SPREAD_BY_LAYER, LAYER_CONSTRAINTS, DRIFT_TOLERANCE } from '../constants/business';
+import { formatIRR } from './currency';
 
 // Validate buy trade
 export const validateBuyTrade = (
@@ -40,7 +41,7 @@ export const validateBuyTrade = (
   }
 
   if (amountIRR < MIN_TRADE_AMOUNT) {
-    errors.push(`Minimum trade amount is ${MIN_TRADE_AMOUNT.toLocaleString()} IRR`);
+    errors.push(`Minimum trade amount is ${formatIRR(MIN_TRADE_AMOUNT)}`);
   }
 
   if (cashIRR < amountIRR) {
@@ -74,7 +75,7 @@ export const validateSellTrade = (
   }
 
   if (amountIRR < MIN_TRADE_AMOUNT) {
-    errors.push(`Minimum trade amount is ${MIN_TRADE_AMOUNT.toLocaleString()} IRR`);
+    errors.push(`Minimum trade amount is ${formatIRR(MIN_TRADE_AMOUNT)}`);
   }
 
   if (!holding) {

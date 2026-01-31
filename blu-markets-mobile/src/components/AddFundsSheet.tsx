@@ -18,7 +18,7 @@ import { useAppDispatch, useAppSelector } from '../hooks/useStore';
 import { updateCash, logAction, setPortfolioValues } from '../store/slices/portfolioSlice';
 import { portfolio } from '../services/api';
 import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
-import { formatNumber } from '../utils/currency';
+import { formatNumber, formatIRR } from '../utils/currency';
 import { ALERTS } from '../constants/messages';
 
 // Minimum deposit amount (100,000 IRR)
@@ -55,7 +55,7 @@ export const AddFundsSheet: React.FC<AddFundsSheetProps> = ({
   // Validation
   const isValid = amountIRR >= MIN_DEPOSIT;
   const validationError = amountIRR > 0 && amountIRR < MIN_DEPOSIT
-    ? `Minimum deposit is ${MIN_DEPOSIT.toLocaleString()} IRR`
+    ? `Minimum deposit is ${formatIRR(MIN_DEPOSIT)}`
     : null;
 
   // Handle amount input
@@ -102,7 +102,7 @@ export const AddFundsSheet: React.FC<AddFundsSheetProps> = ({
       dispatch(logAction({
         type: 'ADD_FUNDS',
         boundary: 'SAFE',
-        message: `Added ${formatNumber(actualAmountAdded)} IRR to portfolio`,
+        message: `Added ${formatIRR(actualAmountAdded)} to portfolio`,
         amountIRR: actualAmountAdded,
       }));
 
@@ -112,9 +112,9 @@ export const AddFundsSheet: React.FC<AddFundsSheetProps> = ({
         title: 'Added to Cash Wallet',
         subtitle: 'This amount is available as cash.\nYou decide how to invest it.',
         items: [
-          { label: 'Amount Added', value: `${formatNumber(actualAmountAdded)} IRR` },
-          { label: 'Previous Cash', value: `${formatNumber(previousBalance)} IRR` },
-          { label: 'New Cash Balance', value: `${formatNumber(newBalance)} IRR`, highlight: true },
+          { label: 'Amount Added', value: formatIRR(actualAmountAdded) },
+          { label: 'Previous Cash', value: formatIRR(previousBalance) },
+          { label: 'New Cash Balance', value: formatIRR(newBalance), highlight: true },
         ],
       });
       setShowSuccess(true);
@@ -163,7 +163,7 @@ export const AddFundsSheet: React.FC<AddFundsSheetProps> = ({
             {/* Current Balance */}
             <View style={styles.balanceSection}>
               <Text style={styles.balanceLabel}>Current Cash Balance</Text>
-              <Text style={styles.balanceValue}>{formatNumber(cashIRR)} IRR</Text>
+              <Text style={styles.balanceValue}>{formatIRR(cashIRR)}</Text>
             </View>
 
             {/* Amount Input */}
@@ -219,7 +219,7 @@ export const AddFundsSheet: React.FC<AddFundsSheetProps> = ({
               <View style={styles.previewSection}>
                 <Text style={styles.previewLabel}>New Cash Balance</Text>
                 <Text style={styles.previewValue}>
-                  {formatNumber(cashIRR + amountIRR)} IRR
+                  {formatIRR(cashIRR + amountIRR)}
                 </Text>
               </View>
             )}

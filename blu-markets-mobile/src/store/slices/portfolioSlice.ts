@@ -17,6 +17,7 @@ import {
 } from '../../types';
 import { MAX_ACTION_LOG_SIZE, RISK_PROFILE_ALLOCATIONS } from '../../constants/business';
 import { ASSETS } from '../../constants/assets';
+import { formatIRR } from '../../utils/currency';
 
 // Counter for unique IDs - prevents duplicate keys when multiple entries are created in the same millisecond
 let idCounter = 0;
@@ -184,7 +185,7 @@ const portfolioSlice = createSlice({
         timestamp: new Date().toISOString(),
         type: 'TRADE',
         boundary: 'SAFE',
-        message: `${side === 'BUY' ? 'Bought' : 'Sold'} ${asset.symbol}`,
+        message: `${side === 'BUY' ? 'Bought' : 'Sold'} ${asset.name}`,
         assetId,
       };
       state.actionLog.unshift(entry);
@@ -312,7 +313,7 @@ const portfolioSlice = createSlice({
         timestamp: new Date().toISOString(),
         type: 'ADD_FUNDS',
         boundary: 'SAFE',
-        message: `Added ${amountIRR.toLocaleString()} IRR cash`,
+        message: `Added ${formatIRR(amountIRR)} cash`,
         amountIRR,
       };
       state.actionLog.unshift(entry);
@@ -349,7 +350,7 @@ const portfolioSlice = createSlice({
         timestamp: new Date().toISOString(),
         type: 'TRADE',
         boundary,
-        message: `${side === 'BUY' ? 'Bought' : 'Sold'} ${asset.symbol} (${amountIRR.toLocaleString()} IRR)`,
+        message: `${side === 'BUY' ? 'Bought' : 'Sold'} ${asset.name} (${formatIRR(amountIRR)})`,
         amountIRR,
         assetId,
       };

@@ -21,6 +21,7 @@ import { removeProtection } from '../../store/slices/portfolioSlice';
 import ProtectionSheet from '../../components/ProtectionSheet';
 import { EmptyState } from '../../components/EmptyState';
 import { protection as protectionApi, ProtectionsResponse, EligibleAssetsResponse } from '../../services/api';
+import { formatIRR } from '../../utils/currency';
 
 const ProtectionScreen: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -234,7 +235,7 @@ const ProtectionScreen: React.FC = () => {
                     <View style={styles.protectionValue}>
                       <Text style={styles.protectionValueLabel}>Covered</Text>
                       <Text style={styles.protectionValueAmount}>
-                        {(protection.notionalIRR ?? protection.notionalIrr ?? 0).toLocaleString()} IRR
+                        {formatIRR(protection.notionalIRR ?? protection.notionalIrr ?? 0)}
                       </Text>
                     </View>
                   </View>
@@ -255,7 +256,7 @@ const ProtectionScreen: React.FC = () => {
                   <View style={styles.premiumInfo}>
                     <Text style={styles.premiumInfoLabel}>Premium paid</Text>
                     <Text style={styles.premiumInfoValue}>
-                      {(protection.premiumIRR ?? protection.premiumIrr ?? 0).toLocaleString()} IRR
+                      {formatIRR(protection.premiumIRR ?? protection.premiumIrr ?? 0)}
                     </Text>
                   </View>
 
@@ -304,7 +305,7 @@ const ProtectionScreen: React.FC = () => {
                         <Text style={styles.assetSymbol}> | {asset.symbol}</Text>
                       </Text>
                       <Text style={styles.assetValue}>
-                        {(valueIRR || 0).toLocaleString()} IRR
+                        {formatIRR(valueIRR || 0)}
                       </Text>
                     </View>
                   </View>

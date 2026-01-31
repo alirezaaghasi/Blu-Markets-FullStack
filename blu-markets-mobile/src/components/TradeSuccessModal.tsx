@@ -24,6 +24,7 @@ import { Button } from './common';
 import { AssetId } from '../types';
 import { ASSETS } from '../constants/assets';
 import { TRADE, BUTTONS } from '../constants/messages';
+import { formatIRR } from '../utils/currency';
 
 interface TradeResult {
   side: 'BUY' | 'SELL';
@@ -156,7 +157,7 @@ export const TradeSuccessModal: React.FC<TradeSuccessModalProps> = ({
                     {isBuy ? 'Amount Paid' : 'Amount Received'}
                   </Text>
                   <Text style={styles.summaryValue}>
-                    {formatNumber(result.amountIRR ?? 0)} IRR
+                    {formatIRR(result.amountIRR ?? 0)}
                   </Text>
                 </View>
 
@@ -167,7 +168,7 @@ export const TradeSuccessModal: React.FC<TradeSuccessModalProps> = ({
                   <View style={styles.balanceRow}>
                     <Text style={styles.balanceLabel}>Cash</Text>
                     <Text style={styles.balanceValue}>
-                      {formatNumber(result.newCashBalance ?? 0)} IRR
+                      {formatIRR(result.newCashBalance ?? 0)}
                     </Text>
                   </View>
                   <View style={styles.balanceRow}>

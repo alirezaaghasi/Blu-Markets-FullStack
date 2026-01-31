@@ -38,6 +38,7 @@ import { completeOnboarding } from '../../store/slices/authSlice';
 import { ASSETS, getAssetsByLayer } from '../../constants/assets';
 import { DEFAULT_FX_RATE } from '../../constants/business';
 import { ONBOARDING } from '../../constants/messages';
+import { formatIRR } from '../../utils/currency';
 // BUG-021 FIX: Import prices selector to get actual fxRate
 
 type SuccessScreenProps = {
@@ -414,7 +415,7 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
         <Animated.View style={[styles.totalCard, { opacity: fadeAnim }]}>
           <Text style={styles.totalLabel}>{ONBOARDING.success.invested.toUpperCase()}</Text>
           <Text style={styles.totalAmount}>
-            {(initialInvestment || 0).toLocaleString()} IRR
+            {formatIRR(initialInvestment || 0)}
           </Text>
           <Text style={styles.totalUsd}>
             ≈ {formatUsd(initialInvestment, fxRate)} USD

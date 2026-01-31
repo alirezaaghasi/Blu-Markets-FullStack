@@ -157,13 +157,13 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
   if (amountIRR <= 0) {
     validationErrors.push('Enter an amount to borrow');
   } else if (amountIRR < LOAN_MIN_AMOUNT) {
-    validationErrors.push(`Minimum loan amount is ${LOAN_MIN_AMOUNT.toLocaleString()} IRR`);
+    validationErrors.push(`Minimum loan amount is ${formatIRR(LOAN_MIN_AMOUNT)}`);
   }
   if (amountIRR > effectiveMaxBorrow) {
     if (amountIRR > maxBorrowIRR) {
-      validationErrors.push(`Maximum borrow with this asset is ${(maxBorrowIRR || 0).toLocaleString()} IRR`);
+      validationErrors.push(`Maximum borrow with this asset is ${formatIRR(maxBorrowIRR || 0)}`);
     } else {
-      validationErrors.push(`Exceeds portfolio loan limit. Remaining: ${(remainingPortfolioCapacity || 0).toLocaleString()} IRR`);
+      validationErrors.push(`Exceeds portfolio loan limit. Remaining: ${formatIRR(remainingPortfolioCapacity || 0)}`);
     }
   }
   const isValid = validationErrors.length === 0 && amountIRR > 0;
@@ -206,7 +206,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
         logAction({
           type: 'BORROW',
           boundary: 'SAFE',
-          message: `Borrowed ${formatNumber(amountIRR)} IRR against ${selectedAsset.symbol}`,
+          message: `Borrowed ${formatIRR(amountIRR)} against ${selectedAsset.name}`,
           amountIRR,
           assetId: selectedAssetId,
         })
@@ -230,11 +230,11 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
         title: 'Loan Created!',
         subtitle: `Funds added to your cash balance`,
         items: [
-          { label: 'Amount Borrowed', value: `${formatNumber(amountIRR)} IRR`, highlight: true },
+          { label: 'Amount Borrowed', value: formatIRR(amountIRR), highlight: true },
           { label: 'Locked for this loan', value: `${selectedAsset.name}` },
           { label: 'Duration', value: LOAN_DURATION_LABELS[durationDays] || `${durationDays} days` },
           { label: 'Interest Rate', value: `${(LOAN_ANNUAL_INTEREST_RATE * 100).toFixed(0)}% yearly` },
-          { label: 'Total to Repay', value: `${formatNumber(Math.round(amountIRR + totalInterest))} IRR` },
+          { label: 'Total to Repay', value: formatIRR(Math.round(amountIRR + totalInterest)) },
         ],
       });
       setShowSuccess(true);

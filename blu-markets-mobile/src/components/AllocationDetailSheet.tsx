@@ -14,6 +14,7 @@ import { TYPOGRAPHY } from '../constants/typography';
 import { SPACING, RADIUS } from '../constants/spacing';
 import { LAYER_COLORS, LAYER_NAMES, LAYER_DESCRIPTIONS } from '../constants/assets';
 import { TargetLayerPct, Layer } from '../types';
+import { formatIRR } from '../utils/currency';
 
 interface AllocationDetailSheetProps {
   visible: boolean;
@@ -153,7 +154,7 @@ export const AllocationDetailSheet: React.FC<AllocationDetailSheetProps> = ({
                         <View style={styles.statItem}>
                           <Text style={styles.statLabel}>Value</Text>
                           <Text style={styles.statValue}>
-                            {formatNumber(value)} IRR
+                            {formatIRR(value)}
                           </Text>
                         </View>
                       )}
@@ -187,7 +188,7 @@ export const AllocationDetailSheet: React.FC<AllocationDetailSheetProps> = ({
               {totalValue !== undefined && (
                 <View style={styles.totalSection}>
                   <Text style={styles.totalLabel}>Total Portfolio Value</Text>
-                  <Text style={styles.totalValue}>{formatNumber(totalValue)} IRR</Text>
+                  <Text style={styles.totalValue}>{formatIRR(totalValue)}</Text>
                 </View>
               )}
             </View>

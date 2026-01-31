@@ -26,6 +26,7 @@ import { useAppDispatch, useAppSelector } from '../../hooks/useStore';
 import { setInitialInvestment } from '../../store/slices/onboardingSlice';
 import { MIN_INVESTMENT_AMOUNT } from '../../constants/business';
 import { onboarding } from '../../services/api';
+import { formatIRR } from '../../utils/currency';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const IS_SMALL_DEVICE = SCREEN_HEIGHT < 700;
@@ -126,7 +127,7 @@ const InitialFundingScreen: React.FC<InitialFundingScreenProps> = ({
       <View style={styles.amountSection}>
         <Text style={styles.amountText}>{formatNumber(amount)}</Text>
         <Text style={styles.currencyLabel}>IRR</Text>
-        <Text style={styles.minimumText}>Minimum: {formatNumber(MIN_INVESTMENT_AMOUNT)} IRR</Text>
+        <Text style={styles.minimumText}>Minimum: {formatIRR(MIN_INVESTMENT_AMOUNT)}</Text>
         {error && <Text style={styles.errorText}>{error}</Text>}
       </View>
 

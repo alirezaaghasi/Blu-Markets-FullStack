@@ -352,7 +352,7 @@ function LoanCard({
       {/* Field 1: Asset name + quantity + status badge */}
       <View style={styles.loanHeader}>
         <Text style={styles.loanAssetName}>
-          {getAssetName(loan.collateralAssetId)} ({formatCrypto(loan.collateralQuantity, loan.collateralAssetId)})
+          {getAssetName(loan.collateralAssetId)}
         </Text>
         <View style={styles.loanStatus}>
           <Text style={styles.loanStatusText}>{loan.status}</Text>

@@ -28,6 +28,7 @@ import { setRiskProfile } from '../../../store/slices/onboardingSlice';
 import { ASSETS } from '../../../constants/assets';
 import { FIXED_INCOME_UNIT_PRICE, RISK_PROFILE_ALLOCATIONS, RISK_PROFILE_NAMES, SPREAD_BY_LAYER } from '../../../constants/business';
 import { calculateRiskProfile } from '../../../utils/riskProfile';
+import { formatIRR } from '../../../utils/currency';
 import type {
   AssetId,
   Holding,
@@ -288,7 +289,7 @@ export const onboarding = {
     store.dispatch(logAction({
       type: 'PORTFOLIO_CREATED',
       boundary: 'SAFE',
-      message: `Started with ${amountIrr.toLocaleString()} IRR`,
+      message: `Started with ${formatIRR(amountIrr)}`,
       amountIRR: amountIrr,
     }));
 
@@ -1425,7 +1426,7 @@ export const loans = {
     store.dispatch(logAction({
       type: 'BORROW',
       boundary: 'SAFE',
-      message: `Borrowed ${amountIrr.toLocaleString()} IRR`,
+      message: `Borrowed ${formatIRR(amountIrr)}`,
       amountIRR: amountIrr,
     }));
 
@@ -1483,7 +1484,7 @@ export const loans = {
     store.dispatch(logAction({
       type: 'REPAY',
       boundary: 'SAFE',
-      message: `Repaid ${amountIrr.toLocaleString()} IRR`,
+      message: `Repaid ${formatIRR(amountIrr)}`,
       amountIRR: amountIrr,
     }));
 

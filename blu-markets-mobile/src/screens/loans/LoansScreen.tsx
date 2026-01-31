@@ -26,6 +26,7 @@ import LoanSheet from '../../components/LoanSheet';
 import RepaySheet from '../../components/RepaySheet';
 import { EmptyState } from '../../components/EmptyState';
 import { HOLDING } from '../../constants/messages';
+import { formatIRR } from '../../utils/currency';
 
 const LoansScreen: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -198,19 +199,19 @@ const LoansScreen: React.FC = () => {
             <View style={styles.capacityItem}>
               <Text style={styles.capacityLabel}>Used</Text>
               <Text style={styles.capacityValue}>
-                {usedLoanCapacity.toLocaleString()} IRR
+                {formatIRR(usedLoanCapacity)}
               </Text>
             </View>
             <View style={styles.capacityItem}>
               <Text style={styles.capacityLabel}>Maximum</Text>
               <Text style={styles.capacityValue}>
-                {maxLoanCapacity.toLocaleString()} IRR
+                {formatIRR(maxLoanCapacity)}
               </Text>
             </View>
             <View style={styles.capacityItem}>
               <Text style={styles.capacityLabel}>Remaining</Text>
               <Text style={[styles.capacityValue, styles.capacityRemaining]}>
-                {remainingCapacity.toLocaleString()} IRR
+                {formatIRR(remainingCapacity)}
               </Text>
             </View>
           </View>
@@ -249,15 +250,11 @@ const LoansScreen: React.FC = () => {
                         <View style={styles.assetNameRow}>
                           <Text style={styles.assetName}>
                             {asset.name}
-                            <Text style={styles.assetSymbol}> | {asset.symbol}</Text>
                           </Text>
                           <View style={styles.frozenBadge}>
                             <Text style={styles.frozenBadgeText}>{HOLDING.frozenBadge.toUpperCase()}</Text>
                           </View>
                         </View>
-                        <Text style={styles.collateralAmount}>
-                          {loan.collateralQuantity.toFixed(4)} {asset.symbol}
-                        </Text>
                       </View>
                     </View>
                     <View style={[styles.healthBadge, { backgroundColor: `${health.color}20` }]}>
@@ -273,7 +270,7 @@ const LoansScreen: React.FC = () => {
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Principal</Text>
                       <Text style={styles.detailValue}>
-                        {(loan.amountIRR ?? 0).toLocaleString()} IRR
+                        {formatIRR(loan.amountIRR ?? 0)}
                       </Text>
                     </View>
                     <View style={styles.detailRow}>
@@ -361,7 +358,7 @@ const LoansScreen: React.FC = () => {
                       <Text style={styles.assetSymbol}> | {asset.symbol}</Text>
                     </Text>
                     <Text style={styles.collateralValue}>
-                      Up to {(maxBorrowIRR || 0).toLocaleString()} IRR ({((asset.ltv || 0) * 100).toFixed(0)}% LTV)
+                      Up to {formatIRR(maxBorrowIRR || 0)} ({((asset.ltv || 0) * 100).toFixed(0)}% LTV)
                     </Text>
                   </View>
                   <Text style={styles.collateralArrow}>›</Text>

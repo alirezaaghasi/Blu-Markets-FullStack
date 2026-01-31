@@ -44,7 +44,7 @@ import { TradeSuccessModal } from './TradeSuccessModal';
 import { TradeErrorModal } from './TradeErrorModal';
 // RTK Query for refetching portfolio after trade
 import { apiSlice } from '../store/api/apiSlice';
-import { formatNumber } from '../utils/currency';
+import { formatNumber, formatIRR } from '../utils/currency';
 import { devLog } from '../utils/devLogger';
 import {
   getBoundaryExplanation,
@@ -257,7 +257,7 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
     if (side === 'BUY') {
       // Buy validation
       if (amountIRR > 0 && amountIRR < MIN_TRADE_AMOUNT) {
-        errors.push(`Minimum trade is ${MIN_TRADE_AMOUNT.toLocaleString()} IRR`);
+        errors.push(`Minimum trade is ${formatIRR(MIN_TRADE_AMOUNT)}`);
       }
       if (amountIRR > cashIRR) {
         errors.push('Insufficient funds');
@@ -399,7 +399,7 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
       dispatch(logAction({
         type: 'TRADE',
         boundary: preview?.boundary ?? 'SAFE',
-        message: `${side === 'BUY' ? 'Bought' : 'Sold'} ${(preview?.quantity ?? 0).toFixed(6)} ${asset?.symbol ?? ''}`,
+        message: `${side === 'BUY' ? 'Bought' : 'Sold'} ${asset?.name ?? ''} (${formatIRR(amountIRR)})`,
         amountIRR: amountIRR,
       }));
 
@@ -503,7 +503,7 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
                     {/* BUG-DISPLAY FIX: Show holding value for SELL, price per unit for BUY */}
                     {side === 'SELL' && holdingValue > 0
                       ? `You own: ${formatIRRCompact(holdingValue)} IRR`
-                      : `${formatNumber(priceIRR)} IRR (${(priceUSD || 0).toLocaleString()})`}
+                      : `${formatIRR(priceIRR)} ($${(priceUSD || 0).toLocaleString()})`}
                   </Text>
                 </View>
               </View>
@@ -543,7 +543,7 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
                 returnKeyType="done"
               />
               <Text style={styles.availableText}>
-                Available: {formatNumber(availableBalance)} IRR
+                Available: {formatIRR(availableBalance)}
               </Text>
             </View>
 
@@ -571,7 +571,7 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
                   <Text style={styles.previewValue}>
                     {side === 'BUY'
                       ? `${(preview.quantity ?? 0).toFixed(6)} ${asset?.symbol ?? ''}`
-                      : `${formatNumber(Math.round(amountIRR * (1 - (preview.spread ?? 0))))} IRR`
+                      : formatIRR(Math.round(amountIRR * (1 - (preview.spread ?? 0))))
                     }
                   </Text>
                 </View>
@@ -595,7 +595,7 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
                     </TouchableOpacity>
                   </View>
                   <Text style={styles.previewValue}>
-                    {formatNumber(Math.round(amountIRR * (preview.spread ?? 0)))} IRR
+                    {formatIRR(Math.round(amountIRR * (preview.spread ?? 0)))}
                   </Text>
                 </View>
 
@@ -730,8 +730,8 @@ const AssetPickerModal: React.FC<AssetPickerModalProps> = ({
   // Get assets to show based on side
   const assetsToShow = useMemo(() => {
     if (side === 'BUY') {
-      // Show all tradeable assets except IRR_FIXED_INCOME
-      return Object.values(ASSETS).filter((a) => a.id !== 'IRR_FIXED_INCOME');
+      // Show all tradeable assets
+      return Object.values(ASSETS);
     } else {
       // Show only assets user holds
       return holdings
