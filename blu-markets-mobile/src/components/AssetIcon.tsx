@@ -1,19 +1,36 @@
 /**
  * AssetIcon Component
- * Renders cryptocurrency icons in monochrome white with layer-based styling
+ * Renders cryptocurrency icons from the cryptocurrency-icons library
+ * https://github.com/spothq/cryptocurrency-icons (MIT License)
  */
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Image, Text, StyleSheet, ImageSourcePropType } from 'react-native';
 import { AssetId } from '../types';
 import { LAYER_COLORS, ASSETS } from '../constants/assets';
-import { CRYPTO_ICONS } from './CryptoIcons';
 
 interface AssetIconProps {
   assetId: AssetId;
   size?: number;
 }
 
-// Fallback symbols for assets without SVG icons
+// PNG icons from cryptocurrency-icons library
+const CRYPTO_ICON_IMAGES: Partial<Record<AssetId, ImageSourcePropType>> = {
+  BTC: require('../../assets/crypto-icons/btc.png'),
+  ETH: require('../../assets/crypto-icons/eth.png'),
+  USDT: require('../../assets/crypto-icons/usdt.png'),
+  BNB: require('../../assets/crypto-icons/bnb.png'),
+  XRP: require('../../assets/crypto-icons/xrp.png'),
+  SOL: require('../../assets/crypto-icons/sol.png'),
+  LINK: require('../../assets/crypto-icons/link.png'),
+  AVAX: require('../../assets/crypto-icons/avax.png'),
+  MATIC: require('../../assets/crypto-icons/matic.png'),
+  TON: require('../../assets/crypto-icons/ton.png'),
+  ARB: require('../../assets/crypto-icons/arb.png'),
+  PAXG: require('../../assets/crypto-icons/paxg.png'),
+  KAG: require('../../assets/crypto-icons/kag.png'),
+};
+
+// Fallback symbols for assets without PNG icons
 const FALLBACK_SYMBOLS: Partial<Record<AssetId, string>> = {
   IRR_FIXED_INCOME: '%',
   QQQ: 'Q',
@@ -22,10 +39,10 @@ const FALLBACK_SYMBOLS: Partial<Record<AssetId, string>> = {
 export const AssetIcon: React.FC<AssetIconProps> = ({ assetId, size = 44 }) => {
   const asset = ASSETS[assetId];
   const layerColor = LAYER_COLORS[asset?.layer || 'FOUNDATION'];
-  const IconComponent = CRYPTO_ICONS[assetId];
+  const iconSource = CRYPTO_ICON_IMAGES[assetId];
   const fallbackSymbol = FALLBACK_SYMBOLS[assetId];
 
-  const iconSize = size * 0.55; // Icon takes 55% of container
+  const iconSize = size * 0.7; // Icon takes 70% of container
 
   return (
     <View style={[
@@ -39,8 +56,15 @@ export const AssetIcon: React.FC<AssetIconProps> = ({ assetId, size = 44 }) => {
         backgroundColor: `${layerColor}15`,
       }
     ]}>
-      {IconComponent ? (
-        <IconComponent size={iconSize} color="#FFFFFF" />
+      {iconSource ? (
+        <Image
+          source={iconSource}
+          style={{
+            width: iconSize,
+            height: iconSize,
+          }}
+          resizeMode="contain"
+        />
       ) : (
         <Text style={[styles.fallbackText, { fontSize: size * 0.4 }]}>
           {fallbackSymbol || asset?.symbol?.charAt(0) || '?'}
@@ -54,6 +78,7 @@ const styles = StyleSheet.create({
   container: {
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
   fallbackText: {
     fontWeight: '600',
