@@ -44,6 +44,8 @@ import { TradeSuccessModal } from './TradeSuccessModal';
 import { TradeErrorModal } from './TradeErrorModal';
 // RTK Query for refetching portfolio after trade
 import { apiSlice } from '../store/api/apiSlice';
+import { formatNumber } from '../utils/currency';
+import { devLog } from '../utils/devLogger';
 
 interface TradeBottomSheetProps {
   visible: boolean;
@@ -296,12 +298,6 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
     };
   }, [side, assetId, amountIRR]);
 
-  // Format number with commas
-  const formatNumber = (num: number): string => {
-    if (num === undefined || num === null || isNaN(num)) return '0';
-    return num.toLocaleString('en-US');
-  };
-
   // Handle amount input
   const handleAmountChange = (text: string) => {
     // Remove non-numeric characters except commas
@@ -352,13 +348,11 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
       // In demo mode, this uses mock API; in production, uses real backend
       const response = await trade.execute(assetId, side, amountIRR);
 
-      if (__DEV__) {
-        console.log('[TradeBottomSheet] Trade executed:', {
-          tradeId: response.tradeId,
-          newCashIrr: response.newCashIrr,
-          newHoldingQuantity: response.newHoldingQuantity,
-        });
-      }
+      devLog('[TradeBottomSheet] Trade executed:', {
+        tradeId: response.tradeId,
+        newCashIrr: response.newCashIrr,
+        newHoldingQuantity: response.newHoldingQuantity,
+      });
 
       // Invalidate RTK Query cache to trigger portfolio refetch
       // This ensures Redux state is updated with new balances from backend

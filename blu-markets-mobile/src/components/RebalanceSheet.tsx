@@ -19,18 +19,12 @@ import { logAction } from '../store/slices/portfolioSlice';
 import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
 // RTK Query - auto-invalidates portfolio cache after rebalance
 import { useGetRebalancePreviewQuery, useExecuteRebalanceMutation } from '../store/api/apiSlice';
-import { formatIRR, formatPercent } from '../utils/currency';
+import { formatIRR, formatPercent, formatNumber } from '../utils/currency';
 
 interface RebalanceSheetProps {
   visible: boolean;
   onClose: () => void;
 }
-
-// Format number with commas
-const formatNumber = (num: number): string => {
-  if (num === undefined || num === null || isNaN(num)) return '0';
-  return Math.round(num).toLocaleString('en-US');
-};
 
 const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => {
   const dispatch = useAppDispatch();

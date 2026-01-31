@@ -18,6 +18,7 @@ import { useAppDispatch, useAppSelector } from '../hooks/useStore';
 import { updateCash, logAction, setPortfolioValues } from '../store/slices/portfolioSlice';
 import { portfolio } from '../services/api';
 import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
+import { formatNumber } from '../utils/currency';
 
 // Minimum deposit amount (100,000 IRR)
 const MIN_DEPOSIT = 100_000;
@@ -55,12 +56,6 @@ export const AddFundsSheet: React.FC<AddFundsSheetProps> = ({
   const validationError = amountIRR > 0 && amountIRR < MIN_DEPOSIT
     ? `Minimum deposit is ${MIN_DEPOSIT.toLocaleString()} IRR`
     : null;
-
-  // Format number with commas
-  const formatNumber = (num: number): string => {
-    if (num === undefined || num === null || isNaN(num)) return '0';
-    return num.toLocaleString('en-US');
-  };
 
   // Handle amount input
   const handleAmountChange = (text: string) => {

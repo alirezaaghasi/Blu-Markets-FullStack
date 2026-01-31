@@ -20,6 +20,7 @@ import { updateLoan, removeLoan, unfreezeHolding, subtractCash, logAction, setPo
 import { portfolio as portfolioApi } from '../services/api';
 import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
 import { loans as loansApi } from '../services/api';
+import { formatNumber } from '../utils/currency';
 
 interface RepaySheetProps {
   visible: boolean;
@@ -74,9 +75,6 @@ export const RepaySheet: React.FC<RepaySheetProps> = ({
   // Validation
   const canAfford = cashIRR >= repayAmount;
   const isValid = repayAmount > 0 && canAfford;
-
-  // Format number
-  const formatNumber = (num: number): string => (num === undefined || num === null || isNaN(num)) ? '0' : num.toLocaleString('en-US');
 
   // Handle custom amount input
   const handleCustomAmountChange = (text: string) => {

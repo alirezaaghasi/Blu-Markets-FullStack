@@ -29,7 +29,7 @@ import { addLoan, freezeHolding, addCash, logAction, setPortfolioValues } from '
 import { portfolio as portfolioApi } from '../services/api';
 import { TransactionSuccessModal, TransactionSuccessResult } from './TransactionSuccessModal';
 import { loans as loansApi } from '../services/api';
-import { formatIRR } from '../utils/currency';
+import { formatIRR, formatNumber } from '../utils/currency';
 import type { LoanCapacityResponse, LoanPreviewResponse } from '../services/api';
 
 interface LoanSheetProps {
@@ -192,9 +192,6 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
     }
   }
   const isValid = validationErrors.length === 0 && amountIRR > 0;
-
-  // Format number
-  const formatNumber = (num: number): string => (num === undefined || num === null || isNaN(num)) ? '0' : num.toLocaleString('en-US');
 
   // Handle amount input
   const handleAmountChange = (text: string) => {

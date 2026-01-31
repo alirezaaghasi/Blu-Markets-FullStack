@@ -17,6 +17,7 @@
 // NOT ACCEPTABLE FOR: Production deployment with real user data
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PortfolioState, AuthState, OnboardingState, PriceState } from '../types';
+import { devWarn, devError } from './devLogger';
 
 // BUG-004 FIX: Simple obfuscation for sensitive data at rest
 // In production, replace with proper encryption using device-bound keys
@@ -62,7 +63,7 @@ function deobfuscateData(obfuscated: string): string {
       : Buffer.from(base64, 'base64').toString();
   } catch (error) {
     // If deobfuscation fails, try parsing as plain JSON (migration from old format)
-    if (__DEV__) console.warn('[Storage] Failed to deobfuscate, trying plain JSON');
+    devWarn('[Storage] Failed to deobfuscate, trying plain JSON');
     return obfuscated;
   }
 }
@@ -95,7 +96,7 @@ export const saveAuthState = async (state: AuthState): Promise<void> => {
     };
     await AsyncStorage.setItem(STORAGE_KEYS.AUTH, JSON.stringify(stateToSave));
   } catch (error) {
-    if (__DEV__) console.error('Failed to save auth state:', error);
+    devError('[Storage] Failed to save auth state:', error);
   }
 };
 
@@ -105,7 +106,7 @@ export const loadAuthState = async (): Promise<Partial<AuthState> | null> => {
     const data = await AsyncStorage.getItem(STORAGE_KEYS.AUTH);
     return data ? JSON.parse(data) : null;
   } catch (error) {
-    if (__DEV__) console.error('Failed to load auth state:', error);
+    devError('[Storage] Failed to load auth state:', error);
     return null;
   }
 };
@@ -120,7 +121,7 @@ export const savePortfolioState = async (state: PortfolioState): Promise<void> =
     await AsyncStorage.setItem(STORAGE_KEYS.PORTFOLIO, obfuscatedData);
     await AsyncStorage.setItem(STORAGE_KEYS.LAST_SYNC, Date.now().toString());
   } catch (error) {
-    if (__DEV__) console.error('Failed to save portfolio state:', error);
+    devError('[Storage] Failed to save portfolio state:', error);
   }
 };
 
@@ -135,7 +136,7 @@ export const loadPortfolioState = async (): Promise<Partial<PortfolioState> | nu
     const jsonData = deobfuscateData(data);
     return JSON.parse(jsonData);
   } catch (error) {
-    if (__DEV__) console.error('Failed to load portfolio state:', error);
+    devError('[Storage] Failed to load portfolio state:', error);
     return null;
   }
 };
@@ -145,7 +146,7 @@ export const saveOnboardingState = async (state: OnboardingState): Promise<void>
   try {
     await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING, JSON.stringify(state));
   } catch (error) {
-    if (__DEV__) console.error('Failed to save onboarding state:', error);
+    devError('[Storage] Failed to save onboarding state:', error);
   }
 };
 
@@ -155,7 +156,7 @@ export const loadOnboardingState = async (): Promise<Partial<OnboardingState> | 
     const data = await AsyncStorage.getItem(STORAGE_KEYS.ONBOARDING);
     return data ? JSON.parse(data) : null;
   } catch (error) {
-    if (__DEV__) console.error('Failed to load onboarding state:', error);
+    devError('[Storage] Failed to load onboarding state:', error);
     return null;
   }
 };
@@ -165,7 +166,7 @@ export const savePricesCache = async (state: PriceState): Promise<void> => {
   try {
     await AsyncStorage.setItem(STORAGE_KEYS.PRICES_CACHE, JSON.stringify(state));
   } catch (error) {
-    if (__DEV__) console.error('Failed to save prices cache:', error);
+    devError('[Storage] Failed to save prices cache:', error);
   }
 };
 
@@ -175,7 +176,7 @@ export const loadPricesCache = async (): Promise<Partial<PriceState> | null> => 
     const data = await AsyncStorage.getItem(STORAGE_KEYS.PRICES_CACHE);
     return data ? JSON.parse(data) : null;
   } catch (error) {
-    if (__DEV__) console.error('Failed to load prices cache:', error);
+    devError('[Storage] Failed to load prices cache:', error);
     return null;
   }
 };
@@ -199,7 +200,7 @@ export const loadAllState = async (): Promise<StorageData> => {
       lastSync: lastSync ? parseInt(lastSync, 10) : undefined,
     };
   } catch (error) {
-    if (__DEV__) console.error('Failed to load all state:', error);
+    devError('[Storage] Failed to load all state:', error);
     return {};
   }
 };
@@ -215,7 +216,7 @@ export const clearAllState = async (): Promise<void> => {
       STORAGE_KEYS.LAST_SYNC,
     ]);
   } catch (error) {
-    if (__DEV__) console.error('Failed to clear all state:', error);
+    devError('[Storage] Failed to clear all state:', error);
   }
 };
 
@@ -224,7 +225,7 @@ export const clearPortfolioState = async (): Promise<void> => {
   try {
     await AsyncStorage.removeItem(STORAGE_KEYS.PORTFOLIO);
   } catch (error) {
-    if (__DEV__) console.error('Failed to clear portfolio state:', error);
+    devError('[Storage] Failed to clear portfolio state:', error);
   }
 };
 
@@ -234,7 +235,7 @@ export const getLastSyncTime = async (): Promise<number | null> => {
     const data = await AsyncStorage.getItem(STORAGE_KEYS.LAST_SYNC);
     return data ? parseInt(data, 10) : null;
   } catch (error) {
-    if (__DEV__) console.error('Failed to get last sync time:', error);
+    devError('[Storage] Failed to get last sync time:', error);
     return null;
   }
 };

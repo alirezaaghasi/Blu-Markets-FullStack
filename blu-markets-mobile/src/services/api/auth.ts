@@ -3,6 +3,7 @@
 
 import { apiClient, setAuthTokens, clearAuthTokens } from './client';
 import type { AuthResponse } from './types';
+import { devLog, devError } from '../../utils/devLogger';
 
 // Backend response format (tokens are nested)
 interface BackendVerifyOtpResponse {
@@ -18,27 +19,27 @@ interface BackendVerifyOtpResponse {
 
 export const auth = {
   sendOtp: async (phone: string): Promise<{ success: boolean }> => {
-    // BUG-014 FIX: Guard sensitive logs with __DEV__ to prevent PII leakage in production
-    if (__DEV__) console.log('[Auth] Sending OTP to:', phone);
+    // Using devLog ensures logs are completely stripped in production
+    devLog('[Auth] Sending OTP to:', phone);
     try {
       const result = await apiClient.post('/auth/send-otp', { phone }) as unknown as { success: boolean };
-      if (__DEV__) console.log('[Auth] OTP sent successfully');
+      devLog('[Auth] OTP sent successfully');
       return result;
     } catch (error) {
-      if (__DEV__) console.error('[Auth] Send OTP error:', error);
+      devError('[Auth] Send OTP error:', error);
       throw error;
     }
   },
 
   verifyOtp: async (phone: string, code: string): Promise<AuthResponse> => {
-    // BUG-014 FIX: Guard sensitive logs with __DEV__ to prevent PII leakage in production
-    if (__DEV__) console.log('[Auth] Verifying OTP for:', phone);
+    // Using devLog ensures logs are completely stripped in production
+    devLog('[Auth] Verifying OTP for:', phone);
     try {
       const response: BackendVerifyOtpResponse = await apiClient.post('/auth/verify-otp', { phone, code });
-      if (__DEV__) console.log('[Auth] OTP verified, storing tokens...');
+      devLog('[Auth] OTP verified, storing tokens...');
       // Store tokens after successful verification (unwrap from nested structure)
       await setAuthTokens(response.tokens.accessToken, response.tokens.refreshToken);
-      if (__DEV__) console.log('[Auth] Tokens stored successfully');
+      devLog('[Auth] Tokens stored successfully');
       // Return flattened response for frontend consumption
       return {
         accessToken: response.tokens.accessToken,
@@ -47,7 +48,7 @@ export const auth = {
         onboardingComplete: response.onboardingComplete,
       };
     } catch (error) {
-      if (__DEV__) console.error('[Auth] Verify OTP error:', error);
+      devError('[Auth] Verify OTP error:', error);
       throw error;
     }
   },

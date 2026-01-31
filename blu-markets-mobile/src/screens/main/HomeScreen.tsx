@@ -31,8 +31,8 @@ import { useAppSelector, useAppDispatch } from '../../hooks/useStore';
 import { useActivityFeed } from '../../hooks/useActivityFeed';
 import { usePriceConnection } from '../../hooks/usePriceConnection';
 import { setHoldings, updateCash, setStatus, setTargetLayerPct, setPortfolioValues } from '../../store/slices/portfolioSlice';
-// Note: Price fetching removed - backend calculates all values
-import { portfolio as portfolioApi } from '../../services/api';
+import { useGetPortfolioQuery } from '../../store/api/apiSlice';
+import { devLog, devError, devWarn } from '../../utils/devLogger';
 import type { Holding, ActionLogEntry } from '../../types';
 import { ASSETS } from '../../constants/assets';
 import { DEMO_TOKEN } from '../../constants/business';
@@ -73,9 +73,7 @@ function formatActivityMessage(entry: ActionLogEntry): string {
   }
 
   // Fallback only for legacy/missing data - log warning in dev
-  if (__DEV__) {
-    console.warn('[Activity] Missing message from backend for entry:', entry.type, entry.id);
-  }
+  devWarn('[Activity] Missing message from backend for entry:', entry.type, entry.id);
   return 'Activity recorded';
 }
 
@@ -190,23 +188,56 @@ const HomeScreen: React.FC = () => {
   const [protectionSheetVisible, setProtectionSheetVisible] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Redux state
-  const portfolioState = useAppSelector((state) => state.portfolio);
-  const holdings = portfolioState?.holdings || [];
-  const cashIRR = portfolioState?.cashIRR || 0;
-  const targetLayerPct = portfolioState?.targetLayerPct || { FOUNDATION: 0.50, GROWTH: 0.35, UPSIDE: 0.15 };
-  const loans = portfolioState?.loans || [];
+  // Redux state - using granular selectors to prevent unnecessary re-renders
+  const holdings = useAppSelector((state) => state.portfolio.holdings) || [];
+  const cashIRR = useAppSelector((state) => state.portfolio.cashIRR) || 0;
+  const targetLayerPct = useAppSelector((state) => state.portfolio.targetLayerPct) || { FOUNDATION: 0.50, GROWTH: 0.35, UPSIDE: 0.15 };
+  const loans = useAppSelector((state) => state.portfolio.loans) || [];
   // Backend-calculated values (frontend is presentation layer only)
-  const holdingsValueIrr = portfolioState?.holdingsValueIrr || 0;
+  const holdingsValueIrr = useAppSelector((state) => state.portfolio.holdingsValueIrr) || 0;
+  const portfolioStatus = useAppSelector((state) => state.portfolio.status) || 'BALANCED';
   // Total Holdings = Cash + Asset Value (ensure correct sum even if backend value is stale)
   const totalValueIrr = cashIRR + holdingsValueIrr;
-  const currentAllocation = portfolioState?.currentAllocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
-  const portfolioStatus = portfolioState?.status || 'BALANCED';
-  console.log('[HomeScreen] Current portfolioStatus from Redux:', portfolioStatus);
-  const { phone, authToken } = useAppSelector((state) => state.auth);
+  devLog('[HomeScreen] Current portfolioStatus from Redux:', portfolioStatus);
+  const phone = useAppSelector((state) => state.auth.phone);
+  const authToken = useAppSelector((state) => state.auth.authToken);
 
   // Check if we're in demo mode (runtime check)
   const isDemoMode = authToken === DEMO_TOKEN;
+
+  // RTK Query for portfolio data - single source of truth
+  const {
+    data: portfolioData,
+    isLoading: isLoadingPortfolio,
+    refetch: refetchPortfolio,
+  } = useGetPortfolioQuery(undefined, {
+    skip: isDemoMode, // Skip API call in demo mode
+  });
+
+  // Sync RTK Query data to Redux when it changes
+  useEffect(() => {
+    if (!portfolioData) return;
+
+    dispatch(updateCash(portfolioData.cashIrr));
+    dispatch(setTargetLayerPct(portfolioData.targetAllocation));
+    dispatch(setPortfolioValues({
+      totalValueIrr: portfolioData.totalValueIrr || 0,
+      holdingsValueIrr: portfolioData.holdingsValueIrr || 0,
+      currentAllocation: portfolioData.allocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
+      driftPct: portfolioData.driftPct || 0,
+      status: portfolioData.status || 'BALANCED',
+    }));
+
+    if (portfolioData.holdings) {
+      dispatch(setHoldings(portfolioData.holdings.map((h) => ({
+        id: h.id,
+        assetId: h.assetId,
+        quantity: h.quantity,
+        frozen: h.frozen,
+        layer: h.layer,
+      }))));
+    }
+  }, [portfolioData, dispatch]);
 
   // ==========================================================================
   // COMPUTED VALUES (using backend-calculated values from Redux)
@@ -264,7 +295,7 @@ const HomeScreen: React.FC = () => {
     navigation.navigate('Market', { initialTab, loanId });
   }, [navigation]);
 
-  // Comprehensive refresh
+  // Comprehensive refresh using RTK Query refetch
   const onRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
@@ -275,86 +306,20 @@ const HomeScreen: React.FC = () => {
         return;
       }
 
-      const [portfolioResponse] = await Promise.all([
-        portfolioApi.get(),
+      // Use RTK Query refetch - data sync handled by useEffect above
+      await Promise.all([
+        refetchPortfolio(),
         refreshActivities(),
       ]);
-
-      // DEBUG: Log portfolio response on refresh
-      console.log('[HomeScreen] Refresh - Portfolio status:', portfolioResponse.status);
-
-      // Update cash and target allocation
-      dispatch(updateCash(portfolioResponse.cashIrr));
-      dispatch(setTargetLayerPct(portfolioResponse.targetAllocation));
-
-      // Update backend-calculated values (frontend is presentation layer only)
-      dispatch(setPortfolioValues({
-        totalValueIrr: portfolioResponse.totalValueIrr || 0,
-        holdingsValueIrr: portfolioResponse.holdingsValueIrr || (portfolioResponse.totalValueIrr - portfolioResponse.cashIrr) || 0,
-        currentAllocation: portfolioResponse.allocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
-        driftPct: portfolioResponse.driftPct || 0,
-        status: portfolioResponse.status || 'BALANCED',
-      }));
-
-      if (portfolioResponse.holdings) {
-        dispatch(setHoldings(portfolioResponse.holdings.map((h) => ({
-          id: h.id,
-          assetId: h.assetId,
-          quantity: h.quantity,
-          frozen: h.frozen,
-          layer: h.layer,
-        }))));
-      }
     } catch (error) {
-      if (__DEV__) console.error('Failed to refresh home screen data:', error);
+      devError('[HomeScreen] Failed to refresh:', error);
     } finally {
       setIsRefreshing(false);
     }
-  }, [dispatch, refreshActivities, isDemoMode]);
+  }, [refetchPortfolio, refreshActivities, isDemoMode]);
 
-  // Fetch portfolio from backend on mount (not in demo mode)
-  useEffect(() => {
-    if (isDemoMode) return;
-
-    const fetchData = async () => {
-      try {
-        const portfolioResponse = await portfolioApi.get();
-
-        // DEBUG: Log portfolio response to verify status
-        console.log('[HomeScreen] Portfolio API response:', {
-          status: portfolioResponse.status,
-          driftPct: portfolioResponse.driftPct,
-          allocation: portfolioResponse.allocation,
-        });
-
-        // Update cash and target allocation
-        dispatch(updateCash(portfolioResponse.cashIrr));
-        dispatch(setTargetLayerPct(portfolioResponse.targetAllocation));
-
-        // Update backend-calculated values (frontend is presentation layer only)
-        dispatch(setPortfolioValues({
-          totalValueIrr: portfolioResponse.totalValueIrr || 0,
-          holdingsValueIrr: portfolioResponse.holdingsValueIrr || (portfolioResponse.totalValueIrr - portfolioResponse.cashIrr) || 0,
-          currentAllocation: portfolioResponse.allocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
-          driftPct: portfolioResponse.driftPct || 0,
-          status: portfolioResponse.status || 'BALANCED',
-        }));
-
-        if (portfolioResponse.holdings) {
-          dispatch(setHoldings(portfolioResponse.holdings.map((h) => ({
-            id: h.id,
-            assetId: h.assetId,
-            quantity: h.quantity,
-            frozen: h.frozen,
-            layer: h.layer,
-          }))));
-        }
-      } catch (error) {
-        if (__DEV__) console.error('Failed to fetch portfolio on mount:', error);
-      }
-    };
-    fetchData();
-  }, [dispatch, isDemoMode]);
+  // Portfolio data is now fetched automatically by RTK Query's useGetPortfolioQuery
+  // and synced to Redux via the useEffect above. No manual fetch needed.
 
   // ==========================================================================
   // RENDER
