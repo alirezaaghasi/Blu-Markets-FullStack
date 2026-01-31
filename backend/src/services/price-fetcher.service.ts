@@ -1,4 +1,3 @@
-import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { env } from '../config/env.js';
 import { FALLBACK_FX_RATE, type AssetId } from '../types/domain.js';
@@ -371,8 +370,28 @@ export async function updateAllPrices(): Promise<void> {
   logger.info('Updated prices', { count: allPrices.length, durationMs: duration });
 }
 
+/**
+ * Options for getting current prices
+ */
+interface GetPricesOptions {
+  /**
+   * Maximum age in minutes for prices to be considered valid.
+   * If prices are older than this, a warning is logged but prices are still returned.
+   * Default: 5 minutes
+   */
+  maxAgeMinutes?: number;
+
+  /**
+   * If true, returns stale prices even if they exceed maxAgeMinutes.
+   * Useful for onboarding where having some prices is better than none.
+   * Default: false
+   */
+  allowStale?: boolean;
+}
+
 // Get current prices from database with 5-second in-memory cache
-export async function getCurrentPrices(): Promise<Map<AssetId, { priceUsd: number; priceIrr: number; change24hPct?: number }>> {
+export async function getCurrentPrices(options: GetPricesOptions = {}): Promise<Map<AssetId, { priceUsd: number; priceIrr: number; change24hPct?: number }>> {
+  const { maxAgeMinutes = 5, allowStale = false } = options;
   const now = Date.now();
 
   // Return cached data if valid
@@ -384,7 +403,21 @@ export async function getCurrentPrices(): Promise<Map<AssetId, { priceUsd: numbe
   const prices = await prisma.price.findMany();
   const priceMap = new Map<AssetId, { priceUsd: number; priceIrr: number; change24hPct?: number }>();
 
+  // Track staleness for logging
+  let oldestFetchedAt: Date | null = null;
+  let hasStalePrice = false;
+
   for (const price of prices) {
+    // Track oldest price for staleness warning
+    if (!oldestFetchedAt || price.fetchedAt < oldestFetchedAt) {
+      oldestFetchedAt = price.fetchedAt;
+    }
+
+    // Check if this price is stale
+    if (isPriceStale(price.fetchedAt, maxAgeMinutes)) {
+      hasStalePrice = true;
+    }
+
     priceMap.set(price.assetId as AssetId, {
       priceUsd: Number(price.priceUsd),
       priceIrr: Number(price.priceIrr),
@@ -392,11 +425,41 @@ export async function getCurrentPrices(): Promise<Map<AssetId, { priceUsd: numbe
     });
   }
 
+  // Log warning if prices are stale
+  if (hasStalePrice && oldestFetchedAt) {
+    const ageMinutes = Math.round((now - oldestFetchedAt.getTime()) / 60000);
+    if (allowStale) {
+      logger.warn('Using stale prices for operation', {
+        oldestPriceAge: `${ageMinutes} minutes`,
+        maxAgeMinutes,
+        priceCount: priceMap.size,
+      });
+    } else {
+      logger.warn('Prices are stale', {
+        oldestPriceAge: `${ageMinutes} minutes`,
+        maxAgeMinutes,
+        priceCount: priceMap.size,
+      });
+    }
+  }
+
   // Update cache
   priceCache.data = priceMap;
   priceCache.timestamp = now;
 
   return priceMap;
+}
+
+/**
+ * Get prices with fallback for onboarding.
+ * Uses a 60-minute staleness threshold and allows stale prices.
+ * This ensures onboarding can proceed even during temporary price API outages.
+ */
+export async function getPricesForOnboarding(): Promise<Map<AssetId, { priceUsd: number; priceIrr: number; change24hPct?: number }>> {
+  return getCurrentPrices({
+    maxAgeMinutes: 60, // Allow prices up to 1 hour old for onboarding
+    allowStale: true,  // Log warning but don't fail
+  });
 }
 
 /**

@@ -1,7 +1,7 @@
 import { prisma } from '../../config/database.js';
 import { AppError } from '../../middleware/error-handler.js';
 import { calculateRiskScore } from '../../services/risk-scoring.service.js';
-import { getCurrentPrices } from '../../services/price-fetcher.service.js';
+import { getPricesForOnboarding } from '../../services/price-fetcher.service.js';
 import type { RiskProfile, TargetAllocation, AssetId, Layer } from '../../types/domain.js';
 import type { SubmitQuestionnaireInput, RecordConsentInput, InitialFundingInput } from './onboarding.schemas.js';
 import {
@@ -148,7 +148,9 @@ export async function createInitialPortfolio(
   }
 
   // Get current prices for all assets
-  const prices = await getCurrentPrices();
+  // Uses fallback prices (up to 1 hour old) to ensure onboarding can proceed
+  // even during temporary price API outages
+  const prices = await getPricesForOnboarding();
 
   // Calculate target allocation from user profile
   const targetAllocation: TargetAllocation = {

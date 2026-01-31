@@ -1,7 +1,7 @@
 // Blu Markets Mobile App
 // Main entry point
 import React, { useEffect } from 'react';
-import { StatusBar } from 'react-native';
+import { StatusBar, View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { Provider } from 'react-redux';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -11,9 +11,7 @@ import { store } from './src/store';
 import RootNavigator from './src/navigation/RootNavigator';
 import { colors } from './src/constants/theme';
 import { setDefaultPrices } from './src/store/slices/pricesSlice';
-// Disabled during debugging
-// import { usePricePolling } from './src/hooks/usePricePolling';
-// import { usePersistence } from './src/hooks/usePersistence';
+import { useAuthInit } from './src/hooks/useAuthInit';
 
 // Navigation theme
 const navigationTheme = {
@@ -35,14 +33,24 @@ const navigationTheme = {
 };
 
 function AppContent() {
-  // Disabled all hooks during debugging to isolate infinite loop issue
-  // usePersistence();
-  // usePricePolling({ enabled: false });
+  // Initialize auth state from secure storage on app startup
+  // This restores the user's session if they have valid tokens
+  const { isInitializing } = useAuthInit();
 
   useEffect(() => {
     // Initialize default prices on app start
     store.dispatch(setDefaultPrices());
   }, []);
+
+  // Show loading screen while checking auth state
+  if (isInitializing) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bgDark }}>
+        <StatusBar barStyle="light-content" backgroundColor={colors.bgDark} />
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <NavigationContainer theme={navigationTheme}>

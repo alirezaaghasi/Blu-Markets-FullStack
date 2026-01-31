@@ -5,6 +5,7 @@
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { API_BASE_URL, API_TIMEOUT } from '../../config/api';
 import { tokenStorage } from '../../utils/secureStorage';
+import { refreshAccessToken, isTokenRefreshing, getRefreshPromise } from '../../utils/authRefresh';
 
 // Create axios instance
 export const apiClient: AxiosInstance = axios.create({
@@ -16,8 +17,7 @@ export const apiClient: AxiosInstance = axios.create({
   },
 });
 
-// Flag to prevent multiple refresh attempts
-let isRefreshing = false;
+// Queue for requests waiting on token refresh
 let failedQueue: Array<{
   resolve: (value: unknown) => void;
   reject: (reason?: unknown) => void;
@@ -46,7 +46,7 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor - handle 401, refresh token
+// Response interceptor - handle 401, refresh token using shared utility
 apiClient.interceptors.response.use(
   // Success: unwrap data from response
   (response) => response.data,
@@ -55,57 +55,42 @@ apiClient.interceptors.response.use(
 
     // Handle 401 Unauthorized
     if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
-      if (isRefreshing) {
-        // Queue this request until refresh completes
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        })
-          .then((token) => {
-            if (originalRequest.headers) {
-              originalRequest.headers.Authorization = `Bearer ${token}`;
+      // Check if refresh is already in progress (shared state with RTK Query)
+      if (isTokenRefreshing()) {
+        // Wait for the existing refresh to complete
+        const existingPromise = getRefreshPromise();
+        if (existingPromise) {
+          return existingPromise.then((newToken) => {
+            if (newToken && originalRequest.headers) {
+              originalRequest.headers.Authorization = `Bearer ${newToken}`;
+              return apiClient(originalRequest);
             }
-            return apiClient(originalRequest);
-          })
-          .catch((err) => Promise.reject(err));
+            return Promise.reject(new Error('Token refresh failed'));
+          });
+        }
       }
 
       originalRequest._retry = true;
-      isRefreshing = true;
 
       try {
-        const refreshToken = await tokenStorage.getRefreshToken();
+        // Use shared refresh utility (same as RTK Query)
+        const newToken = await refreshAccessToken();
 
-        if (!refreshToken) {
-          throw new Error('No refresh token available');
+        if (newToken) {
+          // Update original request with new token
+          if (originalRequest.headers) {
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          }
+          processQueue(null, newToken);
+          return apiClient(originalRequest);
         }
 
-        // Call refresh endpoint directly (not through apiClient to avoid interceptor loop)
-        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
-          refreshToken,
-        });
-
-        const { accessToken, refreshToken: newRefreshToken } = response.data;
-
-        // Store new tokens in secure storage
-        await tokenStorage.setTokens(accessToken, newRefreshToken);
-
-        // Update original request with new token
-        if (originalRequest.headers) {
-          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-        }
-
-        processQueue(null, accessToken);
-
-        return apiClient(originalRequest);
+        // Refresh failed
+        processQueue(new Error('Token refresh failed'), null);
+        return Promise.reject(new Error('Token refresh failed'));
       } catch (refreshError) {
-        // Refresh failed - clear tokens from secure storage and reject
         processQueue(refreshError as Error, null);
-        await tokenStorage.clearTokens();
-
-        // The app should handle this by redirecting to login
         return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
       }
     }
 

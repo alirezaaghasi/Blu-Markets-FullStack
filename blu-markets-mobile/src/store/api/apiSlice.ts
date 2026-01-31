@@ -10,6 +10,7 @@
 import { createApi, fetchBaseQuery, BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query/react';
 import { API_BASE_URL } from '../../config/api';
 import { tokenStorage } from '../../utils/secureStorage';
+import { refreshAccessToken } from '../../utils/authRefresh';
 import type {
   PortfolioResponse,
   TradePreview,
@@ -69,13 +70,14 @@ function normalizeHolding(h: Record<string, unknown>): Holding {
 }
 
 // Custom baseQuery with auth token handling
+// Uses shared refresh utility for consistent auth handling with Axios client
 const baseQueryWithAuth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = async (
   args,
   api,
   extraOptions
 ) => {
   // Get token from secure storage
-  const token = await tokenStorage.getAccessToken();
+  let token = await tokenStorage.getAccessToken();
 
   // Prepare headers
   const headers: Record<string, string> = {
@@ -99,32 +101,29 @@ const baseQueryWithAuth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQuery
 
   let result = await rawBaseQuery(args, api, extraOptions);
 
-  // Handle 401 - attempt token refresh
+  // Handle 401 - attempt token refresh using shared utility
   if (result.error?.status === 401) {
-    const refreshToken = await tokenStorage.getRefreshToken();
-    if (refreshToken) {
-      try {
-        const refreshResult = await fetch(`${API_BASE_URL}/auth/refresh`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken }),
-        });
+    // Use shared refresh utility (same as Axios client)
+    const newToken = await refreshAccessToken();
 
-        if (refreshResult.ok) {
-          const data = await refreshResult.json();
-          await tokenStorage.setTokens(data.accessToken, data.refreshToken);
+    if (newToken) {
+      // Retry original request with new token
+      headers['Authorization'] = `Bearer ${newToken}`;
 
-          // Retry original request with new token
-          headers['Authorization'] = `Bearer ${data.accessToken}`;
-          result = await rawBaseQuery(args, api, extraOptions);
-        } else {
-          // Refresh failed - clear tokens
-          await tokenStorage.clearTokens();
-        }
-      } catch {
-        await tokenStorage.clearTokens();
-      }
+      // Create new base query with updated headers
+      const retryBaseQuery = fetchBaseQuery({
+        baseUrl: API_BASE_URL,
+        prepareHeaders: (headersInit) => {
+          Object.entries(headers).forEach(([key, value]) => {
+            headersInit.set(key, value);
+          });
+          return headersInit;
+        },
+      });
+
+      result = await retryBaseQuery(args, api, extraOptions);
     }
+    // If refresh failed, tokens are already cleared by refreshAccessToken
   }
 
   return result;
