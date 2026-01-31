@@ -39,26 +39,27 @@ interface ConfirmTradeModalProps {
 }
 
 // Boundary colors and labels
+// PCD-Compliant: Labels describe portfolio STATE, not trade quality
 const BOUNDARY_CONFIG: Record<Boundary, { color: string; bgColor: string; label: string }> = {
   SAFE: {
     color: COLORS.boundary.safe,
     bgColor: `${COLORS.boundary.safe}15`,
-    label: 'Safe Trade',
+    label: 'Within Target Range',
   },
   DRIFT: {
     color: COLORS.boundary.drift,
     bgColor: `${COLORS.boundary.drift}15`,
-    label: 'Minor Drift',
+    label: 'Portfolio Drift',
   },
   STRUCTURAL: {
     color: COLORS.boundary.structural,
     bgColor: `${COLORS.boundary.structural}15`,
-    label: 'Structural Change',
+    label: 'Allocation Shift',
   },
   STRESS: {
     color: COLORS.boundary.stress,
     bgColor: `${COLORS.boundary.stress}15`,
-    label: 'High Risk',
+    label: 'High Exposure Change',
   },
 };
 

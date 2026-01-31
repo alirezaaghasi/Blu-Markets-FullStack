@@ -45,12 +45,11 @@ import { ProtectionSheet } from '../../components/ProtectionSheet';
 import { EmptyState } from '../../components/EmptyState';
 import { formatRelativeTime } from '../../utils/dateUtils';
 import { formatIRR } from '../../utils/currency';
+import { PORTFOLIO_STATUS_MESSAGES, type PortfolioStatus } from '../../constants/messages';
 
 // =============================================================================
 // TYPES
 // =============================================================================
-
-type PortfolioStatus = 'BALANCED' | 'SLIGHTLY_OFF' | 'ATTENTION_REQUIRED';
 
 interface PortfolioStatusResult {
   status: PortfolioStatus;
@@ -83,26 +82,10 @@ function formatActivityMessage(entry: ActionLogEntry): string {
 
 /**
  * Portfolio Health Status
- * Simple, friendly status indicator for retail investors.
- * Shows as a subtle line below portfolio value, not a card/notification.
+ * PCD-Compliant: Describes portfolio STATE, not actions.
+ * Uses canonical messages from constants/messages.ts
  */
-const PORTFOLIO_STATUS_CONFIG: Record<PortfolioStatus, {
-  message: string;
-  color: string;
-}> = {
-  BALANCED: {
-    message: 'Your portfolio is healthy and well-diversified',
-    color: '#22c55e', // green
-  },
-  SLIGHTLY_OFF: {
-    message: 'Your mix has shifted a bit — rebalancing can help',
-    color: '#eab308', // yellow
-  },
-  ATTENTION_REQUIRED: {
-    message: 'Your portfolio needs rebalancing — tap to fix',
-    color: '#ef4444', // red
-  },
-};
+const PORTFOLIO_STATUS_CONFIG = PORTFOLIO_STATUS_MESSAGES;
 
 /**
  * Main Action Button (Row 1 - 3 equal width)

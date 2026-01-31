@@ -485,16 +485,20 @@ export const trade = {
     const afterDrift = Math.abs(after[asset.layer] - targetLayerPct[asset.layer]);
     const movesTowardTarget = afterDrift < beforeDrift;
 
-    // Generate friction copy based on boundary
+    // Generate PCD-compliant friction copy based on boundary
+    // Describes portfolio STATE, not actions or advice
     const frictionCopy: string[] = [];
-    if (boundary === 'DRIFT') {
-      frictionCopy.push('This trade moves your portfolio slightly off-target.');
+    if (movesTowardTarget) {
+      frictionCopy.push('This trade moves your portfolio closer to target allocation.');
+    } else if (boundary === 'DRIFT') {
+      frictionCopy.push('This trade creates minor drift from your target allocation.');
+      frictionCopy.push('Portfolio balance can be restored through future adjustments.');
     } else if (boundary === 'STRUCTURAL') {
-      frictionCopy.push('This is a significant change to your allocation.');
-      frictionCopy.push('Consider rebalancing after this trade.');
+      frictionCopy.push('This trade creates significant drift from your target allocation.');
+      frictionCopy.push('Your portfolio risk profile will change.');
     } else if (boundary === 'STRESS') {
-      frictionCopy.push('WARNING: This trade significantly deviates from your risk profile.');
-      frictionCopy.push('Your portfolio may become unbalanced.');
+      frictionCopy.push('This trade creates major drift from your target allocation.');
+      frictionCopy.push('Downside exposure will increase beyond your stated boundaries.');
     }
 
     return {

@@ -20,6 +20,7 @@ import { TransactionSuccessModal, TransactionSuccessResult } from './Transaction
 // RTK Query - auto-invalidates portfolio cache after rebalance
 import { useGetRebalancePreviewQuery, useExecuteRebalanceMutation } from '../store/api/apiSlice';
 import { formatIRR, formatPercent, formatNumber } from '../utils/currency';
+import { REBALANCE_NOT_NEEDED } from '../constants/messages';
 
 interface RebalanceSheetProps {
   visible: boolean;
@@ -282,10 +283,11 @@ const RebalanceSheet: React.FC<RebalanceSheetProps> = ({ visible, onClose }) => 
             )}
 
             {/* Show appropriate message when no rebalancing needed or possible */}
+            {/* PCD-Compliant: State declaration, no action language */}
             {!isLoading && !error && !canExecute && residualDrift <= 5 && (
               <View style={styles.infoBox}>
                 <Text style={styles.infoText}>
-                  Your portfolio is balanced. No rebalancing needed.
+                  {REBALANCE_NOT_NEEDED}
                 </Text>
               </View>
             )}

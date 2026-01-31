@@ -46,6 +46,11 @@ import { TradeErrorModal } from './TradeErrorModal';
 import { apiSlice } from '../store/api/apiSlice';
 import { formatNumber } from '../utils/currency';
 import { devLog } from '../utils/devLogger';
+import {
+  getBoundaryExplanation,
+  getTradeAllocationImpact,
+  getTransactionFeeExplanation,
+} from '../constants/messages';
 
 interface TradeBottomSheetProps {
   visible: boolean;
@@ -87,7 +92,11 @@ interface TradeResult {
 // Target layer percentages type
 type TargetLayerPct = Record<'FOUNDATION' | 'GROWTH' | 'UPSIDE', number>;
 
-// Generate clear allocation impact sentence for retail users
+/**
+ * Generate PCD-compliant allocation impact sentence.
+ * Uses canonical messages from constants/messages.ts
+ * Describes portfolio STATE changes, not actions.
+ */
 const generateAllocationImpactSentence = (
   preview: TradePreview,
   side: 'BUY' | 'SELL',
@@ -105,39 +114,11 @@ const generateAllocationImpactSentence = (
   const afterDistance = Math.abs(afterPct - targetPct);
   const movingTowardTarget = afterDistance < beforeDistance;
 
-  const direction = side === 'BUY' ? 'increase' : 'decrease';
-  let sentence = `This will ${direction} your ${layerName} allocation from ${beforePct}% to ${afterPct}%`;
-
-  if (movingTowardTarget) {
-    sentence += ` (closer to your ${targetPct}% target).`;
-  } else if (afterDistance > beforeDistance) {
-    sentence += ` (further from your ${targetPct}% target).`;
-  } else {
-    sentence += `.`;
-  }
-
-  return sentence;
+  // Use PCD-compliant message from constants/messages.ts
+  return getTradeAllocationImpact(layerName, beforePct, afterPct, targetPct, movingTowardTarget);
 };
 
-// Generate boundary explanation for retail users
-const getBoundaryExplanation = (boundary: Boundary, movesTowardTarget?: boolean): string => {
-  if (movesTowardTarget) {
-    return 'Good trade — moves toward your target allocation';
-  }
-
-  switch (boundary) {
-    case 'SAFE':
-      return 'Low impact on your portfolio balance';
-    case 'DRIFT':
-      return 'Moderate impact — consider rebalancing soon';
-    case 'STRUCTURAL':
-      return 'Significant impact — your portfolio will drift from target';
-    case 'STRESS':
-      return 'High impact — this moves your portfolio far from target';
-    default:
-      return '';
-  }
-};
+// getBoundaryExplanation is imported from constants/messages.ts (PCD-compliant)
 
 // BUG-1 FIX: Format IRR with compact notation (matching HoldingCard format)
 const formatIRRCompact = (num: number): string => {
@@ -601,11 +582,11 @@ export const TradeBottomSheet: React.FC<TradeBottomSheetProps> = ({
                     <TouchableOpacity
                       onPress={() => Alert.alert(
                         'Transaction Fee',
-                        `This ${((preview.spread ?? 0) * 100).toFixed(2)}% fee covers the bid-ask spread for ${asset?.name || 'this asset'}.\n\n` +
-                        `• Foundation assets: 0.15% (lowest)\n` +
-                        `• Growth assets: 0.30%\n` +
-                        `• Upside assets: 0.60% (higher volatility)`,
-                        [{ text: 'Got it' }]
+                        getTransactionFeeExplanation(
+                          (preview.spread ?? 0) * 100,
+                          asset?.name || 'this asset'
+                        ),
+                        [{ text: 'OK' }]
                       )}
                       style={styles.infoButton}
                     >
