@@ -16,22 +16,22 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  FlatList,
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
   Alert,
+  ListRenderItemInfo,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS } from '../../constants/colors';
 import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING, RADIUS } from '../../constants/spacing';
-import { useAppSelector, useAppDispatch } from '../../hooks/useStore';
+import { useAppSelector } from '../../hooks/useStore';
 import { useActivityFeed } from '../../hooks/useActivityFeed';
 import { usePriceConnection } from '../../hooks/usePriceConnection';
-import { setHoldings, updateCash, setStatus, setTargetLayerPct, setPortfolioValues } from '../../store/slices/portfolioSlice';
-import { useGetPortfolioQuery } from '../../store/api/apiSlice';
+import { usePortfolioSync } from '../../hooks/usePortfolioSync';
 import { devLog, devError, devWarn } from '../../utils/devLogger';
 import type { Holding, ActionLogEntry } from '../../types';
 import { ASSETS } from '../../constants/assets';
@@ -159,7 +159,6 @@ const WideActionButton: React.FC<{
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const dispatch = useAppDispatch();
 
   // Price connection status (for update time display)
   const { lastUpdate: priceLastUpdate } = usePriceConnection();
@@ -200,39 +199,11 @@ const HomeScreen: React.FC = () => {
   // Check if we're in demo mode (runtime check)
   const isDemoMode = authToken === DEMO_TOKEN;
 
-  // RTK Query for portfolio data - single source of truth
-  const {
-    data: portfolioData,
-    isLoading: isLoadingPortfolio,
-    refetch: refetchPortfolio,
-  } = useGetPortfolioQuery(undefined, {
+  // Use centralized portfolio sync from MainTabNavigator
+  // This hook handles RTK Query fetching and Redux sync - no duplicate calls needed
+  const { refetchPortfolio, isLoading: isLoadingPortfolio } = usePortfolioSync({
     skip: isDemoMode, // Skip API call in demo mode
   });
-
-  // Sync RTK Query data to Redux when it changes
-  useEffect(() => {
-    if (!portfolioData) return;
-
-    dispatch(updateCash(portfolioData.cashIrr));
-    dispatch(setTargetLayerPct(portfolioData.targetAllocation));
-    dispatch(setPortfolioValues({
-      totalValueIrr: portfolioData.totalValueIrr || 0,
-      holdingsValueIrr: portfolioData.holdingsValueIrr || 0,
-      currentAllocation: portfolioData.allocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
-      driftPct: portfolioData.driftPct || 0,
-      status: portfolioData.status || 'BALANCED',
-    }));
-
-    if (portfolioData.holdings) {
-      dispatch(setHoldings(portfolioData.holdings.map((h) => ({
-        id: h.id,
-        assetId: h.assetId,
-        quantity: h.quantity,
-        frozen: h.frozen,
-        layer: h.layer,
-      }))));
-    }
-  }, [portfolioData, dispatch]);
 
   // ==========================================================================
   // COMPUTED VALUES (using backend-calculated values from Redux)
@@ -371,81 +342,38 @@ const HomeScreen: React.FC = () => {
       </View>
 
       {/* ================================================================ */}
-      {/* SCROLLABLE ACTIVITY LOG */}
+      {/* ACTIVITY LOG - Using FlatList for virtualization */}
       {/* ================================================================ */}
-      <ScrollView
+      <FlatList
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: FOOTER_BASE_HEIGHT + insets.bottom + SPACING[4] }]}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing || isRefreshingActivities}
-            onRefresh={onRefresh}
-            tintColor={COLORS.brand.primary}
-          />
-        }
-      >
-        <View style={styles.activitySection}>
-          {isLoadingActivities ? (
+        data={isLoadingActivities ? [] : activities.slice(0, 50)}
+        keyExtractor={(item, index) => String(item?.id ?? `activity-${index}`)}
+        renderItem={({ item: entry }: ListRenderItemInfo<ActionLogEntry>) => {
+          const message = formatActivityMessage(entry) || 'Activity recorded';
+          const time = formatRelativeTime(entry?.timestamp) || 'Just now';
+
+          return (
+            <View style={styles.activityItem}>
+              <Text style={styles.activityTime}>{time}</Text>
+              <Text style={styles.activityMessage} numberOfLines={2}>{message}</Text>
+            </View>
+          );
+        }}
+        ListEmptyComponent={
+          isLoadingActivities ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={COLORS.brand.primary} />
             </View>
-          ) : activities.length === 0 ? (
+          ) : (
             <View style={styles.emptyActivity}>
               <Text style={styles.emptyActivityText}>No activity yet</Text>
             </View>
-          ) : (
-            /* BUG-1 FIX: Simplified activity log with guaranteed visible text */
-            <View>
-              {activities.slice(0, 20).map((entry: ActionLogEntry, index: number) => {
-                const message = formatActivityMessage(entry) || 'Activity recorded';
-                const time = formatRelativeTime(entry?.timestamp) || 'Just now';
-
-                return (
-                  <View
-                    key={entry?.id || `activity-${index}`}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'flex-start',
-                      backgroundColor: COLORS.background.surface,
-                      borderRadius: 10,
-                      paddingVertical: 10,
-                      paddingHorizontal: 12,
-                      marginBottom: 6,
-                      borderWidth: 1,
-                      borderColor: COLORS.border,
-                    }}
-                  >
-                    {/* Time */}
-                    <Text style={{
-                      color: COLORS.text.muted,
-                      fontSize: 12,
-                      marginRight: 12,
-                      minWidth: 55,
-                      marginTop: 2,
-                    }}>
-                      {time}
-                    </Text>
-                    {/* Message - allow 2 lines for long messages */}
-                    <Text
-                      style={{
-                        color: COLORS.text.primary,
-                        fontSize: 14,
-                        flex: 1,
-                        lineHeight: 20,
-                      }}
-                      numberOfLines={2}
-                    >
-                      {message}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
-          )}
-
-          {/* Loan Payment Due Alert */}
-          {nextLoanPayment && nextLoanPayment.daysUntil <= 7 && (
+          )
+        }
+        ListFooterComponent={
+          nextLoanPayment && nextLoanPayment.daysUntil <= 7 ? (
             <ActivityCard
               id="loan-payment-alert"
               type="LOAN_PAYMENT"
@@ -457,9 +385,26 @@ const HomeScreen: React.FC = () => {
                 onPress: () => handleDeepLinkServices('loans', nextLoanPayment.loan.id),
               }}
             />
-          )}
-        </View>
-      </ScrollView>
+          ) : null
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing || isRefreshingActivities}
+            onRefresh={onRefresh}
+            tintColor={COLORS.brand.primary}
+          />
+        }
+        // Performance optimizations
+        windowSize={5}
+        maxToRenderPerBatch={10}
+        removeClippedSubviews={true}
+        initialNumToRender={10}
+        getItemLayout={(_, index) => ({
+          length: 52, // Approximate item height (padding + text)
+          offset: 52 * index,
+          index,
+        })}
+      />
 
       {/* ================================================================ */}
       {/* FIXED MAIN ACTIONS AT BOTTOM */}
@@ -661,6 +606,32 @@ const styles = StyleSheet.create({
   emptyActivityText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.text.muted,
+  },
+  // Activity item styles (for FlatList)
+  activityItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: COLORS.background.surface,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 6,
+    marginHorizontal: SPACING[4],
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  activityTime: {
+    color: COLORS.text.muted,
+    fontSize: 12,
+    marginRight: 12,
+    minWidth: 55,
+    marginTop: 2,
+  },
+  activityMessage: {
+    color: COLORS.text.primary,
+    fontSize: 14,
+    flex: 1,
+    lineHeight: 20,
   },
   // Chat UI Styles for Activity Log
   chatContainer: {

@@ -195,11 +195,12 @@ const ProfileScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { phone } = useAppSelector((state) => state.auth);
-  const portfolioState = useAppSelector((state) => state.portfolio);
-  const onboardingState = useAppSelector((state) => state.onboarding);
+  // Granular selector - only re-render when riskScore changes, not entire portfolio
+  const portfolioRiskScore = useAppSelector((state) => state.portfolio.riskScore);
+  const onboardingRiskScore = useAppSelector((state) => state.onboarding?.riskProfile?.score);
 
   // Use stored risk score from portfolio state or onboarding state
-  const storedRiskScore = portfolioState?.riskScore || onboardingState?.riskProfile?.score;
+  const storedRiskScore = portfolioRiskScore || onboardingRiskScore;
   const riskScore = storedRiskScore || 5;
 
   // Biometric authentication

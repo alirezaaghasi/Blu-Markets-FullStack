@@ -1,6 +1,6 @@
 // Portfolio Screen
 // Based on CLAUDE_CODE_HANDOFF.md - Holdings by layer view
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,14 +13,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../../constants/colors';
 import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING, RADIUS } from '../../constants/spacing';
-import { useAppSelector, useAppDispatch } from '../../hooks/useStore';
-import { setHoldings, updateCash, setStatus, setTargetLayerPct, setPortfolioValues } from '../../store/slices/portfolioSlice';
+import { useAppSelector } from '../../hooks/useStore';
+import { usePortfolioSync } from '../../hooks/usePortfolioSync';
 import { Layer, Holding } from '../../types';
 import AllocationBar from '../../components/AllocationBar';
 import HoldingCard from '../../components/HoldingCard';
 import { EmptyState } from '../../components/EmptyState';
-import { portfolio as portfolioApi } from '../../services/api';
-import { formatIRR, formatPercent } from '../../utils/currency';
+import { formatIRR } from '../../utils/currency';
 
 // Layer configuration
 const LAYER_CONFIG: Record<Layer, { name: string; color: string }> = {
@@ -30,7 +29,6 @@ const LAYER_CONFIG: Record<Layer, { name: string; color: string }> = {
 };
 
 const PortfolioScreen: React.FC = () => {
-  const dispatch = useAppDispatch();
   const [refreshing, setRefreshing] = useState(false);
   const [expandedLayers, setExpandedLayers] = useState<Record<Layer, boolean>>({
     FOUNDATION: true,
@@ -38,13 +36,16 @@ const PortfolioScreen: React.FC = () => {
     UPSIDE: true,
   });
 
-  const portfolioState = useAppSelector((state) => state.portfolio);
-  const holdings = portfolioState?.holdings || [];
-  const cashIRR = portfolioState?.cashIRR || 0;
-  const targetLayerPct = portfolioState?.targetLayerPct || { FOUNDATION: 0.5, GROWTH: 0.35, UPSIDE: 0.15 };
+  // Use centralized portfolio sync - handles RTK Query and Redux sync
+  const { refetchPortfolio } = usePortfolioSync();
+
+  // Granular selectors - only re-render when specific fields change
+  const holdings = useAppSelector((state) => state.portfolio.holdings) || [];
+  const cashIRR = useAppSelector((state) => state.portfolio.cashIRR) || 0;
+  const targetLayerPct = useAppSelector((state) => state.portfolio.targetLayerPct) || { FOUNDATION: 0.5, GROWTH: 0.35, UPSIDE: 0.15 };
   // Backend-calculated values (frontend is presentation layer only)
-  const holdingsValueIRR = portfolioState?.holdingsValueIrr || 0;
-  const currentAllocation = portfolioState?.currentAllocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
+  const holdingsValueIRR = useAppSelector((state) => state.portfolio.holdingsValueIrr) || 0;
+  const currentAllocation = useAppSelector((state) => state.portfolio.currentAllocation) || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 };
   const { prices, pricesIrr, fxRate, change24h } = useAppSelector((state) => state.prices);
 
   // Group holdings by layer
@@ -88,68 +89,14 @@ const PortfolioScreen: React.FC = () => {
     setExpandedLayers((prev) => ({ ...prev, [layer]: !prev[layer] }));
   };
 
-  // Fetch portfolio from backend on mount
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const portfolioResponse = await portfolioApi.get();
-
-        // Sync backend data to Redux
-        dispatch(updateCash(portfolioResponse.cashIrr));
-        dispatch(setTargetLayerPct(portfolioResponse.targetAllocation));
-
-        // Update backend-calculated values (frontend is presentation layer only)
-        dispatch(setPortfolioValues({
-          totalValueIrr: portfolioResponse.totalValueIrr || 0,
-          holdingsValueIrr: portfolioResponse.holdingsValueIrr || (portfolioResponse.totalValueIrr - portfolioResponse.cashIrr) || 0,
-          currentAllocation: portfolioResponse.allocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
-          driftPct: portfolioResponse.driftPct || 0,
-          status: portfolioResponse.status || 'BALANCED',
-        }));
-
-        if (portfolioResponse.holdings) {
-          dispatch(setHoldings(portfolioResponse.holdings.map((h) => ({
-            id: h.id,
-            assetId: h.assetId,
-            quantity: h.quantity,
-            frozen: h.frozen,
-            layer: h.layer,
-          }))));
-        }
-      } catch (error) {
-        if (__DEV__) console.error('Failed to fetch portfolio:', error);
-      }
-    };
-    fetchData();
-  }, [dispatch]);
+  // Portfolio data is fetched by usePortfolioSync in MainTabNavigator
+  // No need to fetch on mount - data is already in Redux from centralized sync
 
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      const portfolioResponse = await portfolioApi.get();
-
-      // Update Redux state with fresh portfolio data
-      dispatch(updateCash(portfolioResponse.cashIrr));
-      dispatch(setTargetLayerPct(portfolioResponse.targetAllocation));
-
-      // Update backend-calculated values (frontend is presentation layer only)
-      dispatch(setPortfolioValues({
-        totalValueIrr: portfolioResponse.totalValueIrr || 0,
-        holdingsValueIrr: portfolioResponse.holdingsValueIrr || (portfolioResponse.totalValueIrr - portfolioResponse.cashIrr) || 0,
-        currentAllocation: portfolioResponse.allocation || { FOUNDATION: 0, GROWTH: 0, UPSIDE: 0 },
-        driftPct: portfolioResponse.driftPct || 0,
-        status: portfolioResponse.status || 'BALANCED',
-      }));
-
-      if (portfolioResponse.holdings) {
-        dispatch(setHoldings(portfolioResponse.holdings.map((h) => ({
-          id: h.id,
-          assetId: h.assetId,
-          quantity: h.quantity,
-          frozen: h.frozen,
-          layer: h.layer,
-        }))));
-      }
+      // Use centralized refetch - handles API call and Redux sync
+      await refetchPortfolio();
     } catch (error) {
       if (__DEV__) console.error('Failed to refresh portfolio:', error);
     } finally {
