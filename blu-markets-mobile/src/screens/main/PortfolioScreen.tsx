@@ -190,8 +190,6 @@ const PortfolioScreen: React.FC = () => {
 
         {/* Holdings by Layer */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Holdings</Text>
-
           {holdings.length === 0 ? (
             <EmptyState
               icon="pie-chart"
@@ -206,7 +204,7 @@ const PortfolioScreen: React.FC = () => {
             return (
               <View key={layer} style={styles.layerSection}>
                 <TouchableOpacity
-                  style={styles.layerHeader}
+                  style={[styles.layerHeader, { borderLeftColor: config.color }]}
                   onPress={() => toggleLayer(layer)}
                   activeOpacity={0.7}
                 >
@@ -216,12 +214,14 @@ const PortfolioScreen: React.FC = () => {
                     <Text style={styles.layerCount}>({layerHoldings.length})</Text>
                   </View>
                   <View style={styles.layerHeaderRight}>
-                    <Text style={styles.layerValue}>
-                      {formatIRR(layerValues[layer], { showUnit: false })}
-                    </Text>
-                    <Text style={styles.layerPercent}>
-                      {formatPercent(currentAllocation[layer] * 100)}
-                    </Text>
+                    <View style={styles.layerValueContainer}>
+                      <Text style={styles.layerValue}>
+                        {formatIRR(layerValues[layer], { showUnit: false })}
+                      </Text>
+                      <Text style={styles.layerTarget}>
+                        Target: {Math.round(targetLayerPct[layer] * 100)}%
+                      </Text>
+                    </View>
                     <Text style={styles.expandIcon}>{isExpanded ? '▼' : '▶'}</Text>
                   </View>
                 </TouchableOpacity>
@@ -308,15 +308,18 @@ const styles = StyleSheet.create({
     marginBottom: SPACING[3],
   },
   layerSection: {
-    marginBottom: SPACING[3],
+    marginBottom: SPACING[5],
   },
   layerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: COLORS.background.surface,
+    backgroundColor: COLORS.background.elevated,
     borderRadius: RADIUS.md,
-    padding: SPACING[4],
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: SPACING[2],
+    borderLeftWidth: 3,
   },
   layerHeaderLeft: {
     flexDirection: 'row',
@@ -342,24 +345,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  layerValueContainer: {
+    alignItems: 'flex-end',
+    marginRight: SPACING[3],
+  },
   layerValue: {
     fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
     color: COLORS.text.primary,
-    marginRight: SPACING[2],
   },
-  layerPercent: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.normal,
+  layerTarget: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
     color: COLORS.text.muted,
+    marginTop: 2,
   },
   expandIcon: {
     fontSize: 12,
     color: COLORS.text.muted,
   },
   holdingsList: {
-    marginTop: SPACING[2],
     gap: SPACING[2],
+    paddingLeft: SPACING[1],
   },
   emptyLayer: {
     padding: SPACING[4],

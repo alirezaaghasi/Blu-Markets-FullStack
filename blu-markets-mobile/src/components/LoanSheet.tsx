@@ -1,6 +1,7 @@
 // Loan Bottom Sheet Component
 // Based on PRD Section 6.5 - Borrow Flow
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+// REDESIGNED: Compact single-screen layout with dropdown asset picker
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,15 +12,12 @@ import {
   SafeAreaView,
   ScrollView,
   Alert,
-  Animated,
 } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../constants/theme';
 import { Holding, AssetId } from '../types';
 import { ASSETS, LAYER_COLORS } from '../constants/assets';
 import {
-  LOAN_DAILY_INTEREST_RATE,
   LOAN_ANNUAL_INTEREST_RATE,
-  LOAN_INSTALLMENT_COUNT,
   LOAN_DURATION_OPTIONS,
   LOAN_DURATION_LABELS,
   LOAN_MIN_AMOUNT,
@@ -48,7 +46,6 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
   const { prices, fxRate } = useAppSelector((state) => state.prices);
 
   // Use provided holdings or derive eligible holdings from portfolio
-  // Eligible for loans: unfrozen holdings with LTV > 0
   const eligibleHoldings = useMemo(() => {
     if (propHoldings) return propHoldings;
     return holdings.filter((h) => {
@@ -58,6 +55,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
   }, [propHoldings, holdings]);
 
   const [selectedAssetId, setSelectedAssetId] = useState<AssetId | null>(null);
+  const [showAssetPicker, setShowAssetPicker] = useState(false);
   const [amountInput, setAmountInput] = useState('');
   const [durationDays, setDurationDays] = useState<90 | 180>(90);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -67,22 +65,18 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
   const [loanPreview, setLoanPreview] = useState<LoanPreviewResponse | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
-  // Ref for ScrollView to scroll to amount input when asset is selected
-  const scrollViewRef = useRef<ScrollView>(null);
-  const amountSectionY = useRef(0);
-
   // Reset state when sheet opens/closes
   useEffect(() => {
     if (visible) {
-      // Reset state when sheet opens for fresh start
       setSelectedAssetId(null);
       setAmountInput('');
       setDurationDays(90);
       setLoanPreview(null);
+      setShowAssetPicker(false);
     }
   }, [visible]);
 
-  // BUG-024 FIX: Fetch loan capacity with cleanup to prevent state updates on unmounted component
+  // Fetch loan capacity
   useEffect(() => {
     if (!visible) return;
 
@@ -122,7 +116,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
       } finally {
         if (isMounted) setIsLoadingPreview(false);
       }
-    }, 300); // Debounce 300ms
+    }, 300);
 
     return () => {
       isMounted = false;
@@ -130,50 +124,30 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
     };
   }, [selectedAssetId, amountIRR, durationDays]);
 
-  // REMOVED: Auto-selection was causing UX issues where tapping the first asset
-  // appeared to do nothing because it was already selected.
-  // Users must now explicitly tap an asset to proceed to the amount input step.
-
   // Selected holding and asset
   const selectedHolding = eligibleHoldings.find((h) => h.assetId === selectedAssetId);
   const selectedAsset = selectedAssetId ? ASSETS[selectedAssetId] : null;
 
-  // BUG-005 FIX: Client-side collateral value calculation is for UI preview ONLY
-  // Backend loan.preview API is AUTHORITATIVE for all loan eligibility decisions.
-  // This estimate enables responsive UI while backend calculates actual values.
+  // Collateral value calculation (UI preview only)
   const collateralValueIRR = useMemo(() => {
     if (!selectedHolding || !selectedAssetId) return 0;
     const priceUSD = prices[selectedAssetId] || 0;
-    // UI ESTIMATE ONLY - backend preview is authoritative
     return selectedHolding.quantity * priceUSD * fxRate;
   }, [selectedHolding, selectedAssetId, prices, fxRate]);
 
-  // BUG-005/BUG-023 FIX: UI estimate for slider max, but prefer backend when available
-  // The backend's maxLoanIrr in LoanPreviewResponse is AUTHORITATIVE.
+  // Max borrow estimate
   const localMaxBorrowEstimate = useMemo(() => {
     if (!selectedAsset) return 0;
-    // UI ESTIMATE ONLY - used before backend preview loads
     return collateralValueIRR * selectedAsset.ltv;
   }, [collateralValueIRR, selectedAsset]);
 
-  // BUG-023 FIX: Prefer backend maxLoanIrr when available
   const maxBorrowIRR = loanPreview?.maxLoanIrr ?? localMaxBorrowEstimate;
-
-  // Use backend-derived remaining portfolio capacity
-  // BUG-3 FIX: If capacity not loaded yet, use maxBorrowIRR as fallback (no portfolio limit)
   const remainingPortfolioCapacity = capacity?.availableIrr ?? Infinity;
-
-  // Effective max borrow (minimum of LTV limit and portfolio capacity from backend)
-  // If capacity not fetched yet, use maxBorrowIRR (optimistic, server will validate)
   const effectiveMaxBorrow = capacity
     ? Math.min(maxBorrowIRR, remainingPortfolioCapacity)
     : maxBorrowIRR;
 
-  // NOTE: amountIRR is now parsed in the useEffect above for preview fetching
-
-  // BUG-004 FIX: Use backend-derived interest and installment amounts ONLY
-  // Frontend must NOT compute LTV, interest, installments, or due dates
-  // Display 0 until backend preview is available (loading state handles UX)
+  // Backend-derived values
   const totalInterest = loanPreview?.totalInterestIrr ?? 0;
   const installmentAmount = loanPreview?.installmentAmountIrr ?? 0;
 
@@ -186,9 +160,9 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
   }
   if (amountIRR > effectiveMaxBorrow) {
     if (amountIRR > maxBorrowIRR) {
-      validationErrors.push(`Maximum borrow with this asset is ${(maxBorrowIRR || 0).toLocaleString()} IRR (${(selectedAsset?.ltv || 0) * 100}% of value)`);
+      validationErrors.push(`Maximum borrow with this asset is ${(maxBorrowIRR || 0).toLocaleString()} IRR`);
     } else {
-      validationErrors.push(`Exceeds portfolio loan limit. Remaining capacity: ${(remainingPortfolioCapacity || 0).toLocaleString()} IRR`);
+      validationErrors.push(`Exceeds portfolio loan limit. Remaining: ${(remainingPortfolioCapacity || 0).toLocaleString()} IRR`);
     }
   }
   const isValid = validationErrors.length === 0 && amountIRR > 0;
@@ -210,20 +184,17 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
 
     setIsSubmitting(true);
     try {
-      // Call backend API to create loan (API expects durationDays)
       const loan = await loansApi.create(selectedAssetId, amountIRR, durationDays);
 
-      // Update local Redux state with response
-      // BUG-004 FIX: Use ONLY backend-provided values, no client-side fallback calculations
       dispatch(addLoan({
         id: loan.id,
         collateralAssetId: loan.collateralAssetId,
         collateralQuantity: loan.collateralQuantity || selectedHolding.quantity,
         amountIRR: loan.amountIRR || amountIRR,
-        dailyInterestRate: loan.dailyInterestRate || 0, // Backend must provide
+        dailyInterestRate: loan.dailyInterestRate || 0,
         durationDays: loan.durationDays || durationDays,
         startISO: loan.startISO || new Date().toISOString(),
-        dueISO: loan.dueISO || '', // Backend must provide due date
+        dueISO: loan.dueISO || '',
         status: 'ACTIVE',
         installments: loan.installments || [],
         installmentsPaid: 0,
@@ -240,7 +211,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
         })
       );
 
-      // Refresh full portfolio data to update all values (prevents stale data)
+      // Refresh portfolio data
       try {
         const portfolioData = await portfolioApi.get();
         dispatch(setPortfolioValues({
@@ -251,12 +222,9 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
           status: portfolioData.status || 'BALANCED',
         }));
       } catch (e) {
-        // Non-fatal - status will update on next refresh
         console.warn('Failed to refresh portfolio after loan:', e);
       }
 
-      // BUG-005 FIX: Show success modal with backend-provided values
-      // totalInterest comes from loanPreview API (backend-calculated)
       setSuccessResult({
         title: 'Loan Created!',
         subtitle: `Funds added to your cash balance`,
@@ -265,7 +233,6 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
           { label: 'Locked for this loan', value: `${selectedAsset.name}` },
           { label: 'Duration', value: LOAN_DURATION_LABELS[durationDays] || `${durationDays} days` },
           { label: 'Interest Rate', value: `${(LOAN_ANNUAL_INTEREST_RATE * 100).toFixed(0)}% yearly` },
-          // Use backend-provided totalInterest from loanPreview
           { label: 'Total to Repay', value: `${formatNumber(Math.round(amountIRR + totalInterest))} IRR` },
         ],
       });
@@ -278,18 +245,15 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
     }
   };
 
-  // BUG FIX: Close inner modal first, then parent with delay
-  // React Native's Modal touch handling gets confused when nested modals close simultaneously
   const handleSuccessClose = () => {
     setShowSuccess(false);
     setSuccessResult(null);
-    // Delay parent modal close to allow inner modal to properly unmount
     setTimeout(() => {
       onClose();
     }, 150);
   };
 
-  // Show empty state if no eligible holdings for collateral
+  // Empty state
   if (eligibleHoldings.length === 0) {
     return (
       <Modal
@@ -337,84 +301,49 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
         </View>
 
         <ScrollView
-          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
         >
-          {/* Asset Selection - asset will be locked for this loan */}
+          {/* STEP 1: Collateral Selection - Dropdown Style */}
           <View style={styles.section}>
-            <View style={styles.sectionTitleRow}>
-              <Text style={styles.sectionTitle}>Step 1: Choose Collateral</Text>
-              <Text style={styles.infoIcon} onPress={() => Alert.alert(
-                'Borrowing Limits',
-                'Riskier assets let you borrow a smaller percentage of their value. Stablecoins and gold allow up to 50%, while volatile assets may only allow 30-40%.'
-              )}>ⓘ</Text>
-            </View>
-            {!selectedAssetId && (
-              <Text style={styles.sectionHelper}>Tap an asset to use as security for your loan</Text>
-            )}
-            <View style={styles.collateralList}>
-              {eligibleHoldings.map((holding) => {
-                const asset = ASSETS[holding.assetId];
-                const priceUSD = prices[holding.assetId] || 0;
-                const valueIRR = holding.quantity * priceUSD * fxRate;
-                const maxBorrow = valueIRR * asset.ltv;
-                const isSelected = selectedAssetId === holding.assetId;
+            <Text style={styles.sectionTitle}>Step 1: Choose Collateral</Text>
 
-                return (
-                  <TouchableOpacity
-                    key={holding.assetId}
-                    style={[
-                      styles.collateralOption,
-                      isSelected && styles.collateralOptionSelected,
-                    ]}
-                    onPress={() => {
-                      setSelectedAssetId(holding.assetId);
-                      setAmountInput('');
-                      // Scroll to amount input section after selection
-                      setTimeout(() => {
-                        scrollViewRef.current?.scrollTo({ y: 200, animated: true });
-                      }, 100);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.collateralInfo}>
-                      <View
-                        style={[
-                          styles.assetIcon,
-                          { backgroundColor: `${LAYER_COLORS[asset.layer]}20` },
-                          isSelected && { backgroundColor: `${LAYER_COLORS[asset.layer]}40` },
-                        ]}
-                      >
-                        <Text style={styles.assetIconText}>
-                          {asset.symbol}
-                        </Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.collateralName}>{asset.name}</Text>
-                        <Text style={styles.collateralValue}>
-                          You can borrow up to {formatIRR(maxBorrow)}
-                        </Text>
-                      </View>
-                    </View>
-                    {isSelected && (
-                      <View style={styles.selectedBadge}>
-                        <Text style={styles.checkmark}>✓</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            <TouchableOpacity
+              style={styles.dropdownTrigger}
+              onPress={() => setShowAssetPicker(true)}
+              activeOpacity={0.7}
+            >
+              {selectedAssetId && selectedAsset ? (
+                <View style={styles.selectedAssetRow}>
+                  <View style={[styles.assetIconSmall, { backgroundColor: `${LAYER_COLORS[selectedAsset.layer]}20` }]}>
+                    <Text style={styles.assetIconTextSmall}>{selectedAsset.symbol}</Text>
+                  </View>
+                  <View style={styles.selectedAssetInfo}>
+                    <Text style={styles.selectedAssetName}>{selectedAsset.name}</Text>
+                    <Text style={styles.selectedAssetBorrow}>
+                      Borrow up to {formatIRR(maxBorrowIRR)}
+                    </Text>
+                  </View>
+                  <Text style={styles.dropdownArrow}>▼</Text>
+                </View>
+              ) : (
+                <View style={styles.placeholderRow}>
+                  <Text style={styles.placeholderText}>Select an asset as collateral</Text>
+                  <Text style={styles.dropdownArrow}>▼</Text>
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
 
+          {/* Steps 2-3 and Summary - Always visible when asset selected */}
           {selectedAssetId && (
-            <>
-              {/* Amount Input */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Step 2: Borrow Amount (IRR)</Text>
+            <View style={styles.compactForm}>
+              {/* STEP 2: Amount Input */}
+              <View style={styles.formSection}>
+                <Text style={styles.sectionTitle}>Step 2: Amount (IRR)</Text>
                 <TextInput
-                  style={styles.amountInput}
+                  style={styles.compactAmountInput}
                   value={amountInput}
                   onChangeText={handleAmountChange}
                   placeholder="0"
@@ -422,45 +351,35 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
                   keyboardType="numeric"
                   returnKeyType="done"
                 />
-                <Text style={styles.maxBorrowText}>
-                  Maximum: {formatNumber(effectiveMaxBorrow)} IRR
+                <Text style={styles.maxText}>
+                  Max: {formatIRR(effectiveMaxBorrow)}
                 </Text>
 
-                {/* Quick amount chips */}
-                <View style={styles.quickAmounts}>
+                {/* Quick Amount Chips */}
+                <View style={styles.quickChipsCompact}>
                   {[0.25, 0.50, 0.75, 1.0].map((pct) => (
                     <TouchableOpacity
                       key={pct}
-                      style={styles.quickChip}
-                      onPress={() =>
-                        setAmountInput(formatNumber(Math.floor(effectiveMaxBorrow * pct)))
-                      }
+                      style={styles.quickChipSmall}
+                      onPress={() => setAmountInput(formatNumber(Math.floor(effectiveMaxBorrow * pct)))}
                     >
-                      <Text style={styles.quickChipText}>{pct * 100}%</Text>
+                      <Text style={styles.quickChipTextSmall}>{pct * 100}%</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               </View>
 
-              {/* Duration Selection */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Step 3: Loan Duration</Text>
-                <View style={styles.durationOptions}>
+              {/* STEP 3: Duration */}
+              <View style={styles.formSection}>
+                <Text style={styles.sectionTitle}>Step 3: Duration</Text>
+                <View style={styles.durationCompact}>
                   {LOAN_DURATION_OPTIONS.map((days) => (
                     <TouchableOpacity
                       key={days}
-                      style={[
-                        styles.durationChip,
-                        durationDays === days && styles.durationChipActive,
-                      ]}
+                      style={[styles.durationPill, durationDays === days && styles.durationPillActive]}
                       onPress={() => setDurationDays(days as 90 | 180)}
                     >
-                      <Text
-                        style={[
-                          styles.durationChipText,
-                          durationDays === days && styles.durationChipTextActive,
-                        ]}
-                      >
+                      <Text style={[styles.durationPillText, durationDays === days && styles.durationPillTextActive]}>
                         {LOAN_DURATION_LABELS[days] || `${days} days`}
                       </Text>
                     </TouchableOpacity>
@@ -468,17 +387,20 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
                 </View>
               </View>
 
-              {/* Task 5 (Round 2): Simplified loan summary - 2 rows only */}
+              {/* Loan Summary - Only when amount > 0 */}
               {amountIRR > 0 && (
-                <View style={styles.previewCard}>
-                  <Text style={styles.previewTitle}>Loan Summary</Text>
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Total to Repay</Text>
-                    <Text style={styles.summaryValue}>{formatIRR(Math.round(amountIRR + totalInterest))}</Text>
+                <View style={styles.summaryCompact}>
+                  <View style={styles.summaryRowCompact}>
+                    <Text style={styles.summaryLabelCompact}>Total to Repay</Text>
+                    <Text style={styles.summaryValueCompact}>
+                      {isLoadingPreview ? '...' : formatIRR(Math.round(amountIRR + totalInterest))}
+                    </Text>
                   </View>
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>6 Monthly Payments</Text>
-                    <Text style={styles.summaryValue}>~{formatIRR(installmentAmount)}</Text>
+                  <View style={[styles.summaryRowCompact, styles.summaryRowLast]}>
+                    <Text style={styles.summaryLabelCompact}>6 Monthly Payments</Text>
+                    <Text style={styles.summaryValueCompact}>
+                      {isLoadingPreview ? '...' : `~${formatIRR(installmentAmount)}`}
+                    </Text>
                   </View>
                 </View>
               )}
@@ -487,19 +409,16 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
               {validationErrors.length > 0 && amountIRR > 0 && (
                 <View style={styles.errorCard}>
                   {validationErrors.map((error, index) => (
-                    <Text key={index} style={styles.errorText}>
-                      {error}
-                    </Text>
+                    <Text key={index} style={styles.errorText}>{error}</Text>
                   ))}
                 </View>
               )}
-            </>
+            </View>
           )}
         </ScrollView>
 
-        {/* Action Button - shows contextual text based on current step */}
+        {/* Footer */}
         <View style={styles.footer}>
-          {/* UX-002: Loan warning moved above Confirm button for visibility */}
           {selectedAssetId && isValid && (
             <View style={styles.footerWarning}>
               <Text style={styles.footerWarningText}>
@@ -508,22 +427,18 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
             </View>
           )}
           {!selectedAssetId ? (
-            // Step 1: No asset selected yet
             <View style={[styles.confirmButton, styles.confirmButtonDisabled]}>
-              <Text style={styles.confirmButtonText}>Select an asset above</Text>
+              <Text style={styles.confirmButtonText}>Select collateral above</Text>
             </View>
           ) : amountIRR <= 0 ? (
-            // Step 2: Asset selected but no amount
             <View style={[styles.confirmButton, styles.confirmButtonDisabled]}>
               <Text style={styles.confirmButtonText}>Enter borrow amount</Text>
             </View>
           ) : !isValid ? (
-            // Validation errors
             <View style={[styles.confirmButton, styles.confirmButtonDisabled]}>
               <Text style={styles.confirmButtonText}>Fix errors above</Text>
             </View>
           ) : (
-            // Ready to confirm
             <TouchableOpacity
               style={[styles.confirmButton, isSubmitting && styles.confirmButtonDisabled]}
               onPress={handleConfirm}
@@ -536,6 +451,56 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
           )}
         </View>
       </SafeAreaView>
+
+      {/* Asset Picker Modal */}
+      <Modal
+        visible={showAssetPicker}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowAssetPicker(false)}
+      >
+        <SafeAreaView style={styles.pickerContainer}>
+          <View style={styles.pickerHeader}>
+            <Text style={styles.pickerTitle}>Select Collateral</Text>
+            <TouchableOpacity onPress={() => setShowAssetPicker(false)}>
+              <Text style={styles.pickerClose}>Done</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.pickerList}>
+            {eligibleHoldings.map((holding) => {
+              const asset = ASSETS[holding.assetId];
+              const priceUSD = prices[holding.assetId] || 0;
+              const valueIRR = holding.quantity * priceUSD * fxRate;
+              const maxBorrow = valueIRR * asset.ltv;
+              const isSelected = selectedAssetId === holding.assetId;
+
+              return (
+                <TouchableOpacity
+                  key={holding.assetId}
+                  style={[styles.pickerOption, isSelected && styles.pickerOptionSelected]}
+                  onPress={() => {
+                    setSelectedAssetId(holding.assetId);
+                    setAmountInput('');
+                    setShowAssetPicker(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.assetIconSmall, { backgroundColor: `${LAYER_COLORS[asset.layer]}20` }]}>
+                    <Text style={styles.assetIconTextSmall}>{asset.symbol}</Text>
+                  </View>
+                  <View style={styles.pickerOptionInfo}>
+                    <Text style={styles.pickerOptionName}>{asset.name}</Text>
+                    <Text style={styles.pickerOptionValue}>
+                      Borrow up to {formatIRR(maxBorrow)}
+                    </Text>
+                  </View>
+                  {isSelected && <Text style={styles.pickerCheckmark}>✓</Text>}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
 
       {/* Success Modal */}
       <TransactionSuccessModal
@@ -557,23 +522,23 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing[6],
+    padding: 24,
   },
   emptyStateText: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: 18,
+    fontWeight: '600',
     color: colors.textPrimaryDark,
     textAlign: 'center',
-    marginBottom: spacing[2],
+    marginBottom: 8,
   },
   emptyStateSubtext: {
-    fontSize: typography.fontSize.sm,
+    fontSize: 14,
     color: colors.textSecondary,
     textAlign: 'center',
   },
   header: {
     alignItems: 'center',
-    paddingVertical: spacing[3],
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.borderDark,
   },
@@ -582,298 +547,300 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: colors.borderDark,
-    marginBottom: spacing[2],
+    marginBottom: 8,
   },
   title: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
+    fontSize: 17,
+    fontWeight: '600',
     color: colors.textPrimaryDark,
   },
   closeButton: {
     position: 'absolute',
-    right: spacing[4],
-    top: spacing[3],
+    right: 16,
+    top: 12,
   },
   closeButtonText: {
     color: colors.primary,
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.medium,
+    fontSize: 16,
+    fontWeight: '500',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: spacing[4],
-    paddingBottom: spacing[8],
+    padding: 16,
+    paddingBottom: 24,
   },
   section: {
-    marginBottom: spacing[4],
-  },
-  sectionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing[3],
+    marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: 12,
+    fontWeight: '600',
     color: colors.textSecondary,
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 10,
   },
-  infoIcon: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    marginLeft: spacing[2],
-    paddingHorizontal: spacing[1],
-  },
-  sectionHelper: {
-    fontSize: typography.fontSize.sm,
-    color: colors.primary,
-    marginBottom: spacing[3],
-    marginTop: -spacing[2],
-  },
-  collateralList: {
-    gap: spacing[2],
-  },
-  collateralOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+
+  // Dropdown Trigger
+  dropdownTrigger: {
     backgroundColor: colors.cardDark,
-    borderRadius: borderRadius.default,
-    padding: spacing[4],
-    borderWidth: 2,
-    borderColor: 'transparent',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.borderDark,
   },
-  collateralOptionSelected: {
-    borderColor: colors.primary,
-  },
-  collateralInfo: {
+  selectedAssetRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  assetIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  assetIconSmall: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing[3],
+    marginRight: 12,
   },
-  assetIconText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.bold,
+  assetIconTextSmall: {
+    fontSize: 11,
+    fontWeight: '700',
     color: colors.textPrimaryDark,
   },
-  collateralName: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textPrimaryDark,
-    marginBottom: 2,
+  selectedAssetInfo: {
+    flex: 1,
   },
-  collateralValue: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-  },
-  selectedBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkmark: {
+  selectedAssetName: {
     fontSize: 16,
+    fontWeight: '600',
     color: colors.textPrimaryDark,
-    fontWeight: typography.fontWeight.bold,
   },
-  amountInput: {
+  selectedAssetBorrow: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  dropdownArrow: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginLeft: 8,
+  },
+  placeholderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  placeholderText: {
+    fontSize: 15,
+    color: colors.textSecondary,
+  },
+
+  // Compact Form
+  compactForm: {
+    gap: 20,
+  },
+  formSection: {
+    // No extra margin needed, gap handles it
+  },
+  compactAmountInput: {
     backgroundColor: colors.cardDark,
-    borderRadius: borderRadius.default,
-    padding: spacing[4],
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.bold,
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    fontSize: 28,
+    fontWeight: '700',
     color: colors.textPrimaryDark,
     textAlign: 'center',
   },
-  maxBorrowText: {
-    fontSize: typography.fontSize.sm,
+  maxText: {
+    fontSize: 13,
     color: colors.textSecondary,
     textAlign: 'center',
-    marginTop: spacing[2],
+    marginTop: 8,
   },
-  quickAmounts: {
+  quickChipsCompact: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: spacing[3],
-    gap: spacing[2],
+    gap: 8,
+    marginTop: 12,
   },
-  quickChip: {
+  quickChipSmall: {
     flex: 1,
     backgroundColor: colors.surfaceDark,
-    borderRadius: borderRadius.full,
-    paddingVertical: spacing[2],
+    borderRadius: 20,
+    paddingVertical: 10,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.borderDark,
   },
-  quickChipText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
+  quickChipTextSmall: {
+    fontSize: 14,
+    fontWeight: '600',
     color: colors.textPrimaryDark,
   },
-  durationOptions: {
+
+  // Duration
+  durationCompact: {
     flexDirection: 'row',
-    gap: spacing[3],
+    gap: 12,
   },
-  durationChip: {
+  durationPill: {
     flex: 1,
     backgroundColor: colors.surfaceDark,
-    borderRadius: borderRadius.full,
-    paddingVertical: spacing[3],
+    borderRadius: 24,
+    paddingVertical: 14,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.borderDark,
   },
-  durationChipActive: {
+  durationPillActive: {
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
-  durationChipText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
+  durationPillText: {
+    fontSize: 15,
+    fontWeight: '600',
     color: colors.textPrimaryDark,
   },
-  durationChipTextActive: {
+  durationPillTextActive: {
     color: colors.textPrimaryDark,
   },
-  previewCard: {
+
+  // Summary
+  summaryCompact: {
     backgroundColor: colors.cardDark,
-    borderRadius: borderRadius.lg,
-    padding: spacing[4],
-    marginBottom: spacing[4],
+    borderRadius: 12,
+    padding: 16,
   },
-  previewTitle: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textSecondary,
-    marginBottom: spacing[3],
-    textTransform: 'uppercase',
-  },
-  // Task 5 (Round 2): New summary row styles
-  summaryRow: {
+  summaryRowCompact: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: spacing[3],
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderDark,
   },
-  summaryLabel: {
-    fontSize: typography.fontSize.base,
+  summaryRowLast: {
+    borderBottomWidth: 0,
+  },
+  summaryLabelCompact: {
+    fontSize: 15,
     color: colors.textSecondary,
   },
-  summaryValue: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
+  summaryValueCompact: {
+    fontSize: 17,
+    fontWeight: '700',
     color: colors.textPrimaryDark,
   },
-  // Legacy preview styles (kept for compatibility)
-  previewRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing[2],
-  },
-  previewRowTotal: {
-    paddingTop: spacing[3],
-    marginTop: spacing[2],
-    borderTopWidth: 1,
-    borderTopColor: colors.borderDark,
-  },
-  previewLabel: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-  },
-  previewValue: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.textPrimaryDark,
-  },
-  previewTotalLabel: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textPrimaryDark,
-  },
-  previewTotalValue: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.primary,
-  },
-  warningCard: {
-    backgroundColor: `${colors.warning}15`,
-    borderRadius: borderRadius.default,
-    padding: spacing[4],
-    marginBottom: spacing[4],
-    borderWidth: 1,
-    borderColor: `${colors.warning}30`,
-  },
-  warningTitle: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.warning,
-    marginBottom: spacing[2],
-  },
-  warningText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    marginBottom: spacing[1],
-    lineHeight: 20,
-  },
+
+  // Error Card
   errorCard: {
     backgroundColor: `${colors.error}15`,
-    borderRadius: borderRadius.default,
-    padding: spacing[3],
+    borderRadius: 10,
+    padding: 12,
     borderWidth: 1,
     borderColor: `${colors.error}30`,
   },
   errorText: {
-    fontSize: typography.fontSize.sm,
+    fontSize: 13,
     color: colors.error,
+    lineHeight: 18,
   },
+
+  // Footer
   footer: {
-    padding: spacing[4],
-    paddingBottom: spacing[8],
+    padding: 16,
+    paddingBottom: 24,
     borderTopWidth: 1,
     borderTopColor: colors.borderDark,
   },
-  // UX-002: Footer warning styles
   footerWarning: {
     backgroundColor: `${colors.warning}15`,
-    borderRadius: borderRadius.default,
-    padding: spacing[3],
-    marginBottom: spacing[3],
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: `${colors.warning}30`,
   },
   footerWarningText: {
-    fontSize: typography.fontSize.sm,
+    fontSize: 13,
     color: colors.warning,
     textAlign: 'center',
     lineHeight: 18,
   },
   confirmButton: {
     backgroundColor: colors.primary,
-    borderRadius: borderRadius.full,
-    padding: spacing[4],
+    borderRadius: 24,
+    paddingVertical: 16,
     alignItems: 'center',
   },
   confirmButtonDisabled: {
     opacity: 0.5,
   },
   confirmButtonText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.bold,
+    fontSize: 16,
+    fontWeight: '700',
     color: colors.textPrimaryDark,
+  },
+
+  // Asset Picker Modal
+  pickerContainer: {
+    flex: 1,
+    backgroundColor: colors.bgDark,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderDark,
+  },
+  pickerTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: colors.textPrimaryDark,
+  },
+  pickerClose: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.primary,
+  },
+  pickerList: {
+    flex: 1,
+    padding: 16,
+  },
+  pickerOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.cardDark,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  pickerOptionSelected: {
+    borderColor: colors.primary,
+  },
+  pickerOptionInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  pickerOptionName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.textPrimaryDark,
+  },
+  pickerOptionValue: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  pickerCheckmark: {
+    fontSize: 18,
+    color: colors.primary,
+    fontWeight: '700',
   },
 });
 

@@ -73,7 +73,8 @@ export const HoldingCard: React.FC<HoldingCardProps> = ({
             <Text style={styles.assetName}>{asset.name}</Text>
             {holding.frozen && (
               <View style={styles.frozenBadge}>
-                <Text style={styles.frozenText}>🔒</Text>
+                <Text style={styles.frozenIcon}>🔒</Text>
+                <Text style={styles.frozenLabel}>Locked</Text>
               </View>
             )}
           </View>
@@ -110,28 +111,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: colors.surfaceDark,
     borderRadius: borderRadius.default,
-    padding: spacing[3],
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    minHeight: 76,
   },
   leftSection: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  iconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing[3],
-  },
-  iconText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimaryDark,
-  },
   infoContainer: {
     flex: 1,
+    marginLeft: 12,  // Gap between icon and text
   },
   nameRow: {
     flexDirection: 'row',
@@ -142,21 +133,30 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
     color: colors.textPrimaryDark,
   },
-  assetSymbol: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.textSecondary,
-  },
   frozenBadge: {
-    marginLeft: spacing[2],
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(251, 146, 60, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 8,
   },
-  frozenText: {
-    fontSize: 12,
+  frozenIcon: {
+    fontSize: 10,
+    marginRight: 4,
+  },
+  frozenLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#fb923c',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   quantity: {
     fontSize: typography.fontSize.sm,
     color: colors.textSecondary,
-    marginTop: 2,
+    marginTop: 4,
   },
   rightSection: {
     alignItems: 'flex-end',
