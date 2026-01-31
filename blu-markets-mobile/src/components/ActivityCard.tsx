@@ -6,15 +6,9 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { COLORS } from '../constants/colors';
 import { TYPOGRAPHY } from '../constants/typography';
 import { SPACING, RADIUS } from '../constants/spacing';
-import { Boundary, ActionType } from '../types';
+import { ActionType } from '../types';
 
-// Boundary badge colors
-const BOUNDARY_COLORS: Record<Boundary, { bg: string; text: string }> = {
-  SAFE: { bg: `${COLORS.boundary.safe}20`, text: COLORS.boundary.safe },
-  DRIFT: { bg: `${COLORS.boundary.drift}20`, text: COLORS.boundary.drift },
-  STRUCTURAL: { bg: `${COLORS.boundary.structural}20`, text: COLORS.boundary.structural },
-  STRESS: { bg: `${COLORS.boundary.stress}20`, text: COLORS.boundary.stress },
-};
+// Boundary badges disabled - activity cards use neutral styling
 
 // P2: Action type icons - Unicode symbols (cleaner than emojis)
 const ACTION_ICONS: Record<ActionType | string, string> = {
@@ -37,7 +31,6 @@ interface ActivityCardProps {
   title: string;
   subtitle?: string;
   timestamp: string;
-  boundary?: Boundary;
 
   // Action buttons (for alerts)
   primaryAction?: {
@@ -61,13 +54,11 @@ export function ActivityCard({
   title,
   subtitle,
   timestamp,
-  boundary,
   primaryAction,
   secondaryAction,
   deepLink
 }: ActivityCardProps) {
   const icon = ACTION_ICONS[type] || '●';
-  const boundaryColor = boundary ? BOUNDARY_COLORS[boundary] : null;
 
   return (
     <View style={styles.card}>
@@ -78,13 +69,6 @@ export function ActivityCard({
         <View style={styles.content}>
           <View style={styles.titleRow}>
             <Text style={styles.title} numberOfLines={1}>{title}</Text>
-            {boundary && boundaryColor && (
-              <View style={[styles.boundaryBadge, { backgroundColor: boundaryColor.bg }]}>
-                <Text style={[styles.boundaryText, { color: boundaryColor.text }]}>
-                  {boundary}
-                </Text>
-              </View>
-            )}
           </View>
           <Text style={styles.timestamp}>{timestamp}</Text>
           {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
@@ -123,17 +107,7 @@ export function ActivityCard({
   );
 }
 
-// Boundary Badge standalone component
-export function BoundaryBadge({ boundary }: { boundary: Boundary }) {
-  const colors = BOUNDARY_COLORS[boundary];
-  return (
-    <View style={[styles.boundaryBadge, { backgroundColor: colors.bg }]}>
-      <Text style={[styles.boundaryText, { color: colors.text }]}>
-        {boundary}
-      </Text>
-    </View>
-  );
-}
+// BoundaryBadge removed - activity cards use neutral styling
 
 const styles = StyleSheet.create({
   card: {
@@ -183,15 +157,6 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.text.secondary,
     marginTop: SPACING[1],
-  },
-  boundaryBadge: {
-    paddingHorizontal: SPACING[2],
-    paddingVertical: 2,
-    borderRadius: RADIUS.sm,
-  },
-  boundaryText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
   },
   actions: {
     flexDirection: 'row',

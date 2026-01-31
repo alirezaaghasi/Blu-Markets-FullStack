@@ -312,7 +312,8 @@ const HomeScreen: React.FC = () => {
       {/* PORTFOLIO VALUE + STATUS */}
       {/* ================================================================ */}
       <View style={styles.valueSection}>
-        {/* Total Holdings - ONE big number (backend-calculated) */}
+        {/* Total Holdings label + big number */}
+        <Text style={styles.totalValueLabel}>Total Holdings</Text>
         <Text style={styles.totalValueAmount}>
           {formatIRR(totalValueIrr, { showUnit: false })} <Text style={styles.totalValueCurrency}>IRR</Text>
         </Text>
@@ -336,15 +337,15 @@ const HomeScreen: React.FC = () => {
           ) : statusContent;
         })()}
 
-        {/* Compact row: Assets | Cash | View Portfolio */}
+        {/* Compact row: Assets Value | Cash | View Portfolio */}
         <View style={styles.compactRow}>
           <View style={styles.compactItem}>
-            <Text style={styles.compactValue}>{formatIRR(holdingsValueIrr, { showUnit: false })}</Text>
-            <Text style={styles.compactLabel}>Assets</Text>
+            <Text style={styles.compactValue}>{formatIRR(holdingsValueIrr, { showUnit: false })} <Text style={styles.compactUnit}>IRR</Text></Text>
+            <Text style={styles.compactLabel}>Assets Value</Text>
           </View>
           <View style={styles.compactDivider} />
           <View style={styles.compactItem}>
-            <Text style={styles.compactValue}>{formatIRR(cashIRR, { showUnit: false })}</Text>
+            <Text style={styles.compactValue}>{formatIRR(cashIRR, { showUnit: false })} <Text style={styles.compactUnit}>IRR</Text></Text>
             <Text style={styles.compactLabel}>Cash</Text>
           </View>
           <View style={styles.compactDivider} />
@@ -358,7 +359,19 @@ const HomeScreen: React.FC = () => {
       </View>
 
       {/* ================================================================ */}
-      {/* SCROLLABLE ACTIVITY LOG: Last 3-5 entries */}
+      {/* ACTIVITY LOG HEADER (FIXED) */}
+      {/* ================================================================ */}
+      <View style={styles.activityHeaderFixed}>
+        <Text style={styles.sectionTitle}>Recent Changes</Text>
+        <Text style={styles.updateTime}>
+          {priceLastUpdate
+            ? `Prices as of ${priceLastUpdate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
+            : 'Loading prices...'}
+        </Text>
+      </View>
+
+      {/* ================================================================ */}
+      {/* SCROLLABLE ACTIVITY LOG */}
       {/* ================================================================ */}
       <ScrollView
         style={styles.scrollView}
@@ -373,16 +386,6 @@ const HomeScreen: React.FC = () => {
         }
       >
         <View style={styles.activitySection}>
-          <View style={styles.activityHeader}>
-            <Text style={styles.sectionTitle}>Activity Log</Text>
-            {/* Update time moved from value section */}
-            <Text style={styles.updateTime}>
-              {priceLastUpdate
-                ? `Updated ${priceLastUpdate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
-                : 'Connecting...'}
-            </Text>
-          </View>
-
           {isLoadingActivities ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={COLORS.brand.primary} />
@@ -397,10 +400,6 @@ const HomeScreen: React.FC = () => {
               {activities.slice(0, 20).map((entry: ActionLogEntry, index: number) => {
                 const message = formatActivityMessage(entry) || 'Activity recorded';
                 const time = formatRelativeTime(entry?.timestamp) || 'Just now';
-                const boundary = entry?.boundary || 'SAFE';
-                const dotColor = boundary === 'SAFE' ? '#4ade80' :
-                  boundary === 'DRIFT' ? '#fde047' :
-                  boundary === 'STRUCTURAL' ? '#fb923c' : '#f87171';
 
                 return (
                   <View
@@ -417,15 +416,6 @@ const HomeScreen: React.FC = () => {
                       borderColor: COLORS.border,
                     }}
                   >
-                    {/* Dot */}
-                    <View style={{
-                      width: 10,
-                      height: 10,
-                      borderRadius: 5,
-                      backgroundColor: dotColor,
-                      marginRight: 12,
-                      marginTop: 4,
-                    }} />
                     {/* Time */}
                     <Text style={{
                       color: COLORS.text.muted,
@@ -579,6 +569,12 @@ const styles = StyleSheet.create({
     paddingTop: SPACING[4],
     paddingBottom: SPACING[2],
   },
+  totalValueLabel: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '500',
+    color: COLORS.text.muted,
+    marginBottom: SPACING[1],
+  },
   totalValueAmount: {
     fontSize: 44,
     fontWeight: '700',
@@ -612,6 +608,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.text.primary,
   },
+  compactUnit: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    fontWeight: '500',
+    color: COLORS.text.muted,
+  },
   compactLabel: {
     fontSize: TYPOGRAPHY.fontSize.xs,
     color: COLORS.text.muted,
@@ -628,11 +629,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[4],
     marginTop: SPACING[2],
   },
-  activityHeader: {
+  activityHeaderFixed: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING[2],
+    paddingHorizontal: SPACING[4],
+    paddingVertical: SPACING[2],
+    backgroundColor: COLORS.background.primary,
   },
   sectionTitle: {
     fontSize: TYPOGRAPHY.fontSize.sm,

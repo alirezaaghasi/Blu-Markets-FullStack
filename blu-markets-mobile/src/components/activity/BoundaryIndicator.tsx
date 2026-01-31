@@ -32,41 +32,7 @@ const BOUNDARY_CONFIG: Record<Boundary, { color: string; bg: string; label: stri
   },
 };
 
-interface BoundaryDotProps {
-  boundary: Boundary;
-  size?: 'sm' | 'md';
-  showRing?: boolean;
-}
-
-export const BoundaryDot: React.FC<BoundaryDotProps> = ({
-  boundary,
-  size = 'md',
-  showRing = false, // UX-005: Disabled ring by default
-}) => {
-  const config = BOUNDARY_CONFIG[boundary];
-  const dotSize = size === 'sm' ? 8 : 10;
-
-  // UX-005: Use white/muted color for activity dots instead of boundary colors
-  // This reduces visual noise in the activity log
-  return (
-    <View
-      style={[
-        styles.dot,
-        {
-          width: dotSize,
-          height: dotSize,
-          backgroundColor: COLORS.text.muted, // White/muted instead of colored
-        },
-        showRing && {
-          shadowColor: config.color,
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 0.5,
-          shadowRadius: 4,
-        },
-      ]}
-    />
-  );
-};
+// BoundaryDot removed - activity items no longer use dots for cleaner UI
 
 interface BoundaryBadgeProps {
   boundary: Boundary;
@@ -95,9 +61,6 @@ export const BoundaryBadge: React.FC<BoundaryBadgeProps> = ({
 };
 
 const styles = StyleSheet.create({
-  dot: {
-    borderRadius: 999,
-  },
   badge: {
     paddingHorizontal: SPACING[2],
     paddingVertical: 2,
@@ -114,4 +77,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default { BoundaryDot, BoundaryBadge };
+export default { BoundaryBadge };

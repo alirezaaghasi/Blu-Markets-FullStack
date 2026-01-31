@@ -5,7 +5,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { COLORS } from '../../constants/colors';
 import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING } from '../../constants/spacing';
-import { BoundaryDot, BoundaryBadge, Boundary } from './BoundaryIndicator';
+import { Boundary } from './BoundaryIndicator';
 
 export type ActivityType =
   | 'PORTFOLIO_CREATED'
@@ -64,7 +64,7 @@ export const ActivityEntry: React.FC<ActivityEntryProps> = ({
       {/* Timeline column */}
       {showTimeline && (
         <View style={styles.timelineColumn}>
-          <BoundaryDot boundary={entry.boundary} />
+          <View style={styles.timelineDot} />
           {!isLast && <View style={styles.timelineLine} />}
         </View>
       )}
@@ -75,7 +75,6 @@ export const ActivityEntry: React.FC<ActivityEntryProps> = ({
           <Text style={styles.message}>
             {entry.message}
           </Text>
-          <BoundaryBadge boundary={entry.boundary} />
         </View>
         <Text style={styles.timestamp}>{formatRelativeTime(entry.timestamp)}</Text>
       </View>
@@ -91,6 +90,12 @@ const styles = StyleSheet.create({
     width: 24,
     alignItems: 'center',
     marginRight: SPACING[4],
+  },
+  timelineDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.text.muted,
   },
   timelineLine: {
     width: 2,

@@ -3,7 +3,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../constants/theme';
-import { ActionLogEntry, Boundary } from '../types';
+import { ActionLogEntry } from '../types';
 
 interface ActivityFeedProps {
   entries: ActionLogEntry[];
@@ -11,21 +11,7 @@ interface ActivityFeedProps {
   onViewAll?: () => void;
 }
 
-// Boundary indicator colors
-const BOUNDARY_COLORS: Record<Boundary, string> = {
-  SAFE: colors.boundarySafe,
-  DRIFT: colors.boundaryDrift,
-  STRUCTURAL: colors.boundaryStructural,
-  STRESS: colors.boundaryStress,
-};
-
-// Boundary indicator emojis
-const BOUNDARY_INDICATORS: Record<Boundary, string> = {
-  SAFE: '🟢',
-  DRIFT: '🟡',
-  STRUCTURAL: '🟠',
-  STRESS: '🔴',
-};
+// Activity dots are white for all entries (no boundary coloring)
 
 // Format time for display
 const formatTime = (timestamp: string): string => {
@@ -89,20 +75,9 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({
 const ActivityEntry: React.FC<{ entry: ActionLogEntry }> = ({ entry }) => {
   return (
     <View style={styles.entryContainer}>
-      <View style={styles.entryLeft}>
-        <View
-          style={[
-            styles.entryDot,
-            { backgroundColor: BOUNDARY_COLORS[entry.boundary] },
-          ]}
-        />
-        <Text style={styles.entryTime}>{formatTime(entry.timestamp)}</Text>
-      </View>
+      <Text style={styles.entryTime}>{formatTime(entry.timestamp)}</Text>
       <Text style={styles.entryMessage} numberOfLines={2}>
         {entry.message}
-      </Text>
-      <Text style={styles.entryIndicator}>
-        {BOUNDARY_INDICATORS[entry.boundary]}
       </Text>
     </View>
   );
@@ -138,17 +113,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     paddingVertical: spacing[2],
   },
-  entryLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexShrink: 0,
-  },
-  entryDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: spacing[2],
-  },
   entryTime: {
     fontSize: typography.fontSize.sm,
     color: colors.textSecondary,
@@ -159,11 +123,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: typography.fontSize.sm,
     color: colors.textPrimaryDark,
-    marginRight: spacing[2],
     lineHeight: 18,
-  },
-  entryIndicator: {
-    fontSize: 12,
   },
   emptyState: {
     paddingVertical: spacing[4],
