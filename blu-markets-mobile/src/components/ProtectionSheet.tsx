@@ -243,7 +243,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
         logAction({
           type: 'PROTECT',
           boundary: 'SAFE',
-          message: `Protected ${asset.symbol} for ${formatDuration(durationDays)}`,
+          message: `Insured ${asset.symbol} for ${formatDuration(durationDays)}`,
           amountIRR: quote.premiumIrr,
           assetId: holding.assetId,
         })

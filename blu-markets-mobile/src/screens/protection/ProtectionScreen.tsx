@@ -110,12 +110,12 @@ const ProtectionScreen: React.FC = () => {
   // Handle cancel protection
   const handleCancelProtection = (protection: Protection) => {
     Alert.alert(
-      'Cancel Protection',
-      `Are you sure you want to cancel protection for ${ASSETS[protection.assetId as keyof typeof ASSETS]?.name || protection.assetId}? The remaining premium will not be refunded.`,
+      'Cancel Insurance',
+      `Are you sure you want to cancel insurance for ${ASSETS[protection.assetId as keyof typeof ASSETS]?.name || protection.assetId}? The remaining premium will not be refunded.`,
       [
-        { text: 'Keep Protection', style: 'cancel' },
+        { text: 'Keep Insurance', style: 'cancel' },
         {
-          text: 'Cancel Protection',
+          text: 'Cancel Insurance',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -123,9 +123,9 @@ const ProtectionScreen: React.FC = () => {
               dispatch(removeProtection(protection.id));
               // Refresh data
               fetchData();
-              Alert.alert('Success', 'Protection cancelled successfully.');
+              Alert.alert('Success', 'Insurance cancelled successfully.');
             } catch (err: any) {
-              Alert.alert('Error', err?.message || 'Failed to cancel protection');
+              Alert.alert('Error', err?.message || 'Failed to cancel insurance');
             }
           },
         },
@@ -143,16 +143,16 @@ const ProtectionScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Protection</Text>
+        <Text style={styles.title}>Insurance</Text>
         <Text style={styles.subtitle}>
-          Protect your assets against market downturns
+          Insure your assets against market downturns
         </Text>
       </View>
 
       {isLoading ? (
         <View style={styles.loadingState}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading protections...</Text>
+          <Text style={styles.loadingText}>Loading insurance...</Text>
         </View>
       ) : error ? (
         <View style={styles.errorState}>
@@ -177,14 +177,14 @@ const ProtectionScreen: React.FC = () => {
         {showEducation && (
           <View style={styles.educationCard}>
             <View style={styles.educationHeader}>
-              <Text style={styles.educationTitle}>How Protection Works</Text>
+              <Text style={styles.educationTitle}>How Insurance Works</Text>
               <TouchableOpacity onPress={() => setShowEducation(false)}>
                 <Text style={styles.educationClose}>×</Text>
               </TouchableOpacity>
             </View>
             <Text style={styles.educationText}>
-              Protection acts like insurance for your holdings. If the price drops below your
-              protection strike price during the coverage period, you're covered for the difference.
+              Insurance locks in a minimum value for your holdings. If the price drops below your
+              insured strike price during the coverage period, you're covered for the difference.
             </Text>
             {/* BUG-011 FIX: Removed static premium rates - premiums are now calculated dynamically
                 using Black-Scholes option pricing based on asset volatility and market conditions.
@@ -194,7 +194,7 @@ const ProtectionScreen: React.FC = () => {
               <Text style={styles.educationText}>
                 Premiums are calculated using Black-Scholes option pricing and vary based on
                 asset volatility, coverage duration, and market conditions. Get a quote to see
-                the current premium for your specific protection.
+                the current premium for your specific insurance.
               </Text>
             </View>
           </View>
@@ -203,7 +203,7 @@ const ProtectionScreen: React.FC = () => {
         {/* Active Protections */}
         {protections.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Active Protections</Text>
+            <Text style={styles.sectionTitle}>Active Insurance</Text>
             {protections.map((protection) => {
               const asset = ASSETS[protection.assetId as keyof typeof ASSETS];
               // Use backend-derived values
@@ -264,7 +264,7 @@ const ProtectionScreen: React.FC = () => {
                     style={styles.cancelButton}
                     onPress={() => handleCancelProtection(protection)}
                   >
-                    <Text style={styles.cancelButtonText}>Cancel Protection</Text>
+                    <Text style={styles.cancelButtonText}>Cancel Insurance</Text>
                   </TouchableOpacity>
                 </View>
               );
@@ -275,7 +275,7 @@ const ProtectionScreen: React.FC = () => {
         {/* Eligible Assets for Protection */}
         {eligibleHoldings.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Available to Protect</Text>
+            <Text style={styles.sectionTitle}>Available to Insure</Text>
             {eligibleHoldings.map((holding) => {
               const asset = ASSETS[holding.assetId];
               const priceUSD = prices[holding.assetId] || 0;
@@ -309,7 +309,7 @@ const ProtectionScreen: React.FC = () => {
                     </View>
                   </View>
                   <View style={styles.protectAction}>
-                    <Text style={styles.protectActionText}>Protect</Text>
+                    <Text style={styles.protectActionText}>Insure</Text>
                     <Text style={styles.protectArrow}>›</Text>
                   </View>
                 </TouchableOpacity>
@@ -322,11 +322,11 @@ const ProtectionScreen: React.FC = () => {
         {protections.length === 0 && eligibleHoldings.length === 0 && (
           <EmptyState
             icon="shield-outline"
-            title="No Active Protections"
+            title="No Active Insurance"
             description={
               holdings.length === 0
-                ? 'Add assets to your portfolio to protect them'
-                : 'All your eligible assets are already protected'
+                ? 'Add assets to your portfolio to insure them'
+                : 'All your eligible assets are already insured'
             }
           />
         )}

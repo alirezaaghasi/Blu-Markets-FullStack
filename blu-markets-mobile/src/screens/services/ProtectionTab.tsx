@@ -206,11 +206,11 @@ function ProtectionCard({
 
       {/* Cancel functionality is disabled until backend supports it.
           Backend currently returns 501 NOT_IMPLEMENTED for cancellation.
-          TODO: Re-enable when protection cancellation is implemented.
+          TODO: Re-enable when insurance cancellation is implemented.
       {isActive && (
         <View style={styles.protectionActions}>
           <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
-            <Text style={styles.cancelButtonText}>Cancel Protection</Text>
+            <Text style={styles.cancelButtonText}>Cancel Insurance</Text>
           </TouchableOpacity>
         </View>
       )}

@@ -631,7 +631,7 @@ export const protection = {
     store.dispatch(logAction({
       type: 'CANCEL_PROTECTION',
       boundary: 'SAFE',
-      message: 'Protection cancelled',
+      message: 'Insurance cancelled',
     }));
 
     return { success: true };

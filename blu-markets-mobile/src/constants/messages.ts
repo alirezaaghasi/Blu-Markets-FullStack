@@ -344,30 +344,30 @@ export const LOAN = {
 export const PROTECTION = {
   // Sheet titles
   sheet: {
-    title: 'Protect Assets', // Changed from "Insure Assets"
-    selectTitle: 'Select Asset to Protect',
+    title: 'Insure Assets',
+    selectTitle: 'Select Asset to Insure',
   },
 
   // Configuration labels
   config: {
-    value: 'Value to Protect',
+    value: 'Value to Insure',
     duration: 'Coverage Duration',
     coverage: 'Coverage Amount',
-    strikePrice: 'Protected Price',
+    strikePrice: 'Insured Price',
   },
 
   // Quote section
   quote: {
-    loading: 'Calculating protection cost...',
-    totalCost: 'Total Protection Cost',
+    loading: 'Calculating insurance cost...',
+    totalCost: 'Total Insurance Cost',
     availableCash: 'Available Cash',
     premium: 'Premium',
   },
 
-  // Active protections
+  // Active protections (internal name kept, user sees "Insurance")
   active: {
-    title: 'Active Protections',
-    protectedValue: 'Protected Value',
+    title: 'Active Insurance',
+    protectedValue: 'Insured Value',
     expires: 'Expires',
     premiumPaid: 'Premium Paid',
     coverage: 'Coverage',
@@ -375,49 +375,49 @@ export const PROTECTION = {
 
   // Education
   education: {
-    title: 'How Protection Works',
+    title: 'How Insurance Works',
     description:
-      'Protection locks in a minimum value for your asset. If the market price falls below this level, you receive the difference. Your upside remains unlimited.',
+      'Insurance locks in a minimum value for your asset. If the market price falls below this level, you receive the difference. Your upside remains unlimited.',
     pricingTitle: 'Premium Pricing',
     pricingDetail:
-      'Protection cost depends on duration, coverage level, and current market volatility. Higher coverage and longer duration increase the premium.',
+      'Insurance cost depends on duration, coverage level, and current market volatility. Higher coverage and longer duration increase the premium.',
   },
 
   // Empty states
   empty: {
-    noProtections: 'No Active Protections',
-    noAssets: 'No Assets to Protect',
-    noAssetsDescription: 'Add crypto holdings to your portfolio to enable protection.',
+    noProtections: 'No Active Insurance',
+    noAssets: 'No Assets to Insure',
+    noAssetsDescription: 'Add holdings to your portfolio to enable insurance.',
     description:
-      'Protection can limit downside risk while preserving upside potential. A premium is paid upfront for this coverage.',
+      'Insurance can limit downside risk while preserving upside potential. A premium is paid upfront for this coverage.',
   },
 
   // Buttons
   buttons: {
-    protect: 'Protect',
-    cancel: 'Cancel Protection',
+    protect: 'Insure',
+    cancel: 'Cancel Insurance',
     back: 'Back',
-    confirm: 'Confirm Protection',
+    confirm: 'Confirm Insurance',
   },
 
   // Success
   success: {
-    title: 'Protection Active',
-    message: 'Your asset is now protected.',
+    title: 'Insurance Active',
+    message: 'Your asset is now insured.',
   },
 
   // Error
   error: {
-    title: 'Protection Not Activated',
-    message: 'Protection could not be activated. No premium has been charged.',
-    selectAsset: 'Select an asset to protect.',
-    quoteRequired: 'Unable to get protection quote.',
+    title: 'Insurance Not Activated',
+    message: 'Insurance could not be activated. No premium has been charged.',
+    selectAsset: 'Select an asset to insure.',
+    quoteRequired: 'Unable to get insurance quote.',
     insufficientFunds: 'Insufficient funds for premium.',
   },
 
   // Explanation text
-  explanation: 'Protection reduces downside exposure for the selected asset. Premium cost affects portfolio liquidity.',
-  activeExplanation: 'This asset has active downside protection. Coverage continues until the expiry date.',
+  explanation: 'Insurance reduces downside exposure for the selected asset. Premium cost affects portfolio liquidity.',
+  activeExplanation: 'This asset has active downside insurance. Coverage continues until the expiry date.',
 };
 
 // =============================================================================
@@ -490,7 +490,7 @@ export const HOME = {
     addFunds: 'Add Funds',
     trade: 'Trade',
     borrow: 'Borrow',
-    protect: 'Protect',
+    protect: 'Insure',
   },
   portfolioLink: 'View Portfolio',
 };

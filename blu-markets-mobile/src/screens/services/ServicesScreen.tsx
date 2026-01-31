@@ -1,4 +1,4 @@
-// Services Screen - Loans + Protection with horizontal sub-tabs
+// Services Screen - Loans + Insurance with horizontal sub-tabs
 // Based on UI Restructure Specification Section 3
 
 import React, { useState } from 'react';
@@ -48,7 +48,7 @@ export function ServicesScreen({ route }: Props) {
           onPress={() => setActiveTab('protection')}
         >
           <Text style={[styles.tabText, activeTab === 'protection' && styles.tabTextActive]}>
-            Protection
+            Insurance
           </Text>
         </TouchableOpacity>
       </View>

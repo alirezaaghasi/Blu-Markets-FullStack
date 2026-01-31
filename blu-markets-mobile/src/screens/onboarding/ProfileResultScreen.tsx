@@ -75,7 +75,7 @@ function getTradeoffs(foundationPct: number): Tradeoffs {
     return {
       prioritizes: [
         'Balance between stability and growth',
-        'Moderate protection during downturns',
+        'Moderate coverage during downturns',
         'Participation in market upside',
       ],
       sacrifices: [
