@@ -49,8 +49,11 @@ const PortfolioScreen: React.FC = () => {
   const portfolioStatus = useAppSelector((state) => state.portfolio.status) as PortfolioStatus || 'BALANCED';
   const { prices, pricesIrr, fxRate, change24h } = useAppSelector((state) => state.prices);
 
-  // Calculate total value for percentage calculations
+  // Calculate total value for display (holdings + cash)
   const totalValue = holdingsValueIRR + cashIRR;
+
+  // Use holdings value for allocation percentages (matches backend calculation)
+  // This makes layer percentages add up to 100% and matches status determination
 
   // Group holdings by layer
   const holdingsByLayer: Record<Layer, Holding[]> = {
@@ -225,7 +228,7 @@ const PortfolioScreen: React.FC = () => {
                         {formatIRR(layerValues[layer], { showUnit: false })} IRR
                       </Text>
                       <Text style={styles.layerPercent}>
-                        {totalValue > 0 ? Math.round((layerValues[layer] / totalValue) * 100) : 0}%
+                        {holdingsValueIRR > 0 ? Math.round((layerValues[layer] / holdingsValueIRR) * 100) : 0}%
                       </Text>
                     </View>
                     <Text style={styles.expandIcon}>{isExpanded ? '▼' : '▶'}</Text>
