@@ -272,15 +272,15 @@ const HomeScreen: React.FC = () => {
           {formatIRR(totalValueIrr, { showUnit: false })} <Text style={styles.totalValueCurrency}>IRR</Text>
         </Text>
 
-        {/* Portfolio Health Status - simple friendly message */}
+        {/* Portfolio Status - Subtle sentence with colored dot only */}
         {(() => {
-          const { message, color } = PORTFOLIO_STATUS_CONFIG[portfolioStatusResult.status];
+          const { message, dotColor } = PORTFOLIO_STATUS_CONFIG[portfolioStatusResult.status];
           const isTappable = portfolioStatusResult.status !== 'BALANCED';
 
           const statusContent = (
-            <View style={styles.statusLine}>
-              <View style={[styles.statusDot, { backgroundColor: color }]} />
-              <Text style={[styles.statusText, { color }]}>{message}</Text>
+            <View style={styles.statusContainer}>
+              <View style={[styles.statusDot, { backgroundColor: dotColor }]} />
+              <Text style={[styles.statusText, { color: dotColor }]}>{message}</Text>
             </View>
           );
 
@@ -471,23 +471,24 @@ const styles = StyleSheet.create({
     // paddingBottom is applied dynamically with safe area insets
   },
 
-  // Status Line - simple health indicator below portfolio value
-  statusLine: {
+  // Portfolio Status - Subtle metadata sentence with colored dot only
+  statusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: SPACING[2],
-    marginBottom: SPACING[1],
+    marginBottom: SPACING[3],
+    gap: 6,
   },
   statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginRight: SPACING[2],
   },
   statusText: {
-    fontSize: TYPOGRAPHY.fontSize.base, // Same as activity log messages
+    fontSize: 16,
     fontWeight: '500',
+    // Color applied dynamically to match dot
   },
 
   // Value Section - Compact Layout

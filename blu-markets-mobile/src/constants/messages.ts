@@ -80,18 +80,24 @@ Blu Markets evaluates these continuously to preserve future choice.`,
 // HOME SCREEN STATUS MESSAGES
 // =============================================================================
 
-export const STATUS_MESSAGES: Record<PortfolioStatus, { message: string; color: string }> = {
+/**
+ * Portfolio Status Configuration
+ * PCD-compliant: Describes state, not actions
+ * Styled as subtle metadata, not a notification banner
+ * Only the dot is colored, text remains muted gray
+ */
+export const STATUS_MESSAGES: Record<PortfolioStatus, { message: string; dotColor: string }> = {
   BALANCED: {
-    message: 'Your portfolio is within target allocation ranges. No action is required.',
-    color: '#4ade80',
+    message: 'Portfolio is on target',
+    dotColor: '#22c55e',
   },
   SLIGHTLY_OFF: {
-    message: 'Your portfolio has drifted from target allocation. You may review when ready.',
-    color: '#fde047',
+    message: 'Portfolio has drifted slightly from target',
+    dotColor: '#eab308',
   },
   ATTENTION_REQUIRED: {
-    message: 'Your portfolio allocation has shifted significantly. Review is available.',
-    color: '#f87171',
+    message: 'Portfolio has drifted significantly from target',
+    dotColor: '#ef4444',
   },
 };
 
