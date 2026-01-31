@@ -398,7 +398,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
                     </Text>
                   </View>
                   <View style={[styles.summaryRowCompact, styles.summaryRowLast]}>
-                    <Text style={styles.summaryLabelCompact}>{LOAN.summary.payments(6)}</Text>
+                    <Text style={styles.summaryLabelCompact}>{LOAN.summary.payments(durationDays / 30)}</Text>
                     <Text style={styles.summaryValueCompact}>
                       {isLoadingPreview ? '...' : `~${formatIRR(installmentAmount)}`}
                     </Text>
