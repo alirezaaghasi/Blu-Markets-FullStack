@@ -19,6 +19,7 @@ import { TYPOGRAPHY } from '../constants/typography';
 import { SPACING, RADIUS } from '../constants/spacing';
 import { LAYOUT } from '../constants/layout';
 import { Button } from './common';
+import { TRADE, BUTTONS } from '../constants/messages';
 
 interface TradeErrorModalProps {
   /** Visibility state */
@@ -60,7 +61,7 @@ export const TradeErrorModal: React.FC<TradeErrorModalProps> = ({
               </View>
 
               {/* Title */}
-              <Text style={styles.title}>Trade Failed</Text>
+              <Text style={styles.title}>{TRADE.error.title}</Text>
 
               {/* Error Message */}
               <View style={styles.messageContainer}>
@@ -82,7 +83,7 @@ export const TradeErrorModal: React.FC<TradeErrorModalProps> = ({
               <View style={styles.actions}>
                 {onRetry && (
                   <Button
-                    label="Try Again"
+                    label={BUTTONS.tryAgain}
                     variant="primary"
                     size="lg"
                     fullWidth
@@ -90,7 +91,7 @@ export const TradeErrorModal: React.FC<TradeErrorModalProps> = ({
                   />
                 )}
                 <Button
-                  label="Close"
+                  label={BUTTONS.close}
                   variant="secondary"
                   size="lg"
                   fullWidth

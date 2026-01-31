@@ -24,6 +24,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { LoanSheet } from '../../components/LoanSheet';
 import { RepaySheet } from '../../components/RepaySheet';
 import { formatIRR, formatCrypto, getAssetName, formatDate } from '../../utils/currency';
+import { LOAN } from '../../constants/messages';
 
 // BUG-012 FIX: Collateral eligibility should come from backend
 // This list is a fallback for UI responsiveness; backend API is authoritative
@@ -137,26 +138,26 @@ export function LoansTab({ loanId }: LoansTabProps) {
         >
           <EmptyState
             icon="cash-outline"
-            title="No Active Loans"
+            title={LOAN.empty.title}
             description={availableCapacity > 0
-              ? `Borrow against your crypto holdings. Up to ${formatIRR(availableCapacity)} available.`
-              : "Borrow against your crypto holdings at competitive rates"}
+              ? `${LOAN.empty.description} Up to ${formatIRR(availableCapacity)} available.`
+              : LOAN.empty.description}
             actionLabel="Explore Borrowing"
             onAction={handleExploreBorrowing}
           />
 
           {/* How It Works Section */}
           <View style={styles.howItWorksSection}>
-            <Text style={styles.howItWorksTitle}>How Crypto-Backed Loans Work</Text>
+            <Text style={styles.howItWorksTitle}>{LOAN.education.title}</Text>
 
             <View style={styles.stepCard}>
               <View style={styles.stepNumber}>
                 <Text style={styles.stepNumberText}>1</Text>
               </View>
               <View style={styles.stepContent}>
-                <Text style={styles.stepTitle}>Choose Collateral</Text>
+                <Text style={styles.stepTitle}>{LOAN.education.step1.title}</Text>
                 <Text style={styles.stepDescription}>
-                  Select crypto assets from your portfolio to use as collateral
+                  {LOAN.education.step1.description}
                 </Text>
               </View>
             </View>
@@ -166,10 +167,9 @@ export function LoansTab({ loanId }: LoansTabProps) {
                 <Text style={styles.stepNumberText}>2</Text>
               </View>
               <View style={styles.stepContent}>
-                <Text style={styles.stepTitle}>Get Instant IRR</Text>
-                {/* BUG-012 FIX: Loan percentage varies by asset layer (70%/50%/30%) */}
+                <Text style={styles.stepTitle}>{LOAN.education.step2.title}</Text>
                 <Text style={styles.stepDescription}>
-                  Receive a loan based on your asset's value (% varies by asset type)
+                  {LOAN.education.step2.description}
                 </Text>
               </View>
             </View>
@@ -179,31 +179,31 @@ export function LoansTab({ loanId }: LoansTabProps) {
                 <Text style={styles.stepNumberText}>3</Text>
               </View>
               <View style={styles.stepContent}>
-                <Text style={styles.stepTitle}>Repay & Unlock</Text>
+                <Text style={styles.stepTitle}>{LOAN.education.step3.title}</Text>
                 <Text style={styles.stepDescription}>
-                  Pay back in installments to unlock your crypto
+                  {LOAN.education.step3.description}
                 </Text>
               </View>
             </View>
 
-            {/* Benefits */}
+            {/* Benefits - PCD-Compliant: Path presentation, not advice */}
             <View style={styles.benefitsCard}>
-              <Text style={styles.benefitsTitle}>Benefits</Text>
+              <Text style={styles.benefitsTitle}>{LOAN.benefits.title}</Text>
               <View style={styles.benefitRow}>
                 <Text style={styles.benefitIcon}>✓</Text>
-                <Text style={styles.benefitText}>Keep your crypto exposure</Text>
+                <Text style={styles.benefitText}>{LOAN.benefits.exposure}</Text>
               </View>
               <View style={styles.benefitRow}>
                 <Text style={styles.benefitIcon}>✓</Text>
-                <Text style={styles.benefitText}>No credit check required</Text>
+                <Text style={styles.benefitText}>{LOAN.benefits.noCredit}</Text>
               </View>
               <View style={styles.benefitRow}>
                 <Text style={styles.benefitIcon}>✓</Text>
-                <Text style={styles.benefitText}>Competitive interest rates</Text>
+                <Text style={styles.benefitText}>{LOAN.benefits.rates}</Text>
               </View>
               <View style={styles.benefitRow}>
                 <Text style={styles.benefitIcon}>✓</Text>
-                <Text style={styles.benefitText}>Flexible repayment options</Text>
+                <Text style={styles.benefitText}>{LOAN.benefits.flexible}</Text>
               </View>
             </View>
           </View>

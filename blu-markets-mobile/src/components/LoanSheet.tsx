@@ -29,6 +29,7 @@ import { TransactionSuccessModal, TransactionSuccessResult } from './Transaction
 import { loans as loansApi } from '../services/api';
 import { formatIRR, formatNumber } from '../utils/currency';
 import type { LoanCapacityResponse, LoanPreviewResponse } from '../services/api';
+import { LOAN, BUTTONS } from '../constants/messages';
 
 interface LoanSheetProps {
   visible: boolean;
@@ -307,7 +308,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
         >
           {/* STEP 1: Collateral Selection - Dropdown Style */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Step 1: Choose Collateral</Text>
+            <Text style={styles.sectionTitle}>{LOAN.steps.collateral}</Text>
 
             <TouchableOpacity
               style={styles.dropdownTrigger}
@@ -329,7 +330,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
                 </View>
               ) : (
                 <View style={styles.placeholderRow}>
-                  <Text style={styles.placeholderText}>Select an asset as collateral</Text>
+                  <Text style={styles.placeholderText}>{LOAN.steps.collateralHelper}</Text>
                   <Text style={styles.dropdownArrow}>▼</Text>
                 </View>
               )}
@@ -341,7 +342,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
             <View style={styles.compactForm}>
               {/* STEP 2: Amount Input */}
               <View style={styles.formSection}>
-                <Text style={styles.sectionTitle}>Step 2: Amount (IRR)</Text>
+                <Text style={styles.sectionTitle}>{LOAN.steps.amount}</Text>
                 <TextInput
                   style={styles.compactAmountInput}
                   value={amountInput}
@@ -371,7 +372,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
 
               {/* STEP 3: Duration */}
               <View style={styles.formSection}>
-                <Text style={styles.sectionTitle}>Step 3: Duration</Text>
+                <Text style={styles.sectionTitle}>{LOAN.steps.duration}</Text>
                 <View style={styles.durationCompact}>
                   {LOAN_DURATION_OPTIONS.map((days) => (
                     <TouchableOpacity
@@ -391,13 +392,13 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
               {amountIRR > 0 && (
                 <View style={styles.summaryCompact}>
                   <View style={styles.summaryRowCompact}>
-                    <Text style={styles.summaryLabelCompact}>Total to Repay</Text>
+                    <Text style={styles.summaryLabelCompact}>{LOAN.summary.totalRepay}</Text>
                     <Text style={styles.summaryValueCompact}>
                       {isLoadingPreview ? '...' : formatIRR(Math.round(amountIRR + totalInterest))}
                     </Text>
                   </View>
                   <View style={[styles.summaryRowCompact, styles.summaryRowLast]}>
-                    <Text style={styles.summaryLabelCompact}>6 Monthly Payments</Text>
+                    <Text style={styles.summaryLabelCompact}>{LOAN.summary.payments(6)}</Text>
                     <Text style={styles.summaryValueCompact}>
                       {isLoadingPreview ? '...' : `~${formatIRR(installmentAmount)}`}
                     </Text>
@@ -422,21 +423,21 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
           {selectedAssetId && isValid && (
             <View style={styles.footerWarning}>
               <Text style={styles.footerWarningText}>
-                ⚠️ Your {selectedAsset?.name} will be locked and may be sold if value drops below loan amount
+                {LOAN.warning.collateral(selectedAsset?.name || 'This asset')}
               </Text>
             </View>
           )}
           {!selectedAssetId ? (
             <View style={[styles.confirmButton, styles.confirmButtonDisabled]}>
-              <Text style={styles.confirmButtonText}>Select collateral above</Text>
+              <Text style={styles.confirmButtonText}>{LOAN.buttonStates.selectAsset}</Text>
             </View>
           ) : amountIRR <= 0 ? (
             <View style={[styles.confirmButton, styles.confirmButtonDisabled]}>
-              <Text style={styles.confirmButtonText}>Enter borrow amount</Text>
+              <Text style={styles.confirmButtonText}>{LOAN.buttonStates.enterAmount}</Text>
             </View>
           ) : !isValid ? (
             <View style={[styles.confirmButton, styles.confirmButtonDisabled]}>
-              <Text style={styles.confirmButtonText}>Fix errors above</Text>
+              <Text style={styles.confirmButtonText}>{LOAN.buttonStates.fixErrors}</Text>
             </View>
           ) : (
             <TouchableOpacity
@@ -445,7 +446,7 @@ export const LoanSheet: React.FC<LoanSheetProps> = ({
               disabled={isSubmitting}
             >
               <Text style={styles.confirmButtonText}>
-                {isSubmitting ? 'Processing...' : 'Confirm Loan'}
+                {isSubmitting ? LOAN.buttonStates.processing : LOAN.buttonStates.confirm}
               </Text>
             </TouchableOpacity>
           )}

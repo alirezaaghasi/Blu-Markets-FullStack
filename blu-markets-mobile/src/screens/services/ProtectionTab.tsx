@@ -22,6 +22,7 @@ import { ASSETS } from '../../constants/assets';
 import { EmptyState } from '../../components/EmptyState';
 import { ProtectionSheet } from '../../components/ProtectionSheet';
 import { formatIRR } from '../../utils/currency';
+import { PROTECTION, BUTTONS } from '../../constants/messages';
 
 interface ProtectionTabProps {
   protectionId?: string;
@@ -69,7 +70,7 @@ export function ProtectionTab({ protectionId }: ProtectionTabProps) {
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={refresh}>
-          <Text style={styles.retryButtonText}>Retry</Text>
+          <Text style={styles.retryButtonText}>{BUTTONS.retry}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -90,7 +91,7 @@ export function ProtectionTab({ protectionId }: ProtectionTabProps) {
       {/* Active Protections */}
       {hasProtections && (
         <>
-          <Text style={styles.sectionTitle}>Active Protections</Text>
+          <Text style={styles.sectionTitle}>{PROTECTION.active.title}</Text>
           {protections.map((protection) => (
             <ProtectionCard
               key={protection.id}
@@ -104,7 +105,7 @@ export function ProtectionTab({ protectionId }: ProtectionTabProps) {
 
       {/* Eligible Assets - filter out zero-balance holdings */}
       <Text style={[styles.sectionTitle, hasProtections && { marginTop: SPACING[6] }]}>
-        Protect Your Assets
+        {PROTECTION.sheet.title}
       </Text>
       {eligibleAssets.filter(a => (a.quantity ?? 0) > 0).length > 0 ? (
         <EligibleAssetsGrid
@@ -114,8 +115,8 @@ export function ProtectionTab({ protectionId }: ProtectionTabProps) {
       ) : (
         <EmptyState
           icon="shield-outline"
-          title="No Assets to Protect"
-          description="Add crypto holdings to your portfolio to enable downside protection"
+          title={PROTECTION.empty.noAssets}
+          description={PROTECTION.empty.noAssetsDescription}
           compact
         />
       )}
@@ -123,8 +124,8 @@ export function ProtectionTab({ protectionId }: ProtectionTabProps) {
       {!hasProtections && eligibleAssets.length === 0 && (
         <EmptyState
           icon="shield-outline"
-          title="Protect Your Portfolio"
-          description="Guard against downside risk while keeping your upside potential"
+          title={PROTECTION.empty.noProtections}
+          description={PROTECTION.empty.description}
         />
       )}
 
@@ -189,14 +190,14 @@ function ProtectionCard({
 
       <View style={styles.protectionDetails}>
         <View style={styles.protectionDetailRow}>
-          <Text style={styles.protectionDetailLabel}>Protected Value</Text>
+          <Text style={styles.protectionDetailLabel}>{PROTECTION.active.protectedValue}</Text>
           <Text style={styles.protectionDetailValue}>
             {/* BUG-2 FIX: Use canonical notionalIrr, fallback to alias notionalIRR */}
             {formatIRR(protection.notionalIrr ?? protection.notionalIRR ?? 0)}
           </Text>
         </View>
         <View style={styles.protectionDetailRow}>
-          <Text style={styles.protectionDetailLabel}>Expires</Text>
+          <Text style={styles.protectionDetailLabel}>{PROTECTION.active.expires}</Text>
           <Text style={styles.protectionDetailValue}>
             {expiryDate ? new Date(expiryDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
           </Text>
@@ -252,7 +253,7 @@ function EligibleAssetsGrid({
               style={styles.protectButton}
               onPress={() => onProtect(item)}
             >
-              <Text style={styles.protectButtonText}>Protect</Text>
+              <Text style={styles.protectButtonText}>{PROTECTION.buttons.protect}</Text>
             </TouchableOpacity>
           </View>
         );

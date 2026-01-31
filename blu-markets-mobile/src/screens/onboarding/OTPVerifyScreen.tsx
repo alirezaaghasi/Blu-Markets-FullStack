@@ -28,6 +28,7 @@ import { Button, OTPInput } from '../../components/common';
 import { useAppDispatch } from '../../hooks/useStore';
 import { setAuthToken } from '../../store/slices/authSlice';
 import { auth, setAuthTokens } from '../../services/api';
+import { ONBOARDING } from '../../constants/messages';
 
 type OTPVerifyScreenProps = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'OTPVerify'>;
@@ -161,9 +162,9 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
       <View style={styles.content}>
         {/* Title */}
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>Enter verification code</Text>
+          <Text style={styles.title}>{ONBOARDING.otp.title}</Text>
           <Text style={styles.subtitle}>
-            We sent a 6-digit code to{'\n'}
+            {ONBOARDING.otp.subtitle}{'\n'}
             <Text style={styles.phoneHighlight}>{formatPhoneDisplay(phone)}</Text>
           </Text>
         </View>
@@ -188,7 +189,7 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
             <ActivityIndicator size="small" color={COLORS.brand.primary} />
           ) : (
             <TouchableOpacity onPress={handleResend}>
-              <Text style={styles.resendButton}>Resend code</Text>
+              <Text style={styles.resendButton}>{ONBOARDING.otp.resend}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -204,7 +205,7 @@ const OTPVerifyScreen: React.FC<OTPVerifyScreenProps> = ({
       {/* Footer with CTA */}
       <View style={styles.footer}>
         <Button
-          label="Verify"
+          label={ONBOARDING.otp.verify}
           variant="primary"
           size="lg"
           fullWidth

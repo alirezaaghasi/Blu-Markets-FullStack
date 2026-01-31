@@ -27,6 +27,7 @@ import { enableDemoMode } from '../../store/slices/authSlice';
 import { loadDemoData, resetPortfolio } from '../../store/slices/portfolioSlice';
 import { setDefaultPrices } from '../../store/slices/pricesSlice';
 import { clearAllState } from '../../utils/storage';
+import { ONBOARDING } from '../../constants/messages';
 
 type WelcomeScreenProps = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'Welcome'>;
@@ -62,8 +63,8 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
         </View>
 
         {/* Title & Tagline */}
-        <Text style={styles.title}>Blu Markets</Text>
-        <Text style={styles.tagline}>Markets, but mindful</Text>
+        <Text style={styles.title}>{ONBOARDING.welcome.title}</Text>
+        <Text style={styles.tagline}>{ONBOARDING.welcome.subtitle}</Text>
       </View>
 
       {/* Buttons */}
@@ -73,7 +74,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
           onPress={handleGetStarted}
           activeOpacity={0.8}
         >
-          <Text style={styles.primaryButtonText}>Get Started</Text>
+          <Text style={styles.primaryButtonText}>{ONBOARDING.welcome.cta}</Text>
           <Text style={styles.primaryButtonArrow}>→</Text>
         </TouchableOpacity>
 
@@ -84,7 +85,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
             onPress={handleDemoMode}
             activeOpacity={0.8}
           >
-            <Text style={styles.secondaryButtonText}>Try Demo</Text>
+            <Text style={styles.secondaryButtonText}>{ONBOARDING.welcome.demo}</Text>
           </TouchableOpacity>
         )}
       </View>

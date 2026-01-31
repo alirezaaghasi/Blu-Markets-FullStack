@@ -23,6 +23,7 @@ import { LAYOUT } from '../constants/layout';
 import { Button } from './common';
 import { AssetId } from '../types';
 import { ASSETS } from '../constants/assets';
+import { TRADE, BUTTONS } from '../constants/messages';
 
 interface TradeResult {
   side: 'BUY' | 'SELL';
@@ -131,7 +132,7 @@ export const TradeSuccessModal: React.FC<TradeSuccessModalProps> = ({
 
               {/* Title */}
               <Animated.View style={{ opacity: fadeAnim }}>
-                <Text style={styles.title}>Trade Complete!</Text>
+                <Text style={styles.title}>{TRADE.success.title}</Text>
                 <Text style={styles.subtitle}>
                   Your {isBuy ? 'purchase' : 'sale'} was successful
                 </Text>
@@ -162,7 +163,7 @@ export const TradeSuccessModal: React.FC<TradeSuccessModalProps> = ({
                 <View style={styles.divider} />
 
                 <View style={styles.balanceSection}>
-                  <Text style={styles.balanceTitle}>New Balances</Text>
+                  <Text style={styles.balanceTitle}>{TRADE.success.newBalances}</Text>
                   <View style={styles.balanceRow}>
                     <Text style={styles.balanceLabel}>Cash</Text>
                     <Text style={styles.balanceValue}>
@@ -181,7 +182,7 @@ export const TradeSuccessModal: React.FC<TradeSuccessModalProps> = ({
               {/* Action */}
               <Animated.View style={[styles.actions, { opacity: fadeAnim }]}>
                 <Button
-                  label="Done"
+                  label={BUTTONS.done}
                   variant="primary"
                   size="lg"
                   fullWidth

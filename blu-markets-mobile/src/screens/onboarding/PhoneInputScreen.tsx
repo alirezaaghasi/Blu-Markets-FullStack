@@ -29,6 +29,7 @@ import { useAppDispatch } from '../../hooks/useStore';
 import { setPhone } from '../../store/slices/onboardingSlice';
 import { IRAN_PHONE_PREFIX } from '../../constants/business';
 import { auth } from '../../services/api';
+import { ONBOARDING } from '../../constants/messages';
 
 type PhoneInputScreenProps = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'PhoneInput'>;
@@ -65,7 +66,7 @@ const PhoneInputScreen: React.FC<PhoneInputScreenProps> = ({ navigation }) => {
   const validatePhone = (): boolean => {
     const normalized = normalizePhone(phoneNumber);
     if (normalized.length !== 10) {
-      setError('Please enter a valid Iranian phone number (e.g., 09123456789)');
+      setError(ONBOARDING.phone.error);
       return false;
     }
     if (!normalized.startsWith('9')) {
@@ -121,7 +122,7 @@ const PhoneInputScreen: React.FC<PhoneInputScreenProps> = ({ navigation }) => {
         <View style={styles.content}>
           {/* Title */}
           <View style={styles.titleContainer}>
-            <Text style={styles.title}>Enter your phone number</Text>
+            <Text style={styles.title}>{ONBOARDING.phone.title}</Text>
             <Text style={styles.subtitle}>
               We'll send you a verification code
             </Text>
@@ -132,7 +133,7 @@ const PhoneInputScreen: React.FC<PhoneInputScreenProps> = ({ navigation }) => {
             variant="phone"
             value={phoneNumber}
             onChangeText={handlePhoneChange}
-            placeholder="09123456789"
+            placeholder={ONBOARDING.phone.placeholder}
             error={error}
             autoFocus
           />
@@ -141,7 +142,7 @@ const PhoneInputScreen: React.FC<PhoneInputScreenProps> = ({ navigation }) => {
         {/* Footer with CTA */}
         <View style={styles.footer}>
           <Button
-            label="Send OTP"
+            label={ONBOARDING.phone.cta}
             variant="primary"
             size="lg"
             fullWidth

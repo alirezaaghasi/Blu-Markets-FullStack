@@ -15,6 +15,7 @@ import {
 import { colors, typography, spacing, borderRadius } from '../constants/theme';
 import { ProtectableHolding, ProtectionQuote, Holding } from '../types';
 import { ASSETS, LAYER_COLORS } from '../constants/assets';
+import { PROTECTION, BUTTONS, ERRORS, LABELS } from '../constants/messages';
 import { PROTECTION_DURATION_PRESETS } from '../constants/business';
 import { useAppSelector, useAppDispatch } from '../hooks/useStore';
 import { addProtection, subtractCash, logAction, setPortfolioValues } from '../store/slices/portfolioSlice';
@@ -212,15 +213,15 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
   const handleConfirm = async () => {
     // BUG-4 FIX: Provide feedback instead of silently returning
     if (!holding || !asset) {
-      Alert.alert('Select Asset', 'Please select an asset to protect.');
+      Alert.alert(PROTECTION.error.title, PROTECTION.error.selectAsset);
       return;
     }
     if (!quote) {
-      Alert.alert('Quote Required', quoteError || 'Unable to get protection quote. Please try again.');
+      Alert.alert(PROTECTION.error.title, quoteError || PROTECTION.error.quoteRequired);
       return;
     }
     if (!canAfford) {
-      Alert.alert('Insufficient Funds', `You need ${(quote.premiumIrr ?? 0).toLocaleString()} IRR but only have ${(cashIRR ?? 0).toLocaleString()} IRR.`);
+      Alert.alert(ERRORS.validation.insufficientFunds, `You need ${(quote.premiumIrr ?? 0).toLocaleString()} IRR but only have ${(cashIRR ?? 0).toLocaleString()} IRR.`);
       return;
     }
 
@@ -268,18 +269,18 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
 
       // Show success modal
       setSuccessResult({
-        title: 'Protection Activated!',
-        subtitle: `Your ${asset.name} is now protected`,
+        title: PROTECTION.success.title,
+        subtitle: PROTECTION.success.message,
         items: [
-          { label: 'Coverage', value: `${(coveragePct * 100).toFixed(0)}%` },
-          { label: 'Duration', value: formatDuration(durationDays) },
-          { label: 'Protection Cost', value: `${(quote.premiumIrr ?? 0).toLocaleString()} IRR` },
-          { label: 'Expires', value: expiryDate.toLocaleDateString(), highlight: true },
+          { label: PROTECTION.active.coverage, value: `${(coveragePct * 100).toFixed(0)}%` },
+          { label: PROTECTION.config.duration, value: formatDuration(durationDays) },
+          { label: PROTECTION.quote.totalCost, value: `${(quote.premiumIrr ?? 0).toLocaleString()} IRR` },
+          { label: PROTECTION.active.expires, value: expiryDate.toLocaleDateString(), highlight: true },
         ],
       });
       setShowSuccess(true);
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Failed to activate protection. Please try again.');
+      Alert.alert(PROTECTION.error.title, error?.message || PROTECTION.error.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -309,9 +310,9 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
         <SafeAreaView style={styles.container}>
           <View style={styles.header}>
             <View style={styles.dragIndicator} />
-            <Text style={styles.title}>Insure Assets</Text>
+            <Text style={styles.title}>{PROTECTION.sheet.title}</Text>
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <Text style={styles.closeButtonText}>Cancel</Text>
+              <Text style={styles.closeButtonText}>{BUTTONS.cancel}</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.emptyState}>
@@ -319,7 +320,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
               <>
                 <ActivityIndicator size="large" color={colors.primary} />
                 <Text style={[styles.emptyStateText, { marginTop: spacing[4] }]}>
-                  Loading eligible assets...
+                  {PROTECTION.quote.loading}
                 </Text>
               </>
             ) : holdingsError ? (
@@ -342,16 +343,16 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
                     }).finally(() => setIsLoadingHoldings(false));
                   }}
                 >
-                  <Text style={{ color: colors.textPrimaryDark, fontWeight: '600' }}>Retry</Text>
+                  <Text style={{ color: colors.textPrimaryDark, fontWeight: '600' }}>{BUTTONS.retry}</Text>
                 </TouchableOpacity>
               </>
             ) : (
               <>
                 <Text style={styles.emptyStateText}>
-                  No assets available for protection.
+                  {PROTECTION.empty.noAssets}
                 </Text>
                 <Text style={styles.emptyStateSubtext}>
-                  Growth and Upside layer assets can be protected against price drops.
+                  {PROTECTION.empty.noAssetsDescription}
                 </Text>
               </>
             )}
@@ -373,14 +374,14 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
         <SafeAreaView style={styles.container}>
           <View style={styles.header}>
             <View style={styles.dragIndicator} />
-            <Text style={styles.title}>Select Asset to Insure</Text>
+            <Text style={styles.title}>{PROTECTION.sheet.selectTitle}</Text>
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <Text style={styles.closeButtonText}>Cancel</Text>
+              <Text style={styles.closeButtonText}>{BUTTONS.cancel}</Text>
             </TouchableOpacity>
           </View>
           <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
             <Text style={styles.pickerSubtitle}>
-              Choose an asset from your portfolio to protect against price drops.
+              {PROTECTION.empty.description}
             </Text>
             {eligibleHoldings.map((h) => {
               const assetInfo = ASSETS[h.assetId];
@@ -450,12 +451,12 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
                 setQuote(null);
               }}
             >
-              <Text style={styles.backButtonText}>← Back</Text>
+              <Text style={styles.backButtonText}>← {BUTTONS.back}</Text>
             </TouchableOpacity>
           )}
-          <Text style={styles.title}>Insure {asset?.name || holding.assetId}</Text>
+          <Text style={styles.title}>{PROTECTION.sheet.title} {asset?.name || holding.assetId}</Text>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Text style={styles.closeButtonText}>Cancel</Text>
+            <Text style={styles.closeButtonText}>{BUTTONS.cancel}</Text>
           </TouchableOpacity>
         </View>
 
@@ -481,7 +482,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
             </View>
             {/* UX-025: Show IRR only, hide USD */}
             <View style={styles.assetValue}>
-              <Text style={styles.assetValueLabel}>Value to Protect</Text>
+              <Text style={styles.assetValueLabel}>{PROTECTION.config.value}</Text>
               <Text style={styles.assetValueAmount}>
                 {formatIRR(holding.valueIrr || 0)}
               </Text>
@@ -490,7 +491,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
 
           {/* Duration Selection */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Coverage Duration</Text>
+            <Text style={styles.sectionTitle}>{PROTECTION.config.duration}</Text>
             <View style={styles.durationOptions}>
               {PROTECTION_DURATION_PRESETS.map((days) => (
                 <TouchableOpacity
@@ -516,7 +517,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
 
           {/* Coverage Selection */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Coverage Amount</Text>
+            <Text style={styles.sectionTitle}>{PROTECTION.config.coverage}</Text>
             <View style={styles.coverageOptions}>
               {[0.25, 0.5, 0.75, 1.0].map((pct) => (
                 <TouchableOpacity
@@ -544,7 +545,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
           {isLoadingQuote && (
             <View style={styles.loadingContainer}>
               <ActivityIndicator color={colors.primary} />
-              <Text style={styles.loadingText}>Getting quote...</Text>
+              <Text style={styles.loadingText}>{PROTECTION.quote.loading}</Text>
             </View>
           )}
 
@@ -553,7 +554,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
             <View style={styles.errorBanner}>
               <Text style={styles.errorText}>{quoteError}</Text>
               <TouchableOpacity onPress={fetchQuote}>
-                <Text style={styles.retryText}>Retry</Text>
+                <Text style={styles.retryText}>{BUTTONS.retry}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -562,11 +563,11 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
           {quote && !isLoadingQuote && (
             <View style={styles.costSummary}>
               <View style={styles.costRow}>
-                <Text style={styles.costLabel}>Total Protection Cost</Text>
+                <Text style={styles.costLabel}>{PROTECTION.quote.totalCost}</Text>
                 <Text style={styles.costValue}>{formatIRR(quote.premiumIrr || 0)}</Text>
               </View>
               <View style={styles.costRow}>
-                <Text style={styles.costLabel}>Available Cash</Text>
+                <Text style={styles.costLabel}>{PROTECTION.quote.availableCash}</Text>
                 <Text style={[styles.costValue, !canAfford && styles.cashValueInsufficient]}>
                   {formatIRR(cashIRR || 0)}
                 </Text>
@@ -577,7 +578,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
           {/* Show Available Cash even when no quote yet */}
           {!quote && !isLoadingQuote && (
             <View style={styles.cashInfo}>
-              <Text style={styles.cashLabel}>Available Cash</Text>
+              <Text style={styles.cashLabel}>{PROTECTION.quote.availableCash}</Text>
               <Text style={styles.cashValue}>{formatIRR(cashIRR || 0)}</Text>
             </View>
           )}
@@ -602,7 +603,7 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
                 If {holding.assetId} drops, you're covered for the difference.
               </Text>
               <Text style={styles.learnMoreLink}>
-                {showProtectionDetails ? 'Show less' : 'Learn more ›'}
+                {showProtectionDetails ? 'Show less' : `${PROTECTION.education.title} ›`}
               </Text>
             </View>
           </TouchableOpacity>
@@ -643,12 +644,12 @@ export const ProtectionSheet: React.FC<ProtectionSheetProps> = ({
           >
             <Text style={styles.confirmButtonText}>
               {isSubmitting
-                ? 'Processing...'
+                ? LABELS.loading
                 : isLoadingQuote
-                ? 'Loading...'
+                ? LABELS.loading
                 : quote
-                ? `Purchase Insurance for ${formatIRR(quote.premiumIrr || 0)}`
-                : 'Get Quote First'}
+                ? `${PROTECTION.buttons.confirm} for ${formatIRR(quote.premiumIrr || 0)}`
+                : PROTECTION.quote.loading}
             </Text>
           </TouchableOpacity>
         </View>

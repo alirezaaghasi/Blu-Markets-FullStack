@@ -37,6 +37,7 @@ import { resetOnboarding } from '../../store/slices/onboardingSlice';
 import { completeOnboarding } from '../../store/slices/authSlice';
 import { ASSETS, getAssetsByLayer } from '../../constants/assets';
 import { DEFAULT_FX_RATE } from '../../constants/business';
+import { ONBOARDING } from '../../constants/messages';
 // BUG-021 FIX: Import prices selector to get actual fxRate
 
 type SuccessScreenProps = {
@@ -403,7 +404,7 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
 
         {/* Title */}
         <Animated.View style={[styles.titleContainer, { opacity: fadeAnim }]}>
-          <Text style={styles.title}>You're all set!</Text>
+          <Text style={styles.title}>{ONBOARDING.success.title}</Text>
           <Text style={styles.subtitle}>
             Based on your answers, here's how the system allocated your investment:
           </Text>
@@ -411,7 +412,7 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
 
         {/* Total Investment Card */}
         <Animated.View style={[styles.totalCard, { opacity: fadeAnim }]}>
-          <Text style={styles.totalLabel}>TOTAL INVESTED</Text>
+          <Text style={styles.totalLabel}>{ONBOARDING.success.invested.toUpperCase()}</Text>
           <Text style={styles.totalAmount}>
             {(initialInvestment || 0).toLocaleString()} IRR
           </Text>
@@ -478,7 +479,7 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation }) => {
           onPress={handleViewPortfolio}
           activeOpacity={0.8}
         >
-          <Text style={styles.primaryButtonText}>View My Portfolio</Text>
+          <Text style={styles.primaryButtonText}>{ONBOARDING.success.cta}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
